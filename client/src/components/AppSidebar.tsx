@@ -7,6 +7,7 @@ import {
   Settings,
   Container,
   BarChart3,
+  FolderPlus,
 } from "lucide-react";
 import {
   Sidebar,
@@ -53,6 +54,11 @@ const menuItems = [
     title: "Reports",
     url: "/reports",
     icon: FileText,
+  },
+  {
+    title: "Create Master Data",
+    url: "/accounting/create",
+    icon: FolderPlus,
   },
   {
     title: "Analytics",

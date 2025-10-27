@@ -17,6 +17,7 @@ import Inventory from "@/pages/Inventory";
 import Containers from "@/pages/Containers";
 import Financial from "@/pages/Financial";
 import Reports from "@/pages/Reports";
+import AccountingCreate from "@/pages/AccountingCreate";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/containers" component={Containers} />
       <Route path="/financial" component={Financial} />
       <Route path="/reports" component={Reports} />
+      <Route path="/accounting/create" component={AccountingCreate} />
       <Route component={NotFound} />
     </Switch>
   );
