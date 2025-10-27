@@ -73,9 +73,11 @@ export default function POS() {
   const [cashAccount, setCashAccount] = useState("cash1");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [zeroStockAlert, setZeroStockAlert] = useState(false);
   const [zeroStockItem, setZeroStockItem] = useState("");
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
+  const itemListRef = useRef<HTMLDivElement>(null);
 
   const columns = [
     { key: "itemName", label: "Item Name", width: "flex-1" },
@@ -112,6 +114,7 @@ export default function POS() {
     
     setRows(newRows);
     setSearchTerm("");
+    setHighlightedIndex(0);
 
     // Add new row if last row is being edited
     if (activeRow === rows.length - 1) {
@@ -145,10 +148,16 @@ export default function POS() {
       newRows[index].amount = qty * rate;
     }
     
+    // Update search term when typing in item name
+    if (field === "itemName") {
+      setSearchTerm(String(value));
+      setHighlightedIndex(0);
+    }
+    
     setRows(newRows);
 
     // Add new row if last row is being edited
-    if (index === rows.length - 1 && value !== "") {
+    if (index === rows.length - 1 && value !== "" && field !== "itemName") {
       setRows([
         ...newRows,
         {
@@ -165,21 +174,56 @@ export default function POS() {
   const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
     const maxCol = columns.length - 1;
     const maxRow = rows.length - 1;
+    const isItemNameField = columns[colIndex].key === "itemName";
+    const filteredItems = getFilteredInventory();
+
+    // Special handling for item name field with filtered items
+    if (isItemNameField && activeRow === rowIndex && filteredItems.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp" && highlightedIndex > 0) {
+        e.preventDefault();
+        setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (filteredItems[highlightedIndex]) {
+          selectItem(filteredItems[highlightedIndex]);
+        }
+        return;
+      }
+    }
 
     switch (e.key) {
       case "ArrowUp":
-        e.preventDefault();
-        if (rowIndex > 0) {
-          setSelectedCell({ row: rowIndex - 1, col: colIndex });
-          focusCell(rowIndex - 1, colIndex);
+        if (!isItemNameField || filteredItems.length === 0) {
+          e.preventDefault();
+          if (rowIndex > 0) {
+            setSelectedCell({ row: rowIndex - 1, col: colIndex });
+            focusCell(rowIndex - 1, colIndex);
+          }
         }
         break;
       case "ArrowDown":
+        if (!isItemNameField || filteredItems.length === 0) {
+          e.preventDefault();
+          if (rowIndex < maxRow) {
+            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+            focusCell(rowIndex + 1, colIndex);
+          }
+        }
+        break;
       case "Enter":
-        e.preventDefault();
-        if (rowIndex < maxRow) {
-          setSelectedCell({ row: rowIndex + 1, col: colIndex });
-          focusCell(rowIndex + 1, colIndex);
+        if (!isItemNameField || filteredItems.length === 0) {
+          e.preventDefault();
+          if (rowIndex < maxRow) {
+            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+            focusCell(rowIndex + 1, colIndex);
+          }
         }
         break;
       case "ArrowLeft":
@@ -207,6 +251,16 @@ export default function POS() {
       inputRefs.current[key]?.select();
     }, 0);
   };
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (itemListRef.current && activeRow !== null) {
+      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [highlightedIndex, activeRow]);
 
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
   const filteredItems = getFilteredInventory();
@@ -313,11 +367,14 @@ export default function POS() {
                             if (col.key === "itemName") {
                               setActiveRow(rowIndex);
                               setSearchTerm(row.itemName);
+                              setHighlightedIndex(0);
                             }
                           }}
                           onBlur={() => {
                             if (col.key === "itemName") {
-                              setTimeout(() => setActiveRow(null), 200);
+                              setTimeout(() => {
+                                setActiveRow(null);
+                              }, 200);
                             }
                           }}
                           readOnly={col.key === "amount"}
@@ -365,14 +422,17 @@ export default function POS() {
               <Input
                 placeholder="Search by name or barcode..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setHighlightedIndex(0);
+                }}
                 className="pl-9"
                 data-testid="input-search"
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto p-2" ref={itemListRef}>
             <div className="space-y-1">
               {filteredItems.map((item, idx) => (
                 <button
@@ -380,7 +440,7 @@ export default function POS() {
                   onClick={() => selectItem(item)}
                   className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
                     item.stock === 0 ? "opacity-60" : ""
-                  }`}
+                  } ${idx === highlightedIndex && activeRow !== null ? "bg-accent" : ""}`}
                   data-testid={`item-${idx}`}
                 >
                   <div className="flex items-start justify-between gap-3">
