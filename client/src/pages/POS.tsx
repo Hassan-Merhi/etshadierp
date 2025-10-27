@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, Wallet, Printer } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,6 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SaleRow {
   id: string;
@@ -17,6 +25,13 @@ interface SaleRow {
   quantity: number;
   rate: number;
   amount: number;
+}
+
+interface InventoryItem {
+  barcode: string;
+  name: string;
+  stock: number;
+  price: number;
 }
 
 //todo: remove mock functionality
@@ -32,6 +47,18 @@ const mockCashAccounts = [
   { value: "bank1", label: "Bank Account - ABC" },
 ];
 
+//todo: remove mock functionality
+const mockInventory: InventoryItem[] = [
+  { barcode: "BAL001", name: "Premium Cotton Bales", stock: 45, price: 450 },
+  { barcode: "BAL002", name: "Denim Mix Bales", stock: 32, price: 380 },
+  { barcode: "BAL003", name: "Designer Labels Mix", stock: 0, price: 650 },
+  { barcode: "BAL004", name: "Summer Collection", stock: 28, price: 420 },
+  { barcode: "BAL005", name: "Winter Apparel Mix", stock: 22, price: 520 },
+  { barcode: "BAL006", name: "Kids Clothing Bales", stock: 40, price: 350 },
+  { barcode: "BAL007", name: "Premium Denim Bales", stock: 15, price: 480 },
+  { barcode: "BAL008", name: "Cotton Casual Mix", stock: 0, price: 390 },
+];
+
 export default function POS() {
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", barcode: "", itemName: "", quantity: 0, rate: 0, amount: 0 },
@@ -42,7 +69,13 @@ export default function POS() {
   });
   const [location, setLocation] = useState("main");
   const [cashAccount, setCashAccount] = useState("cash1");
+  const [autocompleteVisible, setAutocompleteVisible] = useState<number | null>(null);
+  const [autocompleteFilter, setAutocompleteFilter] = useState("");
+  const [selectedAutocomplete, setSelectedAutocomplete] = useState(0);
+  const [zeroStockAlert, setZeroStockAlert] = useState(false);
+  const [zeroStockItem, setZeroStockItem] = useState("");
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
+  const autocompleteRef = useRef<HTMLDivElement>(null);
 
   const columns = [
     { key: "barcode", label: "Barcode", width: "w-40" },
@@ -51,6 +84,56 @@ export default function POS() {
     { key: "rate", label: "Rate", width: "w-32" },
     { key: "amount", label: "Amount", width: "w-32" },
   ];
+
+  const getFilteredInventory = (searchTerm: string) => {
+    if (!searchTerm) return [];
+    return mockInventory.filter((item) =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.barcode.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  const selectItem = (rowIndex: number, item: InventoryItem) => {
+    if (item.stock === 0) {
+      setZeroStockItem(item.name);
+      setZeroStockAlert(true);
+      return;
+    }
+
+    const newRows = [...rows];
+    newRows[rowIndex] = {
+      ...newRows[rowIndex],
+      barcode: item.barcode,
+      itemName: item.name,
+      rate: item.price,
+      quantity: newRows[rowIndex].quantity || 1,
+    };
+    newRows[rowIndex].amount = (newRows[rowIndex].quantity || 1) * item.price;
+    
+    setRows(newRows);
+    setAutocompleteVisible(null);
+    setAutocompleteFilter("");
+
+    // Add new row if last row is being edited
+    if (rowIndex === rows.length - 1) {
+      setRows([
+        ...newRows,
+        {
+          id: String(rows.length + 1),
+          barcode: "",
+          itemName: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+        },
+      ]);
+    }
+
+    // Move to quantity field
+    setTimeout(() => {
+      focusCell(rowIndex, 2);
+    }, 0);
+  };
 
   const updateRow = (index: number, field: keyof SaleRow, value: string | number) => {
     const newRows = [...rows];
@@ -63,10 +146,17 @@ export default function POS() {
       newRows[index].amount = qty * rate;
     }
     
+    // Handle item name autocomplete
+    if (field === "itemName") {
+      setAutocompleteFilter(String(value));
+      setAutocompleteVisible(index);
+      setSelectedAutocomplete(0);
+    }
+    
     setRows(newRows);
 
     // Add new row if last row is being edited
-    if (index === rows.length - 1 && value !== "") {
+    if (index === rows.length - 1 && value !== "" && field !== "itemName") {
       setRows([
         ...newRows,
         {
@@ -85,20 +175,58 @@ export default function POS() {
     const maxCol = columns.length - 1;
     const maxRow = rows.length - 1;
 
+    // Handle autocomplete navigation
+    if (autocompleteVisible === rowIndex && colIndex === 1) {
+      const filteredItems = getFilteredInventory(autocompleteFilter);
+      
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedAutocomplete((prev) => Math.min(prev + 1, filteredItems.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedAutocomplete((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" && filteredItems.length > 0) {
+        e.preventDefault();
+        selectItem(rowIndex, filteredItems[selectedAutocomplete]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setAutocompleteVisible(null);
+        return;
+      }
+    }
+
     switch (e.key) {
       case "ArrowUp":
-        e.preventDefault();
-        if (rowIndex > 0) {
-          setSelectedCell({ row: rowIndex - 1, col: colIndex });
-          focusCell(rowIndex - 1, colIndex);
+        if (autocompleteVisible !== rowIndex) {
+          e.preventDefault();
+          if (rowIndex > 0) {
+            setSelectedCell({ row: rowIndex - 1, col: colIndex });
+            focusCell(rowIndex - 1, colIndex);
+          }
         }
         break;
       case "ArrowDown":
+        if (autocompleteVisible !== rowIndex) {
+          e.preventDefault();
+          if (rowIndex < maxRow) {
+            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+            focusCell(rowIndex + 1, colIndex);
+          }
+        }
+        break;
       case "Enter":
-        e.preventDefault();
-        if (rowIndex < maxRow) {
-          setSelectedCell({ row: rowIndex + 1, col: colIndex });
-          focusCell(rowIndex + 1, colIndex);
+        if (autocompleteVisible !== rowIndex) {
+          e.preventDefault();
+          if (rowIndex < maxRow) {
+            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+            focusCell(rowIndex + 1, colIndex);
+          }
         }
         break;
       case "ArrowLeft":
@@ -106,6 +234,7 @@ export default function POS() {
           e.preventDefault();
           setSelectedCell({ row: rowIndex, col: colIndex - 1 });
           focusCell(rowIndex, colIndex - 1);
+          setAutocompleteVisible(null);
         }
         break;
       case "ArrowRight":
@@ -114,6 +243,7 @@ export default function POS() {
           e.preventDefault();
           setSelectedCell({ row: rowIndex, col: colIndex + 1 });
           focusCell(rowIndex, colIndex + 1);
+          setAutocompleteVisible(null);
         }
         break;
     }
@@ -127,7 +257,20 @@ export default function POS() {
     }, 0);
   };
 
+  // Click outside to close autocomplete
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
+        setAutocompleteVisible(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
+  const filteredItems = autocompleteVisible !== null ? getFilteredInventory(autocompleteFilter) : [];
 
   return (
     <div className="space-y-4">
@@ -178,7 +321,7 @@ export default function POS() {
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <div className="min-w-full">
+          <div className="min-w-full relative">
             {/* Header */}
             <div className="flex bg-muted/50 border-b sticky top-0 z-10">
               <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
@@ -197,7 +340,7 @@ export default function POS() {
             {/* Rows */}
             <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
               {rows.map((row, rowIndex) => (
-                <div key={row.id} className="flex border-b hover-elevate">
+                <div key={row.id} className="flex border-b hover-elevate relative">
                   <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
                     {rowIndex + 1}
                   </div>
@@ -206,7 +349,7 @@ export default function POS() {
                       key={col.key}
                       className={`${col.width} border-r h-10 ${
                         col.key === "amount" ? "bg-muted/30" : ""
-                      }`}
+                      } relative`}
                     >
                       <input
                         ref={(el) => {
@@ -224,7 +367,13 @@ export default function POS() {
                           }
                         }}
                         onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                        onFocus={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+                        onFocus={() => {
+                          setSelectedCell({ row: rowIndex, col: colIndex });
+                          if (col.key === "itemName" && row.itemName) {
+                            setAutocompleteFilter(row.itemName);
+                            setAutocompleteVisible(rowIndex);
+                          }
+                        }}
                         readOnly={col.key === "amount"}
                         className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 ${
                           col.key === "quantity" || col.key === "rate" || col.key === "amount"
@@ -235,11 +384,49 @@ export default function POS() {
                           col.key === "barcode"
                             ? "Scan or type..."
                             : col.key === "itemName"
-                            ? "Item description..."
+                            ? "Type to search..."
                             : ""
                         }
                         data-testid={`input-${col.key}-${rowIndex}`}
                       />
+
+                      {/* Autocomplete Dropdown */}
+                      {col.key === "itemName" && autocompleteVisible === rowIndex && filteredItems.length > 0 && (
+                        <div
+                          ref={autocompleteRef}
+                          className="absolute top-full left-0 right-0 bg-popover border border-popover-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                          data-testid="autocomplete-dropdown"
+                        >
+                          {filteredItems.map((item, idx) => (
+                            <div
+                              key={item.barcode}
+                              onClick={() => selectItem(rowIndex, item)}
+                              className={`px-3 py-2 cursor-pointer hover-elevate ${
+                                idx === selectedAutocomplete ? "bg-accent" : ""
+                              } ${item.stock === 0 ? "opacity-60" : ""}`}
+                              data-testid={`autocomplete-item-${idx}`}
+                            >
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">{item.name}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {item.barcode} • ${item.price}
+                                  </div>
+                                </div>
+                                <div className={`text-xs font-medium px-2 py-1 rounded ${
+                                  item.stock === 0 
+                                    ? "bg-destructive/10 text-destructive" 
+                                    : item.stock < 10
+                                    ? "bg-chart-3/10 text-chart-3"
+                                    : "bg-chart-2/10 text-chart-2"
+                                }`}>
+                                  {item.stock === 0 ? "Out of Stock" : `${item.stock} in stock`}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -262,6 +449,27 @@ export default function POS() {
           </div>
         </div>
       </Card>
+
+      {/* Zero Stock Alert Dialog */}
+      <AlertDialog open={zeroStockAlert} onOpenChange={setZeroStockAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Out of Stock
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{zeroStockItem}</span> cannot be added because it has 0 stock available.
+              Please check inventory or select a different item.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button onClick={() => setZeroStockAlert(false)} data-testid="button-close-alert">
+              OK
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
