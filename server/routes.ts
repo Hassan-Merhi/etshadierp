@@ -501,6 +501,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PO Import - Validate data before import
+  app.post("/api/po-import/validate", async (req, res) => {
+    try {
+      const { containerNumber, supplierId, preview } = req.body;
+
+      if (!containerNumber || !supplierId || !preview) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const errors: string[] = [];
+
+      // Validate supplier exists
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplier = allSuppliers.find(s => s.id === supplierId);
+      if (!supplier) {
+        errors.push("Selected supplier not found");
+      }
+
+      // Get all stock items for validation
+      const allStockItems = await storage.getAllStockItems();
+
+      // Validate all items in the preview
+      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
+      if (!containerPreview) {
+        errors.push("Container data not found in preview");
+      } else {
+        const seenBarcodes = new Set<string>();
+        
+        for (const item of containerPreview.items) {
+          // Check for duplicate barcodes in the import
+          if (item.barcode && seenBarcodes.has(item.barcode)) {
+            errors.push(`Duplicate barcode in import: ${item.barcode}`);
+          } else if (item.barcode) {
+            seenBarcodes.add(item.barcode);
+          }
+
+          // Try to find stock item by barcode first, then by name
+          let stockItem = null;
+          if (item.barcode) {
+            stockItem = allStockItems.find(si => si.barcode === item.barcode);
+          }
+          if (!stockItem && item.itemName) {
+            stockItem = allStockItems.find(si => si.name === item.itemName);
+          }
+
+          if (!stockItem) {
+            if (item.barcode) {
+              errors.push(`Item not found: barcode ${item.barcode} (${item.itemName})`);
+            } else {
+              errors.push(`Item not found by name: ${item.itemName}`);
+            }
+          }
+        }
+      }
+
+      res.json({
+        valid: errors.length === 0,
+        errors,
+      });
+    } catch (error: any) {
+      console.error("PO Import validation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // PO Import - Import data
   app.post("/api/po-import/import", async (req, res) => {
     try {
@@ -510,27 +575,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
+      // SERVER-SIDE VALIDATION - Mandatory before import
+      const validationErrors: string[] = [];
+
+      // Validate supplier exists
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplier = allSuppliers.find(s => s.id === supplierId);
+      if (!supplier) {
+        validationErrors.push("Selected supplier not found");
+      }
+
+      // Get all stock items for validation
+      const allStockItems = await storage.getAllStockItems();
+
+      // Validate all items in the preview
+      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
+      if (!containerPreview) {
+        validationErrors.push("Container data not found in preview");
+      } else {
+        const seenBarcodes = new Set<string>();
+        
+        for (const item of containerPreview.items) {
+          // Check for duplicate barcodes in the import
+          if (item.barcode && seenBarcodes.has(item.barcode)) {
+            validationErrors.push(`Duplicate barcode in import: ${item.barcode}`);
+          } else if (item.barcode) {
+            seenBarcodes.add(item.barcode);
+          }
+
+          // Try to find stock item by barcode first, then by name
+          let stockItem = null;
+          if (item.barcode) {
+            stockItem = allStockItems.find(si => si.barcode === item.barcode);
+          }
+          if (!stockItem && item.itemName) {
+            stockItem = allStockItems.find(si => si.name === item.itemName);
+          }
+
+          if (!stockItem) {
+            if (item.barcode) {
+              validationErrors.push(`Item not found: barcode ${item.barcode} (${item.itemName})`);
+            } else {
+              validationErrors.push(`Item not found by name: ${item.itemName}`);
+            }
+          }
+        }
+      }
+
+      // Reject import if validation fails
+      if (validationErrors.length > 0) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationErrors 
+        });
+      }
+
       // Check idempotency
       const existingImport = await storage.getImportLogByHash(fileHash);
       if (existingImport) {
         return res.status(400).json({ message: "This file has already been imported" });
       }
 
-      // Get supplier
-      const allSuppliers = await storage.getAllSuppliers();
-      const supplier = allSuppliers.find(s => s.id === supplierId);
-      if (!supplier) {
-        return res.status(400).json({ message: "Supplier not found" });
-      }
-
-      // Check if container already exists
+      // Check if container already exists (after validation)
       let container = await storage.getContainerByNumber(containerNumber);
       
-      // Find the preview data for this container
-      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
-      if (!containerPreview) {
-        return res.status(400).json({ message: "Container preview not found" });
-      }
+      // containerPreview is already defined in validation section above
+      // No need to re-check since we just validated it
 
       if (!container) {
         // Create new container

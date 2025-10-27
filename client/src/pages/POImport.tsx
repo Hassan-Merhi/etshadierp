@@ -161,6 +161,24 @@ export default function POImport() {
       return;
     }
 
+    if (!isValidated) {
+      toast({
+        title: "Validation required",
+        description: "Please validate the data before importing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (hasValidationErrors) {
+      toast({
+        title: "Validation errors present",
+        description: "Please fix validation errors before importing",
+        variant: "destructive",
+      });
+      return;
+    }
+
     importMutation.mutate({
       fileHash: preview.fileHash,
       fileName: preview.fileName,
