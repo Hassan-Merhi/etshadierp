@@ -8,6 +8,7 @@ import {
   Container,
   BarChart3,
   FolderPlus,
+  Upload,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,6 +45,11 @@ const menuItems = [
     title: "Containers",
     url: "/containers",
     icon: Container,
+  },
+  {
+    title: "PO Import",
+    url: "/po-import",
+    icon: Upload,
   },
   {
     title: "Financial",

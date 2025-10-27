@@ -18,6 +18,8 @@ import Containers from "@/pages/Containers";
 import Financial from "@/pages/Financial";
 import Reports from "@/pages/Reports";
 import AccountingCreate from "@/pages/AccountingCreate";
+import POImport from "@/pages/POImport";
+import ContainerDetail from "@/pages/ContainerDetail";
 
 function Router() {
   return (
@@ -27,6 +29,8 @@ function Router() {
       <Route path="/pos" component={POS} />
       <Route path="/inventory" component={Inventory} />
       <Route path="/containers" component={Containers} />
+      <Route path="/containers/:id" component={ContainerDetail} />
+      <Route path="/po-import" component={POImport} />
       <Route path="/financial" component={Financial} />
       <Route path="/reports" component={Reports} />
       <Route path="/accounting/create" component={AccountingCreate} />

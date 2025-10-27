@@ -1,48 +1,38 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Upload, Package } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-//todo: remove mock functionality
-const mockContainers = [
-  {
-    id: "1",
-    containerNo: "CONT-2024-001",
-    status: "On The Way",
-    items: 450,
-    estimatedArrival: "2024-11-15",
-    supplier: "Global Textiles Ltd",
-  },
-  {
-    id: "2",
-    containerNo: "CONT-2024-002",
-    status: "Arrived",
-    items: 380,
-    estimatedArrival: "2024-10-28",
-    supplier: "Premium Imports Inc",
-  },
-  {
-    id: "3",
-    containerNo: "CONT-2024-003",
-    status: "Offloading",
-    items: 520,
-    estimatedArrival: "2024-10-25",
-    supplier: "Fashion Wholesale Co",
-  },
-];
+import { Plus, Package, Eye } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const { data: containers = [], isLoading } = useQuery<Container[]>({
+    queryKey: ["/api/containers"],
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+  });
+
+  const getSupplierName = (supplierId: number) => {
+    const supplier = suppliers.find((s) => s.id === supplierId);
+    return supplier ? supplier.legalName : "Unknown";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -53,131 +43,79 @@ export default function Containers() {
             Track containers and manage offloading
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" data-testid="button-import-excel">
-            <Upload className="h-4 w-4" />
-            Import Excel
+        <Link href="/po-import">
+          <Button className="gap-2" data-testid="button-import-po">
+            <Plus className="h-4 w-4" />
+            Import PO
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-add-container">
-                <Plus className="h-4 w-4" />
-                Add Container
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Container</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="containerNo">Container Number</Label>
-                  <Input
-                    id="containerNo"
-                    placeholder="CONT-2024-XXX"
-                    data-testid="input-container-no"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="supplier">Supplier</Label>
-                  <Input
-                    id="supplier"
-                    placeholder="Supplier name"
-                    data-testid="input-supplier"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="items">Number of Items</Label>
-                  <Input
-                    id="items"
-                    type="number"
-                    placeholder="0"
-                    data-testid="input-items"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="arrival">Estimated Arrival</Label>
-                  <Input
-                    id="arrival"
-                    type="date"
-                    data-testid="input-arrival"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    console.log("Container added");
-                    setDialogOpen(false);
-                  }}
-                  data-testid="button-save"
-                >
-                  Save Container
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {mockContainers.map((container) => (
-          <Card
-            key={container.id}
-            className="p-6 hover-elevate cursor-pointer"
-            data-testid={`card-container-${container.id}`}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold font-mono">
-                    {container.containerNo}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {container.supplier}
-                  </p>
-                </div>
-              </div>
-              <Badge
-                variant={
-                  container.status === "On The Way"
-                    ? "secondary"
-                    : container.status === "Arrived"
-                    ? "default"
-                    : "outline"
-                }
-              >
-                {container.status}
-              </Badge>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Items</span>
-                <span className="font-mono font-medium">{container.items}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Est. Arrival</span>
-                <span className="font-mono">{container.estimatedArrival}</span>
-              </div>
-            </div>
-            {container.status === "Arrived" && (
-              <Button className="w-full mt-4" size="sm" data-testid={`button-offload-${container.id}`}>
-                Start Offloading
+      {containers.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Package className="w-16 h-16 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">No containers yet</h2>
+            <p className="text-muted-foreground mb-4">
+              Import your first purchase order to get started
+            </p>
+            <Link href="/po-import">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Import PO
               </Button>
-            )}
-          </Card>
-        ))}
-      </div>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {containers.map((container) => (
+            <Link key={container.id} href={`/containers/${container.id}`}>
+              <Card
+                className="p-6 hover-elevate cursor-pointer"
+                data-testid={`card-container-${container.id}`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                      <Package className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold font-mono">
+                        {container.containerNumber}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {getSupplierName(container.supplierId)}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={container.status === "OTW" ? "default" : "secondary"}>
+                    {container.status}
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Grand Total</span>
+                    <span className="font-mono font-medium">
+                      ${parseFloat(container.grandTotal || "0").toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Import Date</span>
+                    <span className="font-mono">
+                      {new Date(container.importDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <Button className="w-full mt-4" size="sm" variant="outline">
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </Button>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
