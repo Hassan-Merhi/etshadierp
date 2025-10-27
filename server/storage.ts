@@ -20,6 +20,16 @@ import type {
   InsertBankAccount,
   FixedAsset,
   InsertFixedAsset,
+  Container,
+  InsertContainer,
+  PurchaseOrder,
+  InsertPurchaseOrder,
+  POLineItem,
+  InsertPOLineItem,
+  ContainerCharge,
+  InsertContainerCharge,
+  ImportLog,
+  InsertImportLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -67,6 +77,32 @@ export interface IStorage {
   getAllFixedAssets(): Promise<FixedAsset[]>;
   getFixedAssetByCode(code: string): Promise<FixedAsset | undefined>;
   createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset>;
+
+  // Containers
+  getAllContainers(): Promise<Container[]>;
+  getContainerById(id: number): Promise<Container | undefined>;
+  getContainerByNumber(containerNumber: string): Promise<Container | undefined>;
+  createContainer(container: InsertContainer): Promise<Container>;
+  updateContainer(id: number, updates: Partial<InsertContainer>): Promise<Container>;
+
+  // Purchase Orders
+  getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
+  createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+
+  // PO Line Items
+  getLineItemsByPO(poId: number): Promise<POLineItem[]>;
+  createPOLineItem(lineItem: InsertPOLineItem): Promise<POLineItem>;
+
+  // Container Charges
+  getChargesByContainer(containerId: number): Promise<ContainerCharge[]>;
+  createContainerCharge(charge: InsertContainerCharge): Promise<ContainerCharge>;
+
+  // Import Logs
+  getImportLogByHash(hash: string): Promise<ImportLog | undefined>;
+  createImportLog(log: InsertImportLog): Promise<ImportLog>;
+
+  // Stock Items - Additional methods for barcode lookup
+  getStockItemByBarcode(barcode: string): Promise<StockItem | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -204,6 +240,81 @@ export class DbStorage implements IStorage {
   async createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset> {
     const [created] = await db.insert(schema.fixedAssets).values(asset).returning();
     return created;
+  }
+
+  // Containers
+  async getAllContainers(): Promise<Container[]> {
+    return await db.select().from(schema.containers);
+  }
+
+  async getContainerById(id: number): Promise<Container | undefined> {
+    const [container] = await db.select().from(schema.containers).where(eq(schema.containers.id, id));
+    return container;
+  }
+
+  async getContainerByNumber(containerNumber: string): Promise<Container | undefined> {
+    const [container] = await db.select().from(schema.containers).where(eq(schema.containers.containerNumber, containerNumber));
+    return container;
+  }
+
+  async createContainer(container: InsertContainer): Promise<Container> {
+    const [created] = await db.insert(schema.containers).values(container).returning();
+    return created;
+  }
+
+  async updateContainer(id: number, updates: Partial<InsertContainer>): Promise<Container> {
+    const [updated] = await db.update(schema.containers)
+      .set(updates)
+      .where(eq(schema.containers.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Purchase Orders
+  async getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {
+    return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.containerId, containerId));
+  }
+
+  async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const [created] = await db.insert(schema.purchaseOrders).values(po).returning();
+    return created;
+  }
+
+  // PO Line Items
+  async getLineItemsByPO(poId: number): Promise<POLineItem[]> {
+    return await db.select().from(schema.poLineItems).where(eq(schema.poLineItems.poId, poId));
+  }
+
+  async createPOLineItem(lineItem: InsertPOLineItem): Promise<POLineItem> {
+    const [created] = await db.insert(schema.poLineItems).values(lineItem).returning();
+    return created;
+  }
+
+  // Container Charges
+  async getChargesByContainer(containerId: number): Promise<ContainerCharge[]> {
+    return await db.select().from(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+  }
+
+  async createContainerCharge(charge: InsertContainerCharge): Promise<ContainerCharge> {
+    const [created] = await db.insert(schema.containerCharges).values(charge).returning();
+    return created;
+  }
+
+  // Import Logs
+  async getImportLogByHash(hash: string): Promise<ImportLog | undefined> {
+    const [log] = await db.select().from(schema.importLogs).where(eq(schema.importLogs.fileHash, hash));
+    return log;
+  }
+
+  async createImportLog(log: InsertImportLog): Promise<ImportLog> {
+    const [created] = await db.insert(schema.importLogs).values(log).returning();
+    return created;
+  }
+
+  // Stock Items - Barcode lookup
+  async getStockItemByBarcode(barcode: string): Promise<StockItem | undefined> {
+    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.barcode, barcode));
+    return item;
   }
 }
 

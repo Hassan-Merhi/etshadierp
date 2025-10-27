@@ -143,6 +143,7 @@ export const stockItems = pgTable("stock_items", {
   id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
+  barcode: varchar("barcode", { length: 100 }),
   stockGroupId: integer("stock_group_id"),
   uom: text("uom").notNull(),
   openingQty: decimal("opening_qty", { precision: 15, scale: 3 }).default("0"),
@@ -221,3 +222,121 @@ export const insertFixedAssetSchema = createInsertSchema(fixedAssets).omit({
 
 export type InsertFixedAsset = z.infer<typeof insertFixedAssetSchema>;
 export type FixedAsset = typeof fixedAssets.$inferSelect;
+
+export const containers = pgTable("containers", {
+  id: serial("id").primaryKey(),
+  containerNumber: varchar("container_number", { length: 100 }).notNull().unique(),
+  supplierId: integer("supplier_id").notNull(),
+  status: text("status").notNull().default("OTW"),
+  importDate: date("import_date").notNull(),
+  itemsTotal: decimal("items_total", { precision: 15, scale: 2 }).default("0"),
+  chargesTotal: decimal("charges_total", { precision: 15, scale: 2 }).default("0"),
+  grandTotal: decimal("grand_total", { precision: 15, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContainerSchema = createInsertSchema(containers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  containerNumber: z.string().min(1, "Container number is required"),
+  supplierId: z.number().min(1, "Supplier is required"),
+  importDate: z.string().min(1, "Import date is required"),
+});
+
+export type InsertContainer = z.infer<typeof insertContainerSchema>;
+export type Container = typeof containers.$inferSelect;
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: serial("id").primaryKey(),
+  poNumber: varchar("po_number", { length: 100 }).notNull(),
+  containerId: integer("container_id").notNull(),
+  supplierId: integer("supplier_id").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  itemsTotal: decimal("items_total", { precision: 15, scale: 2 }).default("0"),
+  status: text("status").notNull().default("Open"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  poNumber: z.string().min(1, "PO number is required"),
+  containerId: z.number().min(1, "Container is required"),
+  supplierId: z.number().min(1, "Supplier is required"),
+});
+
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+
+export const poLineItems = pgTable("po_line_items", {
+  id: serial("id").primaryKey(),
+  poId: integer("po_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  itemName: text("item_name").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPOLineItemSchema = createInsertSchema(poLineItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  poId: z.number().min(1, "PO is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  itemName: z.string().min(1, "Item name is required"),
+  quantity: z.string().min(1, "Quantity is required"),
+  rate: z.string().min(1, "Rate is required"),
+  lineTotal: z.string().min(1, "Line total is required"),
+});
+
+export type InsertPOLineItem = z.infer<typeof insertPOLineItemSchema>;
+export type POLineItem = typeof poLineItems.$inferSelect;
+
+export const containerCharges = pgTable("container_charges", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  chargeType: text("charge_type").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  ledgerAccountId: integer("ledger_account_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContainerChargeSchema = createInsertSchema(containerCharges).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  containerId: z.number().min(1, "Container is required"),
+  chargeType: z.string().min(1, "Charge type is required"),
+  amount: z.string().min(1, "Amount is required"),
+});
+
+export type InsertContainerCharge = z.infer<typeof insertContainerChargeSchema>;
+export type ContainerCharge = typeof containerCharges.$inferSelect;
+
+export const importLogs = pgTable("import_logs", {
+  id: serial("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  fileHash: text("file_hash").notNull().unique(),
+  rowCount: integer("row_count").notNull(),
+  containerId: integer("container_id"),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertImportLogSchema = createInsertSchema(importLogs).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  fileName: z.string().min(1, "File name is required"),
+  fileHash: z.string().min(1, "File hash is required"),
+  rowCount: z.number().min(0, "Row count must be non-negative"),
+  status: z.enum(["Success", "Failed", "Pending"]),
+});
+
+export type InsertImportLog = z.infer<typeof insertImportLogSchema>;
+export type ImportLog = typeof importLogs.$inferSelect;
