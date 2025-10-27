@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import * as XLSX from "xlsx";
+import crypto from "crypto-js";
 import { storage } from "./storage";
 import {
   insertLocationSchema,
@@ -11,6 +14,8 @@ import {
   insertBankAccountSchema,
   insertFixedAssetSchema,
 } from "@shared/schema";
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Locations
@@ -296,6 +301,391 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(asset);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // PO Import - Parse and Preview Excel
+  app.post("/api/po-import/parse", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (rawData.length === 0) {
+        return res.status(400).json({ message: "Excel file is empty" });
+      }
+
+      // Calculate file hash for idempotency
+      const fileHash = crypto.MD5(req.file.buffer.toString("base64")).toString();
+
+      // Check if file already imported
+      const existingImport = await storage.getImportLogByHash(fileHash);
+      if (existingImport) {
+        return res.status(400).json({ 
+          message: "This file has already been imported",
+          importedAt: existingImport.createdAt,
+          containerId: existingImport.containerId,
+        });
+      }
+
+      // Parse and structure the data
+      const rows = rawData as any[];
+      const errors: string[] = [];
+      const itemRows: any[] = [];
+      const chargeRows: any[] = [];
+
+      // Get all stock items for barcode/name lookup
+      const allStockItems = await storage.getAllStockItems();
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 2;
+
+        // Check if it's a charge row or item row
+        if (row.Charge_Type && row.Charge_Amount) {
+          chargeRows.push({
+            rowNum,
+            chargeType: row.Charge_Type,
+            amount: parseFloat(row.Charge_Amount),
+            containerNumber: row.Container_Number,
+          });
+        } else if (row.Item_Barcode || row.Item_Name) {
+          let stockItem = null;
+          let itemName = row.Item_Name;
+
+          // Barcode lookup
+          if (row.Item_Barcode) {
+            stockItem = allStockItems.find(item => item.barcode === row.Item_Barcode);
+            if (!stockItem) {
+              errors.push(`Row ${rowNum}: Barcode "${row.Item_Barcode}" not found in stock items`);
+              continue;
+            }
+            itemName = stockItem.name;
+          } else if (row.Item_Name) {
+            stockItem = allStockItems.find(item => item.name === row.Item_Name);
+            if (!stockItem) {
+              errors.push(`Row ${rowNum}: Item "${row.Item_Name}" not found in stock items`);
+              continue;
+            }
+          }
+
+          const quantity = parseFloat(row.Quantity);
+          const rate = parseFloat(row.Rate);
+
+          if (!quantity || quantity <= 0) {
+            errors.push(`Row ${rowNum}: Quantity must be greater than 0`);
+            continue;
+          }
+
+          if (rate === undefined || rate < 0) {
+            errors.push(`Row ${rowNum}: Rate must be non-negative`);
+            continue;
+          }
+
+          itemRows.push({
+            rowNum,
+            poNumber: row.PO_Number,
+            containerNumber: row.Container_Number,
+            supplierCode: row.Supplier_Code,
+            stockItemId: stockItem!.id,
+            itemName: itemName,
+            quantity: quantity,
+            rate: rate,
+            lineTotal: quantity * rate,
+            currency: row.Currency || "USD",
+            freight: parseFloat(row.Freight || 0),
+            surcharge: parseFloat(row.Surcharge || 0),
+            fumigation: parseFloat(row.Fumigation || 0),
+            discount: parseFloat(row.Discount || 0),
+            documentCharges: parseFloat(row.Document_Charges || 0),
+          });
+        }
+      }
+
+      if (errors.length > 0) {
+        return res.status(400).json({ message: "Validation errors", errors });
+      }
+
+      if (itemRows.length === 0) {
+        return res.status(400).json({ message: "No valid item rows found" });
+      }
+
+      // Group by container
+      const containerGroups = itemRows.reduce((acc, row) => {
+        if (!acc[row.containerNumber]) {
+          acc[row.containerNumber] = {
+            containerNumber: row.containerNumber,
+            supplierCode: row.supplierCode,
+            items: [],
+            pos: new Map(),
+          };
+        }
+        
+        const container = acc[row.containerNumber];
+        container.items.push(row);
+        
+        if (!container.pos.has(row.poNumber)) {
+          container.pos.set(row.poNumber, []);
+        }
+        container.pos.get(row.poNumber)!.push(row);
+        
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Calculate container totals
+      const preview = Object.values(containerGroups).map((container: any) => {
+        const itemsTotal = container.items.reduce((sum: number, item: any) => sum + item.lineTotal, 0);
+        
+        // Get charges from rows or aggregate from columns
+        const charges = {
+          freight: 0,
+          surcharge: 0,
+          fumigation: 0,
+          discount: 0,
+          documentCharges: 0,
+        };
+
+        // Check if charges are in separate rows
+        const containerCharges = chargeRows.filter(c => c.containerNumber === container.containerNumber);
+        if (containerCharges.length > 0) {
+          containerCharges.forEach(charge => {
+            const chargeType = charge.chargeType.toLowerCase().replace(/[_\s]/g, "");
+            if (chargeType === "freight") charges.freight = charge.amount;
+            else if (chargeType === "surcharge") charges.surcharge = charge.amount;
+            else if (chargeType === "fumigation") charges.fumigation = charge.amount;
+            else if (chargeType === "discount") charges.discount = charge.amount;
+            else if (chargeType.includes("document")) charges.documentCharges = charge.amount;
+          });
+        } else {
+          // Aggregate from item row columns
+          container.items.forEach((item: any) => {
+            charges.freight += item.freight;
+            charges.surcharge += item.surcharge;
+            charges.fumigation += item.fumigation;
+            charges.discount += item.discount;
+            charges.documentCharges += item.documentCharges;
+          });
+        }
+
+        const chargesTotal = charges.freight + charges.surcharge + charges.fumigation + charges.documentCharges - charges.discount;
+        const grandTotal = itemsTotal + chargesTotal;
+
+        return {
+          containerNumber: container.containerNumber,
+          supplierCode: container.supplierCode,
+          itemsCount: container.items.length,
+          posCount: container.pos.size,
+          itemsTotal,
+          charges,
+          chargesTotal,
+          grandTotal,
+          items: container.items,
+          pos: Array.from(container.pos.keys()),
+        };
+      });
+
+      res.json({
+        fileHash,
+        fileName: req.file.originalname,
+        rowCount: rows.length,
+        preview,
+      });
+    } catch (error: any) {
+      console.error("PO Import parse error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // PO Import - Import data
+  app.post("/api/po-import/import", async (req, res) => {
+    try {
+      const { fileHash, fileName, containerNumber, supplierId, importDate, preview } = req.body;
+
+      if (!fileHash || !containerNumber || !supplierId || !importDate || !preview) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Check idempotency
+      const existingImport = await storage.getImportLogByHash(fileHash);
+      if (existingImport) {
+        return res.status(400).json({ message: "This file has already been imported" });
+      }
+
+      // Get supplier
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplier = allSuppliers.find(s => s.id === supplierId);
+      if (!supplier) {
+        return res.status(400).json({ message: "Supplier not found" });
+      }
+
+      // Check if container already exists
+      let container = await storage.getContainerByNumber(containerNumber);
+      
+      // Find the preview data for this container
+      const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
+      if (!containerPreview) {
+        return res.status(400).json({ message: "Container preview not found" });
+      }
+
+      if (!container) {
+        // Create new container
+        container = await storage.createContainer({
+          containerNumber,
+          supplierId,
+          status: "OTW",
+          importDate,
+          itemsTotal: containerPreview.itemsTotal.toString(),
+          chargesTotal: containerPreview.chargesTotal.toString(),
+          grandTotal: containerPreview.grandTotal.toString(),
+        });
+      } else {
+        // Update existing container totals
+        await storage.updateContainer(container.id, {
+          itemsTotal: (parseFloat(container.itemsTotal) + containerPreview.itemsTotal).toString(),
+          chargesTotal: (parseFloat(container.chargesTotal) + containerPreview.chargesTotal).toString(),
+          grandTotal: (parseFloat(container.grandTotal) + containerPreview.grandTotal).toString(),
+        });
+      }
+
+      // Group items by PO
+      const poGroups = containerPreview.items.reduce((acc: any, item: any) => {
+        if (!acc[item.poNumber]) {
+          acc[item.poNumber] = [];
+        }
+        acc[item.poNumber].push(item);
+        return acc;
+      }, {});
+
+      // Create POs and line items
+      for (const [poNumber, items] of Object.entries(poGroups)) {
+        const poItems = items as any[];
+        const poTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
+
+        const po = await storage.createPurchaseOrder({
+          poNumber,
+          containerId: container.id,
+          supplierId,
+          currency: poItems[0].currency,
+          itemsTotal: poTotal.toString(),
+        });
+
+        for (const item of poItems) {
+          await storage.createPOLineItem({
+            poId: po.id,
+            stockItemId: item.stockItemId,
+            itemName: item.itemName,
+            quantity: item.quantity.toString(),
+            rate: item.rate.toString(),
+            lineTotal: item.lineTotal.toString(),
+          });
+        }
+      }
+
+      // Create container charges
+      const charges = containerPreview.charges;
+      if (charges.freight > 0) {
+        await storage.createContainerCharge({
+          containerId: container.id,
+          chargeType: "Freight",
+          amount: charges.freight.toString(),
+        });
+      }
+      if (charges.surcharge > 0) {
+        await storage.createContainerCharge({
+          containerId: container.id,
+          chargeType: "Surcharge",
+          amount: charges.surcharge.toString(),
+        });
+      }
+      if (charges.fumigation > 0) {
+        await storage.createContainerCharge({
+          containerId: container.id,
+          chargeType: "Fumigation",
+          amount: charges.fumigation.toString(),
+        });
+      }
+      if (charges.discount > 0) {
+        await storage.createContainerCharge({
+          containerId: container.id,
+          chargeType: "Discount",
+          amount: (-charges.discount).toString(),
+        });
+      }
+      if (charges.documentCharges > 0) {
+        await storage.createContainerCharge({
+          containerId: container.id,
+          chargeType: "Document Charges",
+          amount: charges.documentCharges.toString(),
+        });
+      }
+
+      // Create import log
+      await storage.createImportLog({
+        fileName,
+        fileHash,
+        rowCount: containerPreview.items.length,
+        containerId: container.id,
+        status: "Success",
+      });
+
+      res.json({
+        success: true,
+        containerId: container.id,
+        containerNumber: container.containerNumber,
+        itemsCount: containerPreview.itemsCount,
+        grandTotal: containerPreview.grandTotal,
+      });
+    } catch (error: any) {
+      console.error("PO Import error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get containers
+  app.get("/api/containers", async (_req, res) => {
+    try {
+      const containers = await storage.getAllContainers();
+      res.json(containers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get container details with POs, line items, and charges
+  app.get("/api/containers/:id", async (req, res) => {
+    try {
+      const containerId = parseInt(req.params.id);
+      const container = await storage.getContainerById(containerId);
+      
+      if (!container) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      const pos = await storage.getPurchaseOrdersByContainer(containerId);
+      const charges = await storage.getChargesByContainer(containerId);
+
+      // Get line items for all POs
+      const allLineItems = await Promise.all(
+        pos.map(po => storage.getLineItemsByPO(po.id))
+      );
+
+      const posWithItems = pos.map((po, index) => ({
+        ...po,
+        items: allLineItems[index],
+      }));
+
+      res.json({
+        container,
+        pos: posWithItems,
+        charges,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
