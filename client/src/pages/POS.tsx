@@ -1,216 +1,265 @@
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone } from "lucide-react";
+import { MapPin, Wallet, Printer } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface SaleRow {
+  id: string;
+  barcode: string;
+  itemName: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
 
 //todo: remove mock functionality
-const mockProducts = [
-  { id: "1", name: "Premium Cotton Bales", price: 450, stock: 45, barcode: "BAL001" },
-  { id: "2", name: "Denim Mix Bales", price: 380, stock: 32, barcode: "BAL002" },
-  { id: "3", name: "Designer Labels Mix", price: 650, stock: 18, barcode: "BAL003" },
-  { id: "4", name: "Summer Collection", price: 420, stock: 28, barcode: "BAL004" },
-  { id: "5", name: "Winter Apparel Mix", price: 520, stock: 22, barcode: "BAL005" },
-  { id: "6", name: "Kids Clothing Bales", price: 350, stock: 40, barcode: "BAL006" },
+const mockLocations = [
+  { value: "main", label: "Main Warehouse" },
+  { value: "east", label: "East Branch" },
+  { value: "west", label: "West Coast Hub" },
+];
+
+const mockCashAccounts = [
+  { value: "cash1", label: "Cash Account - Main" },
+  { value: "cash2", label: "Cash Account - Branch" },
+  { value: "bank1", label: "Bank Account - ABC" },
 ];
 
 export default function POS() {
-  const [cart, setCart] = useState<Array<{ id: string; name: string; price: number; quantity: number }>>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [rows, setRows] = useState<SaleRow[]>([
+    { id: "1", barcode: "", itemName: "", quantity: 0, rate: 0, amount: 0 },
+  ]);
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number }>({
+    row: 0,
+    col: 0,
+  });
+  const [location, setLocation] = useState("main");
+  const [cashAccount, setCashAccount] = useState("cash1");
+  const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
 
-  const addToCart = (product: typeof mockProducts[0]) => {
-    const existing = cart.find((item) => item.id === product.id);
-    if (existing) {
-      setCart(cart.map((item) =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
+  const columns = [
+    { key: "barcode", label: "Barcode", width: "w-40" },
+    { key: "itemName", label: "Item Name", width: "flex-1" },
+    { key: "quantity", label: "Qty", width: "w-24" },
+    { key: "rate", label: "Rate", width: "w-32" },
+    { key: "amount", label: "Amount", width: "w-32" },
+  ];
+
+  const updateRow = (index: number, field: keyof SaleRow, value: string | number) => {
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    
+    // Auto-calculate amount
+    if (field === "quantity" || field === "rate") {
+      const qty = field === "quantity" ? Number(value) : newRows[index].quantity;
+      const rate = field === "rate" ? Number(value) : newRows[index].rate;
+      newRows[index].amount = qty * rate;
+    }
+    
+    setRows(newRows);
+
+    // Add new row if last row is being edited
+    if (index === rows.length - 1 && value !== "") {
+      setRows([
+        ...newRows,
+        {
+          id: String(rows.length + 1),
+          barcode: "",
+          itemName: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+        },
+      ]);
     }
   };
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCart(cart.map((item) =>
-      item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
-    ).filter((item) => item.quantity > 0));
+  const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+    const maxCol = columns.length - 1;
+    const maxRow = rows.length - 1;
+
+    switch (e.key) {
+      case "ArrowUp":
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setSelectedCell({ row: rowIndex - 1, col: colIndex });
+          focusCell(rowIndex - 1, colIndex);
+        }
+        break;
+      case "ArrowDown":
+      case "Enter":
+        e.preventDefault();
+        if (rowIndex < maxRow) {
+          setSelectedCell({ row: rowIndex + 1, col: colIndex });
+          focusCell(rowIndex + 1, colIndex);
+        }
+        break;
+      case "ArrowLeft":
+        if ((e.currentTarget as HTMLInputElement).selectionStart === 0 && colIndex > 0) {
+          e.preventDefault();
+          setSelectedCell({ row: rowIndex, col: colIndex - 1 });
+          focusCell(rowIndex, colIndex - 1);
+        }
+        break;
+      case "ArrowRight":
+      case "Tab":
+        if (!e.shiftKey && (e.currentTarget as HTMLInputElement).selectionStart === (e.currentTarget as HTMLInputElement).value.length && colIndex < maxCol) {
+          e.preventDefault();
+          setSelectedCell({ row: rowIndex, col: colIndex + 1 });
+          focusCell(rowIndex, colIndex + 1);
+        }
+        break;
+    }
   };
 
-  const removeItem = (id: string) => {
-    setCart(cart.filter((item) => item.id !== id));
+  const focusCell = (rowIndex: number, colIndex: number) => {
+    const key = `${rowIndex}-${colIndex}`;
+    setTimeout(() => {
+      inputRefs.current[key]?.focus();
+      inputRefs.current[key]?.select();
+    }, 0);
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.08;
-  const total = subtotal + tax;
-
-  const filteredProducts = mockProducts.filter((p) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.barcode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)]">
-      <div className="flex-1 flex flex-col gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            placeholder="Search products by name or barcode..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-12"
-            data-testid="input-product-search"
-          />
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredProducts.map((product) => (
-              <Card
-                key={product.id}
-                className="p-3 cursor-pointer hover-elevate active-elevate-2"
-                onClick={() => addToCart(product)}
-                data-testid={`card-product-${product.id}`}
-              >
-                <div className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {product.barcode}
-                  </span>
-                </div>
-                <h4 className="text-sm font-medium line-clamp-2 mb-1">
-                  {product.name}
-                </h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold font-mono">
-                    ${product.price}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {product.stock} in stock
-                  </Badge>
-                </div>
-              </Card>
-            ))}
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Point of Sale</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" data-testid="button-print">
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+          <Button data-testid="button-complete-sale">Complete Sale</Button>
         </div>
       </div>
 
-      <Card className="w-full lg:w-96 flex flex-col p-4">
-        <h2 className="text-lg font-semibold mb-4">Current Sale</h2>
-
-        <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-          {cart.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">Cart is empty</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 p-3 border rounded-md"
-                data-testid={`cart-item-${item.id}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    ${item.price} each
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    onClick={() => updateQuantity(item.id, -1)}
-                    data-testid={`button-decrease-${item.id}`}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="text-sm font-mono w-8 text-center">
-                    {item.quantity}
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    onClick={() => updateQuantity(item.id, 1)}
-                    data-testid={`button-increase-${item.id}`}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8"
-                    onClick={() => removeItem(item.id)}
-                    data-testid={`button-remove-${item.id}`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+      <div className="flex gap-4">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <Select value={location} onValueChange={setLocation}>
+            <SelectTrigger className="w-48" data-testid="select-location">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {mockLocations.map((loc) => (
+                <SelectItem key={loc.value} value={loc.value}>
+                  {loc.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span className="font-mono">${subtotal.toFixed(2)}</span>
+        <div className="flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-muted-foreground" />
+          <Select value={cashAccount} onValueChange={setCashAccount}>
+            <SelectTrigger className="w-56" data-testid="select-cash-account">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {mockCashAccounts.map((acc) => (
+                <SelectItem key={acc.value} value={acc.value}>
+                  {acc.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-full">
+            {/* Header */}
+            <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+              <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                #
+              </div>
+              {columns.map((col) => (
+                <div
+                  key={col.key}
+                  className={`${col.width} flex items-center px-3 border-r h-10 font-medium text-sm`}
+                >
+                  {col.label}
+                </div>
+              ))}
+            </div>
+
+            {/* Rows */}
+            <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
+              {rows.map((row, rowIndex) => (
+                <div key={row.id} className="flex border-b hover-elevate">
+                  <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                    {rowIndex + 1}
+                  </div>
+                  {columns.map((col, colIndex) => (
+                    <div
+                      key={col.key}
+                      className={`${col.width} border-r h-10 ${
+                        col.key === "amount" ? "bg-muted/30" : ""
+                      }`}
+                    >
+                      <input
+                        ref={(el) => {
+                          if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
+                        }}
+                        type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
+                        value={
+                          col.key === "amount"
+                            ? row.amount.toFixed(2)
+                            : row[col.key as keyof SaleRow]
+                        }
+                        onChange={(e) => {
+                          if (col.key !== "amount") {
+                            updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                          }
+                        }}
+                        onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                        onFocus={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+                        readOnly={col.key === "amount"}
+                        className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 ${
+                          col.key === "quantity" || col.key === "rate" || col.key === "amount"
+                            ? "font-mono text-right"
+                            : ""
+                        } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
+                        placeholder={
+                          col.key === "barcode"
+                            ? "Scan or type..."
+                            : col.key === "itemName"
+                            ? "Item description..."
+                            : ""
+                        }
+                        data-testid={`input-${col.key}-${rowIndex}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Tax (8%)</span>
-            <span className="font-mono">${tax.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-lg font-semibold border-t pt-3">
-            <span>Total</span>
-            <span className="font-mono" data-testid="text-total">
+        </div>
+
+        {/* Total Section */}
+        <div className="border-t bg-muted/20 p-4">
+          <div className="flex justify-end items-center gap-8 max-w-md ml-auto">
+            <div className="text-sm text-muted-foreground">Total Items:</div>
+            <div className="text-sm font-mono font-medium">
+              {rows.filter((r) => r.amount > 0).length}
+            </div>
+            <div className="text-lg font-semibold">Grand Total:</div>
+            <div className="text-2xl font-bold font-mono" data-testid="text-grand-total">
               ${total.toFixed(2)}
-            </span>
+            </div>
           </div>
-
-          <div className="grid grid-cols-3 gap-2 pt-2">
-            <Button
-              variant={paymentMethod === "cash" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("cash")}
-              className="gap-2"
-              data-testid="button-payment-cash"
-            >
-              <Banknote className="h-4 w-4" />
-              Cash
-            </Button>
-            <Button
-              variant={paymentMethod === "card" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("card")}
-              className="gap-2"
-              data-testid="button-payment-card"
-            >
-              <CreditCard className="h-4 w-4" />
-              Card
-            </Button>
-            <Button
-              variant={paymentMethod === "mobile" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("mobile")}
-              className="gap-2"
-              data-testid="button-payment-mobile"
-            >
-              <Smartphone className="h-4 w-4" />
-              Mobile
-            </Button>
-          </div>
-
-          <Button
-            className="w-full h-12"
-            disabled={cart.length === 0 || !paymentMethod}
-            onClick={() => {
-              console.log("Sale completed:", { cart, paymentMethod, total });
-              setCart([]);
-              setPaymentMethod(null);
-            }}
-            data-testid="button-complete-sale"
-          >
-            Complete Sale
-          </Button>
         </div>
       </Card>
     </div>
