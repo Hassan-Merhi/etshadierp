@@ -8,13 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
-  const { data: containers = [], isLoading } = useQuery<Container[]>({
+  const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers"],
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+
+  // Filter out offloaded containers
+  const containers = allContainers.filter((c) => c.status !== "OFFLOADED");
 
   const getSupplierName = (supplierId: number) => {
     const supplier = suppliers.find((s) => s.id === supplierId);

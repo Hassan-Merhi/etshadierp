@@ -943,6 +943,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Offload container to location
+  app.post("/api/containers/:id/offload", async (req, res) => {
+    try {
+      const containerId = parseInt(req.params.id);
+      
+      // Validate request body
+      const validation = schema.offloadRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { locationId, duties, officeCharges, transferCharges, transportFees } = validation.data;
+
+      // Validate container exists and is not already offloaded
+      const container = await storage.getContainerById(containerId);
+      if (!container) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+      
+      if (container.status === "OFFLOADED") {
+        return res.status(400).json({ message: "Container is already offloaded" });
+      }
+
+      // Perform offload
+      const offload = await storage.offloadContainer(
+        containerId,
+        locationId,
+        duties,
+        officeCharges,
+        transferCharges,
+        transportFees
+      );
+
+      res.json(offload);
+    } catch (error: any) {
+      console.error("Container offload error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

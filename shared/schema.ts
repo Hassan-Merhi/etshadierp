@@ -363,3 +363,40 @@ export const insertInventorySchema = createInsertSchema(inventory).omit({
 
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
 export type Inventory = typeof inventory.$inferSelect;
+
+export const containerOffloads = pgTable("container_offloads", {
+  id: serial("id").primaryKey(),
+  containerId: integer("container_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  duties: decimal("duties", { precision: 15, scale: 2 }).notNull().default("0"),
+  officeCharges: decimal("office_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  transferCharges: decimal("transfer_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  transportFees: decimal("transport_fees", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalCharges: decimal("total_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalBales: decimal("total_bales", { precision: 15, scale: 3 }).notNull(),
+  additionalCostPerBale: decimal("additional_cost_per_bale", { precision: 15, scale: 2 }).notNull(),
+  offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
+});
+
+export const insertContainerOffloadSchema = createInsertSchema(containerOffloads).omit({
+  id: true,
+  offloadedAt: true,
+  totalCharges: true,
+  totalBales: true,
+  additionalCostPerBale: true,
+}).extend({
+  containerId: z.number().min(1, "Container is required"),
+  locationId: z.number().min(1, "Location is required"),
+  duties: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Duties must be a valid non-negative number"),
+  officeCharges: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Office charges must be a valid non-negative number"),
+  transferCharges: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Transfer charges must be a valid non-negative number"),
+  transportFees: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Transport fees must be a valid non-negative number"),
+});
+
+export const offloadRequestSchema = insertContainerOffloadSchema.omit({
+  containerId: true,
+});
+
+export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema>;
+export type ContainerOffload = typeof containerOffloads.$inferSelect;
+export type OffloadRequest = z.infer<typeof offloadRequestSchema>;

@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, FileText } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OffloadDialog } from "@/components/OffloadDialog";
 import type { Supplier } from "@shared/schema";
 
 interface ContainerDetailData {
@@ -17,6 +19,7 @@ interface ContainerDetailData {
 export default function ContainerDetail() {
   const params = useParams();
   const containerId = params.id;
+  const [showOffloadDialog, setShowOffloadDialog] = useState(false);
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -58,16 +61,23 @@ export default function ContainerDetail() {
   const itemsTotal = parseFloat(container.itemsTotal || "0");
   const chargesTotal = parseFloat(container.chargesTotal || "0");
   const grandTotal = parseFloat(container.grandTotal || "0");
+  
+  // Calculate total bales from all line items
+  const totalBales = pos.reduce((total: number, po: any) => {
+    return total + po.items.reduce((sum: number, item: any) => {
+      return sum + parseFloat(item.quantity || "0");
+    }, 0);
+  }, 0);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Link href="/containers">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold" data-testid="text-container-number">
             Container {container.containerNumber}
           </h1>
@@ -78,6 +88,16 @@ export default function ContainerDetail() {
         <Badge variant={container.status === "OTW" ? "default" : "secondary"} data-testid="badge-status">
           {container.status}
         </Badge>
+        {container.status !== "OFFLOADED" && (
+          <Button
+            onClick={() => setShowOffloadDialog(true)}
+            className="gap-2"
+            data-testid="button-offload-container"
+          >
+            <Truck className="w-4 h-4" />
+            Offload Container
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -238,6 +258,14 @@ export default function ContainerDetail() {
           </div>
         </CardContent>
       </Card>
+
+      <OffloadDialog
+        open={showOffloadDialog}
+        onOpenChange={setShowOffloadDialog}
+        containerId={parseInt(containerId!)}
+        containerNumber={container.containerNumber}
+        totalBales={totalBales}
+      />
     </div>
   );
 }

@@ -30,6 +30,8 @@ import type {
   InsertContainerCharge,
   ImportLog,
   InsertImportLog,
+  ContainerOffload,
+  InsertContainerOffload,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -108,6 +110,10 @@ export interface IStorage {
   // Inventory - Location-based stock tracking
   getLocationInventory(locationId: number): Promise<any[]>;
   updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
+
+  // Container Offload
+  offloadContainer(containerId: number, locationId: number, duties: string, officeCharges: string, transferCharges: string, transportFees: string): Promise<ContainerOffload>;
+  createContainerOffload(offload: InsertContainerOffload): Promise<ContainerOffload>;
 }
 
 export class DbStorage implements IStorage {
@@ -386,6 +392,104 @@ export class DbStorage implements IStorage {
         lastUpdated: new Date(),
       });
     }
+  }
+
+  // Container Offload
+  async offloadContainer(
+    containerId: number, 
+    locationId: number, 
+    duties: string, 
+    officeCharges: string, 
+    transferCharges: string, 
+    transportFees: string
+  ): Promise<ContainerOffload> {
+    // Get all POs for this container
+    const pos = await this.getPurchaseOrdersByContainer(containerId);
+    
+    // Get all line items for all POs
+    const allLineItems: POLineItem[] = [];
+    for (const po of pos) {
+      const items = await this.getLineItemsByPO(po.id);
+      allLineItems.push(...items);
+    }
+
+    // Calculate total bales (sum of all quantities)
+    const totalBales = allLineItems.reduce((sum, item) => {
+      return sum + parseFloat(item.quantity);
+    }, 0);
+
+    // Calculate total charges
+    const totalCharges = 
+      parseFloat(duties) + 
+      parseFloat(officeCharges) + 
+      parseFloat(transferCharges) + 
+      parseFloat(transportFees);
+
+    // Calculate additional cost per bale
+    const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
+
+    // Group line items by stock item and calculate new rates
+    const itemsMap = new Map<number, { 
+      stockItemId: number; 
+      totalQuantity: number; 
+      weightedRateSum: number;
+    }>();
+
+    for (const item of allLineItems) {
+      const stockItemId = item.stockItemId;
+      const quantity = parseFloat(item.quantity);
+      const rate = parseFloat(item.rate);
+      
+      if (itemsMap.has(stockItemId)) {
+        const existing = itemsMap.get(stockItemId)!;
+        existing.totalQuantity += quantity;
+        existing.weightedRateSum += rate * quantity;
+      } else {
+        itemsMap.set(stockItemId, {
+          stockItemId,
+          totalQuantity: quantity,
+          weightedRateSum: rate * quantity,
+        });
+      }
+    }
+
+    // Create inventory records at destination location with new rates
+    for (const [stockItemId, data] of Array.from(itemsMap.entries())) {
+      const averageOriginalRate = data.weightedRateSum / data.totalQuantity;
+      const newRate = averageOriginalRate + additionalCostPerBale;
+      const totalValue = data.totalQuantity * newRate;
+
+      await this.updateInventory(
+        locationId,
+        stockItemId,
+        data.totalQuantity.toString(),
+        newRate.toFixed(2),
+        totalValue.toFixed(2)
+      );
+    }
+
+    // Update container status to OFFLOADED
+    await this.updateContainer(containerId, { status: "OFFLOADED" });
+
+    // Create offload record with all calculated values
+    const [offload] = await db.insert(schema.containerOffloads).values({
+      containerId,
+      locationId,
+      duties,
+      officeCharges,
+      transferCharges,
+      transportFees,
+      totalCharges: totalCharges.toFixed(2),
+      totalBales: totalBales.toFixed(3),
+      additionalCostPerBale: additionalCostPerBale.toFixed(2),
+    }).returning();
+
+    return offload;
+  }
+
+  async createContainerOffload(offload: InsertContainerOffload): Promise<ContainerOffload> {
+    const [created] = await db.insert(schema.containerOffloads).values(offload).returning();
+    return created;
   }
 }
 
