@@ -22,9 +22,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Plus } from "lucide-react";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -32,8 +40,6 @@ import {
   insertSupplierSchema,
   insertStockGroupSchema,
   insertStockItemSchema,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
 } from "@shared/schema";
 
 type EntityType =
@@ -42,9 +48,7 @@ type EntityType =
   | "employee"
   | "supplier"
   | "stockGroup"
-  | "stockItem"
-  | "bankAccount"
-  | "fixedAsset";
+  | "stockItem";
 
 const entityConfig = {
   location: { label: "Location", endpoint: "/api/locations", schema: insertLocationSchema },
@@ -53,8 +57,6 @@ const entityConfig = {
   supplier: { label: "Supplier", endpoint: "/api/suppliers", schema: insertSupplierSchema },
   stockGroup: { label: "Stock Group", endpoint: "/api/stock-groups", schema: insertStockGroupSchema },
   stockItem: { label: "Stock Item", endpoint: "/api/stock-items", schema: insertStockItemSchema },
-  bankAccount: { label: "Bank Account", endpoint: "/api/bank-accounts", schema: insertBankAccountSchema },
-  fixedAsset: { label: "Fixed Asset", endpoint: "/api/fixed-assets", schema: insertFixedAssetSchema },
 };
 
 // Wrapper component to properly recreate form when entity changes
@@ -116,10 +118,6 @@ function EntityFormWrapper({
       return <StockGroupForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
     case "stockItem":
       return <StockItemForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
-    case "bankAccount":
-      return <BankAccountForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
-    case "fixedAsset":
-      return <FixedAssetForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
   }
 }
 
@@ -132,15 +130,13 @@ export default function AccountingCreate() {
       <h1 className="text-2xl font-semibold">Create Master Data</h1>
 
       <Tabs value={selectedEntity} onValueChange={(v) => setSelectedEntity(v as EntityType)}>
-        <TabsList className="grid grid-cols-4 lg:grid-cols-8">
+        <TabsList className="grid grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="location" data-testid="tab-location">Location</TabsTrigger>
           <TabsTrigger value="ledger" data-testid="tab-ledger">Ledger</TabsTrigger>
           <TabsTrigger value="employee" data-testid="tab-employee">Employee</TabsTrigger>
           <TabsTrigger value="supplier" data-testid="tab-supplier">Supplier</TabsTrigger>
           <TabsTrigger value="stockGroup" data-testid="tab-stock-group">Stock Group</TabsTrigger>
           <TabsTrigger value="stockItem" data-testid="tab-stock-item">Stock Item</TabsTrigger>
-          <TabsTrigger value="bankAccount" data-testid="tab-bank-account">Bank</TabsTrigger>
-          <TabsTrigger value="fixedAsset" data-testid="tab-fixed-asset">Asset</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedEntity}>
@@ -255,8 +251,10 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
 // Ledger Account Form Component
 function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+  const { toast } = useToast();
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
+  const [isParentDialogOpen, setIsParentDialogOpen] = useState(false);
 
   // Get available subtypes based on account type
   const getSubTypes = () => {
@@ -280,6 +278,46 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
   });
+
+  // Form for creating parent account
+  const parentForm = useForm({
+    resolver: zodResolver(insertLedgerAccountSchema),
+    defaultValues: {
+      code: "",
+      name: "",
+      accountType: "" as any,
+      active: true,
+    },
+  });
+
+  // Mutation for creating parent account
+  const createParentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/ledger-accounts", data);
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Success",
+        description: `Parent account "${data.name}" created successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      form.setValue("parentId", data.id);
+      setIsParentDialogOpen(false);
+      parentForm.reset({ code: "", name: "", accountType: "" as any, active: true });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create parent account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateParent = (data: any) => {
+    createParentMutation.mutate(data);
+  };
 
   return (
     <Card className="p-6">
@@ -374,20 +412,106 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Parent Account</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-parent">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ledgerAccounts.map((acc: any) => (
-                        <SelectItem key={acc.id} value={acc.id.toString()}>
-                          {acc.name} ({acc.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-parent">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ledgerAccounts.map((acc: any) => (
+                          <SelectItem key={acc.id} value={acc.id.toString()}>
+                            {acc.name} ({acc.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Dialog open={isParentDialogOpen} onOpenChange={setIsParentDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" size="icon" variant="outline" data-testid="button-add-parent">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Create Parent Account</DialogTitle>
+                        </DialogHeader>
+                        <Form {...parentForm}>
+                          <form onSubmit={parentForm.handleSubmit(handleCreateParent)} className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <FormField
+                                control={parentForm.control}
+                                name="code"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Code *</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="ACC001" data-testid="input-parent-code" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={parentForm.control}
+                                name="name"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Name *</FormLabel>
+                                    <FormControl>
+                                      <Input {...field} placeholder="Purchases" data-testid="input-parent-name" />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={parentForm.control}
+                                name="accountType"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Account Type *</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid="select-parent-account-type">
+                                          <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="Asset">Asset</SelectItem>
+                                        <SelectItem value="Liability">Liability</SelectItem>
+                                        <SelectItem value="Equity">Equity</SelectItem>
+                                        <SelectItem value="Income">Income</SelectItem>
+                                        <SelectItem value="Expense">Expense</SelectItem>
+                                        <SelectItem value="Bank">Bank</SelectItem>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end border-t pt-4">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsParentDialogOpen(false)}
+                                disabled={createParentMutation.isPending}
+                                data-testid="button-cancel-parent"
+                              >
+                                Cancel
+                              </Button>
+                              <Button type="submit" disabled={createParentMutation.isPending} data-testid="button-save-parent">
+                                {createParentMutation.isPending ? "Creating..." : "Create"}
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -718,10 +842,6 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
 // Stock Group Form Component
 function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
-  const { data: stockGroups = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-groups"],
-  });
-
   return (
     <Card className="p-6">
       <Form {...form}>
@@ -750,31 +870,6 @@ function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; on
                   <FormControl>
                     <Input {...field} placeholder="Cotton Bales" data-testid="input-name" />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="parentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent Group</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-parent">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {stockGroups.map((grp: any) => (
-                        <SelectItem key={grp.id} value={grp.id.toString()}>
-                          {grp.name} ({grp.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -944,338 +1039,6 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                   <FormLabel>Reorder Level</FormLabel>
                   <FormControl>
                     <Input {...field} type="number" step="0.001" placeholder="10.000" data-testid="input-reorder-level" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="active"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-2 space-y-0 pt-8">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
-                  </FormControl>
-                  <FormLabel className="!mt-0">Active</FormLabel>
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormButtons onCancel={onCancel} isPending={isPending} />
-        </form>
-      </Form>
-    </Card>
-  );
-}
-
-// Bank Account Form Component
-function BankAccountForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/ledger-accounts"],
-  });
-
-  const bankCashLedgers = ledgerAccounts.filter(
-    (acc: any) => acc.accountType === "Bank" || acc.accountType === "Cash"
-  );
-
-  const openingBalance = form.watch("openingBalance");
-
-  return (
-    <Card className="p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="BANK001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ABC Business Account" data-testid="input-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="bankName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bank Name *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ABC Bank" data-testid="input-bank-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="accountNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account Number *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="1234567890" data-testid="input-account-number" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="routingCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Routing/IFSC Code</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ABCD0123456" data-testid="input-routing-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="linkedLedgerId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Linked Ledger (Bank/Cash)</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-linked-ledger">
-                        <SelectValue placeholder="Select ledger" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {bankCashLedgers.map((acc: any) => (
-                        <SelectItem key={acc.id} value={acc.id.toString()}>
-                          {acc.name} ({acc.accountType})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="openingBalance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Opening Balance</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {openingBalance && parseFloat(openingBalance) > 0 && (
-              <FormField
-                control={form.control}
-                name="openingBalanceSide"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dr/Cr Side *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-balance-side">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Dr">Debit (Dr)</SelectItem>
-                        <SelectItem value="Cr">Credit (Cr)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="active"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-2 space-y-0 pt-8">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
-                  </FormControl>
-                  <FormLabel className="!mt-0">Active</FormLabel>
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormButtons onCancel={onCancel} isPending={isPending} />
-        </form>
-      </Form>
-    </Card>
-  );
-}
-
-// Fixed Asset Form Component
-function FixedAssetForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
-  const depreciationMethod = form.watch("depreciationMethod");
-
-  return (
-    <Card className="p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ASSET001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Computer Equipment" data-testid="input-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="IT Equipment" data-testid="input-category" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="purchaseDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Purchase Date *</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="date" data-testid="input-purchase-date" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="purchaseAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Purchase Amount *</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-purchase-amount" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="depreciationMethod"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Depreciation Method *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger data-testid="select-depreciation-method">
-                        <SelectValue placeholder="Select method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="None">None</SelectItem>
-                      <SelectItem value="StraightLine">Straight Line</SelectItem>
-                      <SelectItem value="Declining">Declining Balance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {depreciationMethod && depreciationMethod !== "None" && (
-              <FormField
-                control={form.control}
-                name="usefulLife"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Useful Life (Years) *</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" placeholder="5" data-testid="input-useful-life" onChange={(e) => field.onChange(parseInt(e.target.value))} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="openingBalance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Opening Balance</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
