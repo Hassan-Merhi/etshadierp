@@ -7,8 +7,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
-import { LocationSelector } from "@/components/LocationSelector";
 import { AppSidebar } from "@/components/AppSidebar";
+import { LocationProvider } from "@/contexts/LocationContext";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -51,7 +51,8 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
+          <LocationProvider>
+            <SidebarProvider style={style as React.CSSProperties}>
             <div className="flex h-screen w-full">
               <AppSidebar />
               <div className="flex flex-col flex-1 overflow-hidden">
@@ -59,7 +60,6 @@ export default function App() {
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
                   <div className="flex items-center gap-2 ml-auto">
                     <CompanySelector />
-                    <LocationSelector />
                     <ThemeToggle />
                   </div>
                 </header>
@@ -70,8 +70,9 @@ export default function App() {
                 </main>
               </div>
             </div>
-          </SidebarProvider>
-          <Toaster />
+            </SidebarProvider>
+            <Toaster />
+          </LocationProvider>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
