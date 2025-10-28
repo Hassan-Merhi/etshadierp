@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download } from "lucide-react";
 import type { Supplier } from "@shared/schema";
 
 export default function POImport() {
@@ -238,17 +238,29 @@ export default function POImport() {
   const hasValidationErrors = validationResult && validationResult.errors && validationResult.errors.length > 0;
   const isValidated = validationResult !== null;
 
+  const handleDownloadTemplate = () => {
+    window.open("/api/po-import/template", "_blank");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">PO Import (Excel)</h1>
+        <Button
+          variant="outline"
+          onClick={handleDownloadTemplate}
+          data-testid="button-download-template"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download Template
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Upload Purchase Order Excel File</CardTitle>
           <CardDescription>
-            Three-step process: Parse → Validate → Import
+            Three-step process: Parse → Validate → Import. Need help? Download the template above to see the required format.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
