@@ -125,6 +125,8 @@ export interface IStorage {
   getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesBySupplier(supplierId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
 }
@@ -623,6 +625,49 @@ export class DbStorage implements IStorage {
       .where(and(...conditions));
 
     return await query;
+  }
+
+  async getVoucherEntriesBySupplier(
+    supplierId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [eq(schema.voucherEntries.supplierId, supplierId)];
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    const query = db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions));
+
+    return await query;
+  }
+
+  async getContainerCountBySupplier(supplierId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.containers)
+      .where(eq(schema.containers.supplierId, supplierId));
+    
+    return result[0]?.count || 0;
   }
 
   async createVoucher(voucher: InsertVoucher): Promise<Voucher> {
