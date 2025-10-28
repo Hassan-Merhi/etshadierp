@@ -36,6 +36,10 @@ import type {
   InsertVoucher,
   VoucherEntry,
   InsertVoucherEntry,
+  StockTransferVoucher,
+  StockTransferItem,
+  StockAdjustmentVoucher,
+  StockAdjustmentItem,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -131,6 +135,12 @@ export interface IStorage {
   getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
+
+  // Stock Transfers
+  createStockTransfer(voucherId: number, sourceLocationId: number, destinationLocationId: number, notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+
+  // Stock Adjustments
+  createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 }
 
 export class DbStorage implements IStorage {
@@ -692,6 +702,200 @@ export class DbStorage implements IStorage {
   async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
     const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
     return created;
+  }
+
+  // Stock Transfers
+  async createStockTransfer(
+    voucherId: number,
+    sourceLocationId: number,
+    destinationLocationId: number,
+    notes: string,
+    items: Array<{stockItemId: number, quantity: string, rate: string}>
+  ): Promise<any> {
+    // Create the stock transfer voucher record
+    const [transfer] = await db.insert(schema.stockTransferVouchers).values({
+      voucherId,
+      sourceLocationId,
+      destinationLocationId,
+      notes,
+    }).returning();
+
+    // Process each item
+    const transferItems: StockTransferItem[] = [];
+    for (const item of items) {
+      const quantity = parseFloat(item.quantity);
+      const rate = parseFloat(item.rate);
+      const totalAmount = quantity * rate;
+
+      // Insert transfer item
+      const [transferItem] = await db.insert(schema.stockTransferItems).values({
+        transferId: transfer.id,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity,
+        rate: item.rate,
+        totalAmount: totalAmount.toFixed(2),
+      }).returning();
+
+      transferItems.push(transferItem);
+
+      // Get current inventory at source location
+      const [sourceInventory] = await db
+        .select()
+        .from(schema.inventory)
+        .where(and(
+          eq(schema.inventory.locationId, sourceLocationId),
+          eq(schema.inventory.stockItemId, item.stockItemId)
+        ));
+
+      if (sourceInventory) {
+        // Decrease quantity at source location
+        const currentQty = parseFloat(sourceInventory.quantity);
+        const currentValue = parseFloat(sourceInventory.totalValue);
+        const currentRate = parseFloat(sourceInventory.averageRate);
+        
+        const newQty = currentQty - quantity;
+        const newValue = newQty > 0 ? newQty * currentRate : 0;
+        
+        await this.updateInventory(
+          sourceLocationId,
+          item.stockItemId,
+          newQty.toFixed(3),
+          currentRate.toFixed(2),
+          newValue.toFixed(2)
+        );
+      }
+
+      // Get current inventory at destination location
+      const [destInventory] = await db
+        .select()
+        .from(schema.inventory)
+        .where(and(
+          eq(schema.inventory.locationId, destinationLocationId),
+          eq(schema.inventory.stockItemId, item.stockItemId)
+        ));
+
+      if (destInventory) {
+        // Increase quantity at destination location using weighted average
+        const currentQty = parseFloat(destInventory.quantity);
+        const currentValue = parseFloat(destInventory.totalValue);
+        
+        const newQty = currentQty + quantity;
+        const newValue = currentValue + totalAmount;
+        const newRate = newQty > 0 ? newValue / newQty : 0;
+        
+        await this.updateInventory(
+          destinationLocationId,
+          item.stockItemId,
+          newQty.toFixed(3),
+          newRate.toFixed(2),
+          newValue.toFixed(2)
+        );
+      } else {
+        // Create new inventory record at destination
+        await this.updateInventory(
+          destinationLocationId,
+          item.stockItemId,
+          item.quantity,
+          item.rate,
+          totalAmount.toFixed(2)
+        );
+      }
+    }
+
+    return {
+      transfer,
+      items: transferItems,
+    };
+  }
+
+  // Stock Adjustments
+  async createStockAdjustment(
+    voucherId: number,
+    locationId: number,
+    adjustmentType: "Production" | "Consumption",
+    notes: string,
+    items: Array<{stockItemId: number, quantity: string, rate: string}>
+  ): Promise<any> {
+    // Create the stock adjustment voucher record
+    const [adjustment] = await db.insert(schema.stockAdjustmentVouchers).values({
+      voucherId,
+      locationId,
+      adjustmentType,
+      notes,
+    }).returning();
+
+    // Process each item
+    const adjustmentItems: StockAdjustmentItem[] = [];
+    for (const item of items) {
+      const quantity = parseFloat(item.quantity);
+      const rate = parseFloat(item.rate);
+      const totalAmount = Math.abs(quantity) * rate;
+
+      // Insert adjustment item
+      const [adjustmentItem] = await db.insert(schema.stockAdjustmentItems).values({
+        adjustmentId: adjustment.id,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity,
+        rate: item.rate,
+        totalAmount: totalAmount.toFixed(2),
+      }).returning();
+
+      adjustmentItems.push(adjustmentItem);
+
+      // Get current inventory at location
+      const [currentInventory] = await db
+        .select()
+        .from(schema.inventory)
+        .where(and(
+          eq(schema.inventory.locationId, locationId),
+          eq(schema.inventory.stockItemId, item.stockItemId)
+        ));
+
+      if (currentInventory) {
+        // Adjust quantity at location
+        const currentQty = parseFloat(currentInventory.quantity);
+        const currentValue = parseFloat(currentInventory.totalValue);
+        const currentRate = parseFloat(currentInventory.averageRate);
+        
+        let newQty: number;
+        let newValue: number;
+        let newRate: number;
+
+        if (adjustmentType === "Production") {
+          // Positive adjustment - add to inventory
+          newQty = currentQty + quantity;
+          newValue = currentValue + totalAmount;
+          newRate = newQty > 0 ? newValue / newQty : 0;
+        } else {
+          // Consumption - subtract from inventory
+          newQty = currentQty - quantity;
+          newValue = newQty > 0 ? newQty * currentRate : 0;
+          newRate = currentRate;
+        }
+        
+        await this.updateInventory(
+          locationId,
+          item.stockItemId,
+          newQty.toFixed(3),
+          newRate.toFixed(2),
+          newValue.toFixed(2)
+        );
+      } else if (adjustmentType === "Production") {
+        // Create new inventory record for production
+        await this.updateInventory(
+          locationId,
+          item.stockItemId,
+          item.quantity,
+          item.rate,
+          totalAmount.toFixed(2)
+        );
+      }
+    }
+
+    return {
+      adjustment,
+      items: adjustmentItems,
+    };
   }
 }
 

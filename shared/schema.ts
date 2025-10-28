@@ -453,3 +453,97 @@ export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit(
 
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;
+
+// Stock Transfer Vouchers
+export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
+  id: serial("id").primaryKey(),
+  voucherId: integer("voucher_id").notNull(),
+  sourceLocationId: integer("source_location_id").notNull(),
+  destinationLocationId: integer("destination_location_id").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockTransferVoucherSchema = createInsertSchema(stockTransferVouchers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.number().min(1, "Voucher is required"),
+  sourceLocationId: z.number().min(1, "Source location is required"),
+  destinationLocationId: z.number().min(1, "Destination location is required"),
+});
+
+export type InsertStockTransferVoucher = z.infer<typeof insertStockTransferVoucherSchema>;
+export type StockTransferVoucher = typeof stockTransferVouchers.$inferSelect;
+
+// Stock Transfer Items
+export const stockTransferItems = pgTable("stock_transfer_items", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockTransferItemSchema = createInsertSchema(stockTransferItems).omit({
+  id: true,
+  createdAt: true,
+  totalAmount: true,
+}).extend({
+  transferId: z.number().min(1, "Transfer is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+});
+
+export type InsertStockTransferItem = z.infer<typeof insertStockTransferItemSchema>;
+export type StockTransferItem = typeof stockTransferItems.$inferSelect;
+
+// Stock Adjustment Vouchers (Production/Consumption)
+export const stockAdjustmentVouchers = pgTable("stock_adjustment_vouchers", {
+  id: serial("id").primaryKey(),
+  voucherId: integer("voucher_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  adjustmentType: text("adjustment_type").notNull(), // "Production" or "Consumption"
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockAdjustmentVoucherSchema = createInsertSchema(stockAdjustmentVouchers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.number().min(1, "Voucher is required"),
+  locationId: z.number().min(1, "Location is required"),
+  adjustmentType: z.enum(["Production", "Consumption"]),
+});
+
+export type InsertStockAdjustmentVoucher = z.infer<typeof insertStockAdjustmentVoucherSchema>;
+export type StockAdjustmentVoucher = typeof stockAdjustmentVouchers.$inferSelect;
+
+// Stock Adjustment Items
+export const stockAdjustmentItems = pgTable("stock_adjustment_items", {
+  id: serial("id").primaryKey(),
+  adjustmentId: integer("adjustment_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(), // Positive for production, negative for consumption
+  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockAdjustmentItemSchema = createInsertSchema(stockAdjustmentItems).omit({
+  id: true,
+  createdAt: true,
+  totalAmount: true,
+}).extend({
+  adjustmentId: z.number().min(1, "Adjustment is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) !== 0, "Quantity cannot be zero"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+});
+
+export type InsertStockAdjustmentItem = z.infer<typeof insertStockAdjustmentItemSchema>;
+export type StockAdjustmentItem = typeof stockAdjustmentItems.$inferSelect;

@@ -14,6 +14,8 @@ import {
   insertBankAccountSchema,
   insertFixedAssetSchema,
   offloadRequestSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
 } from "@shared/schema";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -1330,6 +1332,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const entry = await storage.createVoucherEntry(req.body);
       res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stock Transfers
+  app.post("/api/stock-transfers", async (req, res) => {
+    try {
+      const { voucherId, sourceLocationId, destinationLocationId, notes, items } = req.body;
+
+      // Validate required fields
+      if (!voucherId) {
+        return res.status(400).json({ message: "Voucher ID is required" });
+      }
+      if (!sourceLocationId) {
+        return res.status(400).json({ message: "Source location is required" });
+      }
+      if (!destinationLocationId) {
+        return res.status(400).json({ message: "Destination location is required" });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items are required" });
+      }
+
+      // Validate that source and destination are different
+      if (sourceLocationId === destinationLocationId) {
+        return res.status(400).json({ message: "Source and destination locations must be different" });
+      }
+
+      // Validate that locations exist
+      const sourceLocation = await storage.getLocationById(sourceLocationId);
+      if (!sourceLocation) {
+        return res.status(404).json({ message: "Source location not found" });
+      }
+
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      if (!destLocation) {
+        return res.status(404).json({ message: "Destination location not found" });
+      }
+
+      // Validate that voucher exists
+      const voucher = await storage.getVoucherById(voucherId);
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Validate items
+      for (const item of items) {
+        if (!item.stockItemId) {
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
+        }
+        if (!item.quantity || parseFloat(item.quantity) <= 0) {
+          return res.status(400).json({ message: "Quantity must be positive for all items" });
+        }
+        if (!item.rate || parseFloat(item.rate) < 0) {
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
+        }
+      }
+
+      const transfer = await storage.createStockTransfer(
+        voucherId,
+        sourceLocationId,
+        destinationLocationId,
+        notes || "",
+        items
+      );
+
+      res.status(201).json(transfer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stock Adjustments
+  app.post("/api/stock-adjustments", async (req, res) => {
+    try {
+      const { voucherId, locationId, adjustmentType, notes, items } = req.body;
+
+      // Validate required fields
+      if (!voucherId) {
+        return res.status(400).json({ message: "Voucher ID is required" });
+      }
+      if (!locationId) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+      if (!adjustmentType) {
+        return res.status(400).json({ message: "Adjustment type is required" });
+      }
+      if (adjustmentType !== "Production" && adjustmentType !== "Consumption") {
+        return res.status(400).json({ message: "Adjustment type must be either 'Production' or 'Consumption'" });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items are required" });
+      }
+
+      // Validate that location exists
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      // Validate that voucher exists
+      const voucher = await storage.getVoucherById(voucherId);
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Validate items
+      for (const item of items) {
+        if (!item.stockItemId) {
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
+        }
+        if (!item.quantity || parseFloat(item.quantity) === 0) {
+          return res.status(400).json({ message: "Quantity cannot be zero for any items" });
+        }
+        if (parseFloat(item.quantity) < 0) {
+          return res.status(400).json({ message: "Quantity must be positive for all items" });
+        }
+        if (!item.rate || parseFloat(item.rate) < 0) {
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
+        }
+      }
+
+      const adjustment = await storage.createStockAdjustment(
+        voucherId,
+        locationId,
+        adjustmentType,
+        notes || "",
+        items
+      );
+
+      res.status(201).json(adjustment);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
