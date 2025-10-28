@@ -2,12 +2,11 @@ import { createContext, useContext, useState, ReactNode } from "react";
 
 interface Location {
   id: number;
+  code: string;
   name: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  isActive?: boolean;
+  city: string | null;
+  state: string | null;
+  country: string | null;
 }
 
 interface LocationContextType {

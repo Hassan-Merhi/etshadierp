@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "@/contexts/LocationContext";
+import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -43,10 +45,12 @@ interface StockGroupSummary {
 }
 
 export default function LocationInventory() {
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
   const tableRef = useRef<HTMLDivElement>(null);
+  const { setSelectedLocation } = useLocation();
+  const [, navigate] = useRoute();
 
   // Fetch all locations
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -55,8 +59,8 @@ export default function LocationInventory() {
 
   // Fetch inventory for selected location
   const { data: inventory = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocation ? [`/api/locations/${selectedLocation.id}/inventory`] : [],
-    enabled: !!selectedLocation,
+    queryKey: selectedLocationLocal ? [`/api/locations/${selectedLocationLocal.id}/inventory`] : [],
+    enabled: !!selectedLocationLocal,
   });
 
   // Group inventory by stock group
@@ -98,13 +102,19 @@ export default function LocationInventory() {
 
   // Handle location selection
   const handleLocationClick = (location: Location) => {
-    setSelectedLocation(location);
+    setSelectedLocationLocal(location);
     setSelectedGroup(null);
+  };
+
+  // Handle selecting a location for use in POS/other modules
+  const handleUseLocation = (location: Location) => {
+    setSelectedLocation(location);
+    navigate("/pos");
   };
 
   // Handle back to locations
   const handleBackToLocations = () => {
-    setSelectedLocation(null);
+    setSelectedLocationLocal(null);
     setSelectedGroup(null);
   };
 
@@ -144,8 +154,8 @@ export default function LocationInventory() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
-        {!selectedLocation && <span>Select Location</span>}
-        {selectedLocation && !selectedGroup && (
+        {!selectedLocationLocal && <span>Select Location</span>}
+        {selectedLocationLocal && !selectedGroup && (
           <>
             <Button
               variant="ghost"
@@ -156,10 +166,10 @@ export default function LocationInventory() {
               Locations
             </Button>
             <ChevronRight className="w-4 h-4" />
-            <span>{selectedLocation.name}</span>
+            <span>{selectedLocationLocal.name}</span>
           </>
         )}
-        {selectedLocation && selectedGroup && (
+        {selectedLocationLocal && selectedGroup && (
           <>
             <Button
               variant="ghost"
@@ -176,7 +186,7 @@ export default function LocationInventory() {
               className="h-auto p-0 text-sm hover:underline"
               data-testid="button-back-to-groups"
             >
-              {selectedLocation.name}
+              {selectedLocationLocal.name}
             </Button>
             <ChevronRight className="w-4 h-4" />
             <span>{selectedGroup.groupName}</span>
@@ -185,7 +195,7 @@ export default function LocationInventory() {
       </div>
 
       {/* Location List View */}
-      {!selectedLocation && (
+      {!selectedLocationLocal && (
         <div>
           <h1 className="text-3xl font-bold mb-6">Location Inventory</h1>
           {locationsLoading ? (
@@ -233,11 +243,21 @@ export default function LocationInventory() {
       )}
 
       {/* Stock Group List View */}
-      {selectedLocation && !selectedGroup && (
+      {selectedLocationLocal && !selectedGroup && (
         <div>
-          <h1 className="text-3xl font-bold mb-6">
-            {selectedLocation.name} - Stock Groups
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">
+              {selectedLocationLocal.name} - Stock Groups
+            </h1>
+            <Button
+              onClick={() => handleUseLocation(selectedLocationLocal)}
+              data-testid="button-use-location"
+              className="gap-2"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              Use Location for POS
+            </Button>
+          </div>
           {inventoryLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map(i => (
@@ -304,7 +324,7 @@ export default function LocationInventory() {
       )}
 
       {/* Stock Items Table View */}
-      {selectedLocation && selectedGroup && (
+      {selectedLocationLocal && selectedGroup && (
         <div>
           <h1 className="text-3xl font-bold mb-6">
             {selectedGroup.groupName} - Stock Items

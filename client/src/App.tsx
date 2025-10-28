@@ -53,23 +53,23 @@ export default function App() {
         <ThemeProvider>
           <LocationProvider>
             <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
-                  <SidebarTrigger data-testid="button-sidebar-toggle" />
-                  <div className="flex items-center gap-2 ml-auto">
-                    <CompanySelector />
-                    <ThemeToggle />
-                  </div>
-                </header>
-                <main className="flex-1 overflow-y-auto p-6">
-                  <div className="max-w-7xl mx-auto">
-                    <Router />
-                  </div>
-                </main>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                    <div className="flex items-center gap-2 ml-auto">
+                      <CompanySelector />
+                      <ThemeToggle />
+                    </div>
+                  </header>
+                  <main className="flex-1 overflow-y-auto p-6">
+                    <div className="max-w-7xl mx-auto">
+                      <Router />
+                    </div>
+                  </main>
+                </div>
               </div>
-            </div>
             </SidebarProvider>
             <Toaster />
           </LocationProvider>
