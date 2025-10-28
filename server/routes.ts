@@ -688,9 +688,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let stockItemId = item.stockItemId;
           let stockItem = null;
 
+          // Try barcode first, then fall back to name
           if (item.barcode) {
             stockItem = freshStockItems.find(si => si.barcode === item.barcode);
-          } else if (item.itemName) {
+          }
+          if (!stockItem && item.itemName) {
             stockItem = freshStockItems.find(si => si.name === item.itemName);
           }
 
