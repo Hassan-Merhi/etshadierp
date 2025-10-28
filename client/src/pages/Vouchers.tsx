@@ -84,11 +84,11 @@ interface VoucherEntry {
 }
 
 interface JournalEntry {
+  type: "DR" | "CR";
   accountType: "ledger" | "bank" | "supplier";
   accountId: number;
   accountName: string;
-  debitAmount: string;
-  creditAmount: string;
+  amount: string;
 }
 
 const voucherEntrySchema = z.object({
@@ -103,21 +103,15 @@ const voucherEntrySchema = z.object({
 });
 
 const journalEntrySchema = z.object({
+  type: z.enum(["DR", "CR"]),
   accountType: z.enum(["ledger", "bank", "supplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  debitAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
-    message: "Debit must be a positive number or empty",
-  }),
-  creditAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
-    message: "Credit must be a positive number or empty",
-  }),
-}).refine((data) => {
-  const debit = parseFloat(data.debitAmount) || 0;
-  const credit = parseFloat(data.creditAmount) || 0;
-  return debit > 0 || credit > 0;
-}, {
-  message: "Either debit or credit amount must be greater than 0",
+  amount: z.string()
+    .min(1, "Amount required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Amount must be a positive number",
+    }),
 });
 
 const voucherFormSchema = z.object({
@@ -579,11 +573,11 @@ export default function Vouchers() {
       voucherDate: new Date(),
       entries: [
         {
+          type: "DR",
           accountType: "ledger",
           accountId: 0,
           accountName: "",
-          debitAmount: "",
-          creditAmount: "",
+          amount: "",
         },
       ],
       notes: "",
@@ -601,11 +595,11 @@ export default function Vouchers() {
 
   const journalEntries = journalForm.watch("entries");
   const totalDebit = journalEntries.reduce(
-    (sum, entry) => sum + (parseFloat(entry.debitAmount) || 0),
+    (sum, entry) => sum + (entry.type === "DR" ? (parseFloat(entry.amount) || 0) : 0),
     0
   );
   const totalCredit = journalEntries.reduce(
-    (sum, entry) => sum + (parseFloat(entry.creditAmount) || 0),
+    (sum, entry) => sum + (entry.type === "CR" ? (parseFloat(entry.amount) || 0) : 0),
     0
   );
 
@@ -641,8 +635,14 @@ export default function Vouchers() {
           entryData.supplierId = entry.accountId;
         }
 
-        entryData.debitAmount = entry.debitAmount || "0";
-        entryData.creditAmount = entry.creditAmount || "0";
+        // Set debit or credit based on type
+        if (entry.type === "DR") {
+          entryData.debitAmount = entry.amount;
+          entryData.creditAmount = "0";
+        } else {
+          entryData.debitAmount = "0";
+          entryData.creditAmount = entry.amount;
+        }
 
         await apiRequest("POST", "/api/voucher-entries", entryData);
       }
@@ -660,11 +660,11 @@ export default function Vouchers() {
         voucherDate: new Date(),
         entries: [
           {
+            type: "DR",
             accountType: "ledger",
             accountId: 0,
             accountName: "",
-            debitAmount: "",
-            creditAmount: "",
+            amount: "",
           },
         ],
         notes: "",
@@ -682,15 +682,26 @@ export default function Vouchers() {
   const onJournalSubmit = (data: JournalFormData) => {
     // Validate that all entries have valid accounts
     const validEntries = data.entries.filter(
-      (entry) =>
-        entry.accountId > 0 &&
-        (parseFloat(entry.debitAmount) > 0 || parseFloat(entry.creditAmount) > 0)
+      (entry) => entry.accountId > 0 && parseFloat(entry.amount) > 0
     );
 
     if (validEntries.length === 0) {
       toast({
         title: "Validation Error",
         description: "Please add at least one valid entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that we have both DR and CR entries
+    const hasDebit = validEntries.some((entry) => entry.type === "DR");
+    const hasCredit = validEntries.some((entry) => entry.type === "CR");
+    
+    if (!hasDebit || !hasCredit) {
+      toast({
+        title: "Validation Error",
+        description: "Journal must have both DR (debit) and CR (credit) entries",
         variant: "destructive",
       });
       return;
@@ -1085,15 +1096,37 @@ export default function Vouchers() {
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
+                          <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
                           <th className="text-left p-3 font-medium w-[50%]">Account</th>
-                          <th className="text-left p-3 font-medium w-[20%]">Debit</th>
-                          <th className="text-left p-3 font-medium w-[20%]">Credit</th>
+                          <th className="text-left p-3 font-medium w-[25%]">Amount</th>
                           <th className="w-[10%]"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {journalFields.map((field, index) => (
                           <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.type`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger data-testid={`select-journal-type-${index}`}>
+                                          <SelectValue placeholder="DR/CR" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="DR">DR</SelectItem>
+                                        <SelectItem value="CR">CR</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
                             <td className="p-2">
                               <FormField
                                 control={journalForm.control}
@@ -1130,7 +1163,7 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={journalForm.control}
-                                name={`entries.${index}.debitAmount`}
+                                name={`entries.${index}.amount`}
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormControl>
@@ -1141,29 +1174,7 @@ export default function Vouchers() {
                                         min="0"
                                         placeholder="0.00"
                                         className="font-mono text-right"
-                                        data-testid={`input-journal-debit-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={journalForm.control}
-                                name={`entries.${index}.creditAmount`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="0.00"
-                                        className="font-mono text-right"
-                                        data-testid={`input-journal-credit-${index}`}
+                                        data-testid={`input-journal-amount-${index}`}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -1196,11 +1207,11 @@ export default function Vouchers() {
                               size="sm"
                               onClick={() =>
                                 appendJournal({
+                                  type: "DR",
                                   accountType: "ledger",
                                   accountId: 0,
                                   accountName: "",
-                                  debitAmount: "",
-                                  creditAmount: "",
+                                  amount: "",
                                 })
                               }
                               data-testid="button-journal-add-row"
@@ -1209,17 +1220,12 @@ export default function Vouchers() {
                               Add Row
                             </Button>
                           </td>
-                          <td className="p-3">
-                            <div className="text-right font-bold font-mono">
-                              ${totalDebit.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
+                          <td className="p-3 text-right text-sm text-muted-foreground">
+                            DR: ${totalDebit.toFixed(2)} | CR: ${totalCredit.toFixed(2)}
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono">
-                              ${totalCredit.toLocaleString(undefined, {
+                              ${Math.max(totalDebit, totalCredit).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
