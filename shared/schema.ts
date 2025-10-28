@@ -252,6 +252,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   poNumber: varchar("po_number", { length: 100 }).notNull(),
   containerId: integer("container_id").notNull(),
   supplierId: integer("supplier_id").notNull(),
+  voucherId: integer("voucher_id"),
   currency: text("currency").notNull().default("USD"),
   itemsTotal: decimal("items_total", { precision: 15, scale: 2 }).default("0"),
   status: text("status").notNull().default("Open"),

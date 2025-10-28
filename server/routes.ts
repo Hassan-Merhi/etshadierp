@@ -697,10 +697,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const poItems = items as any[];
         const poTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
+        // Create voucher for this PO (Purchase voucher debiting supplier account)
+        const voucher = await storage.createVoucher({
+          voucherNumber: `PO-${poNumber}-${Date.now()}`,
+          voucherType: "Purchase",
+          voucherDate: importDate,
+          description: `Purchase Order ${poNumber} - Container ${containerNumber}`,
+          totalAmount: poTotal.toString(),
+        });
+
+        // Create voucher entry debiting supplier account
+        await storage.createVoucherEntry({
+          voucherId: voucher.id,
+          supplierId: supplierId,
+          debitAmount: poTotal.toString(),
+          creditAmount: "0",
+          narration: `PO ${poNumber} - Container ${containerNumber}`,
+        });
+
         const po = await storage.createPurchaseOrder({
           poNumber,
           containerId: container.id,
           supplierId,
+          voucherId: voucher.id,
           currency: poItems[0].currency,
           itemsTotal: poTotal.toString(),
         });
