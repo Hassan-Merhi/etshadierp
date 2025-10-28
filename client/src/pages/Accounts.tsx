@@ -66,6 +66,8 @@ export default function Accounts() {
       let accountType = selectedAccount.type.toLowerCase();
       if (accountType === "fixed asset") {
         accountType = "fixed-asset";
+      } else if (accountType === "supplier") {
+        accountType = "supplier";
       }
       
       const url = `/api/accounts/${accountType}/${selectedAccount.accountId}/transactions${
