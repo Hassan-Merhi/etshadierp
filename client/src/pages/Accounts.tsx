@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
-import { format } from "date-fns";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X } from "lucide-react";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 interface Account {
   id: string;
@@ -44,6 +45,8 @@ export default function Accounts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
@@ -86,6 +89,60 @@ export default function Accounts() {
     setSelectedAccount(account || null);
     setSearchTerm("");
   };
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    if (month && selectedYear) {
+      const monthIndex = parseInt(month) - 1;
+      const year = parseInt(selectedYear);
+      const start = startOfMonth(new Date(year, monthIndex, 1));
+      const end = endOfMonth(new Date(year, monthIndex, 1));
+      setStartDate(format(start, "yyyy-MM-dd"));
+      setEndDate(format(end, "yyyy-MM-dd"));
+    } else {
+      setStartDate("");
+      setEndDate("");
+    }
+  };
+
+  const handleYearChange = (year: string) => {
+    setSelectedYear(year);
+    if (year && selectedMonth) {
+      const monthIndex = parseInt(selectedMonth) - 1;
+      const yearNum = parseInt(year);
+      const start = startOfMonth(new Date(yearNum, monthIndex, 1));
+      const end = endOfMonth(new Date(yearNum, monthIndex, 1));
+      setStartDate(format(start, "yyyy-MM-dd"));
+      setEndDate(format(end, "yyyy-MM-dd"));
+    } else {
+      setStartDate("");
+      setEndDate("");
+    }
+  };
+
+  const clearDateFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setSelectedMonth("");
+    setSelectedYear("");
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const months = [
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
 
   const filteredAccounts = accounts.filter((account) => {
     const searchLower = searchTerm.toLowerCase();
@@ -218,36 +275,96 @@ export default function Accounts() {
         </CardContent>
       </Card>
 
-      {selectedAccount && selectedAccount.type === "Ledger" && (
+      {selectedAccount && (
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Filter by Date Range
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Filter by Date Range
+                </CardTitle>
+                {(startDate || endDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearDateFilters}
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start-date">Start Date</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    data-testid="input-start-date"
-                  />
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Quick Filter by Month</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-year">Year</Label>
+                    <Select value={selectedYear} onValueChange={handleYearChange}>
+                      <SelectTrigger id="filter-year" data-testid="select-year">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filter-month">Month</Label>
+                    <Select value={selectedMonth} onValueChange={handleMonthChange}>
+                      <SelectTrigger id="filter-month" data-testid="select-month">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end-date">End Date</Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    data-testid="input-end-date"
-                  />
+              </div>
+              
+              <div className="pt-4 border-t">
+                <Label className="text-sm font-medium mb-2 block">Or Set Custom Date Range</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-date">Start Date</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        setSelectedMonth("");
+                        setSelectedYear("");
+                      }}
+                      data-testid="input-start-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end-date">End Date</Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        setSelectedMonth("");
+                        setSelectedYear("");
+                      }}
+                      data-testid="input-end-date"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
