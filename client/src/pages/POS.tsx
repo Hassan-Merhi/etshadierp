@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation as useLocationContext } from "@/contexts/LocationContext";
+import { useLocation, Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -62,6 +64,8 @@ const mockInventory: InventoryItem[] = [
 ];
 
 export default function POS() {
+  const { selectedLocation } = useLocationContext();
+  const [, navigate] = useLocation();
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -69,7 +73,6 @@ export default function POS() {
     row: 0,
     col: 0,
   });
-  const [location, setLocation] = useState("main");
   const [cashAccount, setCashAccount] = useState("cash1");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
@@ -78,6 +81,11 @@ export default function POS() {
   const [zeroStockItem, setZeroStockItem] = useState("");
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
+
+  // Redirect to Location Inventory if no location is selected
+  if (!selectedLocation) {
+    return <Redirect to="/location-inventory" />;
+  }
 
   const columns = [
     { key: "itemName", label: "Item Name", width: "flex-1" },
@@ -281,18 +289,16 @@ export default function POS() {
       <div className="flex gap-4">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-muted-foreground" />
-          <Select value={location} onValueChange={setLocation}>
-            <SelectTrigger className="w-48" data-testid="select-location">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {mockLocations.map((loc) => (
-                <SelectItem key={loc.value} value={loc.value}>
-                  {loc.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/location-inventory")}
+            className="gap-2"
+            data-testid="button-change-location"
+          >
+            <span className="font-medium">{selectedLocation.name}</span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-xs text-muted-foreground">Change</span>
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
