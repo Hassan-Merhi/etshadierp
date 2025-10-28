@@ -517,7 +517,7 @@ export const insertStockAdjustmentVoucherSchema = createInsertSchema(stockAdjust
 }).extend({
   voucherId: z.number().min(1, "Voucher is required"),
   locationId: z.number().min(1, "Location is required"),
-  adjustmentType: z.enum(["Production", "Consumption"]),
+  adjustmentType: z.enum(["Production", "Consumption", "Mixed"]),
 });
 
 export type InsertStockAdjustmentVoucher = z.infer<typeof insertStockAdjustmentVoucherSchema>;

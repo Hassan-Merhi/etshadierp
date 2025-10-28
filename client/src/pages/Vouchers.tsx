@@ -184,10 +184,13 @@ const stockAdjustmentEntrySchema = z.object({
 const stockAdjustmentFormSchema = z.object({
   voucherDate: z.date(),
   locationId: z.number().min(1, "Location required"),
-  adjustmentType: z.enum(["Production", "Consumption"]),
-  entries: z.array(stockAdjustmentEntrySchema).min(1),
+  consumptionEntries: z.array(stockAdjustmentEntrySchema),
+  productionEntries: z.array(stockAdjustmentEntrySchema),
   notes: z.string().optional(),
-});
+}).refine(
+  (data) => data.consumptionEntries.length > 0 || data.productionEntries.length > 0,
+  { message: "At least one entry (consumption or production) is required" }
+);
 
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
 type JournalFormData = z.infer<typeof journalFormSchema>;
@@ -1009,30 +1012,37 @@ export default function Vouchers() {
     defaultValues: {
       voucherDate: new Date(),
       locationId: 0,
-      adjustmentType: "Production",
-      entries: [
-        {
-          stockItemId: 0,
-          stockItemName: "",
-          quantity: "",
-          rate: "",
-        },
-      ],
+      consumptionEntries: [],
+      productionEntries: [],
       notes: "",
     },
   });
 
   const {
-    fields: adjustmentFields,
-    append: appendAdjustment,
-    remove: removeAdjustment,
+    fields: consumptionFields,
+    append: appendConsumption,
+    remove: removeConsumption,
   } = useFieldArray({
     control: stockAdjustmentForm.control,
-    name: "entries",
+    name: "consumptionEntries",
   });
 
-  const adjustmentEntries = stockAdjustmentForm.watch("entries");
-  const adjustmentTotal = adjustmentEntries.reduce(
+  const {
+    fields: productionFields,
+    append: appendProduction,
+    remove: removeProduction,
+  } = useFieldArray({
+    control: stockAdjustmentForm.control,
+    name: "productionEntries",
+  });
+
+  const consumptionEntries = stockAdjustmentForm.watch("consumptionEntries") || [];
+  const productionEntries = stockAdjustmentForm.watch("productionEntries") || [];
+  const consumptionTotal = consumptionEntries.reduce(
+    (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
+    0
+  );
+  const productionTotal = productionEntries.reduce(
     (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
     0
   );
@@ -1042,27 +1052,48 @@ export default function Vouchers() {
     mutationFn: async (formData: StockAdjustmentFormData) => {
       const data = formData;
       
+      // Determine adjustment type based on which arrays have entries
+      const hasConsumption = data.consumptionEntries.length > 0;
+      const hasProduction = data.productionEntries.length > 0;
+      const adjustmentType = hasConsumption && hasProduction 
+        ? "Mixed" 
+        : hasProduction 
+          ? "Production" 
+          : "Consumption";
+      
+      // Combine both arrays with consumption quantities negated
+      const combinedItems = [
+        ...data.consumptionEntries.map(entry => ({
+          stockItemId: entry.stockItemId,
+          quantity: (-parseFloat(entry.quantity)).toString(), // Negate for consumption
+          rate: entry.rate,
+        })),
+        ...data.productionEntries.map(entry => ({
+          stockItemId: entry.stockItemId,
+          quantity: entry.quantity, // Keep positive for production
+          rate: entry.rate,
+        })),
+      ];
+
+      const totalAmount = consumptionTotal + productionTotal;
+      
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        voucherType: data.adjustmentType,
-        voucherNumber: `${data.adjustmentType.toUpperCase()}-${Date.now()}`,
+        voucherType: adjustmentType,
+        voucherNumber: `${adjustmentType.toUpperCase()}-${Date.now()}`,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: `Stock ${data.adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
-        totalAmount: Math.abs(adjustmentTotal).toString(),
+        description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
+        totalAmount: totalAmount.toString(),
       });
       const voucher = await voucherRes.json();
 
-      // Create stock adjustment with items
+      // Create stock adjustment with combined items
       await apiRequest("POST", "/api/stock-adjustments", {
         voucherId: voucher.id,
         locationId: data.locationId,
-        adjustmentType: data.adjustmentType,
+        adjustmentType: adjustmentType,
         notes: data.notes || "",
-        items: data.entries.map(entry => ({
-          stockItemId: entry.stockItemId,
-          quantity: entry.quantity,
-          rate: entry.rate,
-        })),
+        items: combinedItems,
       });
 
       return voucher;
@@ -1070,22 +1101,15 @@ export default function Vouchers() {
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Stock adjustment voucher created successfully",
+        description: "Production/Consumption voucher created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       stockAdjustmentForm.reset({
         voucherDate: new Date(),
         locationId: 0,
-        adjustmentType: "Production",
-        entries: [
-          {
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          },
-        ],
+        consumptionEntries: [],
+        productionEntries: [],
         notes: "",
       });
     },
@@ -1099,15 +1123,20 @@ export default function Vouchers() {
   });
 
   const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
-    // Validate entries
-    const validEntries = data.entries.filter(
-      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) !== 0
+    // Validate consumption entries
+    const validConsumption = data.consumptionEntries.filter(
+      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
     );
 
-    if (validEntries.length === 0) {
+    // Validate production entries
+    const validProduction = data.productionEntries.filter(
+      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
+    );
+
+    if (validConsumption.length === 0 && validProduction.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid entry",
+        description: "Please add at least one valid entry in consumption or production",
         variant: "destructive",
       });
       return;
@@ -1200,8 +1229,8 @@ export default function Vouchers() {
     }
   };
 
-  // Keyboard navigation handlers for Stock Adjustment
-  const handleAdjustmentKeyDown = (
+  // Keyboard navigation handlers for Consumption Table
+  const handleConsumptionKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
     fieldName: "quantity"
@@ -1210,7 +1239,34 @@ export default function Vouchers() {
       e.preventDefault();
       if (fieldName === "quantity") {
         // Add new row when pressing Enter on quantity field
-        appendAdjustment({
+        appendConsumption({
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        });
+        // Focus the Stock Item combobox in the new row after a small delay
+        setTimeout(() => {
+          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowButton) {
+            newRowButton.focus();
+          }
+        }, 100);
+      }
+    }
+  };
+
+  // Keyboard navigation handlers for Production Table
+  const handleProductionKeyDown = (
+    e: React.KeyboardEvent,
+    rowIndex: number,
+    fieldName: "quantity"
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (fieldName === "quantity") {
+        // Add new row when pressing Enter on quantity field
+        appendProduction({
           stockItemId: 0,
           stockItemName: "",
           quantity: "",
@@ -2339,69 +2395,41 @@ export default function Vouchers() {
         <TabsContent value="adjustment" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Stock Adjustment Voucher</CardTitle>
+              <CardTitle>Production / Consumption Voucher</CardTitle>
             </CardHeader>
             <CardContent>
               <Form {...stockAdjustmentForm}>
                 <form onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
                   {/* Header section */}
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex gap-4 flex-1">
-                      <FormField
-                        control={stockAdjustmentForm.control}
-                        name="adjustmentType"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Adjustment Type</FormLabel>
-                            <Select
-                              value={field.value}
-                              onValueChange={field.onChange}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-adjustment-type">
-                                  <SelectValue placeholder="Select type..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="Production">Production</SelectItem>
-                                <SelectItem value="Consumption">Consumption</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <FormField
+                      control={stockAdjustmentForm.control}
+                      name="locationId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Location</FormLabel>
+                          <Select
+                            value={field.value > 0 ? field.value.toString() : ""}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-adjustment-location">
+                                <SelectValue placeholder="Select location..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {locations.map((location) => (
+                                <SelectItem key={location.id} value={location.id.toString()}>
+                                  {location.code} - {location.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                      <FormField
-                        control={stockAdjustmentForm.control}
-                        name="locationId"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Location</FormLabel>
-                            <Select
-                              value={field.value > 0 ? field.value.toString() : ""}
-                              onValueChange={(value) => field.onChange(parseInt(value))}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-adjustment-location">
-                                  <SelectValue placeholder="Select location..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {locations.map((location) => (
-                                  <SelectItem key={location.id} value={location.id.toString()}>
-                                    {location.code} - {location.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* Right: Date picker */}
                     <FormField
                       control={stockAdjustmentForm.control}
                       name="voucherDate"
@@ -2439,150 +2467,289 @@ export default function Vouchers() {
                     />
                   </div>
 
-                  {/* Spreadsheet table */}
-                  <div className="border rounded-md overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="text-left p-3 font-medium w-[45%]">Stock Item</th>
-                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
-                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
-                          <th className="text-left p-3 font-medium w-[20%]">Total</th>
-                          <th className="w-[5%]"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {adjustmentFields.map((field, index) => (
-                          <tr key={field.id} className="border-t">
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.stockItemId`}
-                                render={({ field: stockField }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <StockItemCombobox
-                                        value={
-                                          adjustmentEntries[index].stockItemId > 0
-                                            ? {
-                                                id: adjustmentEntries[index].stockItemId,
-                                                name: adjustmentEntries[index].stockItemName,
-                                              }
-                                            : null
-                                        }
-                                        onChange={(id, name) => {
-                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, id);
-                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, name);
-                                        }}
-                                        stockItems={stockItems}
-                                        rowIndex={index}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.quantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.001"
-                                        placeholder="0.000"
-                                        className="font-mono"
-                                        data-testid={`input-adjustment-quantity-${index}`}
-                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "quantity")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.rate`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        data-testid={`input-adjustment-rate-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <div className="text-right font-mono">
-                                ${(parseFloat(adjustmentEntries[index].quantity || "0") * parseFloat(adjustmentEntries[index].rate || "0")).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </div>
-                            </td>
-                            <td className="p-2">
-                              {adjustmentFields.length > 1 && (
+                  {/* TWO TABLES SIDE-BY-SIDE */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* LEFT: Consumption Table */}
+                    <div className="border rounded-md overflow-hidden">
+                      <div className="bg-muted/50 p-3 font-medium border-b">
+                        Consumption
+                      </div>
+                      <table className="w-full">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="text-left p-2 text-sm font-medium">Stock Item</th>
+                            <th className="text-left p-2 text-sm font-medium w-[80px]">Qty</th>
+                            <th className="text-left p-2 text-sm font-medium w-[80px]">Rate</th>
+                            <th className="text-left p-2 text-sm font-medium w-[100px]">Total</th>
+                            <th className="w-[40px]"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {consumptionFields.map((field, index) => (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`consumptionEntries.${index}.stockItemId`}
+                                  render={({ field: stockField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            consumptionEntries[index]?.stockItemId > 0
+                                              ? {
+                                                  id: consumptionEntries[index].stockItemId,
+                                                  name: consumptionEntries[index].stockItemName,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, id);
+                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`consumptionEntries.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono text-sm"
+                                          data-testid={`input-consumption-quantity-${index}`}
+                                          onKeyDown={(e) => handleConsumptionKeyDown(e, index, "quantity")}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`consumptionEntries.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0"
+                                          className="font-mono text-sm"
+                                          data-testid={`input-consumption-rate-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono text-sm">
+                                  ${(parseFloat(consumptionEntries[index]?.quantity || "0") * parseFloat(consumptionEntries[index]?.rate || "0")).toFixed(2)}
+                                </div>
+                              </td>
+                              <td className="p-2">
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => removeAdjustment(index)}
-                                  data-testid={`button-remove-adjustment-${index}`}
+                                  onClick={() => removeConsumption(index)}
+                                  data-testid={`button-remove-consumption-${index}`}
                                 >
                                   ×
                                 </Button>
-                              )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-muted/30 border-t">
+                          <tr>
+                            <td colSpan={3} className="p-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  appendConsumption({
+                                    stockItemId: 0,
+                                    stockItemName: "",
+                                    quantity: "",
+                                    rate: "",
+                                  })
+                                }
+                                data-testid="button-add-consumption-row"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Row
+                              </Button>
                             </td>
+                            <td className="p-2">
+                              <div className="text-right font-bold font-mono text-sm">
+                                ${consumptionTotal.toFixed(2)}
+                              </div>
+                            </td>
+                            <td></td>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-muted/30 border-t-2">
-                        <tr>
-                          <td colSpan={3} className="p-3">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                appendAdjustment({
-                                  stockItemId: 0,
-                                  stockItemName: "",
-                                  quantity: "",
-                                  rate: "",
-                                })
-                              }
-                              data-testid="button-add-adjustment-row"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Row
-                            </Button>
-                          </td>
-                          <td className="p-3">
-                            <div className="text-right font-bold font-mono">
-                              ${adjustmentTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
-                          </td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {/* RIGHT: Production Table */}
+                    <div className="border rounded-md overflow-hidden">
+                      <div className="bg-muted/50 p-3 font-medium border-b">
+                        Production
+                      </div>
+                      <table className="w-full">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="text-left p-2 text-sm font-medium">Stock Item</th>
+                            <th className="text-left p-2 text-sm font-medium w-[80px]">Qty</th>
+                            <th className="text-left p-2 text-sm font-medium w-[80px]">Rate</th>
+                            <th className="text-left p-2 text-sm font-medium w-[100px]">Total</th>
+                            <th className="w-[40px]"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {productionFields.map((field, index) => (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`productionEntries.${index}.stockItemId`}
+                                  render={({ field: stockField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            productionEntries[index]?.stockItemId > 0
+                                              ? {
+                                                  id: productionEntries[index].stockItemId,
+                                                  name: productionEntries[index].stockItemName,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, id);
+                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`productionEntries.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono text-sm"
+                                          data-testid={`input-production-quantity-${index}`}
+                                          onKeyDown={(e) => handleProductionKeyDown(e, index, "quantity")}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={stockAdjustmentForm.control}
+                                  name={`productionEntries.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0"
+                                          className="font-mono text-sm"
+                                          data-testid={`input-production-rate-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono text-sm">
+                                  ${(parseFloat(productionEntries[index]?.quantity || "0") * parseFloat(productionEntries[index]?.rate || "0")).toFixed(2)}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeProduction(index)}
+                                  data-testid={`button-remove-production-${index}`}
+                                >
+                                  ×
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-muted/30 border-t">
+                          <tr>
+                            <td colSpan={3} className="p-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  appendProduction({
+                                    stockItemId: 0,
+                                    stockItemName: "",
+                                    quantity: "",
+                                    rate: "",
+                                  })
+                                }
+                                data-testid="button-add-production-row"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Row
+                              </Button>
+                            </td>
+                            <td className="p-2">
+                              <div className="text-right font-bold font-mono text-sm">
+                                ${productionTotal.toFixed(2)}
+                              </div>
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Notes field */}
@@ -2609,10 +2776,10 @@ export default function Vouchers() {
                   <div className="flex justify-end">
                     <Button
                       type="submit"
-                      disabled={stockAdjustmentMutation.isPending || adjustmentTotal === 0}
+                      disabled={stockAdjustmentMutation.isPending || (consumptionTotal === 0 && productionTotal === 0)}
                       data-testid="button-save-adjustment-voucher"
                     >
-                      {stockAdjustmentMutation.isPending ? "Saving..." : "Save Stock Adjustment"}
+                      {stockAdjustmentMutation.isPending ? "Saving..." : "Save Production/Consumption Voucher"}
                     </Button>
                   </div>
                 </form>

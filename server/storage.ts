@@ -140,7 +140,7 @@ export interface IStorage {
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 
   // Stock Adjustments
-  createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+  createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption" | "Mixed", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 }
 
 export class DbStorage implements IStorage {
