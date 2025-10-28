@@ -987,12 +987,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all accounts (combined from ledgers, bank accounts, and fixed assets)
+  // Get all accounts (combined from ledgers, bank accounts, fixed assets, and suppliers)
   app.get("/api/accounts/all", async (_req, res) => {
     try {
       const ledgers = await storage.getAllLedgerAccounts();
       const banks = await storage.getAllBankAccounts();
       const assets = await storage.getAllFixedAssets();
+      const suppliers = await storage.getAllSuppliers();
 
       const accounts = [
         ...ledgers.map((account) => ({
@@ -1024,6 +1025,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           balance: parseFloat(asset.openingBalance || "0"),
           balanceSide: "Dr",
           active: asset.active,
+        })),
+        ...suppliers.map((supplier) => ({
+          id: `supplier-${supplier.id}`,
+          accountId: supplier.id,
+          type: "Supplier",
+          code: supplier.code,
+          name: supplier.legalName,
+          balance: 0,
+          balanceSide: "Cr",
+          active: supplier.active,
         })),
       ];
 
@@ -1102,6 +1113,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get transactions for a specific supplier with optional date filtering
+  app.get("/api/accounts/supplier/:id/transactions", async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const transactions = await storage.getVoucherEntriesBySupplier(
+        supplierId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all vouchers with date filtering
   app.get("/api/vouchers", async (req, res) => {
     try {
@@ -1118,6 +1152,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(vouchers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all suppliers with balances and container counts
+  app.get("/api/suppliers/with-stats", async (_req, res) => {
+    try {
+      const suppliers = await storage.getAllSuppliers();
+      
+      const suppliersWithStats = await Promise.all(
+        suppliers.map(async (supplier) => {
+          const containerCount = await storage.getContainerCountBySupplier(supplier.id);
+          
+          return {
+            ...supplier,
+            containerCount,
+            balance: 0,
+          };
+        })
+      );
+
+      res.json(suppliersWithStats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
