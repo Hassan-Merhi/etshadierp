@@ -95,7 +95,9 @@ const voucherEntrySchema = z.object({
 });
 
 const voucherFormSchema = z.object({
-  bankAccountId: z.number().min(1, "Please select a bank account"),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier"]),
+  paymentAccountId: z.number().min(1, "Please select an account"),
+  paymentAccountName: z.string(),
   voucherDate: z.date(),
   entries: z.array(voucherEntrySchema).min(1, "Add at least one entry"),
   notes: z.string().optional(),
@@ -194,14 +196,16 @@ function AccountCombobox({
 // Print Template Component
 const PrintTemplate = ({
   voucherType,
-  bankAccount,
+  paymentAccountName,
+  paymentAccountBalance,
   date,
   entries,
   notes,
   total,
 }: {
   voucherType: "Payment" | "Receipt";
-  bankAccount: BankAccount | null;
+  paymentAccountName: string;
+  paymentAccountBalance: number;
   date: Date;
   entries: VoucherEntry[];
   notes: string;
@@ -219,16 +223,13 @@ const PrintTemplate = ({
           <h2 className="font-bold text-lg mb-2">
             {voucherType === "Payment" ? "Paid From:" : "Received In:"}
           </h2>
-          {bankAccount && (
+          {paymentAccountName && (
             <div className="text-sm">
               <p>
-                <strong>Bank:</strong> {bankAccount.bankName}
+                <strong>Account:</strong> {paymentAccountName}
               </p>
               <p>
-                <strong>Account:</strong> {bankAccount.accountName} ({bankAccount.accountNumber})
-              </p>
-              <p>
-                <strong>Balance (Before Transaction):</strong> ${parseFloat(bankAccount.balance || "0").toLocaleString(undefined, {
+                <strong>Balance (Before Transaction):</strong> ${paymentAccountBalance.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
@@ -313,7 +314,9 @@ export default function Vouchers() {
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
     defaultValues: {
-      bankAccountId: 0,
+      paymentAccountType: "bank",
+      paymentAccountId: 0,
+      paymentAccountName: "",
       voucherDate: new Date(),
       entries: [
         {
@@ -339,9 +342,41 @@ export default function Vouchers() {
     0
   );
 
-  // Get selected bank account
-  const selectedBankId = form.watch("bankAccountId");
-  const selectedBank = bankAccounts.find((b) => b.id === selectedBankId);
+  // Get selected payment account and calculate balance
+  const paymentAccountType = form.watch("paymentAccountType");
+  const paymentAccountId = form.watch("paymentAccountId");
+  const paymentAccountName = form.watch("paymentAccountName");
+  
+  // Calculate balance for selected account
+  const { data: accountBalance = 0 } = useQuery({
+    queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"],
+    enabled: paymentAccountId > 0,
+    queryFn: async () => {
+      if (paymentAccountType === "bank") {
+        const account = bankAccounts.find((b) => b.id === paymentAccountId);
+        return account ? parseFloat(account.balance || "0") : 0;
+      } else if (paymentAccountType === "ledger") {
+        const res = await fetch(`/api/accounts/ledger/${paymentAccountId}/transactions`);
+        const transactions = await res.json();
+        const balance = transactions.reduce((sum: number, t: any) => {
+          const debit = parseFloat(t.debitAmount || "0");
+          const credit = parseFloat(t.creditAmount || "0");
+          return sum + debit - credit;
+        }, 0);
+        return balance;
+      } else if (paymentAccountType === "supplier") {
+        const res = await fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`);
+        const transactions = await res.json();
+        const balance = transactions.reduce((sum: number, t: any) => {
+          const credit = parseFloat(t.creditAmount || "0");
+          const debit = parseFloat(t.debitAmount || "0");
+          return sum + credit - debit;
+        }, 0);
+        return balance;
+      }
+      return 0;
+    },
+  });
 
   // Save mutation
   const saveMutation = useMutation({
@@ -368,8 +403,13 @@ export default function Vouchers() {
           narration,
         };
 
+        const paymentEntryData: any = {
+          voucherId: voucher.id,
+          narration,
+        };
+
         if (activeTab === "payment") {
-          // Payment: Debit the accounts, Credit the bank
+          // Payment: Debit the expense/asset accounts, Credit the payment account
           if (entry.accountType === "ledger") {
             entryData.ledgerAccountId = entry.accountId;
           } else if (entry.accountType === "bank") {
@@ -382,23 +422,31 @@ export default function Vouchers() {
 
           await apiRequest("POST", "/api/voucher-entries", entryData);
 
-          // Credit the bank account
-          await apiRequest("POST", "/api/voucher-entries", {
-            voucherId: voucher.id,
-            bankAccountId: data.bankAccountId,
-            debitAmount: "0",
-            creditAmount: entry.amount,
-            narration,
-          });
+          // Credit the payment account
+          if (data.paymentAccountType === "ledger") {
+            paymentEntryData.ledgerAccountId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "bank") {
+            paymentEntryData.bankAccountId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "supplier") {
+            paymentEntryData.supplierId = data.paymentAccountId;
+          }
+          paymentEntryData.debitAmount = "0";
+          paymentEntryData.creditAmount = entry.amount;
+
+          await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
         } else {
-          // Receipt: Debit the bank, Credit the accounts
-          await apiRequest("POST", "/api/voucher-entries", {
-            voucherId: voucher.id,
-            bankAccountId: data.bankAccountId,
-            debitAmount: entry.amount,
-            creditAmount: "0",
-            narration,
-          });
+          // Receipt: Debit the payment account, Credit the income/liability accounts
+          if (data.paymentAccountType === "ledger") {
+            paymentEntryData.ledgerAccountId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "bank") {
+            paymentEntryData.bankAccountId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "supplier") {
+            paymentEntryData.supplierId = data.paymentAccountId;
+          }
+          paymentEntryData.debitAmount = entry.amount;
+          paymentEntryData.creditAmount = "0";
+
+          await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
 
           // Credit the account
           if (entry.accountType === "ledger") {
@@ -423,8 +471,11 @@ export default function Vouchers() {
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher created successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       form.reset({
-        bankAccountId: selectedBankId,
+        paymentAccountType: data.paymentAccountType,
+        paymentAccountId: data.paymentAccountId,
+        paymentAccountName: data.paymentAccountName,
         voucherDate: new Date(),
         entries: [
           {
@@ -524,7 +575,8 @@ export default function Vouchers() {
         <div ref={printRef}>
           <PrintTemplate
             voucherType={activeTab === "payment" ? "Payment" : "Receipt"}
-            bankAccount={selectedBank || null}
+            paymentAccountName={paymentAccountName}
+            paymentAccountBalance={accountBalance}
             date={form.watch("voucherDate")}
             entries={entries.filter((e) => e.accountId > 0 && e.amount)}
             notes={form.watch("notes") || ""}
@@ -555,40 +607,41 @@ export default function Vouchers() {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {/* Header section */}
                   <div className="flex items-start justify-between gap-4">
-                    {/* Left: Bank account selector */}
+                    {/* Left: Payment account selector */}
                     <FormField
                       control={form.control}
-                      name="bankAccountId"
+                      name="paymentAccountId"
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormLabel>
                             {activeTab === "payment" ? "Pay From" : "Receive In"}
                           </FormLabel>
-                          <Select
-                            onValueChange={(value) => field.onChange(parseInt(value))}
-                            value={field.value?.toString()}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-bank-account">
-                                <SelectValue placeholder="Select bank account" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {bankAccounts.map((account) => (
-                                <SelectItem
-                                  key={account.id}
-                                  value={account.id.toString()}
-                                  data-testid={`option-bank-${account.id}`}
-                                >
-                                  {account.bankName} - {account.accountNumber}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {selectedBank && (
+                          <FormControl>
+                            <AccountCombobox
+                              value={
+                                paymentAccountId > 0
+                                  ? {
+                                      type: paymentAccountType,
+                                      id: paymentAccountId,
+                                      name: paymentAccountName,
+                                    }
+                                  : null
+                              }
+                              onChange={(type, id, name) => {
+                                form.setValue("paymentAccountType", type);
+                                form.setValue("paymentAccountId", id);
+                                form.setValue("paymentAccountName", name);
+                              }}
+                              ledgerAccounts={ledgerAccounts}
+                              bankAccounts={bankAccounts}
+                              suppliers={suppliers}
+                              rowIndex={-1}
+                            />
+                          </FormControl>
+                          {paymentAccountId > 0 && (
                             <p className="text-sm text-muted-foreground mt-1">
                               Balance: $
-                              {parseFloat(selectedBank.balance).toLocaleString(undefined, {
+                              {accountBalance.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
@@ -641,7 +694,7 @@ export default function Vouchers() {
                         type="button"
                         variant="outline"
                         onClick={handlePrint}
-                        disabled={!selectedBank || entries.filter((e) => e.accountId > 0).length === 0}
+                        disabled={paymentAccountId === 0 || entries.filter((e) => e.accountId > 0).length === 0}
                         data-testid="button-print"
                       >
                         <Printer className="h-4 w-4 mr-2" />
