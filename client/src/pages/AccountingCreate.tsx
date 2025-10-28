@@ -374,14 +374,13 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Parent Account</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-parent">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {ledgerAccounts.map((acc: any) => (
                         <SelectItem key={acc.id} value={acc.id.toString()}>
                           {acc.name} ({acc.code})
@@ -762,14 +761,13 @@ function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; on
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Parent Group</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-parent">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {stockGroups.map((grp: any) => (
                         <SelectItem key={grp.id} value={grp.id.toString()}>
                           {grp.name} ({grp.code})
@@ -863,14 +861,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock Group</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-stock-group">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {stockGroups.map((grp: any) => (
                         <SelectItem key={grp.id} value={grp.id.toString()}>
                           {grp.name} ({grp.code})
@@ -1071,14 +1068,13 @@ function BankAccountForm({ form, onSubmit, onCancel, isPending }: { form: any; o
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Linked Ledger (Bank/Cash)</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-linked-ledger">
                         <SelectValue placeholder="Select ledger" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {bankCashLedgers.map((acc: any) => (
                         <SelectItem key={acc.id} value={acc.id.toString()}>
                           {acc.name} ({acc.accountType})
