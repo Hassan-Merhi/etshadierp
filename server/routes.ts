@@ -667,6 +667,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return acc;
       }, {});
 
+      // Get fresh stock items data for barcode lookup during import
+      const freshStockItems = await storage.getAllStockItems();
+
       // Create POs and line items
       for (const [poNumber, items] of Object.entries(poGroups)) {
         const poItems = items as any[];
@@ -681,9 +684,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         for (const item of poItems) {
+          // Re-lookup stock item by barcode or name to get fresh ID (not stale preview data)
+          let stockItemId = item.stockItemId;
+          let stockItem = null;
+
+          if (item.barcode) {
+            stockItem = freshStockItems.find(si => si.barcode === item.barcode);
+          } else if (item.itemName) {
+            stockItem = freshStockItems.find(si => si.name === item.itemName);
+          }
+
+          if (stockItem) {
+            stockItemId = stockItem.id;
+          }
+
+          if (!stockItemId) {
+            return res.status(400).json({ 
+              message: `Stock item not found: ${item.barcode || item.itemName}. Please ensure all items exist before importing.`
+            });
+          }
+
           await storage.createPOLineItem({
             poId: po.id,
-            stockItemId: item.stockItemId,
+            stockItemId: stockItemId,
             itemName: item.itemName,
             quantity: item.quantity.toString(),
             rate: item.rate.toString(),
