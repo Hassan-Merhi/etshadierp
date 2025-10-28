@@ -40,6 +40,7 @@ export interface IStorage {
 
   // Locations
   getAllLocations(): Promise<Location[]>;
+  getLocationById(id: number): Promise<Location | undefined>;
   getLocationByCode(code: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
 
@@ -129,6 +130,11 @@ export class DbStorage implements IStorage {
   // Locations
   async getAllLocations(): Promise<Location[]> {
     return await db.select().from(schema.locations);
+  }
+
+  async getLocationById(id: number): Promise<Location | undefined> {
+    const [location] = await db.select().from(schema.locations).where(eq(schema.locations.id, id));
+    return location;
   }
 
   async getLocationByCode(code: string): Promise<Location | undefined> {

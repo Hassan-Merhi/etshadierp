@@ -52,7 +52,7 @@ export default function LocationInventory() {
 
   // Fetch inventory for selected location
   const { data: inventory = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/locations", selectedLocation?.id, "inventory"],
+    queryKey: selectedLocation ? [`/api/locations/${selectedLocation.id}/inventory`] : [],
     enabled: !!selectedLocation,
   });
 

@@ -53,6 +53,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid location ID" });
       }
 
+      // Validate location exists
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
       const inventory = await storage.getLocationInventory(locationId);
       res.json(inventory);
     } catch (error: any) {
