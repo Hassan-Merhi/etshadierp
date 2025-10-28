@@ -83,6 +83,14 @@ interface VoucherEntry {
   amount: string;
 }
 
+interface JournalEntry {
+  accountType: "ledger" | "bank" | "supplier";
+  accountId: number;
+  accountName: string;
+  debitAmount: string;
+  creditAmount: string;
+}
+
 const voucherEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier"]),
   accountId: z.number().min(1, "Please select an account"),
@@ -94,6 +102,24 @@ const voucherEntrySchema = z.object({
     }),
 });
 
+const journalEntrySchema = z.object({
+  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountId: z.number().min(1, "Please select an account"),
+  accountName: z.string(),
+  debitAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
+    message: "Debit must be a positive number or empty",
+  }),
+  creditAmount: z.string().refine((val) => val === "" || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0), {
+    message: "Credit must be a positive number or empty",
+  }),
+}).refine((data) => {
+  const debit = parseFloat(data.debitAmount) || 0;
+  const credit = parseFloat(data.creditAmount) || 0;
+  return debit > 0 || credit > 0;
+}, {
+  message: "Either debit or credit amount must be greater than 0",
+});
+
 const voucherFormSchema = z.object({
   paymentAccountType: z.enum(["ledger", "bank", "supplier"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
@@ -103,7 +129,14 @@ const voucherFormSchema = z.object({
   notes: z.string().optional(),
 });
 
+const journalFormSchema = z.object({
+  voucherDate: z.date(),
+  entries: z.array(journalEntrySchema).min(1, "Add at least one entry"),
+  notes: z.string().optional(),
+});
+
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
+type JournalFormData = z.infer<typeof journalFormSchema>;
 
 // Account Combobox Component
 function AccountCombobox({
@@ -294,7 +327,7 @@ const PrintTemplate = ({
 };
 
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt">("payment");
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal">("payment");
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -539,6 +572,143 @@ export default function Vouchers() {
     saveMutation.mutate(data);
   };
 
+  // Journal form
+  const journalForm = useForm<JournalFormData>({
+    resolver: zodResolver(journalFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      entries: [
+        {
+          accountType: "ledger",
+          accountId: 0,
+          accountName: "",
+          debitAmount: "",
+          creditAmount: "",
+        },
+      ],
+      notes: "",
+    },
+  });
+
+  const {
+    fields: journalFields,
+    append: appendJournal,
+    remove: removeJournal,
+  } = useFieldArray({
+    control: journalForm.control,
+    name: "entries",
+  });
+
+  const journalEntries = journalForm.watch("entries");
+  const totalDebit = journalEntries.reduce(
+    (sum, entry) => sum + (parseFloat(entry.debitAmount) || 0),
+    0
+  );
+  const totalCredit = journalEntries.reduce(
+    (sum, entry) => sum + (parseFloat(entry.creditAmount) || 0),
+    0
+  );
+
+  // Journal save mutation
+  const journalMutation = useMutation({
+    mutationFn: async (formData: JournalFormData) => {
+      const data = formData;
+      
+      // Create voucher
+      const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        voucherType: "Journal",
+        voucherDate: data.voucherDate.toISOString(),
+        notes: data.notes || "",
+        totalAmount: totalDebit.toString(),
+      });
+      const voucher = await voucherRes.json();
+
+      // Create voucher entries
+      for (const entry of data.entries) {
+        if (entry.accountId === 0) continue;
+
+        const narration = `Journal Entry - ${entry.accountName}`;
+        const entryData: any = {
+          voucherId: voucher.id,
+          narration,
+        };
+
+        if (entry.accountType === "ledger") {
+          entryData.ledgerAccountId = entry.accountId;
+        } else if (entry.accountType === "bank") {
+          entryData.bankAccountId = entry.accountId;
+        } else if (entry.accountType === "supplier") {
+          entryData.supplierId = entry.accountId;
+        }
+
+        entryData.debitAmount = entry.debitAmount || "0";
+        entryData.creditAmount = entry.creditAmount || "0";
+
+        await apiRequest("POST", "/api/voucher-entries", entryData);
+      }
+
+      return voucher;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Journal voucher created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      journalForm.reset({
+        voucherDate: new Date(),
+        entries: [
+          {
+            accountType: "ledger",
+            accountId: 0,
+            accountName: "",
+            debitAmount: "",
+            creditAmount: "",
+          },
+        ],
+        notes: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create journal voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onJournalSubmit = (data: JournalFormData) => {
+    // Validate that all entries have valid accounts
+    const validEntries = data.entries.filter(
+      (entry) =>
+        entry.accountId > 0 &&
+        (parseFloat(entry.debitAmount) > 0 || parseFloat(entry.creditAmount) > 0)
+    );
+
+    if (validEntries.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one valid entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that total debits equal total credits
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      toast({
+        title: "Validation Error",
+        description: `Debits ($${totalDebit.toFixed(2)}) must equal Credits ($${totalCredit.toFixed(2)})`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    journalMutation.mutate(data);
+  };
+
   // Keyboard navigation handlers
   const handleKeyDown = (
     e: React.KeyboardEvent,
@@ -586,13 +756,16 @@ export default function Vouchers() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal")}>
         <TabsList>
           <TabsTrigger value="payment" data-testid="tab-payment">
-            Payment Voucher
+            Payment
           </TabsTrigger>
           <TabsTrigger value="receipt" data-testid="tab-receipt">
-            Receipt Voucher
+            Receipt
+          </TabsTrigger>
+          <TabsTrigger value="journal" data-testid="tab-journal">
+            Journal
           </TabsTrigger>
         </TabsList>
 
@@ -851,6 +1024,251 @@ export default function Vouchers() {
                       data-testid="button-save-voucher"
                     >
                       {saveMutation.isPending ? "Saving..." : "Save Voucher"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Journal Voucher Tab */}
+        <TabsContent value="journal" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Journal Voucher</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...journalForm}>
+                <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start justify-end gap-4">
+                    <FormField
+                      control={journalForm.control}
+                      name="voucherDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-[200px] justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="button-journal-date-picker"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Spreadsheet table */}
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[50%]">Account</th>
+                          <th className="text-left p-3 font-medium w-[20%]">Debit</th>
+                          <th className="text-left p-3 font-medium w-[20%]">Credit</th>
+                          <th className="w-[10%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {journalFields.map((field, index) => (
+                          <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.accountId`}
+                                render={({ field: accountField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <AccountCombobox
+                                        value={
+                                          journalEntries[index].accountId > 0
+                                            ? {
+                                                type: journalEntries[index].accountType,
+                                                id: journalEntries[index].accountId,
+                                                name: journalEntries[index].accountName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(type, id, name) => {
+                                          journalForm.setValue(`entries.${index}.accountType`, type);
+                                          journalForm.setValue(`entries.${index}.accountId`, id);
+                                          journalForm.setValue(`entries.${index}.accountName`, name);
+                                        }}
+                                        ledgerAccounts={ledgerAccounts}
+                                        bankAccounts={bankAccounts}
+                                        suppliers={suppliers}
+                                        rowIndex={index}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.debitAmount`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                        className="font-mono text-right"
+                                        data-testid={`input-journal-debit-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={journalForm.control}
+                                name={`entries.${index}.creditAmount`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="0.00"
+                                        className="font-mono text-right"
+                                        data-testid={`input-journal-credit-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              {journalFields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeJournal(index)}
+                                  data-testid={`button-journal-remove-${index}`}
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                appendJournal({
+                                  accountType: "ledger",
+                                  accountId: 0,
+                                  accountName: "",
+                                  debitAmount: "",
+                                  creditAmount: "",
+                                })
+                              }
+                              data-testid="button-journal-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${totalDebit.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${totalCredit.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                        {Math.abs(totalDebit - totalCredit) > 0.01 && (
+                          <tr>
+                            <td colSpan={4} className="p-3">
+                              <div className="text-center text-sm text-destructive">
+                                ⚠️ Debits and Credits must be equal. Difference: $
+                                {Math.abs(totalDebit - totalCredit).toFixed(2)}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Notes field */}
+                  <FormField
+                    control={journalForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Additional notes..."
+                            rows={3}
+                            data-testid="input-journal-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Submit button */}
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={journalMutation.isPending || Math.abs(totalDebit - totalCredit) > 0.01}
+                      data-testid="button-save-journal-voucher"
+                    >
+                      {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
                     </Button>
                   </div>
                 </form>
