@@ -10,6 +10,7 @@ import {
   FolderPlus,
   Upload,
   MapPin,
+  Wallet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -61,6 +62,11 @@ const menuItems = [
     title: "Financial",
     url: "/financial",
     icon: DollarSign,
+  },
+  {
+    title: "Accounts",
+    url: "/accounts",
+    icon: Wallet,
   },
   {
     title: "Reports",

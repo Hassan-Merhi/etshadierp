@@ -987,6 +987,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all accounts (combined from ledgers, bank accounts, and fixed assets)
+  app.get("/api/accounts/all", async (_req, res) => {
+    try {
+      const ledgers = await storage.getAllLedgerAccounts();
+      const banks = await storage.getAllBankAccounts();
+      const assets = await storage.getAllFixedAssets();
+
+      const accounts = [
+        ...ledgers.map((account) => ({
+          id: `ledger-${account.id}`,
+          accountId: account.id,
+          type: "Ledger",
+          code: account.code,
+          name: account.name,
+          balance: parseFloat(account.openingBalance || "0"),
+          balanceSide: account.openingBalanceSide || null,
+          active: account.active,
+        })),
+        ...banks.map((account) => ({
+          id: `bank-${account.id}`,
+          accountId: account.id,
+          type: "Bank",
+          code: account.code,
+          name: `${account.name} (${account.bankName})`,
+          balance: parseFloat(account.openingBalance || "0"),
+          balanceSide: account.openingBalanceSide || null,
+          active: account.active,
+        })),
+        ...assets.map((asset) => ({
+          id: `asset-${asset.id}`,
+          accountId: asset.id,
+          type: "Fixed Asset",
+          code: asset.code,
+          name: asset.name,
+          balance: parseFloat(asset.openingBalance || "0"),
+          balanceSide: "Dr",
+          active: asset.active,
+        })),
+      ];
+
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get transactions for a specific ledger account with optional date filtering
+  app.get("/api/accounts/ledger/:id/transactions", async (req, res) => {
+    try {
+      const ledgerAccountId = parseInt(req.params.id);
+      
+      if (isNaN(ledgerAccountId)) {
+        return res.status(400).json({ message: "Invalid ledger account ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const transactions = await storage.getVoucherEntriesByLedger(
+        ledgerAccountId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get transactions for a specific bank account with optional date filtering
+  app.get("/api/accounts/bank/:id/transactions", async (req, res) => {
+    try {
+      const bankAccountId = parseInt(req.params.id);
+      
+      if (isNaN(bankAccountId)) {
+        return res.status(400).json({ message: "Invalid bank account ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const transactions = await storage.getVoucherEntriesByBankAccount(
+        bankAccountId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get transactions for a specific fixed asset with optional date filtering
+  app.get("/api/accounts/fixed-asset/:id/transactions", async (req, res) => {
+    try {
+      const fixedAssetId = parseInt(req.params.id);
+      
+      if (isNaN(fixedAssetId)) {
+        return res.status(400).json({ message: "Invalid fixed asset ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+
+      const transactions = await storage.getVoucherEntriesByFixedAsset(
+        fixedAssetId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all vouchers with date filtering
+  app.get("/api/vouchers", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      let vouchers;
+      if (startDate && endDate) {
+        vouchers = await storage.getVouchersByDateRange(
+          startDate as string,
+          endDate as string
+        );
+      } else {
+        vouchers = await storage.getAllVouchers();
+      }
+
+      res.json(vouchers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

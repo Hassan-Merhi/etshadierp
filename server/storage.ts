@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -32,6 +32,10 @@ import type {
   InsertImportLog,
   ContainerOffload,
   InsertContainerOffload,
+  Voucher,
+  InsertVoucher,
+  VoucherEntry,
+  InsertVoucherEntry,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -113,6 +117,16 @@ export interface IStorage {
 
   // Container Offload
   offloadContainer(containerId: number, locationId: number, duties: string, officeCharges: string, transferCharges: string, transportFees: string): Promise<ContainerOffload>;
+
+  // Vouchers and Journal Entries
+  getAllVouchers(): Promise<Voucher[]>;
+  getVoucherById(id: number): Promise<Voucher | undefined>;
+  getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]>;
+  getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  createVoucher(voucher: InsertVoucher): Promise<Voucher>;
+  createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
 }
 
 export class DbStorage implements IStorage {
@@ -484,6 +498,141 @@ export class DbStorage implements IStorage {
     }).returning();
 
     return offload;
+  }
+
+  // Vouchers and Journal Entries
+  async getAllVouchers(): Promise<Voucher[]> {
+    return await db.select().from(schema.vouchers);
+  }
+
+  async getVoucherById(id: number): Promise<Voucher | undefined> {
+    const [voucher] = await db.select().from(schema.vouchers).where(eq(schema.vouchers.id, id));
+    return voucher;
+  }
+
+  async getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]> {
+    const vouchers = await db
+      .select()
+      .from(schema.vouchers)
+      .where(
+        and(
+          sql`${schema.vouchers.voucherDate} >= ${startDate}`,
+          sql`${schema.vouchers.voucherDate} <= ${endDate}`
+        )
+      );
+    return vouchers;
+  }
+
+  async getVoucherEntriesByLedger(
+    ledgerAccountId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [eq(schema.voucherEntries.ledgerAccountId, ledgerAccountId)];
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    const query = db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions));
+
+    return await query;
+  }
+
+  async getVoucherEntriesByBankAccount(
+    bankAccountId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [eq(schema.voucherEntries.bankAccountId, bankAccountId)];
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    const query = db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions));
+
+    return await query;
+  }
+
+  async getVoucherEntriesByFixedAsset(
+    fixedAssetId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [eq(schema.voucherEntries.fixedAssetId, fixedAssetId)];
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    const query = db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions));
+
+    return await query;
+  }
+
+  async createVoucher(voucher: InsertVoucher): Promise<Voucher> {
+    const [created] = await db.insert(schema.vouchers).values(voucher).returning();
+    return created;
+  }
+
+  async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
+    const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
+    return created;
   }
 }
 

@@ -400,3 +400,49 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
 export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema>;
 export type ContainerOffload = typeof containerOffloads.$inferSelect;
 export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
+
+export const vouchers = pgTable("vouchers", {
+  id: serial("id").primaryKey(),
+  voucherNumber: varchar("voucher_number", { length: 100 }).notNull().unique(),
+  voucherType: text("voucher_type").notNull(),
+  voucherDate: date("voucher_date").notNull(),
+  description: text("description"),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVoucherSchema = createInsertSchema(vouchers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherNumber: z.string().min(1, "Voucher number is required"),
+  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"]),
+  voucherDate: z.string().min(1, "Voucher date is required"),
+  totalAmount: z.string().min(1, "Total amount is required"),
+});
+
+export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
+export type Voucher = typeof vouchers.$inferSelect;
+
+export const voucherEntries = pgTable("voucher_entries", {
+  id: serial("id").primaryKey(),
+  voucherId: integer("voucher_id").notNull(),
+  ledgerAccountId: integer("ledger_account_id").notNull(),
+  debitAmount: decimal("debit_amount", { precision: 15, scale: 2 }).default("0"),
+  creditAmount: decimal("credit_amount", { precision: 15, scale: 2 }).default("0"),
+  narration: text("narration"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.number().min(1, "Voucher is required"),
+  ledgerAccountId: z.number().min(1, "Ledger account is required"),
+  debitAmount: z.string().optional(),
+  creditAmount: z.string().optional(),
+});
+
+export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
+export type VoucherEntry = typeof voucherEntries.$inferSelect;
