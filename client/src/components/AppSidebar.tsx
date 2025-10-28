@@ -9,6 +9,7 @@ import {
   BarChart3,
   FolderPlus,
   Upload,
+  MapPin,
 } from "lucide-react";
 import {
   Sidebar,
@@ -40,6 +41,11 @@ const menuItems = [
     title: "Inventory",
     url: "/inventory",
     icon: Package,
+  },
+  {
+    title: "Location Inventory",
+    url: "/location-inventory",
+    icon: MapPin,
   },
   {
     title: "Containers",

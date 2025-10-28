@@ -20,6 +20,7 @@ import Reports from "@/pages/Reports";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
 import ContainerDetail from "@/pages/ContainerDetail";
+import LocationInventory from "@/pages/LocationInventory";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/pos" component={POS} />
       <Route path="/inventory" component={Inventory} />
+      <Route path="/location-inventory" component={LocationInventory} />
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/po-import" component={POImport} />
