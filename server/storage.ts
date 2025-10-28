@@ -93,8 +93,10 @@ export interface IStorage {
   updateContainer(id: number, updates: Partial<InsertContainer>): Promise<Container>;
 
   // Purchase Orders
+  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
   getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
   createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
 
   // PO Line Items
   getLineItemsByPO(poId: number): Promise<POLineItem[]>;
@@ -302,6 +304,10 @@ export class DbStorage implements IStorage {
   }
 
   // Purchase Orders
+  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return await db.select().from(schema.purchaseOrders);
+  }
+
   async getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {
     return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.containerId, containerId));
   }
@@ -309,6 +315,14 @@ export class DbStorage implements IStorage {
   async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
     const [created] = await db.insert(schema.purchaseOrders).values(po).returning();
     return created;
+  }
+
+  async updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder> {
+    const [updated] = await db.update(schema.purchaseOrders)
+      .set(updates)
+      .where(eq(schema.purchaseOrders.id, id))
+      .returning();
+    return updated;
   }
 
   // PO Line Items

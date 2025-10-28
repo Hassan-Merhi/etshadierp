@@ -692,12 +692,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get fresh stock items data for barcode lookup during import
       const freshStockItems = await storage.getAllStockItems();
 
+      // Get or create "Purchases" ledger account for double-entry bookkeeping
+      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
+      if (!purchasesAccount) {
+        // Create default Purchases account if it doesn't exist
+        purchasesAccount = await storage.createLedgerAccount({
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
       // Create POs and line items
       for (const [poNumber, items] of Object.entries(poGroups)) {
         const poItems = items as any[];
         const poTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
 
-        // Create voucher for this PO (Purchase voucher debiting supplier account)
+        // Create voucher for this PO (Purchase voucher with double-entry)
         const voucher = await storage.createVoucher({
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
@@ -706,12 +720,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalAmount: poTotal.toString(),
         });
 
-        // Create voucher entry debiting supplier account
+        // Create voucher entries for double-entry bookkeeping
+        // Debit: Purchases account (Expense increases)
+        await storage.createVoucherEntry({
+          voucherId: voucher.id,
+          ledgerAccountId: purchasesAccount.id,
+          debitAmount: poTotal.toString(),
+          creditAmount: "0",
+          narration: `PO ${poNumber} - Container ${containerNumber}`,
+        });
+
+        // Credit: Supplier account (Accounts Payable increases)
         await storage.createVoucherEntry({
           voucherId: voucher.id,
           supplierId: supplierId,
-          debitAmount: poTotal.toString(),
-          creditAmount: "0",
+          debitAmount: "0",
+          creditAmount: poTotal.toString(),
           narration: `PO ${poNumber} - Container ${containerNumber}`,
         });
 
@@ -1002,6 +1026,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(offload);
     } catch (error: any) {
       console.error("Container offload error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Backfill voucher entries for existing POs
+  app.post("/api/po-import/backfill", async (_req, res) => {
+    try {
+      // Get all POs without voucher IDs
+      const allPOs = await storage.getAllPurchaseOrders();
+      const posWithoutVouchers = allPOs.filter((po: any) => !po.voucherId);
+
+      if (posWithoutVouchers.length === 0) {
+        return res.json({ 
+          message: "No POs need backfilling", 
+          count: 0 
+        });
+      }
+
+      // Get or create "Purchases" ledger account for double-entry bookkeeping
+      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
+      if (!purchasesAccount) {
+        purchasesAccount = await storage.createLedgerAccount({
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
+      // Get all containers to lookup import dates
+      const allContainers = await storage.getAllContainers();
+      const containerMap = new Map(allContainers.map(c => [c.id, c]));
+
+      let backfilledCount = 0;
+
+      for (const po of posWithoutVouchers) {
+        const container = containerMap.get(po.containerId);
+        if (!container) continue;
+
+        // Create voucher for this PO with double-entry bookkeeping
+        const voucher = await storage.createVoucher({
+          voucherNumber: `PO-${po.poNumber}-BACKFILL-${Date.now()}`,
+          voucherType: "Purchase",
+          voucherDate: container.importDate,
+          description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Backfilled)`,
+          totalAmount: po.itemsTotal || "0",
+        });
+
+        // Debit: Purchases account (Expense increases)
+        await storage.createVoucherEntry({
+          voucherId: voucher.id,
+          ledgerAccountId: purchasesAccount.id,
+          debitAmount: po.itemsTotal || "0",
+          creditAmount: "0",
+          narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Backfilled)`,
+        });
+
+        // Credit: Supplier account (Accounts Payable increases)
+        await storage.createVoucherEntry({
+          voucherId: voucher.id,
+          supplierId: po.supplierId,
+          debitAmount: "0",
+          creditAmount: po.itemsTotal || "0",
+          narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Backfilled)`,
+        });
+
+        // Update PO with voucher ID
+        await storage.updatePurchaseOrder(po.id, {
+          voucherId: voucher.id,
+        });
+
+        backfilledCount++;
+      }
+
+      res.json({ 
+        message: "Backfill completed successfully", 
+        count: backfilledCount 
+      });
+    } catch (error: any) {
+      console.error("Backfill error:", error);
       res.status(500).json({ message: error.message });
     }
   });
