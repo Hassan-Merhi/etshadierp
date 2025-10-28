@@ -13,6 +13,7 @@ import {
   insertStockItemSchema,
   insertBankAccountSchema,
   insertFixedAssetSchema,
+  offloadRequestSchema,
 } from "@shared/schema";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -949,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const containerId = parseInt(req.params.id);
       
       // Validate request body
-      const validation = schema.offloadRequestSchema.safeParse(req.body);
+      const validation = offloadRequestSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ 
           message: "Validation failed", 

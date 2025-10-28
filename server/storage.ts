@@ -113,7 +113,6 @@ export interface IStorage {
 
   // Container Offload
   offloadContainer(containerId: number, locationId: number, duties: string, officeCharges: string, transferCharges: string, transportFees: string): Promise<ContainerOffload>;
-  createContainerOffload(offload: InsertContainerOffload): Promise<ContainerOffload>;
 }
 
 export class DbStorage implements IStorage {
@@ -485,11 +484,6 @@ export class DbStorage implements IStorage {
     }).returning();
 
     return offload;
-  }
-
-  async createContainerOffload(offload: InsertContainerOffload): Promise<ContainerOffload> {
-    const [created] = await db.insert(schema.containerOffloads).values(offload).returning();
-    return created;
   }
 }
 
