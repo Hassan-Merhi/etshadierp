@@ -91,6 +91,33 @@ interface JournalEntry {
   amount: string;
 }
 
+interface StockItem {
+  id: number;
+  code: string;
+  name: string;
+  uom: string;
+}
+
+interface Location {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface StockTransferEntry {
+  stockItemId: number;
+  stockItemName: string;
+  quantity: string;
+  rate: string;
+}
+
+interface StockAdjustmentEntry {
+  stockItemId: number;
+  stockItemName: string;
+  quantity: string;
+  rate: string;
+}
+
 const voucherEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier"]),
   accountId: z.number().min(1, "Please select an account"),
@@ -129,8 +156,40 @@ const journalFormSchema = z.object({
   notes: z.string().optional(),
 });
 
+const stockTransferEntrySchema = z.object({
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+});
+
+const stockTransferFormSchema = z.object({
+  voucherDate: z.date(),
+  sourceLocationId: z.number().min(1, "Source location required"),
+  destinationLocationId: z.number().min(1, "Destination location required"),
+  entries: z.array(stockTransferEntrySchema).min(1),
+  notes: z.string().optional(),
+});
+
+const stockAdjustmentEntrySchema = z.object({
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) !== 0, "Quantity cannot be zero"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+});
+
+const stockAdjustmentFormSchema = z.object({
+  voucherDate: z.date(),
+  locationId: z.number().min(1, "Location required"),
+  adjustmentType: z.enum(["Production", "Consumption"]),
+  entries: z.array(stockAdjustmentEntrySchema).min(1),
+  notes: z.string().optional(),
+});
+
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
 type JournalFormData = z.infer<typeof journalFormSchema>;
+type StockTransferFormData = z.infer<typeof stockTransferFormSchema>;
+type StockAdjustmentFormData = z.infer<typeof stockAdjustmentFormSchema>;
 
 // Account Combobox Component
 function AccountCombobox({
@@ -210,6 +269,70 @@ function AccountCombobox({
                     )}
                   />
                   {account.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Stock Item Combobox Component
+function StockItemCombobox({
+  value,
+  onChange,
+  stockItems,
+  rowIndex,
+  onFocus,
+}: {
+  value: { id: number; name: string } | null;
+  onChange: (id: number, name: string) => void;
+  stockItems: StockItem[];
+  rowIndex: number;
+  onFocus?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+          data-testid={`button-stock-item-${rowIndex}`}
+          onFocus={onFocus}
+        >
+          {value ? value.name : "Select stock item..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0">
+        <Command>
+          <CommandInput placeholder="Search stock items..." />
+          <CommandList>
+            <CommandEmpty>No stock item found.</CommandEmpty>
+            <CommandGroup>
+              {stockItems.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={`${item.code} - ${item.name}`}
+                  onSelect={() => {
+                    onChange(item.id, `${item.code} - ${item.name}`);
+                    setOpen(false);
+                  }}
+                  data-testid={`option-stock-item-${item.id}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value?.id === item.id ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {item.code} - {item.name}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -321,7 +444,7 @@ const PrintTemplate = ({
 };
 
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal">("payment");
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">("payment");
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -336,6 +459,14 @@ export default function Vouchers() {
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: stockItems = [] } = useQuery<StockItem[]>({
+    queryKey: ["/api/stock-items"],
+  });
+
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
   });
 
   const form = useForm<VoucherFormData>({
@@ -720,6 +851,242 @@ export default function Vouchers() {
     journalMutation.mutate(data);
   };
 
+  // Stock Transfer form
+  const stockTransferForm = useForm<StockTransferFormData>({
+    resolver: zodResolver(stockTransferFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      sourceLocationId: 0,
+      destinationLocationId: 0,
+      entries: [
+        {
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        },
+      ],
+      notes: "",
+    },
+  });
+
+  const {
+    fields: transferFields,
+    append: appendTransfer,
+    remove: removeTransfer,
+  } = useFieldArray({
+    control: stockTransferForm.control,
+    name: "entries",
+  });
+
+  const transferEntries = stockTransferForm.watch("entries");
+  const transferTotal = transferEntries.reduce(
+    (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
+    0
+  );
+
+  // Stock Transfer mutation
+  const stockTransferMutation = useMutation({
+    mutationFn: async (formData: StockTransferFormData) => {
+      const data = formData;
+      
+      // Create voucher
+      const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        voucherType: "StockTransfer",
+        voucherNumber: `TRANSFER-${Date.now()}`,
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: `Stock transfer from ${locations.find(l => l.id === data.sourceLocationId)?.name} to ${locations.find(l => l.id === data.destinationLocationId)?.name}`,
+        totalAmount: transferTotal.toString(),
+      });
+      const voucher = await voucherRes.json();
+
+      // Create stock transfer with items
+      await apiRequest("POST", "/api/stock-transfers", {
+        voucherId: voucher.id,
+        sourceLocationId: data.sourceLocationId,
+        destinationLocationId: data.destinationLocationId,
+        notes: data.notes || "",
+        items: data.entries.map(entry => ({
+          stockItemId: entry.stockItemId,
+          quantity: entry.quantity,
+          rate: entry.rate,
+        })),
+      });
+
+      return voucher;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Stock transfer voucher created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      stockTransferForm.reset({
+        voucherDate: new Date(),
+        sourceLocationId: 0,
+        destinationLocationId: 0,
+        entries: [
+          {
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          },
+        ],
+        notes: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create stock transfer",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onStockTransferSubmit = (data: StockTransferFormData) => {
+    // Validate source != destination
+    if (data.sourceLocationId === data.destinationLocationId) {
+      toast({
+        title: "Validation Error",
+        description: "Source and destination locations must be different",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate entries
+    const validEntries = data.entries.filter(
+      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
+    );
+
+    if (validEntries.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one valid entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    stockTransferMutation.mutate(data);
+  };
+
+  // Stock Adjustment form
+  const stockAdjustmentForm = useForm<StockAdjustmentFormData>({
+    resolver: zodResolver(stockAdjustmentFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      locationId: 0,
+      adjustmentType: "Production",
+      entries: [
+        {
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        },
+      ],
+      notes: "",
+    },
+  });
+
+  const {
+    fields: adjustmentFields,
+    append: appendAdjustment,
+    remove: removeAdjustment,
+  } = useFieldArray({
+    control: stockAdjustmentForm.control,
+    name: "entries",
+  });
+
+  const adjustmentEntries = stockAdjustmentForm.watch("entries");
+  const adjustmentTotal = adjustmentEntries.reduce(
+    (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
+    0
+  );
+
+  // Stock Adjustment mutation
+  const stockAdjustmentMutation = useMutation({
+    mutationFn: async (formData: StockAdjustmentFormData) => {
+      const data = formData;
+      
+      // Create voucher
+      const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        voucherType: data.adjustmentType,
+        voucherNumber: `${data.adjustmentType.toUpperCase()}-${Date.now()}`,
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: `Stock ${data.adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
+        totalAmount: Math.abs(adjustmentTotal).toString(),
+      });
+      const voucher = await voucherRes.json();
+
+      // Create stock adjustment with items
+      await apiRequest("POST", "/api/stock-adjustments", {
+        voucherId: voucher.id,
+        locationId: data.locationId,
+        adjustmentType: data.adjustmentType,
+        notes: data.notes || "",
+        items: data.entries.map(entry => ({
+          stockItemId: entry.stockItemId,
+          quantity: entry.quantity,
+          rate: entry.rate,
+        })),
+      });
+
+      return voucher;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Stock adjustment voucher created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      stockAdjustmentForm.reset({
+        voucherDate: new Date(),
+        locationId: 0,
+        adjustmentType: "Production",
+        entries: [
+          {
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          },
+        ],
+        notes: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create stock adjustment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
+    // Validate entries
+    const validEntries = data.entries.filter(
+      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) !== 0
+    );
+
+    if (validEntries.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one valid entry",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    stockAdjustmentMutation.mutate(data);
+  };
+
   // Keyboard navigation handlers
   const handleKeyDown = (
     e: React.KeyboardEvent,
@@ -767,7 +1134,7 @@ export default function Vouchers() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
         <TabsList>
           <TabsTrigger value="payment" data-testid="tab-payment">
             Payment
@@ -777,6 +1144,12 @@ export default function Vouchers() {
           </TabsTrigger>
           <TabsTrigger value="journal" data-testid="tab-journal">
             Journal
+          </TabsTrigger>
+          <TabsTrigger value="transfer" data-testid="tab-transfer">
+            Stock Transfer
+          </TabsTrigger>
+          <TabsTrigger value="adjustment" data-testid="tab-adjustment">
+            Production/Consumption
           </TabsTrigger>
         </TabsList>
 
@@ -1275,6 +1648,581 @@ export default function Vouchers() {
                       data-testid="button-save-journal-voucher"
                     >
                       {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transfer" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Transfer Voucher</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...stockTransferForm}>
+                <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)} className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-4 flex-1">
+                      <FormField
+                        control={stockTransferForm.control}
+                        name="sourceLocationId"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Source Location</FormLabel>
+                            <Select
+                              value={field.value > 0 ? field.value.toString() : ""}
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-source-location">
+                                  <SelectValue placeholder="Select source location..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {locations.map((location) => (
+                                  <SelectItem key={location.id} value={location.id.toString()}>
+                                    {location.code} - {location.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={stockTransferForm.control}
+                        name="destinationLocationId"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Destination Location</FormLabel>
+                            <Select
+                              value={field.value > 0 ? field.value.toString() : ""}
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-destination-location">
+                                  <SelectValue placeholder="Select destination location..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {locations.map((location) => (
+                                  <SelectItem key={location.id} value={location.id.toString()}>
+                                    {location.code} - {location.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Right: Date picker */}
+                    <FormField
+                      control={stockTransferForm.control}
+                      name="voucherDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-[200px] justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="button-transfer-date-picker"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Spreadsheet table */}
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[45%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
+                          <th className="text-left p-3 font-medium w-[20%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transferFields.map((field, index) => (
+                          <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={stockTransferForm.control}
+                                name={`entries.${index}.stockItemId`}
+                                render={({ field: stockField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <StockItemCombobox
+                                        value={
+                                          transferEntries[index].stockItemId > 0
+                                            ? {
+                                                id: transferEntries[index].stockItemId,
+                                                name: transferEntries[index].stockItemName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(id, name) => {
+                                          stockTransferForm.setValue(`entries.${index}.stockItemId`, id);
+                                          stockTransferForm.setValue(`entries.${index}.stockItemName`, name);
+                                        }}
+                                        stockItems={stockItems}
+                                        rowIndex={index}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={stockTransferForm.control}
+                                name={`entries.${index}.quantity`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.001"
+                                        placeholder="0.000"
+                                        className="font-mono"
+                                        data-testid={`input-transfer-quantity-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={stockTransferForm.control}
+                                name={`entries.${index}.rate`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        className="font-mono"
+                                        data-testid={`input-transfer-rate-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <div className="text-right font-mono">
+                                ${(parseFloat(transferEntries[index].quantity || "0") * parseFloat(transferEntries[index].rate || "0")).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              {transferFields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeTransfer(index)}
+                                  data-testid={`button-remove-transfer-${index}`}
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                appendTransfer({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  rate: "",
+                                })
+                              }
+                              data-testid="button-add-transfer-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${transferTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Notes field */}
+                  <FormField
+                    control={stockTransferForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Additional notes..."
+                            rows={3}
+                            data-testid="input-transfer-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Submit button */}
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={
+                        stockTransferMutation.isPending ||
+                        stockTransferForm.watch("sourceLocationId") === stockTransferForm.watch("destinationLocationId") ||
+                        transferTotal === 0
+                      }
+                      data-testid="button-save-transfer-voucher"
+                    >
+                      {stockTransferMutation.isPending ? "Saving..." : "Save Stock Transfer"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="adjustment" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Adjustment Voucher</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...stockAdjustmentForm}>
+                <form onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-4 flex-1">
+                      <FormField
+                        control={stockAdjustmentForm.control}
+                        name="adjustmentType"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Adjustment Type</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-adjustment-type">
+                                  <SelectValue placeholder="Select type..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Production">Production</SelectItem>
+                                <SelectItem value="Consumption">Consumption</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={stockAdjustmentForm.control}
+                        name="locationId"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Location</FormLabel>
+                            <Select
+                              value={field.value > 0 ? field.value.toString() : ""}
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-adjustment-location">
+                                  <SelectValue placeholder="Select location..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {locations.map((location) => (
+                                  <SelectItem key={location.id} value={location.id.toString()}>
+                                    {location.code} - {location.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Right: Date picker */}
+                    <FormField
+                      control={stockAdjustmentForm.control}
+                      name="voucherDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-[200px] justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="button-adjustment-date-picker"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Spreadsheet table */}
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[45%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
+                          <th className="text-left p-3 font-medium w-[20%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adjustmentFields.map((field, index) => (
+                          <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={stockAdjustmentForm.control}
+                                name={`entries.${index}.stockItemId`}
+                                render={({ field: stockField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <StockItemCombobox
+                                        value={
+                                          adjustmentEntries[index].stockItemId > 0
+                                            ? {
+                                                id: adjustmentEntries[index].stockItemId,
+                                                name: adjustmentEntries[index].stockItemName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(id, name) => {
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, id);
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, name);
+                                        }}
+                                        stockItems={stockItems}
+                                        rowIndex={index}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={stockAdjustmentForm.control}
+                                name={`entries.${index}.quantity`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.001"
+                                        placeholder="0.000"
+                                        className="font-mono"
+                                        data-testid={`input-adjustment-quantity-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={stockAdjustmentForm.control}
+                                name={`entries.${index}.rate`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        className="font-mono"
+                                        data-testid={`input-adjustment-rate-${index}`}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <div className="text-right font-mono">
+                                ${(parseFloat(adjustmentEntries[index].quantity || "0") * parseFloat(adjustmentEntries[index].rate || "0")).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              {adjustmentFields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeAdjustment(index)}
+                                  data-testid={`button-remove-adjustment-${index}`}
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                appendAdjustment({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  rate: "",
+                                })
+                              }
+                              data-testid="button-add-adjustment-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${adjustmentTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Notes field */}
+                  <FormField
+                    control={stockAdjustmentForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Additional notes..."
+                            rows={3}
+                            data-testid="input-adjustment-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Submit button */}
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={stockAdjustmentMutation.isPending || adjustmentTotal === 0}
+                      data-testid="button-save-adjustment-voucher"
+                    >
+                      {stockAdjustmentMutation.isPending ? "Saving..." : "Save Stock Adjustment"}
                     </Button>
                   </div>
                 </form>
