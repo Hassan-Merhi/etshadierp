@@ -1291,10 +1291,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         suppliers.map(async (supplier) => {
           const containerCount = await storage.getContainerCountBySupplier(supplier.id);
           
+          // Calculate balance from voucher entries
+          // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
+          // Balance = Credits - Debits (positive means we owe them)
+          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+          const balance = entries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            return sum + credit - debit;
+          }, 0);
+          
           return {
             ...supplier,
             containerCount,
-            balance: 0,
+            balance,
           };
         })
       );
