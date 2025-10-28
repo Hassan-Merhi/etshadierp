@@ -45,6 +45,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Location Inventory - Get inventory for a specific location
+  app.get("/api/locations/:locationId/inventory", async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const inventory = await storage.getLocationInventory(locationId);
+      res.json(inventory);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Ledger Accounts
   app.get("/api/ledger-accounts", async (_req, res) => {
     try {

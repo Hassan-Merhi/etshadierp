@@ -340,3 +340,26 @@ export const insertImportLogSchema = createInsertSchema(importLogs).omit({
 
 export type InsertImportLog = z.infer<typeof insertImportLogSchema>;
 export type ImportLog = typeof importLogs.$inferSelect;
+
+export const inventory = pgTable("inventory", {
+  id: serial("id").primaryKey(),
+  locationId: integer("location_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
+  averageRate: decimal("average_rate", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalValue: decimal("total_value", { precision: 15, scale: 2 }).notNull().default("0"),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+});
+
+export const insertInventorySchema = createInsertSchema(inventory).omit({
+  id: true,
+}).extend({
+  locationId: z.number().min(1, "Location is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  quantity: z.string(),
+  averageRate: z.string(),
+  totalValue: z.string(),
+});
+
+export type InsertInventory = z.infer<typeof insertInventorySchema>;
+export type Inventory = typeof inventory.$inferSelect;

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -103,6 +103,10 @@ export interface IStorage {
 
   // Stock Items - Additional methods for barcode lookup
   getStockItemByBarcode(barcode: string): Promise<StockItem | undefined>;
+
+  // Inventory - Location-based stock tracking
+  getLocationInventory(locationId: number): Promise<any[]>;
+  updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -315,6 +319,67 @@ export class DbStorage implements IStorage {
   async getStockItemByBarcode(barcode: string): Promise<StockItem | undefined> {
     const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.barcode, barcode));
     return item;
+  }
+
+  // Inventory - Location-based stock tracking
+  async getLocationInventory(locationId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        inventoryId: schema.inventory.id,
+        locationId: schema.inventory.locationId,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+        lastUpdated: schema.inventory.lastUpdated,
+        stockItemCode: schema.stockItems.code,
+        stockItemName: schema.stockItems.name,
+        stockItemBarcode: schema.stockItems.barcode,
+        stockItemUom: schema.stockItems.uom,
+        stockGroupId: schema.stockItems.stockGroupId,
+        stockGroupName: schema.stockGroups.name,
+        stockGroupCode: schema.stockGroups.code,
+      })
+      .from(schema.inventory)
+      .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
+      .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .where(eq(schema.inventory.locationId, locationId));
+    
+    return results;
+  }
+
+  async updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void> {
+    // Check if inventory record exists
+    const [existing] = await db
+      .select()
+      .from(schema.inventory)
+      .where(and(
+        eq(schema.inventory.locationId, locationId),
+        eq(schema.inventory.stockItemId, stockItemId)
+      ));
+
+    if (existing) {
+      // Update existing record
+      await db
+        .update(schema.inventory)
+        .set({
+          quantity,
+          averageRate,
+          totalValue,
+          lastUpdated: new Date(),
+        })
+        .where(eq(schema.inventory.id, existing.id));
+    } else {
+      // Create new record
+      await db.insert(schema.inventory).values({
+        locationId,
+        stockItemId,
+        quantity,
+        averageRate,
+        totalValue,
+        lastUpdated: new Date(),
+      });
+    }
   }
 }
 
