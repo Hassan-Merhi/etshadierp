@@ -18,6 +18,7 @@ import Containers from "@/pages/Containers";
 import Financial from "@/pages/Financial";
 import Accounts from "@/pages/Accounts";
 import Suppliers from "@/pages/Suppliers";
+import Vouchers from "@/pages/Vouchers";
 import Reports from "@/pages/Reports";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/financial" component={Financial} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />
+      <Route path="/vouchers" component={Vouchers} />
       <Route path="/reports" component={Reports} />
       <Route path="/accounting/create" component={AccountingCreate} />
       <Route component={NotFound} />
