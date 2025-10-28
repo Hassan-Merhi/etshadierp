@@ -358,20 +358,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let stockItem = null;
           let itemName = row.Item_Name;
 
-          // Barcode lookup
+          // Try to find stock item (for preview purposes only - validation happens in validate step)
           if (row.Item_Barcode) {
             stockItem = allStockItems.find(item => item.barcode === row.Item_Barcode);
-            if (!stockItem) {
-              errors.push(`Row ${rowNum}: Barcode "${row.Item_Barcode}" not found in stock items`);
-              continue;
+            if (stockItem) {
+              itemName = stockItem.name;
             }
-            itemName = stockItem.name;
           } else if (row.Item_Name) {
             stockItem = allStockItems.find(item => item.name === row.Item_Name);
-            if (!stockItem) {
-              errors.push(`Row ${rowNum}: Item "${row.Item_Name}" not found in stock items`);
-              continue;
-            }
           }
 
           const quantity = parseFloat(row.Quantity);
@@ -392,7 +386,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             poNumber: row.PO_Number,
             containerNumber: row.Container_Number,
             supplierCode: row.Supplier_Code,
-            stockItemId: stockItem!.id,
+            barcode: row.Item_Barcode || null,
+            stockItemId: stockItem?.id || null,
             itemName: itemName,
             quantity: quantity,
             rate: rate,
@@ -407,6 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Basic structural errors only (validation of item existence happens in validate step)
       if (errors.length > 0) {
         return res.status(400).json({ message: "Validation errors", errors });
       }
