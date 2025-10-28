@@ -427,7 +427,10 @@ export type Voucher = typeof vouchers.$inferSelect;
 export const voucherEntries = pgTable("voucher_entries", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull(),
-  ledgerAccountId: integer("ledger_account_id").notNull(),
+  ledgerAccountId: integer("ledger_account_id"),
+  bankAccountId: integer("bank_account_id"),
+  fixedAssetId: integer("fixed_asset_id"),
+  supplierId: integer("supplier_id"),
   debitAmount: decimal("debit_amount", { precision: 15, scale: 2 }).default("0"),
   creditAmount: decimal("credit_amount", { precision: 15, scale: 2 }).default("0"),
   narration: text("narration"),
@@ -439,7 +442,10 @@ export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit(
   createdAt: true,
 }).extend({
   voucherId: z.number().min(1, "Voucher is required"),
-  ledgerAccountId: z.number().min(1, "Ledger account is required"),
+  ledgerAccountId: z.number().optional(),
+  bankAccountId: z.number().optional(),
+  fixedAssetId: z.number().optional(),
+  supplierId: z.number().optional(),
   debitAmount: z.string().optional(),
   creditAmount: z.string().optional(),
 });
