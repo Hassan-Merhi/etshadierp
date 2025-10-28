@@ -137,7 +137,7 @@ export interface IStorage {
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
 
   // Stock Transfers
-  createStockTransfer(voucherId: number, sourceLocationId: number, destinationLocationId: number, notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+  createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 
   // Stock Adjustments
   createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
@@ -707,15 +707,14 @@ export class DbStorage implements IStorage {
   // Stock Transfers
   async createStockTransfer(
     voucherId: number,
-    sourceLocationId: number,
     destinationLocationId: number,
     notes: string,
-    items: Array<{stockItemId: number, quantity: string, rate: string}>
+    items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>
   ): Promise<any> {
-    // Create the stock transfer voucher record
+    // Create the stock transfer voucher record (note: no global sourceLocationId)
     const [transfer] = await db.insert(schema.stockTransferVouchers).values({
       voucherId,
-      sourceLocationId,
+      sourceLocationId: items[0].sourceLocationId, // Store first item's source for legacy compatibility
       destinationLocationId,
       notes,
     }).returning();
@@ -738,17 +737,17 @@ export class DbStorage implements IStorage {
 
       transferItems.push(transferItem);
 
-      // Get current inventory at source location
+      // Get current inventory at THIS ITEM's source location
       const [sourceInventory] = await db
         .select()
         .from(schema.inventory)
         .where(and(
-          eq(schema.inventory.locationId, sourceLocationId),
+          eq(schema.inventory.locationId, item.sourceLocationId),
           eq(schema.inventory.stockItemId, item.stockItemId)
         ));
 
       if (sourceInventory) {
-        // Decrease quantity at source location
+        // Decrease quantity at this item's source location
         const currentQty = parseFloat(sourceInventory.quantity);
         const currentValue = parseFloat(sourceInventory.totalValue);
         const currentRate = parseFloat(sourceInventory.averageRate);
@@ -757,7 +756,7 @@ export class DbStorage implements IStorage {
         const newValue = newQty > 0 ? newQty * currentRate : 0;
         
         await this.updateInventory(
-          sourceLocationId,
+          item.sourceLocationId,
           item.stockItemId,
           newQty.toFixed(3),
           currentRate.toFixed(2),

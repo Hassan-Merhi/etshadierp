@@ -105,6 +105,8 @@ interface Location {
 }
 
 interface StockTransferEntry {
+  sourceLocationId: number;
+  sourceLocationName: string;
   stockItemId: number;
   stockItemName: string;
   quantity: string;
@@ -157,6 +159,8 @@ const journalFormSchema = z.object({
 });
 
 const stockTransferEntrySchema = z.object({
+  sourceLocationId: z.number().min(1, "Please select a source location"),
+  sourceLocationName: z.string(),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
   quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
@@ -165,13 +169,9 @@ const stockTransferEntrySchema = z.object({
 
 const stockTransferFormSchema = z.object({
   voucherDate: z.date(),
-  sourceLocationId: z.number().min(1, "Source location required"),
   destinationLocationId: z.number().min(1, "Destination location required"),
   entries: z.array(stockTransferEntrySchema).min(1),
   notes: z.string().optional(),
-}).refine((data) => data.sourceLocationId !== data.destinationLocationId, {
-  message: "Source and destination locations must be different",
-  path: ["destinationLocationId"],
 });
 
 const stockAdjustmentEntrySchema = z.object({
@@ -859,10 +859,11 @@ export default function Vouchers() {
     resolver: zodResolver(stockTransferFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      sourceLocationId: 0,
       destinationLocationId: 0,
       entries: [
         {
+          sourceLocationId: 0,
+          sourceLocationName: "",
           stockItemId: 0,
           stockItemName: "",
           quantity: "",
@@ -888,28 +889,51 @@ export default function Vouchers() {
     0
   );
 
+  // Auto-fill rate when source location + stock item are selected
+  useEffect(() => {
+    transferEntries.forEach((entry, index) => {
+      if (entry.sourceLocationId > 0 && entry.stockItemId > 0 && !entry.rate) {
+        // Fetch inventory for source location and auto-fill rate
+        fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
+          .then(res => res.json())
+          .then(inventory => {
+            const inventoryItem = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
+            if (inventoryItem && inventoryItem.averageRate) {
+              stockTransferForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
+            }
+          })
+          .catch(err => console.error('Failed to fetch inventory:', err));
+      }
+    });
+  }, [transferEntries.map(e => `${e.sourceLocationId}-${e.stockItemId}`).join(',')]);
+
   // Stock Transfer mutation
   const stockTransferMutation = useMutation({
     mutationFn: async (formData: StockTransferFormData) => {
       const data = formData;
+      
+      // Get unique source locations for description
+      const uniqueSources = [...new Set(data.entries.map(e => e.sourceLocationId))];
+      const sourceNames = uniqueSources.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(", ");
+      const destName = locations.find(l => l.id === data.destinationLocationId)?.name;
       
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
         voucherType: "StockTransfer",
         voucherNumber: `TRANSFER-${Date.now()}`,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: `Stock transfer from ${locations.find(l => l.id === data.sourceLocationId)?.name} to ${locations.find(l => l.id === data.destinationLocationId)?.name}`,
+        description: `Stock transfer from ${sourceNames} to ${destName}`,
         totalAmount: transferTotal.toString(),
       });
       const voucher = await voucherRes.json();
 
-      // Create stock transfer with items
+      // Create stock transfer with items (including per-item source locations)
       await apiRequest("POST", "/api/stock-transfers", {
         voucherId: voucher.id,
-        sourceLocationId: data.sourceLocationId,
         destinationLocationId: data.destinationLocationId,
         notes: data.notes || "",
         items: data.entries.map(entry => ({
+          sourceLocationId: entry.sourceLocationId,
           stockItemId: entry.stockItemId,
           quantity: entry.quantity,
           rate: entry.rate,
@@ -927,10 +951,11 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       stockTransferForm.reset({
         voucherDate: new Date(),
-        sourceLocationId: 0,
         destinationLocationId: 0,
         entries: [
           {
+            sourceLocationId: 0,
+            sourceLocationName: "",
             stockItemId: 0,
             stockItemName: "",
             quantity: "",
@@ -950,25 +975,26 @@ export default function Vouchers() {
   });
 
   const onStockTransferSubmit = (data: StockTransferFormData) => {
-    // Validate source != destination
-    if (data.sourceLocationId === data.destinationLocationId) {
-      toast({
-        title: "Validation Error",
-        description: "Source and destination locations must be different",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Validate entries
     const validEntries = data.entries.filter(
-      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
+      (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) > 0
     );
 
     if (validEntries.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid entry",
+        description: "Please add at least one valid entry with source location",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that each row's sourceLocationId !== destinationLocationId
+    const invalidEntry = validEntries.find(entry => entry.sourceLocationId === data.destinationLocationId);
+    if (invalidEntry) {
+      toast({
+        title: "Validation Error",
+        description: "Source and destination locations must be different for each item",
         variant: "destructive",
       });
       return;
@@ -1156,16 +1182,18 @@ export default function Vouchers() {
       if (fieldName === "quantity") {
         // Add new row when pressing Enter on quantity field
         appendTransfer({
+          sourceLocationId: 0,
+          sourceLocationName: "",
           stockItemId: 0,
           stockItemName: "",
           quantity: "",
           rate: "",
         });
-        // Focus the Stock Item combobox in the new row after a small delay
+        // Focus the Source Location selector in the new row after a small delay
         setTimeout(() => {
-          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowButton) {
-            newRowButton.focus();
+          const newRowSelect = document.querySelector(`[data-testid="select-source-location-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowSelect) {
+            newRowSelect.focus();
           }
         }, 100);
       }
@@ -2021,63 +2049,33 @@ export default function Vouchers() {
                 <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)} className="space-y-6">
                   {/* Header section */}
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex gap-4 flex-1">
-                      <FormField
-                        control={stockTransferForm.control}
-                        name="sourceLocationId"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Source Location</FormLabel>
-                            <Select
-                              value={field.value > 0 ? field.value.toString() : ""}
-                              onValueChange={(value) => field.onChange(parseInt(value))}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-source-location">
-                                  <SelectValue placeholder="Select source location..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {locations.map((location) => (
-                                  <SelectItem key={location.id} value={location.id.toString()}>
-                                    {location.code} - {location.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={stockTransferForm.control}
-                        name="destinationLocationId"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Destination Location</FormLabel>
-                            <Select
-                              value={field.value > 0 ? field.value.toString() : ""}
-                              onValueChange={(value) => field.onChange(parseInt(value))}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-destination-location">
-                                  <SelectValue placeholder="Select destination location..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {locations.map((location) => (
-                                  <SelectItem key={location.id} value={location.id.toString()}>
-                                    {location.code} - {location.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <FormField
+                      control={stockTransferForm.control}
+                      name="destinationLocationId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Destination Location</FormLabel>
+                          <Select
+                            value={field.value > 0 ? field.value.toString() : ""}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-destination-location">
+                                <SelectValue placeholder="Select destination location..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {locations.map((location) => (
+                                <SelectItem key={location.id} value={location.id.toString()}>
+                                  {location.code} - {location.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     {/* Right: Date picker */}
                     <FormField
@@ -2122,16 +2120,50 @@ export default function Vouchers() {
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left p-3 font-medium w-[45%]">Stock Item</th>
-                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
-                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
-                          <th className="text-left p-3 font-medium w-[20%]">Total</th>
+                          <th className="text-left p-3 font-medium w-[25%]">Source Location</th>
+                          <th className="text-left p-3 font-medium w-[30%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[12%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[12%]">Rate</th>
+                          <th className="text-left p-3 font-medium w-[16%]">Total</th>
                           <th className="w-[5%]"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {transferFields.map((field, index) => (
                           <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={stockTransferForm.control}
+                                name={`entries.${index}.sourceLocationId`}
+                                render={({ field: locationField }) => (
+                                  <FormItem>
+                                    <Select
+                                      value={transferEntries[index].sourceLocationId > 0 ? transferEntries[index].sourceLocationId.toString() : ""}
+                                      onValueChange={(value) => {
+                                        const locationId = parseInt(value);
+                                        const location = locations.find(l => l.id === locationId);
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, locationId);
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, location ? `${location.code} - ${location.name}` : "");
+                                      }}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger data-testid={`select-source-location-${index}`}>
+                                          <SelectValue placeholder="Select source..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {locations.map((location) => (
+                                          <SelectItem key={location.id} value={location.id.toString()}>
+                                            {location.code} - {location.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
                             <td className="p-2">
                               <FormField
                                 control={stockTransferForm.control}
@@ -2230,13 +2262,15 @@ export default function Vouchers() {
                       </tbody>
                       <tfoot className="bg-muted/30 border-t-2">
                         <tr>
-                          <td colSpan={3} className="p-3">
+                          <td colSpan={4} className="p-3">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
                               onClick={() =>
                                 appendTransfer({
+                                  sourceLocationId: 0,
+                                  sourceLocationName: "",
                                   stockItemId: 0,
                                   stockItemName: "",
                                   quantity: "",
@@ -2289,7 +2323,6 @@ export default function Vouchers() {
                       type="submit"
                       disabled={
                         stockTransferMutation.isPending ||
-                        stockTransferForm.watch("sourceLocationId") === stockTransferForm.watch("destinationLocationId") ||
                         transferTotal === 0
                       }
                       data-testid="button-save-transfer-voucher"

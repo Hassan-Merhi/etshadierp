@@ -1340,14 +1340,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stock Transfers
   app.post("/api/stock-transfers", async (req, res) => {
     try {
-      const { voucherId, sourceLocationId, destinationLocationId, notes, items } = req.body;
+      const { voucherId, destinationLocationId, notes, items } = req.body;
 
       // Validate required fields
       if (!voucherId) {
         return res.status(400).json({ message: "Voucher ID is required" });
-      }
-      if (!sourceLocationId) {
-        return res.status(400).json({ message: "Source location is required" });
       }
       if (!destinationLocationId) {
         return res.status(400).json({ message: "Destination location is required" });
@@ -1356,17 +1353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Items are required" });
       }
 
-      // Validate that source and destination are different
-      if (sourceLocationId === destinationLocationId) {
-        return res.status(400).json({ message: "Source and destination locations must be different" });
-      }
-
-      // Validate that locations exist
-      const sourceLocation = await storage.getLocationById(sourceLocationId);
-      if (!sourceLocation) {
-        return res.status(404).json({ message: "Source location not found" });
-      }
-
+      // Validate that destination location exists
       const destLocation = await storage.getLocationById(destinationLocationId);
       if (!destLocation) {
         return res.status(404).json({ message: "Destination location not found" });
@@ -1378,8 +1365,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Voucher not found" });
       }
 
-      // Validate items
+      // Validate items and their source locations
       for (const item of items) {
+        if (!item.sourceLocationId) {
+          return res.status(400).json({ message: "Source location is required for all items" });
+        }
         if (!item.stockItemId) {
           return res.status(400).json({ message: "Stock item ID is required for all items" });
         }
@@ -1389,11 +1379,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!item.rate || parseFloat(item.rate) < 0) {
           return res.status(400).json({ message: "Rate must be non-negative for all items" });
         }
+
+        // Validate that source and destination are different for each item
+        if (item.sourceLocationId === destinationLocationId) {
+          return res.status(400).json({ message: "Source and destination locations must be different for each item" });
+        }
+
+        // Validate that source location exists
+        const sourceLocation = await storage.getLocationById(item.sourceLocationId);
+        if (!sourceLocation) {
+          return res.status(404).json({ message: `Source location with ID ${item.sourceLocationId} not found` });
+        }
       }
 
       const transfer = await storage.createStockTransfer(
         voucherId,
-        sourceLocationId,
         destinationLocationId,
         notes || "",
         items
