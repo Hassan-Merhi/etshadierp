@@ -68,6 +68,8 @@ Preferred communication style: Simple, everyday language.
 - Employees, Suppliers
 - Stock groups and items (inventory hierarchy)
 - Bank accounts, Fixed assets
+- Purchase orders with voucher linkage for accounting integration
+- Vouchers and voucher entries for double-entry bookkeeping
 - Support for multi-currency, opening balances, and active/inactive states
 
 **Migration Strategy**: Drizzle Kit manages schema migrations with `db:push` command for schema synchronization
@@ -110,3 +112,26 @@ Preferred communication style: Simple, everyday language.
 - Separation of concerns: client code in `/client`, server code in `/server`, shared types in `/shared`
 - Environment-based configuration with development and production build targets
 - Design system approach with comprehensive typography scale and spacing primitives documented in design guidelines
+
+## Recent Changes (October 2025)
+
+### Purchase Order Accounting Integration
+- **Automatic Voucher Creation**: When importing POs via containers, the system now automatically creates accounting vouchers following double-entry bookkeeping principles
+  - Debit entry: PURCHASES ledger account (expense increases)
+  - Credit entry: Supplier account (accounts payable increases)
+- **Supplier Balance Tracking**: PO amounts now correctly appear in supplier account balances, making it easy to track what you owe each supplier
+- **Auto-Account Creation**: System automatically creates a "PURCHASES" ledger account (code: PURCHASES, type: Expense) if it doesn't exist when importing the first PO
+- **Purchase Order-Voucher Linkage**: Added `voucherId` field to purchase_orders table to maintain referential integrity between POs and their accounting entries
+- **Backfill Support**: Created `/api/po-import/backfill` endpoint to retroactively create voucher entries for existing POs imported before this feature was implemented
+
+### Enhanced Transaction Filtering
+- **Month/Year Selector**: Accounts page now includes dropdown selectors to easily filter transactions by month and year
+  - Generates options from January 2024 through current month
+  - Automatically converts selected month/year to proper date range filters
+  - Works across all account types: Ledger, Bank, Fixed Asset, and Supplier accounts
+- **Improved UX**: Users can still use custom date ranges if needed, with a clear button to reset all filters at once
+
+### Technical Implementation Notes
+- **Double-Entry Compliance**: All vouchers created by PO import are properly balanced with equal debit and credit amounts
+- **Idempotency**: Backfill endpoint checks for existing voucherIds to prevent duplicate processing
+- **Storage Extensions**: Added getAllPurchaseOrders and updatePurchaseOrder methods to support backfill workflow
