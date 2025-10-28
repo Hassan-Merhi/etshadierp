@@ -11,6 +11,7 @@ import {
   Upload,
   MapPin,
   Wallet,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -67,6 +68,11 @@ const menuItems = [
     title: "Accounts",
     url: "/accounts",
     icon: Wallet,
+  },
+  {
+    title: "Suppliers",
+    url: "/suppliers",
+    icon: Users,
   },
   {
     title: "Reports",
