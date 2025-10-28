@@ -23,14 +23,16 @@ Preferred communication style: Simple, everyday language.
 
 **State Management**: 
 - TanStack Query (React Query) for server state management with configured defaults for infinite stale time and disabled refetching
-- React hooks and context for local UI state (theme, sidebar state)
+- React hooks and context for local UI state (theme, sidebar state, location selection)
+- LocationContext: Global context managing the currently selected location across the app
 - Form state managed through react-hook-form with Zod validation
 
 **Routing**: wouter library for lightweight client-side routing
 
 **Key Pages**:
 - Dashboard: KPI cards and charts for business overview
-- POS: Point-of-sale interface with barcode scanning
+- Location Inventory: Central hub for location selection with hierarchical drill-down (Locations → Stock Groups → Stock Items). Features spreadsheet-style table view with keyboard navigation for stock items. Used to select working location for POS and other modules.
+- POS: Point-of-sale interface with barcode scanning. Requires location selection via Location Inventory page. Displays current location with option to change.
 - Inventory: Stock management across locations
 - Containers: Import tracking and management
 - Financial: Voucher and expense management

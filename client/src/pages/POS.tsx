@@ -36,13 +36,6 @@ interface InventoryItem {
   price: number;
 }
 
-//todo: remove mock functionality
-const mockLocations = [
-  { value: "main", label: "Main Warehouse" },
-  { value: "east", label: "East Branch" },
-  { value: "west", label: "West Coast Hub" },
-];
-
 const mockCashAccounts = [
   { value: "cash1", label: "Cash Account - Main" },
   { value: "cash2", label: "Cash Account - Branch" },
