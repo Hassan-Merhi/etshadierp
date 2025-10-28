@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Package, MapPin, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Location {
   id: number;
@@ -44,6 +45,8 @@ interface StockGroupSummary {
 export default function LocationInventory() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   // Fetch all locations
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -108,7 +111,34 @@ export default function LocationInventory() {
   // Handle back to groups
   const handleBackToGroups = () => {
     setSelectedGroup(null);
+    setSelectedRowIndex(0);
   };
+
+  // Keyboard navigation for table
+  useEffect(() => {
+    if (!selectedGroup) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const itemCount = selectedGroup.items.length;
+      if (itemCount === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedRowIndex((prev) => (prev + 1) % itemCount);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedRowIndex((prev) => (prev - 1 + itemCount) % itemCount);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedGroup]);
+
+  // Reset selected row when group changes
+  useEffect(() => {
+    setSelectedRowIndex(0);
+  }, [selectedGroup]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -273,43 +303,56 @@ export default function LocationInventory() {
         </div>
       )}
 
-      {/* Stock Items List View */}
+      {/* Stock Items Table View */}
       {selectedLocation && selectedGroup && (
         <div>
           <h1 className="text-3xl font-bold mb-6">
             {selectedGroup.groupName} - Stock Items
           </h1>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {selectedGroup.items.map((item) => (
-              <Card key={item.inventoryId} data-testid={`card-item-${item.stockItemId}`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    {item.stockItemName}
-                  </CardTitle>
-                  <CardDescription>
-                    {item.stockItemCode}
-                    {item.stockItemBarcode && ` • ${item.stockItemBarcode}`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Quantity:</span>
-                      <span className="font-medium">{parseFloat(item.quantity).toFixed(3)} {item.stockItemUom}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Avg Rate:</span>
-                      <span className="font-medium">${parseFloat(item.averageRate).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Value:</span>
-                      <span className="font-medium text-primary">${parseFloat(item.totalValue).toFixed(2)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div ref={tableRef} className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Barcode</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead>UOM</TableHead>
+                  <TableHead className="text-right">Avg Rate</TableHead>
+                  <TableHead className="text-right">Total Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedGroup.items.map((item, index) => (
+                  <TableRow
+                    key={item.inventoryId}
+                    data-testid={`row-item-${item.stockItemId}`}
+                    className={`cursor-pointer ${
+                      index === selectedRowIndex
+                        ? "bg-accent"
+                        : ""
+                    }`}
+                    onClick={() => setSelectedRowIndex(index)}
+                  >
+                    <TableCell className="font-medium">{item.stockItemCode}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.stockItemBarcode || "-"}
+                    </TableCell>
+                    <TableCell>{item.stockItemName}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {parseFloat(item.quantity).toFixed(3)}
+                    </TableCell>
+                    <TableCell>{item.stockItemUom}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      ${parseFloat(item.averageRate).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      ${parseFloat(item.totalValue).toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
