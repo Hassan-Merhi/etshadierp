@@ -1315,6 +1315,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a new voucher
+  app.post("/api/vouchers", async (req, res) => {
+    try {
+      const voucher = await storage.createVoucher(req.body);
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new voucher entry
+  app.post("/api/voucher-entries", async (req, res) => {
+    try {
+      const entry = await storage.createVoucherEntry(req.body);
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

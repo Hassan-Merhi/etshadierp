@@ -81,7 +81,6 @@ interface VoucherEntry {
   accountId: number;
   accountName: string;
   amount: string;
-  narration: string;
 }
 
 const voucherEntrySchema = z.object({
@@ -93,7 +92,6 @@ const voucherEntrySchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
     }),
-  narration: z.string().min(1, "Narration required"),
 });
 
 const voucherFormSchema = z.object({
@@ -244,7 +242,6 @@ const PrintTemplate = ({
             <tr className="bg-gray-100">
               <th className="border border-black p-2 text-left">#</th>
               <th className="border border-black p-2 text-left">Account</th>
-              <th className="border border-black p-2 text-left">Narration</th>
               <th className="border border-black p-2 text-right">Amount</th>
             </tr>
           </thead>
@@ -253,7 +250,6 @@ const PrintTemplate = ({
               <tr key={index}>
                 <td className="border border-black p-2">{index + 1}</td>
                 <td className="border border-black p-2">{entry.accountName}</td>
-                <td className="border border-black p-2">{entry.narration}</td>
                 <td className="border border-black p-2 text-right font-mono">
                   ${parseFloat(entry.amount || "0").toLocaleString(undefined, {
                     minimumFractionDigits: 2,
@@ -263,7 +259,7 @@ const PrintTemplate = ({
               </tr>
             ))}
             <tr className="bg-gray-100 font-bold">
-              <td colSpan={3} className="border border-black p-2 text-right">
+              <td colSpan={2} className="border border-black p-2 text-right">
                 Total:
               </td>
               <td className="border border-black p-2 text-right font-mono">
@@ -325,7 +321,6 @@ export default function Vouchers() {
           accountId: 0,
           accountName: "",
           amount: "",
-          narration: "",
         },
       ],
       notes: "",
@@ -365,9 +360,12 @@ export default function Vouchers() {
 
       // Create voucher entries
       for (const entry of data.entries) {
+        const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
+        const narration = `${voucherType} - ${entry.accountName}`;
+        
         const entryData: any = {
           voucherId: voucher.id,
-          narration: entry.narration,
+          narration,
         };
 
         if (activeTab === "payment") {
@@ -390,7 +388,7 @@ export default function Vouchers() {
             bankAccountId: data.bankAccountId,
             debitAmount: "0",
             creditAmount: entry.amount,
-            narration: entry.narration,
+            narration,
           });
         } else {
           // Receipt: Debit the bank, Credit the accounts
@@ -399,7 +397,7 @@ export default function Vouchers() {
             bankAccountId: data.bankAccountId,
             debitAmount: entry.amount,
             creditAmount: "0",
-            narration: entry.narration,
+            narration,
           });
 
           // Credit the account
@@ -434,7 +432,6 @@ export default function Vouchers() {
             accountId: 0,
             accountName: "",
             amount: "",
-            narration: "",
           },
         ],
         notes: "",
@@ -494,18 +491,17 @@ export default function Vouchers() {
   const handleKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "amount" | "narration"
+    fieldName: "amount"
   ) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (fieldName === "narration") {
-        // Add new row when pressing Enter on narration field
+      if (fieldName === "amount") {
+        // Add new row when pressing Enter on amount field
         append({
           accountType: "ledger",
           accountId: 0,
           accountName: "",
           amount: "",
-          narration: "",
         });
         // Focus will naturally move to next row
       }
@@ -659,9 +655,8 @@ export default function Vouchers() {
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left p-3 font-medium w-[40%]">Account</th>
-                          <th className="text-left p-3 font-medium w-[20%]">Amount</th>
-                          <th className="text-left p-3 font-medium w-[35%]">Narration</th>
+                          <th className="text-left p-3 font-medium w-[70%]">Account</th>
+                          <th className="text-left p-3 font-medium w-[25%]">Amount</th>
                           <th className="w-[5%]"></th>
                         </tr>
                       </thead>
@@ -715,25 +710,7 @@ export default function Vouchers() {
                                         placeholder="0.00"
                                         className="font-mono"
                                         data-testid={`input-amount-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={form.control}
-                                name={`entries.${index}.narration`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="Description..."
-                                        data-testid={`input-narration-${index}`}
-                                        onKeyDown={(e) => handleKeyDown(e, index, "narration")}
+                                        onKeyDown={(e) => handleKeyDown(e, index, "amount")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -770,7 +747,6 @@ export default function Vouchers() {
                                   accountId: 0,
                                   accountName: "",
                                   amount: "",
-                                  narration: "",
                                 })
                               }
                               data-testid="button-add-row"
