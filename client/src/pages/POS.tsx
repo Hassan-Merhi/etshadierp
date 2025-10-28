@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useLocation, Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -36,29 +37,49 @@ interface InventoryItem {
   price: number;
 }
 
+interface APIInventoryItem {
+  inventoryId: number;
+  locationId: number;
+  stockItemId: number;
+  quantity: string;
+  averageRate: string;
+  totalValue: string;
+  stockItemCode: string;
+  stockItemName: string;
+  stockItemBarcode: string | null;
+  stockItemUom: string;
+  stockGroupId: number | null;
+  stockGroupName: string | null;
+  stockGroupCode: string | null;
+}
+
 const mockCashAccounts = [
   { value: "cash1", label: "Cash Account - Main" },
   { value: "cash2", label: "Cash Account - Branch" },
   { value: "bank1", label: "Bank Account - ABC" },
 ];
 
-//todo: remove mock functionality
-const mockInventory: InventoryItem[] = [
-  { barcode: "BAL001", name: "Premium Cotton Bales", stock: 45, price: 450 },
-  { barcode: "BAL002", name: "Denim Mix Bales", stock: 32, price: 380 },
-  { barcode: "BAL003", name: "Designer Labels Mix", stock: 0, price: 650 },
-  { barcode: "BAL004", name: "Summer Collection", stock: 28, price: 420 },
-  { barcode: "BAL005", name: "Winter Apparel Mix", stock: 22, price: 520 },
-  { barcode: "BAL006", name: "Kids Clothing Bales", stock: 40, price: 350 },
-  { barcode: "BAL007", name: "Premium Denim Bales", stock: 15, price: 480 },
-  { barcode: "BAL008", name: "Cotton Casual Mix", stock: 0, price: 390 },
-  { barcode: "BAL009", name: "Vintage Apparel Mix", stock: 18, price: 550 },
-  { barcode: "BAL010", name: "Sports Wear Bales", stock: 25, price: 420 },
-];
-
 export default function POS() {
   const { selectedLocation } = useLocationContext();
   const [, navigate] = useLocation();
+
+  // Redirect to Location Inventory if no location is selected
+  if (!selectedLocation) {
+    return <Redirect to="/location-inventory" />;
+  }
+
+  // Fetch inventory for the selected location
+  const { data: apiInventory = [], isLoading: inventoryLoading } = useQuery<APIInventoryItem[]>({
+    queryKey: [`/api/locations/${selectedLocation.id}/inventory`],
+  });
+
+  // Transform API inventory to POS format
+  const inventory: InventoryItem[] = apiInventory.map((item) => ({
+    barcode: item.stockItemBarcode || item.stockItemCode,
+    name: item.stockItemName,
+    stock: parseFloat(item.quantity),
+    price: parseFloat(item.averageRate),
+  }));
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -75,11 +96,6 @@ export default function POS() {
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
 
-  // Redirect to Location Inventory if no location is selected
-  if (!selectedLocation) {
-    return <Redirect to="/location-inventory" />;
-  }
-
   const columns = [
     { key: "itemName", label: "Item Name", width: "flex-1" },
     { key: "quantity", label: "Qty", width: "w-24" },
@@ -88,8 +104,8 @@ export default function POS() {
   ];
 
   const getFilteredInventory = () => {
-    if (!searchTerm) return mockInventory;
-    return mockInventory.filter((item) =>
+    if (!searchTerm) return inventory;
+    return inventory.filter((item) =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.barcode.toLowerCase().includes(searchTerm.toLowerCase())
     );
