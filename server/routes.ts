@@ -656,9 +656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Update existing container totals
         await storage.updateContainer(container.id, {
-          itemsTotal: (parseFloat(container.itemsTotal) + containerPreview.itemsTotal).toString(),
-          chargesTotal: (parseFloat(container.chargesTotal) + containerPreview.chargesTotal).toString(),
-          grandTotal: (parseFloat(container.grandTotal) + containerPreview.grandTotal).toString(),
+          itemsTotal: (parseFloat(container.itemsTotal || "0") + containerPreview.itemsTotal).toString(),
+          chargesTotal: (parseFloat(container.chargesTotal || "0") + containerPreview.chargesTotal).toString(),
+          grandTotal: (parseFloat(container.grandTotal || "0") + containerPreview.grandTotal).toString(),
         });
       }
 
