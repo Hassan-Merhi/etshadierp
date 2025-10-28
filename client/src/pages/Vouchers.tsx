@@ -169,6 +169,9 @@ const stockTransferFormSchema = z.object({
   destinationLocationId: z.number().min(1, "Destination location required"),
   entries: z.array(stockTransferEntrySchema).min(1),
   notes: z.string().optional(),
+}).refine((data) => data.sourceLocationId !== data.destinationLocationId, {
+  message: "Source and destination locations must be different",
+  path: ["destinationLocationId"],
 });
 
 const stockAdjustmentEntrySchema = z.object({
@@ -1087,7 +1090,7 @@ export default function Vouchers() {
     stockAdjustmentMutation.mutate(data);
   };
 
-  // Keyboard navigation handlers
+  // Keyboard navigation handlers for Payment/Receipt
   const handleKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
@@ -1103,7 +1106,95 @@ export default function Vouchers() {
           accountName: "",
           amount: "",
         });
-        // Focus will naturally move to next row
+        // Focus the Account combobox in the new row after a small delay
+        setTimeout(() => {
+          const newRowButton = document.querySelector(`[data-testid="button-account-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowButton) {
+            newRowButton.focus();
+          }
+        }, 100);
+      }
+    }
+  };
+
+  // Keyboard navigation handlers for Journal
+  const handleJournalKeyDown = (
+    e: React.KeyboardEvent,
+    rowIndex: number,
+    fieldName: "amount"
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (fieldName === "amount") {
+        // Add new row when pressing Enter on amount field
+        appendJournal({
+          type: "DR",
+          accountType: "ledger",
+          accountId: 0,
+          accountName: "",
+          amount: "",
+        });
+        // Focus the DR/CR selector in the new row after a small delay
+        setTimeout(() => {
+          const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowSelect) {
+            newRowSelect.focus();
+          }
+        }, 100);
+      }
+    }
+  };
+
+  // Keyboard navigation handlers for Stock Transfer
+  const handleTransferKeyDown = (
+    e: React.KeyboardEvent,
+    rowIndex: number,
+    fieldName: "quantity"
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (fieldName === "quantity") {
+        // Add new row when pressing Enter on quantity field
+        appendTransfer({
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        });
+        // Focus the Stock Item combobox in the new row after a small delay
+        setTimeout(() => {
+          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowButton) {
+            newRowButton.focus();
+          }
+        }, 100);
+      }
+    }
+  };
+
+  // Keyboard navigation handlers for Stock Adjustment
+  const handleAdjustmentKeyDown = (
+    e: React.KeyboardEvent,
+    rowIndex: number,
+    fieldName: "quantity"
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (fieldName === "quantity") {
+        // Add new row when pressing Enter on quantity field
+        appendAdjustment({
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        });
+        // Focus the Stock Item combobox in the new row after a small delay
+        setTimeout(() => {
+          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowButton) {
+            newRowButton.focus();
+          }
+        }, 100);
       }
     }
   };
@@ -1153,7 +1244,270 @@ export default function Vouchers() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="space-y-4">
+        <TabsContent value="payment" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {activeTab === "payment" ? "Payment" : "Receipt"} Voucher
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left: Payment account selector */}
+                    <FormField
+                      control={form.control}
+                      name="paymentAccountId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>
+                            {activeTab === "payment" ? "Pay From" : "Receive In"}
+                          </FormLabel>
+                          <FormControl>
+                            <AccountCombobox
+                              value={
+                                paymentAccountId > 0
+                                  ? {
+                                      type: paymentAccountType,
+                                      id: paymentAccountId,
+                                      name: paymentAccountName,
+                                    }
+                                  : null
+                              }
+                              onChange={(type, id, name) => {
+                                form.setValue("paymentAccountType", type);
+                                form.setValue("paymentAccountId", id);
+                                form.setValue("paymentAccountName", name);
+                              }}
+                              ledgerAccounts={ledgerAccounts}
+                              bankAccounts={bankAccounts}
+                              suppliers={suppliers}
+                              rowIndex={-1}
+                            />
+                          </FormControl>
+                          {paymentAccountId > 0 && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Balance: $
+                              {accountBalance.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Right: Date picker and print button */}
+                    <div className="flex items-end gap-2">
+                      <FormField
+                        control={form.control}
+                        name="voucherDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-[200px] justify-start text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    data-testid="button-date-picker"
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePrint}
+                        disabled={paymentAccountId === 0 || entries.filter((e) => e.accountId > 0).length === 0}
+                        data-testid="button-print"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Spreadsheet table */}
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[70%]">Account</th>
+                          <th className="text-left p-3 font-medium w-[25%]">Amount</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fields.map((field, index) => (
+                          <tr key={field.id} className="border-t">
+                            <td className="p-2">
+                              <FormField
+                                control={form.control}
+                                name={`entries.${index}.accountId`}
+                                render={({ field: accountField }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <AccountCombobox
+                                        value={
+                                          entries[index].accountId > 0
+                                            ? {
+                                                type: entries[index].accountType,
+                                                id: entries[index].accountId,
+                                                name: entries[index].accountName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(type, id, name) => {
+                                          form.setValue(`entries.${index}.accountType`, type);
+                                          form.setValue(`entries.${index}.accountId`, id);
+                                          form.setValue(`entries.${index}.accountName`, name);
+                                        }}
+                                        ledgerAccounts={ledgerAccounts}
+                                        bankAccounts={bankAccounts}
+                                        suppliers={suppliers}
+                                        rowIndex={index}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <FormField
+                                control={form.control}
+                                name={`entries.${index}.amount`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        className="font-mono"
+                                        data-testid={`input-amount-${index}`}
+                                        onKeyDown={(e) => handleKeyDown(e, index, "amount")}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </td>
+                            <td className="p-2">
+                              {fields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => remove(index)}
+                                  data-testid={`button-remove-${index}`}
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={1} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                append({
+                                  accountType: "ledger",
+                                  accountId: 0,
+                                  accountName: "",
+                                  amount: "",
+                                })
+                              }
+                              data-testid="button-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${total.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Notes field */}
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Additional notes..."
+                            rows={3}
+                            data-testid="input-notes"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Submit button */}
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={saveMutation.isPending || total === 0}
+                      data-testid="button-save-voucher"
+                    >
+                      {saveMutation.isPending ? "Saving..." : "Save Voucher"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="receipt" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -1548,6 +1902,7 @@ export default function Vouchers() {
                                         placeholder="0.00"
                                         className="font-mono text-right"
                                         data-testid={`input-journal-amount-${index}`}
+                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "amount")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -1820,6 +2175,7 @@ export default function Vouchers() {
                                         placeholder="0.000"
                                         className="font-mono"
                                         data-testid={`input-transfer-quantity-${index}`}
+                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "quantity")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2108,6 +2464,7 @@ export default function Vouchers() {
                                         placeholder="0.000"
                                         className="font-mono"
                                         data-testid={`input-adjustment-quantity-${index}`}
+                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "quantity")}
                                       />
                                     </FormControl>
                                     <FormMessage />
