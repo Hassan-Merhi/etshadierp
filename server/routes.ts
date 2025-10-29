@@ -369,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single location by ID
-  app.get("/api/locations/:locationId", async (req, res) => {
+  app.get("/api/locations/:locationId", requireAuth, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -381,6 +381,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Location not found" });
       }
 
+      // Verify location belongs to current company
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+      }
+
       res.json(location);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -388,7 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Location Inventory - Get inventory for a specific location
-  app.get("/api/locations/:locationId/inventory", async (req, res) => {
+  app.get("/api/locations/:locationId/inventory", requireAuth, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -399,6 +404,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
+      }
+
+      // Verify location belongs to current company
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
       }
 
       const inventory = await storage.getLocationInventory(locationId);

@@ -72,18 +72,20 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const [, navigate] = useLocation();
 
   // For POS users, fetch their assigned location
-  const { data: posLocation } = useQuery<Location>({
+  const { data: posLocation, error: locationError, isLoading: locationLoading } = useQuery<Location>({
     queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
     enabled: !!posUser?.assignedLocationId,
+    retry: false,
   });
 
   // Use either the selected location (for Admin/Owner/Manager) or POS user's assigned location
   const activeLocation = posUser ? posLocation : selectedLocation;
 
   // Fetch inventory for the active location
-  const { data: apiInventory = [], isLoading: inventoryLoading } = useQuery<APIInventoryItem[]>({
+  const { data: apiInventory = [], isLoading: inventoryLoading, error: inventoryError } = useQuery<APIInventoryItem[]>({
     queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
     enabled: !!activeLocation,
+    retry: false,
   });
 
   // Transform API inventory to POS format with stockItemId
@@ -135,10 +137,73 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   }
 
   // Show loading state while fetching POS user's location
-  if (posUser && !posLocation) {
+  if (posUser && locationLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading location...</p>
+      </div>
+    );
+  }
+
+  // Show error if POS user's location is not accessible in current company
+  if (posUser && locationError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-8 w-8" />
+          <h2 className="text-xl font-semibold">Location Access Denied</h2>
+        </div>
+        <p className="text-center text-muted-foreground max-w-md">
+          You don't have access to a location in the currently selected company. 
+          Please contact your administrator to assign you to a location in this company, 
+          or switch to a different company where you have location access.
+        </p>
+        <Button 
+          onClick={() => window.location.reload()} 
+          variant="outline"
+          data-testid="button-retry-location"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // Show error if POS user has no assigned location
+  if (posUser && !posUser.assignedLocationId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-8 w-8" />
+          <h2 className="text-xl font-semibold">No Location Assigned</h2>
+        </div>
+        <p className="text-center text-muted-foreground max-w-md">
+          You don't have a location assigned to your account. 
+          Please contact your administrator to assign you to a location.
+        </p>
+      </div>
+    );
+  }
+
+  // Show error if inventory access is denied
+  if (activeLocation && inventoryError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-8 w-8" />
+          <h2 className="text-xl font-semibold">Inventory Access Denied</h2>
+        </div>
+        <p className="text-center text-muted-foreground max-w-md">
+          Unable to access inventory for this location. This may be because the location 
+          belongs to a different company or you don't have the necessary permissions.
+        </p>
+        <Button 
+          onClick={() => window.location.reload()} 
+          variant="outline"
+          data-testid="button-retry-inventory"
+        >
+          Retry
+        </Button>
       </div>
     );
   }
