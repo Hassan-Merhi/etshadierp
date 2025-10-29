@@ -150,7 +150,7 @@ export interface IStorage {
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
-    additionalCharges?: Array<{ description: string; amount: number; supplierId: number }>
+    additionalCharges?: Array<{ description: string; amount: number; ledgerAccountId: number }>
   ): Promise<ContainerOffload>;
 
   // Vouchers and Journal Entries
@@ -588,7 +588,7 @@ export class DbStorage implements IStorage {
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
-    additionalCharges: Array<{ description: string; amount: number; supplierId: number }> = []
+    additionalCharges: Array<{ description: string; amount: number; ledgerAccountId: number }> = []
   ): Promise<ContainerOffload> {
     // Get all POs for this container
     const pos = await this.getPurchaseOrdersByContainer(containerId);
@@ -719,10 +719,10 @@ export class DbStorage implements IStorage {
         narration: `Duties for container ${container.containerNumber}`,
       });
 
-      // Credit: Supplier account (Liability increases)
+      // Credit: Duty Agent account (Liability increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        supplierId: dutiesAccountId,
+        ledgerAccountId: dutiesAccountId,
         debitAmount: "0",
         creditAmount: duties,
         narration: `Duties for container ${container.containerNumber}`,
@@ -750,10 +750,10 @@ export class DbStorage implements IStorage {
         narration: `Transport fees for container ${container.containerNumber}`,
       });
 
-      // Credit: Supplier account (Liability increases)
+      // Credit: Transporter account (Liability increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        supplierId: transportAccountId,
+        ledgerAccountId: transportAccountId,
         debitAmount: "0",
         creditAmount: transportFees,
         narration: `Transport fees for container ${container.containerNumber}`,
@@ -782,10 +782,10 @@ export class DbStorage implements IStorage {
           narration: `${charge.description} for container ${container.containerNumber}`,
         });
 
-        // Credit: Supplier account (Liability increases)
+        // Credit: Specified ledger account (Liability increases)
         await db.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
-          supplierId: charge.supplierId,
+          ledgerAccountId: charge.ledgerAccountId,
           debitAmount: "0",
           creditAmount: charge.amount.toFixed(2),
           narration: `${charge.description} for container ${container.containerNumber}`,

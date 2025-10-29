@@ -36,7 +36,7 @@ interface AdditionalCharge {
   id: string;
   description: string;
   amount: string;
-  supplierId: string;
+  ledgerAccountId: string;
 }
 
 export function OffloadDialog({
@@ -61,8 +61,8 @@ export function OffloadDialog({
     queryKey: ["/api/locations"],
   });
 
-  const { data: suppliers = [] } = useQuery<any[]>({
-    queryKey: ["/api/suppliers"],
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts"],
   });
 
   const totalCharges =
@@ -81,7 +81,7 @@ export function OffloadDialog({
         id: Date.now().toString(),
         description: "",
         amount: "0",
-        supplierId: "",
+        ledgerAccountId: "",
       },
     ]);
   };
@@ -120,7 +120,7 @@ export function OffloadDialog({
           if (!charge.description) {
             throw new Error("Please provide a description for all additional charges");
           }
-          if (!charge.supplierId) {
+          if (!charge.ledgerAccountId) {
             throw new Error("Please select an account for all additional charges");
           }
         }
@@ -142,7 +142,7 @@ export function OffloadDialog({
             .map((charge) => ({
               description: charge.description,
               amount: parseFloat(charge.amount),
-              supplierId: parseInt(charge.supplierId),
+              ledgerAccountId: parseInt(charge.ledgerAccountId),
             })),
         }
       );
@@ -205,9 +205,9 @@ export function OffloadDialog({
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier: any) => (
-                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                      {supplier.legalName} ({supplier.code})
+                  {ledgerAccounts.map((account: any) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} ({account.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -265,9 +265,9 @@ export function OffloadDialog({
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier: any) => (
-                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                      {supplier.legalName} ({supplier.code})
+                  {ledgerAccounts.map((account: any) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} ({account.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -316,18 +316,18 @@ export function OffloadDialog({
                     />
                     <div className="col-span-4">
                       <Select
-                        value={charge.supplierId}
+                        value={charge.ledgerAccountId}
                         onValueChange={(value) =>
-                          handleUpdateCharge(charge.id, "supplierId", value)
+                          handleUpdateCharge(charge.id, "ledgerAccountId", value)
                         }
                       >
                         <SelectTrigger data-testid={`select-charge-account-${charge.id}`}>
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
-                          {suppliers.map((supplier: any) => (
-                            <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                              {supplier.legalName} ({supplier.code})
+                          {ledgerAccounts.map((account: any) => (
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name} ({account.code})
                             </SelectItem>
                           ))}
                         </SelectContent>
