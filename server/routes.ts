@@ -9,6 +9,7 @@ import { requireAuth, requireRole, canDelete } from "./auth";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
+  updateLedgerAccountSchema,
   insertEmployeeSchema,
   insertSupplierSchema,
   insertStockGroupSchema,
@@ -24,9 +25,10 @@ import {
   stockItems,
   vouchers,
   voucherEntries,
+  locations,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -419,6 +421,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const account = await storage.createLedgerAccount(parsed);
       res.status(201).json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/ledger-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ message: "Invalid account ID" });
+      }
+
+      // Verify account exists and belongs to current company
+      const existingAccount = await storage.getLedgerAccountById(accountId);
+      if (!existingAccount) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      if (existingAccount.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Account belongs to a different company" });
+      }
+
+      const parsed = updateLedgerAccountSchema.parse({ ...req.body, id: accountId });
+
+      // Check for duplicate code if code is being changed
+      if (parsed.code && parsed.code !== existingAccount.code) {
+        const duplicate = await storage.getLedgerAccountByCode(parsed.code);
+        if (duplicate) {
+          return res.status(400).json({ message: "Ledger account code already exists" });
+        }
+      }
+
+      // Validate opening balance amount and side must both be present or both absent
+      const hasBalance = parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
+      const hasSide = parsed.openingBalanceSide !== undefined && parsed.openingBalanceSide !== null;
+      
+      if (hasBalance && !hasSide) {
+        return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
+      }
+      
+      if (!hasBalance && hasSide) {
+        return res.status(400).json({ message: "Dr/Cr side requires opening balance amount" });
+      }
+
+      // Validate subType based on accountType if accountType is being updated
+      const accountType = parsed.accountType || existingAccount.accountType;
+      const validSubTypes: Record<string, string[]> = {
+        "Income": ["Direct Income", "Indirect Income"],
+        "Expense": ["Direct Expense", "Indirect Expense"],
+        "Liability": ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
+        "Asset": ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
+      };
+
+      if (parsed.subType && validSubTypes[accountType]) {
+        if (!validSubTypes[accountType].includes(parsed.subType)) {
+          return res.status(400).json({ 
+            message: `Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${validSubTypes[accountType].join(", ")}` 
+          });
+        }
+      }
+
+      const updatedAccount = await storage.updateLedgerAccount(parsed);
+      res.json(updatedAccount);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

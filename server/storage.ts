@@ -74,8 +74,10 @@ export interface IStorage {
 
   // Ledger Accounts
   getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
+  getLedgerAccountById(id: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined>;
   createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
+  updateLedgerAccount(account: schema.UpdateLedgerAccount): Promise<LedgerAccount>;
 
   // Employees
   getAllEmployees(companyId: number): Promise<Employee[]>;
@@ -292,6 +294,21 @@ export class DbStorage implements IStorage {
   async createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
     const [created] = await db.insert(schema.ledgerAccounts).values(account).returning();
     return created;
+  }
+
+  async getLedgerAccountById(id: number): Promise<LedgerAccount | undefined> {
+    const [account] = await db.select().from(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, id));
+    return account;
+  }
+
+  async updateLedgerAccount(account: schema.UpdateLedgerAccount): Promise<LedgerAccount> {
+    const { id, ...updates } = account;
+    const [updated] = await db
+      .update(schema.ledgerAccounts)
+      .set(updates)
+      .where(eq(schema.ledgerAccounts.id, id))
+      .returning();
+    return updated;
   }
 
   // Employees
