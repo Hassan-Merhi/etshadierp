@@ -21,6 +21,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -29,17 +36,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users } from "lucide-react";
-import { insertUserSchema, insertCompanySchema } from "@shared/schema";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 
 const userFormSchema = insertUserSchema;
 const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+  (data) => {
+    // If role is POS, assignedLocationId must be present
+    if (data.role.startsWith("POS") && !data.assignedLocationId) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "POS roles require an assigned location",
+    path: ["assignedLocationId"],
+  }
+);
 
 type UserFormData = z.infer<typeof userFormSchema>;
 type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
@@ -47,6 +69,10 @@ export default function Settings() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
     queryKey: ["/api/companies"],
@@ -54,6 +80,12 @@ export default function Settings() {
 
   const { data: users = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/users"],
+  });
+
+  // Query for user company roles when a user is expanded
+  const { data: userCompanyRoles = [] } = useQuery<any[]>({
+    queryKey: [`/api/users/${expandedUserId}/company-roles`],
+    enabled: !!expandedUserId,
   });
 
   const companyForm = useForm<CompanyFormData>({
@@ -72,6 +104,30 @@ export default function Settings() {
       password: "",
       active: true,
     },
+  });
+
+  const roleForm = useForm<RoleAssignmentData>({
+    resolver: zodResolver(roleAssignmentSchema),
+    defaultValues: {
+      userId: "",
+      companyId: 0,
+      role: "Manager",
+    },
+  });
+
+  const selectedRole = roleForm.watch("role");
+  const selectedCompanyId = roleForm.watch("companyId");
+  
+  // Load locations for the selected company when assigning roles
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations", { companyId: selectedCompanyId }],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const res = await fetch(`/api/locations?companyId=${selectedCompanyId}`);
+      if (!res.ok) throw new Error("Failed to fetch locations");
+      return res.json();
+    },
+    enabled: !!selectedCompanyId && isRoleDialogOpen,
   });
 
   const createCompanyMutation = useMutation({
@@ -140,6 +196,66 @@ export default function Settings() {
     },
   });
 
+  const createRoleMutation = useMutation({
+    mutationFn: async (data: RoleAssignmentData) => {
+      if (editingRole) {
+        const res = await apiRequest("PATCH", `/api/user-company-roles/${editingRole.id}`, data);
+        return await res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/user-company-roles", data);
+        return await res.json();
+      }
+    },
+    onSuccess: () => {
+      // Capture userId before resetting state
+      const userId = currentUserId;
+      
+      toast({
+        title: "Success",
+        description: editingRole ? "Role updated successfully" : "Role assigned successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
+      setIsRoleDialogOpen(false);
+      setEditingRole(null);
+      setCurrentUserId(null);
+      roleForm.reset({
+        userId: "",
+        companyId: 0,
+        role: "Manager",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save role",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleId: number) => {
+      await apiRequest("DELETE", `/api/user-company-roles/${roleId}`, {});
+    },
+    onSuccess: () => {
+      // Capture userId before it potentially changes
+      const userId = currentUserId;
+      
+      toast({
+        title: "Success",
+        description: "Role assignment removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${userId}/company-roles`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete role",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditCompany = (company: any) => {
     setEditingCompany(company);
     companyForm.reset({
@@ -173,6 +289,47 @@ export default function Settings() {
       createUserMutation.mutate(data);
     }
   };
+
+  const handleAddRole = (userId: string) => {
+    setCurrentUserId(userId);
+    setEditingRole(null);
+    roleForm.reset({
+      userId,
+      companyId: companies[0]?.id || 0,
+      role: "Manager",
+    });
+    setIsRoleDialogOpen(true);
+  };
+
+  const handleEditRole = (role: any) => {
+    setCurrentUserId(role.userId);
+    setEditingRole(role);
+    roleForm.reset({
+      userId: role.userId,
+      companyId: role.companyId,
+      role: role.role,
+      assignedLocationId: role.assignedLocationId,
+      posStation: role.posStation,
+    });
+    setIsRoleDialogOpen(true);
+  };
+
+  const handleSubmitRole = (data: RoleAssignmentData) => {
+    createRoleMutation.mutate(data);
+  };
+
+  const handleDeleteRole = (roleId: number, userId: string) => {
+    setCurrentUserId(userId);
+    if (confirm("Are you sure you want to remove this role assignment?")) {
+      deleteRoleMutation.mutate(roleId);
+    }
+  };
+
+  const toggleUserExpansion = (userId: string) => {
+    setExpandedUserId(expandedUserId === userId ? null : userId);
+  };
+
+  const isPOSRole = selectedRole?.startsWith("POS");
 
   return (
     <div className="space-y-8">
@@ -438,44 +595,280 @@ export default function Settings() {
           {isLoading ? (
             <p className="text-center text-muted-foreground">Loading users...</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user: any) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
-                      {user.username}
-                    </TableCell>
-                    <TableCell data-testid={`text-status-${user.id}`}>
-                      {user.active ? "Active" : "Inactive"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEdit(user)}
-                        data-testid={`button-edit-${user.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <div className="space-y-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Company Assignments</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user: any) => (
+                    <>
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleUserExpansion(user.id)}
+                            data-testid={`button-expand-${user.id}`}
+                          >
+                            {expandedUserId === user.id ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
+                          {user.username}
+                        </TableCell>
+                        <TableCell data-testid={`text-status-${user.id}`}>
+                          {user.active ? "Active" : "Inactive"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              toggleUserExpansion(user.id);
+                            }}
+                            data-testid={`button-view-roles-${user.id}`}
+                          >
+                            View Roles
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(user)}
+                            data-testid={`button-edit-${user.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {expandedUserId === user.id && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-muted/50">
+                            <div className="p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">Company Role Assignments</h4>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddRole(user.id)}
+                                  data-testid={`button-add-role-${user.id}`}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add Role
+                                </Button>
+                              </div>
+                              {userCompanyRoles.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No company assignments yet</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {userCompanyRoles.map((role: any) => {
+                                    const company = companies.find((c: any) => c.id === role.companyId);
+                                    const location = locations.find((l: any) => l.id === role.assignedLocationId);
+                                    return (
+                                      <div
+                                        key={role.id}
+                                        className="flex items-center justify-between p-3 bg-background rounded-md border"
+                                        data-testid={`role-assignment-${role.id}`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div>
+                                            <div className="font-medium">{company?.name || "Unknown Company"}</div>
+                                            <div className="text-sm text-muted-foreground">
+                                              <Badge variant="outline" className="mr-2">{role.role}</Badge>
+                                              {location && <span className="text-xs">Location: {location.name}</span>}
+                                              {role.posStation && <span className="text-xs ml-2">Station: {role.posStation}</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleEditRole(role)}
+                                            data-testid={`button-edit-role-${role.id}`}
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleDeleteRole(role.id, user.id)}
+                                            data-testid={`button-delete-role-${role.id}`}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </Card>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Note: User role assignments per company can be configured in the next section (coming soon).
-      </p>
+      {/* Role Assignment Dialog */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingRole ? "Edit Role Assignment" : "Add Role Assignment"}</DialogTitle>
+          </DialogHeader>
+          <Form {...roleForm}>
+            <form onSubmit={roleForm.handleSubmit(handleSubmitRole)} className="space-y-4">
+              <FormField
+                control={roleForm.control}
+                name="companyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company *</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(parseInt(v))}
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-company">
+                          <SelectValue placeholder="Select company" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {companies.map((company: any) => (
+                          <SelectItem key={company.id} value={company.id.toString()}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={roleForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Admin">Admin</SelectItem>
+                        <SelectItem value="Owner">Owner</SelectItem>
+                        <SelectItem value="Manager">Manager</SelectItem>
+                        <SelectItem value="POS1">POS 1</SelectItem>
+                        <SelectItem value="POS2">POS 2</SelectItem>
+                        <SelectItem value="POS3">POS 3</SelectItem>
+                        <SelectItem value="POS4">POS 4</SelectItem>
+                        <SelectItem value="POS5">POS 5</SelectItem>
+                        <SelectItem value="POS6">POS 6</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {isPOSRole && (
+                <>
+                  <FormField
+                    control={roleForm.control}
+                    name="assignedLocationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assigned Location *</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
+                          value={field.value?.toString() || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-location">
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {locations.map((loc: any) => (
+                              <SelectItem key={loc.id} value={loc.id.toString()}>
+                                {loc.name} ({loc.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={roleForm.control}
+                    name="posStation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>POS Station Number</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            min="1"
+                            max="6"
+                            placeholder="1-6"
+                            data-testid="input-pos-station"
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
+              <div className="flex gap-2 justify-end border-t pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsRoleDialogOpen(false);
+                    setEditingRole(null);
+                    setCurrentUserId(null);
+                  }}
+                  disabled={createRoleMutation.isPending}
+                  data-testid="button-cancel-role"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createRoleMutation.isPending} data-testid="button-save-role">
+                  {createRoleMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

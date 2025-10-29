@@ -19,6 +19,7 @@ import {
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
   insertUserSchema,
+  insertUserCompanyRoleSchema,
   inventory,
   stockItems,
   vouchers,
@@ -147,6 +148,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User-Company-Role management routes
+  app.get("/api/users/:userId/company-roles", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const roles = await storage.getUserCompaniesWithRoles(userId);
+      res.json(roles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/user-company-roles", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const parsed = insertUserCompanyRoleSchema.parse(req.body);
+      
+      // Validate POS roles have required fields
+      if (parsed.role.startsWith("POS") && !parsed.assignedLocationId) {
+        return res.status(400).json({ message: "POS roles require an assigned location" });
+      }
+      
+      const role = await storage.createUserCompanyRole(parsed);
+      res.status(201).json(role);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/user-company-roles/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = insertUserCompanyRoleSchema.partial().parse(req.body);
+      
+      // Validate POS roles have required fields if role is being updated
+      if (parsed.role?.startsWith("POS") && !parsed.assignedLocationId) {
+        return res.status(400).json({ message: "POS roles require an assigned location" });
+      }
+      
+      const role = await storage.updateUserCompanyRole(parseInt(id), parsed);
+      res.json(role);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/user-company-roles/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteUserCompanyRole(parseInt(id));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Company management routes
   app.get("/api/companies", requireAuth, async (req, res) => {
     try {
@@ -222,10 +277,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Locations
   app.get("/api/locations", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : req.session.currentCompanyId;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected or specified" });
       }
-      const locations = await storage.getAllLocations(req.session.currentCompanyId);
+      
+      const locations = await storage.getAllLocations(companyId);
       res.json(locations);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
