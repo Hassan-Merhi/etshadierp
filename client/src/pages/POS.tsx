@@ -130,6 +130,54 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   }, [bankAccounts, cashAccount]);
 
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (itemListRef.current && activeRow !== null) {
+      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [highlightedIndex, activeRow]);
+
+  // Save sale mutation
+  const saveMutation = useMutation({
+    mutationFn: async (saleData: any) => {
+      return await apiRequest("POST", "/api/pos/sales", saleData);
+    },
+    onSuccess: (data: any) => {
+      setSavedSale(data);
+      toast({
+        title: "Sale Saved",
+        description: `Sale ${data.voucher?.voucherNumber} has been saved successfully.`,
+      });
+      
+      // Clear the form
+      setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
+      setNotes("");
+      
+      // Invalidate inventory query to refresh stock levels
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
+      
+      // Auto-show print dialog
+      setShowPrintDialog(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save sale",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Print handler
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
+    onAfterPrint: () => setShowPrintDialog(false),
+  });
+
   // Conditional renders after all hooks are called
   // Redirect to Location Inventory if no location is available (only for non-POS users)
   if (!activeLocation && !posUser) {
@@ -412,47 +460,6 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }, 0);
   };
 
-  // Scroll highlighted item into view
-  useEffect(() => {
-    if (itemListRef.current && activeRow !== null) {
-      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
-      if (highlightedElement) {
-        highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
-    }
-  }, [highlightedIndex, activeRow]);
-
-  // Save sale mutation
-  const saveMutation = useMutation({
-    mutationFn: async (saleData: any) => {
-      return await apiRequest("POST", "/api/pos/sales", saleData);
-    },
-    onSuccess: (data) => {
-      setSavedSale(data);
-      toast({
-        title: "Sale Saved",
-        description: `Sale ${data.voucherNumber} has been saved successfully.`,
-      });
-      
-      // Clear the form
-      setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
-      setNotes("");
-      
-      // Invalidate inventory query to refresh stock levels
-      queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
-      
-      // Auto-show print dialog
-      setShowPrintDialog(true);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save sale",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleSaveSale = () => {
     // Validate
     if (!activeLocation) {
@@ -497,13 +504,6 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
 
     saveMutation.mutate(saleData);
   };
-
-  // Print handler
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
-    onAfterPrint: () => setShowPrintDialog(false),
-  });
 
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
   const filteredItems = getFilteredInventory();
