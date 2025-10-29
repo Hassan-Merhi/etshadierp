@@ -89,12 +89,12 @@ export interface IStorage {
 
   // Stock Groups
   getAllStockGroups(companyId: number): Promise<StockGroup[]>;
-  getStockGroupByCode(code: string): Promise<StockGroup | undefined>;
+  getStockGroupByCode(code: string, companyId: number): Promise<StockGroup | undefined>;
   createStockGroup(group: InsertStockGroup): Promise<StockGroup>;
 
   // Stock Items
   getAllStockItems(companyId: number): Promise<StockItem[]>;
-  getStockItemByCode(code: string): Promise<StockItem | undefined>;
+  getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined>;
   createStockItem(item: InsertStockItem): Promise<StockItem>;
 
   // Bank Accounts
@@ -315,8 +315,13 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.companyId, companyId));
   }
 
-  async getStockGroupByCode(code: string): Promise<StockGroup | undefined> {
-    const [group] = await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.code, code));
+  async getStockGroupByCode(code: string, companyId: number): Promise<StockGroup | undefined> {
+    const [group] = await db.select().from(schema.stockGroups).where(
+      and(
+        eq(schema.stockGroups.code, code),
+        eq(schema.stockGroups.companyId, companyId)
+      )
+    );
     return group;
   }
 
@@ -330,8 +335,13 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.stockItems).where(eq(schema.stockItems.companyId, companyId));
   }
 
-  async getStockItemByCode(code: string): Promise<StockItem | undefined> {
-    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.code, code));
+  async getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined> {
+    const [item] = await db.select().from(schema.stockItems).where(
+      and(
+        eq(schema.stockItems.code, code),
+        eq(schema.stockItems.companyId, companyId)
+      )
+    );
     return item;
   }
 

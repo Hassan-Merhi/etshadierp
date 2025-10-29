@@ -556,14 +556,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-groups", async (req, res) => {
+  app.post("/api/stock-groups", requireAuth, async (req, res) => {
     try {
-      const parsed = insertStockGroupSchema.parse(req.body);
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Inject companyId before schema validation
+      const dataWithCompany = {
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      };
+
+      const parsed = insertStockGroupSchema.parse(dataWithCompany);
       
-      // Check for duplicate code
-      const existing = await storage.getStockGroupByCode(parsed.code);
+      // Check for duplicate code within the same company
+      const existing = await storage.getStockGroupByCode(parsed.code, req.session.currentCompanyId);
       if (existing) {
-        return res.status(400).json({ message: "Stock group code already exists" });
+        return res.status(400).json({ message: "Stock group code already exists in this company" });
       }
 
       const group = await storage.createStockGroup(parsed);
@@ -586,14 +596,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-items", async (req, res) => {
+  app.post("/api/stock-items", requireAuth, async (req, res) => {
     try {
-      const parsed = insertStockItemSchema.parse(req.body);
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Inject companyId before schema validation
+      const dataWithCompany = {
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      };
+
+      const parsed = insertStockItemSchema.parse(dataWithCompany);
       
-      // Check for duplicate code
-      const existing = await storage.getStockItemByCode(parsed.code);
+      // Check for duplicate code within the same company
+      const existing = await storage.getStockItemByCode(parsed.code, req.session.currentCompanyId);
       if (existing) {
-        return res.status(400).json({ message: "Stock item code already exists" });
+        return res.status(400).json({ message: "Stock item code already exists in this company" });
       }
 
       // Calculate opening value if qty and rate provided
