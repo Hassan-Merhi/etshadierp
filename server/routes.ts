@@ -1497,52 +1497,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       
-      const ledgers = await storage.getAllLedgerAccounts(req.session.currentCompanyId!);
-      const banks = await storage.getAllBankAccounts(req.session.currentCompanyId!);
-      const assets = await storage.getAllFixedAssets(req.session.currentCompanyId!);
+      const companyId = req.session.currentCompanyId;
+      
+      const ledgers = await storage.getAllLedgerAccounts(companyId);
+      const banks = await storage.getAllBankAccounts(companyId);
+      const assets = await storage.getAllFixedAssets(companyId);
       const suppliers = await storage.getAllSuppliers();
 
+      // Get all voucher entries for this company's vouchers
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(eq(vouchers.companyId, companyId))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map(v => v.id);
+
+      // Get all voucher entries for this company
+      const allEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Group entries by account type and calculate balances
+      const ledgerBalances = new Map<number, { debits: number; credits: number }>();
+      const bankBalances = new Map<number, { debits: number; credits: number }>();
+      const assetBalances = new Map<number, { debits: number; credits: number }>();
+      const supplierBalances = new Map<number, { debits: number; credits: number }>();
+
+      for (const entry of allEntries) {
+        const debit = parseFloat(entry.debitAmount || "0");
+        const credit = parseFloat(entry.creditAmount || "0");
+
+        if (entry.ledgerAccountId) {
+          const existing = ledgerBalances.get(entry.ledgerAccountId) || { debits: 0, credits: 0 };
+          ledgerBalances.set(entry.ledgerAccountId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.bankAccountId) {
+          const existing = bankBalances.get(entry.bankAccountId) || { debits: 0, credits: 0 };
+          bankBalances.set(entry.bankAccountId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.fixedAssetId) {
+          const existing = assetBalances.get(entry.fixedAssetId) || { debits: 0, credits: 0 };
+          assetBalances.set(entry.fixedAssetId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.supplierId) {
+          const existing = supplierBalances.get(entry.supplierId) || { debits: 0, credits: 0 };
+          supplierBalances.set(entry.supplierId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+      }
+
+      // Helper function to calculate actual balance
+      const calculateBalance = (
+        openingBalance: string,
+        openingBalanceSide: string | null,
+        debits: number,
+        credits: number
+      ) => {
+        let balance = parseFloat(openingBalance || "0");
+        
+        // If opening balance has a side, convert to signed number
+        if (openingBalanceSide === "Cr") {
+          balance = -balance;
+        }
+        
+        // Add net change (debits increase, credits decrease)
+        balance += (debits - credits);
+        
+        // Determine side based on final balance
+        const balanceSide = balance >= 0 ? "Dr" : "Cr";
+        const absoluteBalance = Math.abs(balance);
+        
+        return { balance: absoluteBalance, balanceSide };
+      };
+
       const accounts = [
-        ...ledgers.map((account) => ({
-          id: `ledger-${account.id}`,
-          accountId: account.id,
-          type: "Ledger",
-          code: account.code,
-          name: account.name,
-          balance: parseFloat(account.openingBalance || "0"),
-          balanceSide: account.openingBalanceSide || null,
-          active: account.active,
-        })),
-        ...banks.map((account) => ({
-          id: `bank-${account.id}`,
-          accountId: account.id,
-          type: "Bank",
-          code: account.code,
-          name: `${account.name} (${account.bankName})`,
-          balance: parseFloat(account.openingBalance || "0"),
-          balanceSide: account.openingBalanceSide || null,
-          active: account.active,
-        })),
-        ...assets.map((asset) => ({
-          id: `asset-${asset.id}`,
-          accountId: asset.id,
-          type: "Fixed Asset",
-          code: asset.code,
-          name: asset.name,
-          balance: parseFloat(asset.openingBalance || "0"),
-          balanceSide: "Dr",
-          active: asset.active,
-        })),
-        ...suppliers.map((supplier) => ({
-          id: `supplier-${supplier.id}`,
-          accountId: supplier.id,
-          type: "Supplier",
-          code: supplier.code,
-          name: supplier.legalName,
-          balance: 0,
-          balanceSide: "Cr",
-          active: supplier.active,
-        })),
+        ...ledgers.map((account) => {
+          const movements = ledgerBalances.get(account.id) || { debits: 0, credits: 0 };
+          const { balance, balanceSide } = calculateBalance(
+            account.openingBalance || "0",
+            account.openingBalanceSide,
+            movements.debits,
+            movements.credits
+          );
+          
+          return {
+            id: `ledger-${account.id}`,
+            accountId: account.id,
+            type: "Ledger",
+            code: account.code,
+            name: account.name,
+            balance,
+            balanceSide,
+            active: account.active,
+          };
+        }),
+        ...banks.map((account) => {
+          const movements = bankBalances.get(account.id) || { debits: 0, credits: 0 };
+          const { balance, balanceSide } = calculateBalance(
+            account.openingBalance || "0",
+            account.openingBalanceSide,
+            movements.debits,
+            movements.credits
+          );
+          
+          return {
+            id: `bank-${account.id}`,
+            accountId: account.id,
+            type: "Bank",
+            code: account.code,
+            name: `${account.name} (${account.bankName})`,
+            balance,
+            balanceSide,
+            active: account.active,
+          };
+        }),
+        ...assets.map((asset) => {
+          const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
+          const { balance, balanceSide } = calculateBalance(
+            asset.openingBalance || "0",
+            "Dr", // Fixed assets are always debit balance
+            movements.debits,
+            movements.credits
+          );
+          
+          return {
+            id: `asset-${asset.id}`,
+            accountId: asset.id,
+            type: "Fixed Asset",
+            code: asset.code,
+            name: asset.name,
+            balance,
+            balanceSide,
+            active: asset.active,
+          };
+        }),
+        ...suppliers.map((supplier) => {
+          const movements = supplierBalances.get(supplier.id) || { debits: 0, credits: 0 };
+          // Suppliers don't have opening balance, and are typically credit balance (payables)
+          const { balance, balanceSide } = calculateBalance(
+            "0",
+            "Cr",
+            movements.debits,
+            movements.credits
+          );
+          
+          return {
+            id: `supplier-${supplier.id}`,
+            accountId: supplier.id,
+            type: "Supplier",
+            code: supplier.code,
+            name: supplier.legalName,
+            balance,
+            balanceSide,
+            active: supplier.active,
+          };
+        }),
       ];
 
       res.json(accounts);
