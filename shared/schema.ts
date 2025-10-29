@@ -471,7 +471,7 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
   additionalCharges: z.array(z.object({
     description: z.string().min(1, "Description is required"),
     amount: z.number().min(0, "Amount must be non-negative"),
-    supplierId: z.number().min(1, "Supplier is required"),
+    ledgerAccountId: z.number().min(1, "Ledger account is required"),
   })).optional(),
 });
 

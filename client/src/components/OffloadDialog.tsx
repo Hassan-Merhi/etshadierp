@@ -131,11 +131,11 @@ export function OffloadDialog({
         `/api/containers/${containerId}/offload`,
         {
           locationId,
-          duties: parseFloat(duties),
+          duties: duties,
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
-          officeCharges: parseFloat(officeCharges),
-          transferCharges: parseFloat(transferCharges),
-          transportFees: parseFloat(transportFees),
+          officeCharges: officeCharges,
+          transferCharges: transferCharges,
+          transportFees: transportFees,
           transportAccountId: transportAccountId ? parseInt(transportAccountId) : null,
           additionalCharges: additionalCharges
             .filter((charge) => parseFloat(charge.amount) > 0)
