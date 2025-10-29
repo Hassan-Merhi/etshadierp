@@ -10,7 +10,7 @@ import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -32,13 +32,24 @@ import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
   const isPOS = user?.role?.startsWith("POS");
+  const [, navigate] = useLocation();
   
-  // POS users only see the POS interface
+  // POS users only see POS and Location Inventory
   if (isPOS) {
+    // Redirect legacy /pos URL to /
+    useEffect(() => {
+      if (window.location.pathname === "/pos") {
+        navigate("/");
+      }
+    }, [navigate]);
+    
     return (
       <Switch>
         <Route path="/" component={POS} />
-        <Route component={() => <POS />} />
+        <Route path="/location-inventory">
+          {() => <LocationInventory posUser={user} />}
+        </Route>
+        <Route component={POS} />
       </Switch>
     );
   }
@@ -67,6 +78,7 @@ function Router({ user }: { user: any }) {
 
 function AuthenticatedApp() {
   const [location, setLocation] = useLocation();
+  const [currentLocation] = useLocation();
   
   const { data: user, isLoading, error } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -109,18 +121,43 @@ function AuthenticatedApp() {
 
   // POS users get a simplified interface without sidebar
   if (isPOS) {
+    const isOnPOS = currentLocation === "/";
+    const isOnInventory = currentLocation === "/location-inventory";
+    
     return (
       <div className="flex flex-col h-screen w-full">
-        <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">POS Station {user.posStation || ""}</h1>
+        <header className="flex flex-col border-b">
+          <div className="flex items-center justify-between p-4 h-16 gap-4">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">POS Station {user.posStation || ""}</h1>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-sm text-muted-foreground">{user.username}</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
+                <LogOut className="h-4 w-4" />
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-muted-foreground">{user.username}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
-              <LogOut className="h-4 w-4" />
+          <div className="flex items-center gap-2 px-4 pb-2">
+            <Button
+              variant={isOnPOS ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setLocation("/")}
+              data-testid="button-pos-tab"
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Point of Sale
             </Button>
-            <ThemeToggle />
+            <Button
+              variant={isOnInventory ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setLocation("/location-inventory")}
+              data-testid="button-inventory-tab"
+            >
+              <MapPin className="h-4 w-4 mr-2" />
+              Location Inventory
+            </Button>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">

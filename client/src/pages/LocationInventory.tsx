@@ -44,7 +44,7 @@ interface StockGroupSummary {
   items: InventoryItem[];
 }
 
-export default function LocationInventory() {
+export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
@@ -52,10 +52,34 @@ export default function LocationInventory() {
   const { setSelectedLocation } = useLocation();
   const [, navigate] = useRoute();
 
-  // Fetch all locations
+  // Fetch all locations (only if not a POS user)
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+    enabled: !posUser,
   });
+
+  // For POS users, automatically set their assigned location
+  useEffect(() => {
+    if (posUser?.assignedLocationId && locations.length > 0) {
+      const assignedLocation = locations.find(loc => loc.id === posUser.assignedLocationId);
+      if (assignedLocation) {
+        setSelectedLocationLocal(assignedLocation);
+      }
+    }
+  }, [posUser, locations]);
+
+  // If POS user, fetch their specific location
+  const { data: posLocation } = useQuery<Location>({
+    queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
+    enabled: !!posUser?.assignedLocationId,
+  });
+
+  // Auto-select location for POS users
+  useEffect(() => {
+    if (posUser && posLocation && !selectedLocationLocal) {
+      setSelectedLocationLocal(posLocation);
+    }
+  }, [posUser, posLocation, selectedLocationLocal]);
 
   // Fetch inventory for selected location
   const { data: inventory = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
@@ -157,29 +181,37 @@ export default function LocationInventory() {
         {!selectedLocationLocal && <span>Select Location</span>}
         {selectedLocationLocal && !selectedGroup && (
           <>
-            <Button
-              variant="ghost"
-              onClick={handleBackToLocations}
-              className="h-auto p-0 text-sm hover:underline"
-              data-testid="button-back-to-locations"
-            >
-              Locations
-            </Button>
-            <ChevronRight className="w-4 h-4" />
+            {!posUser && (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={handleBackToLocations}
+                  className="h-auto p-0 text-sm hover:underline"
+                  data-testid="button-back-to-locations"
+                >
+                  Locations
+                </Button>
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
             <span>{selectedLocationLocal.name}</span>
           </>
         )}
         {selectedLocationLocal && selectedGroup && (
           <>
-            <Button
-              variant="ghost"
-              onClick={handleBackToLocations}
-              className="h-auto p-0 text-sm hover:underline"
-              data-testid="button-back-to-locations-2"
-            >
-              Locations
-            </Button>
-            <ChevronRight className="w-4 h-4" />
+            {!posUser && (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={handleBackToLocations}
+                  className="h-auto p-0 text-sm hover:underline"
+                  data-testid="button-back-to-locations-2"
+                >
+                  Locations
+                </Button>
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
             <Button
               variant="ghost"
               onClick={handleBackToGroups}
@@ -249,14 +281,16 @@ export default function LocationInventory() {
             <h1 className="text-3xl font-bold">
               {selectedLocationLocal.name} - Stock Groups
             </h1>
-            <Button
-              onClick={() => handleUseLocation(selectedLocationLocal)}
-              data-testid="button-use-location"
-              className="gap-2"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              Use Location for POS
-            </Button>
+            {!posUser && (
+              <Button
+                onClick={() => handleUseLocation(selectedLocationLocal)}
+                data-testid="button-use-location"
+                className="gap-2"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                Use Location for POS
+              </Button>
+            )}
           </div>
           {inventoryLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

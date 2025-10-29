@@ -158,6 +158,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single location by ID
+  app.get("/api/locations/:locationId", async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      res.json(location);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Location Inventory - Get inventory for a specific location
   app.get("/api/locations/:locationId/inventory", async (req, res) => {
     try {
