@@ -23,12 +23,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus } from "lucide-react";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertLedgerAccountSchema } from "@shared/schema";
-import type { InsertLedgerAccount } from "@shared/schema";
+import { insertLedgerAccountSchema, updateLedgerAccountSchema } from "@shared/schema";
+import type { InsertLedgerAccount, UpdateLedgerAccount, LedgerAccount } from "@shared/schema";
 import { z } from "zod";
 import {
   Form,
@@ -41,6 +41,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Account {
   id: string;
@@ -75,9 +76,16 @@ export default function Accounts() {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(null);
+  const [editSearchTerm, setEditSearchTerm] = useState("");
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
+  });
+
+  const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
@@ -240,6 +248,70 @@ export default function Accounts() {
     createLedgerMutation.mutate(data);
   };
 
+  const editForm = useForm<UpdateLedgerAccount>({
+    resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
+    defaultValues: {
+      code: "",
+      name: "",
+      accountType: "Asset",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
+      active: true,
+    },
+  });
+
+  const updateLedgerMutation = useMutation({
+    mutationFn: async (data: UpdateLedgerAccount) => {
+      if (!accountToEdit) {
+        throw new Error("No account selected");
+      }
+      return await apiRequest(`/api/ledger-accounts/${accountToEdit.id}`, "PUT", data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Account updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setAccountToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onEditSubmit = (data: UpdateLedgerAccount) => {
+    updateLedgerMutation.mutate(data);
+  };
+
+  const handleSelectAccountForEdit = (account: LedgerAccount) => {
+    setAccountToEdit(account);
+    editForm.reset({
+      code: account.code,
+      name: account.name,
+      accountType: account.accountType as any,
+      subType: account.subType || undefined,
+      openingBalance: account.openingBalance || "0",
+      openingBalanceSide: account.openingBalanceSide as "Dr" | "Cr" || undefined,
+      active: account.active,
+    });
+  };
+
+  const filteredLedgerAccounts = ledgerAccounts.filter((account) => {
+    const searchLower = editSearchTerm.toLowerCase();
+    return (
+      account.name.toLowerCase().includes(searchLower) ||
+      account.code.toLowerCase().includes(searchLower) ||
+      account.accountType.toLowerCase().includes(searchLower)
+    );
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -385,6 +457,13 @@ export default function Accounts() {
         </Dialog>
       </div>
 
+      <Tabs defaultValue="view" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="view" data-testid="tab-view">View Accounts</TabsTrigger>
+          <TabsTrigger value="alter" data-testid="tab-alter">Alter Account</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="view" className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Select Account</CardTitle>
@@ -654,6 +733,204 @@ export default function Accounts() {
           </Card>
         </>
       )}
+        </TabsContent>
+
+        <TabsContent value="alter" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Alter Ledger Account</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-account-search">Search & Select Account to Edit</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-account-search"
+                    placeholder="Search by name, code, or type..."
+                    value={editSearchTerm}
+                    onChange={(e) => setEditSearchTerm(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-edit-account-search"
+                  />
+                </div>
+                
+                {ledgerAccountsLoading ? (
+                  <div className="p-4">
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                    {filteredLedgerAccounts.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No accounts found
+                      </div>
+                    ) : (
+                      filteredLedgerAccounts.map((account) => (
+                        <button
+                          key={account.id}
+                          onClick={() => handleSelectAccountForEdit(account)}
+                          className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
+                            accountToEdit?.id === account.id
+                              ? "bg-accent"
+                              : ""
+                          }`}
+                          data-testid={`button-select-account-edit-${account.id}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {account.accountType}
+                            </Badge>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {account.code}
+                            </span>
+                            <span className="text-sm">{account.name}</span>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {accountToEdit && (
+                <Card className="bg-muted/50">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Edit Account Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...editForm}>
+                      <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                        <FormField
+                          control={editForm.control}
+                          name="code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Code</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-code" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
+                          name="accountType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-edit-type">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Asset">Asset</SelectItem>
+                                  <SelectItem value="Liability">Liability</SelectItem>
+                                  <SelectItem value="Equity">Equity</SelectItem>
+                                  <SelectItem value="Income">Income</SelectItem>
+                                  <SelectItem value="Expense">Expense</SelectItem>
+                                  <SelectItem value="Bank">Bank</SelectItem>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                  <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                  <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                  <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                  <SelectItem value="Loans">Loans</SelectItem>
+                                  <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                  <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                  <SelectItem value="Profit">Profit</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={editForm.control}
+                            name="openingBalance"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Opening Balance</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    {...field}
+                                    data-testid="input-edit-balance"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="openingBalanceSide"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Balance Side</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-edit-balance-side">
+                                      <SelectValue placeholder="Dr/Cr" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setAccountToEdit(null);
+                              editForm.reset();
+                            }}
+                            data-testid="button-cancel-edit"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={updateLedgerMutation.isPending}
+                            data-testid="button-save-edit"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            {updateLedgerMutation.isPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
