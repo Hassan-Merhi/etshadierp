@@ -60,6 +60,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       req.session.userId = user.id;
       
+      // Auto-select first company
+      const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
+      if (userCompanies.length > 0) {
+        const firstCompany = userCompanies[0];
+        req.session.currentCompanyId = firstCompany.companyId;
+        req.session.currentRole = firstCompany.role;
+        req.session.currentLocationId = firstCompany.assignedLocationId;
+        req.session.currentPOSStation = firstCompany.posStation;
+      }
+      
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
@@ -137,10 +147,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Locations
-  app.get("/api/locations", async (_req, res) => {
+  // Company management routes
+  app.get("/api/companies", requireAuth, async (req, res) => {
     try {
-      const locations = await storage.getAllLocations();
+      const companies = await storage.getAllCompanies();
+      res.json(companies);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/user/companies", requireAuth, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const userCompanies = await storage.getUserCompaniesWithRoles(req.user.id);
+      // Join with companies to include company details
+      const companiesWithRoles = await Promise.all(
+        userCompanies.map(async (uc) => {
+          const company = await storage.getCompanyById(uc.companyId);
+          return {
+            ...uc,
+            companyCode: company?.code,
+            companyName: company?.name,
+            companyActive: company?.active,
+          };
+        })
+      );
+      res.json(companiesWithRoles);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/companies", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const company = await storage.createCompany(req.body);
+      res.status(201).json(company);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Set current company in session
+  app.post("/api/auth/set-company", requireAuth, async (req, res) => {
+    try {
+      const { companyId } = req.body;
+      if (!companyId) {
+        return res.status(400).json({ message: "Company ID is required" });
+      }
+      
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Verify user has access to this company
+      const userRole = await storage.getUserCompanyRole(req.user.id, companyId);
+      if (!userRole) {
+        return res.status(403).json({ message: "You don't have access to this company" });
+      }
+      
+      req.session.currentCompanyId = companyId;
+      req.session.currentRole = userRole.role;
+      req.session.currentLocationId = userRole.assignedLocationId;
+      req.session.currentPOSStation = userRole.posStation;
+      
+      res.json({ message: "Company set successfully", companyId });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Locations
+  app.get("/api/locations", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const locations = await storage.getAllLocations(req.session.currentCompanyId);
       res.json(locations);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -205,9 +290,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Ledger Accounts
-  app.get("/api/ledger-accounts", async (_req, res) => {
+  app.get("/api/ledger-accounts", requireAuth, async (req, res) => {
     try {
-      const accounts = await storage.getAllLedgerAccounts();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const accounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -260,9 +348,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Employees
-  app.get("/api/employees", async (_req, res) => {
+  app.get("/api/employees", requireAuth, async (req, res) => {
     try {
-      const employees = await storage.getAllEmployees();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const employees = await storage.getAllEmployees(req.session.currentCompanyId);
       res.json(employees);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -314,9 +405,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock Groups
-  app.get("/api/stock-groups", async (_req, res) => {
+  app.get("/api/stock-groups", requireAuth, async (req, res) => {
     try {
-      const groups = await storage.getAllStockGroups();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const groups = await storage.getAllStockGroups(req.session.currentCompanyId);
       res.json(groups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -341,9 +435,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock Items
-  app.get("/api/stock-items", async (_req, res) => {
+  app.get("/api/stock-items", requireAuth, async (req, res) => {
     try {
-      const items = await storage.getAllStockItems();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const items = await storage.getAllStockItems(req.session.currentCompanyId);
       res.json(items);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -375,17 +472,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bank Accounts
-  app.get("/api/bank-accounts", async (_req, res) => {
+  app.get("/api/bank-accounts", requireAuth, async (req, res) => {
     try {
-      const accounts = await storage.getAllBankAccounts();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const accounts = await storage.getAllBankAccounts(req.session.currentCompanyId);
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.post("/api/bank-accounts", async (req, res) => {
+  app.post("/api/bank-accounts", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       const parsed = insertBankAccountSchema.parse(req.body);
       
       // Check for duplicate code
@@ -408,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate linked ledger is Bank or Cash type
       if (parsed.linkedLedgerId) {
-        const allLedgers = await storage.getAllLedgerAccounts();
+        const allLedgers = await storage.getAllLedgerAccounts(req.session.currentCompanyId!);
         const linkedLedger = allLedgers.find(l => l.id === parsed.linkedLedgerId);
         
         if (!linkedLedger) {
@@ -430,9 +534,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fixed Assets
-  app.get("/api/fixed-assets", async (_req, res) => {
+  app.get("/api/fixed-assets", requireAuth, async (req, res) => {
     try {
-      const assets = await storage.getAllFixedAssets();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const assets = await storage.getAllFixedAssets(req.session.currentCompanyId);
       res.json(assets);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -464,8 +571,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PO Import - Parse and Preview Excel
-  app.post("/api/po-import/parse", upload.single("file"), async (req, res) => {
+  app.post("/api/po-import/parse", requireAuth, upload.single("file"), async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
@@ -499,7 +610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const chargeRows: any[] = [];
 
       // Get all stock items for barcode/name lookup
-      const allStockItems = await storage.getAllStockItems();
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -657,8 +768,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PO Import - Validate data before import
-  app.post("/api/po-import/validate", async (req, res) => {
+  app.post("/api/po-import/validate", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       const { containerNumber, supplierId, preview } = req.body;
 
       if (!containerNumber || !supplierId || !preview) {
@@ -675,7 +790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all stock items for validation
-      const allStockItems = await storage.getAllStockItems();
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Validate all items in the preview
       const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
@@ -722,8 +837,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PO Import - Import data
-  app.post("/api/po-import/import", async (req, res) => {
+  app.post("/api/po-import/import", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       const { fileHash, fileName, containerNumber, supplierId, importDate, preview } = req.body;
 
       if (!fileHash || !containerNumber || !supplierId || !importDate || !preview) {
@@ -741,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all stock items for validation
-      const allStockItems = await storage.getAllStockItems();
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Validate all items in the preview
       const containerPreview = preview.find((p: any) => p.containerNumber === containerNumber);
@@ -800,6 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!container) {
         // Create new container
         container = await storage.createContainer({
+          companyId: req.session.currentCompanyId!,
           containerNumber,
           supplierId,
           status: "OTW",
@@ -827,13 +947,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, {});
 
       // Get fresh stock items data for barcode lookup during import
-      const freshStockItems = await storage.getAllStockItems();
+      const freshStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
       // Get or create "Purchases" ledger account for double-entry bookkeeping
       let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
       if (!purchasesAccount) {
         // Create default Purchases account if it doesn't exist
         purchasesAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
           code: "PURCHASES",
           name: "Purchases",
           accountType: "Expense",
@@ -850,6 +971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create voucher for this PO (Purchase voucher with double-entry)
         const voucher = await storage.createVoucher({
+          companyId: req.session.currentCompanyId!,
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: importDate,
@@ -877,6 +999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const po = await storage.createPurchaseOrder({
+          companyId: req.session.currentCompanyId!,
           poNumber,
           containerId: container.id,
           supplierId,
@@ -1082,9 +1205,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get containers
-  app.get("/api/containers", async (_req, res) => {
+  app.get("/api/containers", requireAuth, async (req, res) => {
     try {
-      const containers = await storage.getAllContainers();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const containers = await storage.getAllContainers(req.session.currentCompanyId);
       res.json(containers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1168,10 +1294,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Backfill voucher entries for existing POs
-  app.post("/api/po-import/backfill", async (_req, res) => {
+  app.post("/api/po-import/backfill", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       // Get all POs without voucher IDs
-      const allPOs = await storage.getAllPurchaseOrders();
+      const allPOs = await storage.getAllPurchaseOrders(req.session.currentCompanyId!);
       const posWithoutVouchers = allPOs.filter((po: any) => !po.voucherId);
 
       if (posWithoutVouchers.length === 0) {
@@ -1185,6 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
       if (!purchasesAccount) {
         purchasesAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
           code: "PURCHASES",
           name: "Purchases",
           accountType: "Expense",
@@ -1195,7 +1326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all containers to lookup import dates
-      const allContainers = await storage.getAllContainers();
+      const allContainers = await storage.getAllContainers(req.session.currentCompanyId!);
       const containerMap = new Map(allContainers.map(c => [c.id, c]));
 
       let backfilledCount = 0;
@@ -1206,6 +1337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create voucher for this PO with double-entry bookkeeping
         const voucher = await storage.createVoucher({
+          companyId: req.session.currentCompanyId!,
           voucherNumber: `PO-${po.poNumber}-BACKFILL-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: container.importDate,
@@ -1250,11 +1382,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all accounts (combined from ledgers, bank accounts, fixed assets, and suppliers)
-  app.get("/api/accounts/all", async (_req, res) => {
+  app.get("/api/accounts/all", requireAuth, async (req, res) => {
     try {
-      const ledgers = await storage.getAllLedgerAccounts();
-      const banks = await storage.getAllBankAccounts();
-      const assets = await storage.getAllFixedAssets();
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const ledgers = await storage.getAllLedgerAccounts(req.session.currentCompanyId!);
+      const banks = await storage.getAllBankAccounts(req.session.currentCompanyId!);
+      const assets = await storage.getAllFixedAssets(req.session.currentCompanyId!);
       const suppliers = await storage.getAllSuppliers();
 
       const accounts = [
@@ -1399,8 +1535,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all vouchers with date filtering
-  app.get("/api/vouchers", async (req, res) => {
+  app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
       const { startDate, endDate } = req.query;
 
       let vouchers;
@@ -1410,7 +1549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate as string
         );
       } else {
-        vouchers = await storage.getAllVouchers();
+        vouchers = await storage.getAllVouchers(req.session.currentCompanyId);
       }
 
       res.json(vouchers);
@@ -1490,6 +1629,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POS Sales
   app.post("/api/pos/sales", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
       const { locationId, cashAccountId, items, notes } = req.body;
 
       // Validate required fields
@@ -1519,11 +1662,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get or create SALES revenue account (outside transaction for simplicity)
-      const allAccounts = await storage.getAllLedgerAccounts();
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId!);
       let salesAccount = allAccounts.find((a: any) => a.code === "SALES");
       
       if (!salesAccount) {
         salesAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
           code: "SALES",
           name: "Sales Revenue",
           accountType: "Income",
@@ -1588,6 +1732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // STEP 1b: Create accounting records (voucher and entries)
         // Create Sales voucher
         const [voucher] = await tx.insert(vouchers).values({
+          companyId: req.session.currentCompanyId!,
           voucherNumber,
           voucherType: "Sales",
           voucherDate,
