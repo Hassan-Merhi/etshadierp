@@ -111,7 +111,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
-  accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash"]),
+  accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Profit"]),
   subType: z.string().optional(),
   openingBalance: z.string().optional(),
   openingBalanceSide: z.enum(["Dr", "Cr"]).optional(),
