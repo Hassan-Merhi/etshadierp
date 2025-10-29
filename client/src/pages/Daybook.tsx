@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -21,6 +23,23 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Book, Filter, X, Eye, Edit, Trash2 } from "lucide-react";
 import { format, parseISO, isToday } from "date-fns";
 
@@ -35,12 +54,17 @@ interface Voucher {
 }
 
 export default function Daybook({ user }: { user?: any } = {}) {
+  const { toast } = useToast();
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
     voucherType: "all",
     searchQuery: "",
   });
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
 
   // Fetch all vouchers
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
@@ -102,6 +126,53 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // Check if user can delete a voucher (only Admin)
   const canDelete = (): boolean => {
     return user?.role === "Admin";
+  };
+
+  // Delete voucher mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/vouchers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({
+        title: "Success",
+        description: "Voucher deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setVoucherToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handler functions
+  const handleView = (voucher: Voucher) => {
+    setSelectedVoucher(voucher);
+    setViewDialogOpen(true);
+  };
+
+  const handleEdit = (voucher: Voucher) => {
+    toast({
+      title: "Edit Voucher",
+      description: `Edit functionality for ${voucher.voucherNumber} coming soon`,
+    });
+  };
+
+  const handleDelete = (voucher: Voucher) => {
+    setVoucherToDelete(voucher);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (voucherToDelete) {
+      deleteMutation.mutate(voucherToDelete.id);
+    }
   };
 
   const clearFilters = () => {
@@ -309,6 +380,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleView(voucher)}
                             data-testid={`button-view-${voucher.id}`}
                           >
                             <Eye className="w-4 h-4" />
@@ -317,6 +389,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => handleEdit(voucher)}
                               data-testid={`button-edit-${voucher.id}`}
                             >
                               <Edit className="w-4 h-4" />
@@ -326,6 +399,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => handleDelete(voucher)}
                               data-testid={`button-delete-${voucher.id}`}
                             >
                               <Trash2 className="w-4 h-4 text-destructive" />
@@ -341,6 +415,76 @@ export default function Daybook({ user }: { user?: any } = {}) {
           )}
         </CardContent>
       </Card>
+
+      {/* View Voucher Dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Voucher Details</DialogTitle>
+            <DialogDescription>
+              View voucher information
+            </DialogDescription>
+          </DialogHeader>
+          {selectedVoucher && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Voucher Number</p>
+                  <p className="font-mono font-medium">{selectedVoucher.voucherNumber}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">
+                    {format(parseISO(selectedVoucher.voucherDate), "MMM dd, yyyy")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Type</p>
+                  <Badge variant={getVoucherTypeBadgeVariant(selectedVoucher.voucherType)}>
+                    {selectedVoucher.voucherType}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-mono font-bold text-lg">
+                    ${parseFloat(selectedVoucher.totalAmount).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              {selectedVoucher.description && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Description</p>
+                  <p className="text-sm">{selectedVoucher.description}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete voucher{" "}
+              <span className="font-mono font-semibold">{voucherToDelete?.voucherNumber}</span>.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

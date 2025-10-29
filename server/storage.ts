@@ -137,6 +137,7 @@ export interface IStorage {
   getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
+  deleteVoucher(id: number): Promise<void>;
 
   // Stock Transfers
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
@@ -713,6 +714,13 @@ export class DbStorage implements IStorage {
   async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
     const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
     return created;
+  }
+
+  async deleteVoucher(id: number): Promise<void> {
+    // First delete all voucher entries
+    await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
+    // Then delete the voucher
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
   }
 
   // Stock Transfers

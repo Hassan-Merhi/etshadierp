@@ -1472,6 +1472,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a voucher (Admin only)
+  app.delete("/api/vouchers/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      await storage.deleteVoucher(id);
+      res.json({ message: "Voucher deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // POS Sales
   app.post("/api/pos/sales", requireAuth, async (req, res) => {
     try {
