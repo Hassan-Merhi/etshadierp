@@ -143,7 +143,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Save sale mutation
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {
-      return await apiRequest("POST", "/api/pos/sales", saleData);
+      const res = await apiRequest("POST", "/api/pos/sales", saleData);
+      return await res.json();
     },
     onSuccess: (data: any) => {
       setSavedSale(data);
@@ -555,7 +556,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             <SelectContent>
               {bankAccounts.map((acc: any) => (
                 <SelectItem key={acc.id} value={String(acc.id)}>
-                  {acc.accountName}
+                  {acc.name} ({acc.code})
                 </SelectItem>
               ))}
             </SelectContent>
