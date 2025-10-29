@@ -534,11 +534,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       {/* Edit Voucher Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Voucher</DialogTitle>
             <DialogDescription>
-              Update voucher information (amounts cannot be changed)
+              Update voucher date, type, and description. To modify amounts or entries, please delete this voucher and create a new one in the Financial page.
             </DialogDescription>
           </DialogHeader>
           {voucherToEdit && (

@@ -1843,6 +1843,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get voucher entries for a specific voucher
+  app.get("/api/vouchers/:id/entries", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const entries = await storage.getVoucherEntriesByVoucher(id);
+      res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create a new voucher entry
   app.post("/api/voucher-entries", async (req, res) => {
     try {

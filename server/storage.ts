@@ -151,10 +151,13 @@ export interface IStorage {
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]>;
   getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   updateVoucher(id: number, updates: Partial<InsertVoucher>): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
+  updateVoucherEntry(id: number, updates: Partial<InsertVoucherEntry>): Promise<VoucherEntry>;
+  deleteVoucherEntry(id: number): Promise<void>;
   deleteVoucher(id: number): Promise<void>;
 
   // Stock Transfers
@@ -846,9 +849,26 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
+  async getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]> {
+    return await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
+  }
+
   async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
     const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
     return created;
+  }
+
+  async updateVoucherEntry(id: number, updates: Partial<InsertVoucherEntry>): Promise<VoucherEntry> {
+    const [updated] = await db
+      .update(schema.voucherEntries)
+      .set(updates)
+      .where(eq(schema.voucherEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteVoucherEntry(id: number): Promise<void> {
+    await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.id, id));
   }
 
   async deleteVoucher(id: number): Promise<void> {
