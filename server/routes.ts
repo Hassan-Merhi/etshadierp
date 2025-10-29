@@ -2551,6 +2551,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get monthly sales and profit data for Dashboard charts
+  app.get("/api/stats/monthly-data", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all Sales vouchers for this company
+      const salesVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.voucherType, "Sales")
+        ))
+        .execute();
+
+      // Get all Income and Expense ledger accounts
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const incomeAccountIds = companyAccounts
+        .filter(acc => acc.accountType === "Income")
+        .map(acc => acc.id);
+      const expenseAccountIds = companyAccounts
+        .filter(acc => acc.accountType === "Expense")
+        .map(acc => acc.id);
+
+      // Get all voucher entries for this company
+      const companyVouchers = await db
+        .select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
+        .from(vouchers)
+        .where(eq(vouchers.companyId, companyId))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map(v => v.id);
+      const voucherDateMap = new Map(companyVouchers.map(v => [v.id, v.voucherDate]));
+
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Group data by month (last 6 months)
+      const monthlyData = new Map<string, { sales: number; profit: number }>();
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      
+      // Initialize last 6 months
+      const currentDate = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        const monthKey = monthNames[date.getMonth()];
+        monthlyData.set(monthKey, { sales: 0, profit: 0 });
+      }
+
+      // Calculate sales by month
+      for (const voucher of salesVouchers) {
+        const voucherDate = new Date(voucher.voucherDate);
+        const monthKey = monthNames[voucherDate.getMonth()];
+        const amount = parseFloat(voucher.totalAmount || "0");
+        
+        if (monthlyData.has(monthKey)) {
+          const data = monthlyData.get(monthKey)!;
+          data.sales += amount;
+        }
+      }
+
+      // Calculate profit by month (income - expenses)
+      for (const entry of companyEntries) {
+        const voucherDate = voucherDateMap.get(entry.voucherId);
+        if (!voucherDate) continue;
+
+        const date = new Date(voucherDate);
+        const monthKey = monthNames[date.getMonth()];
+        
+        if (!monthlyData.has(monthKey)) continue;
+
+        const data = monthlyData.get(monthKey)!;
+        
+        // Income accounts: credits increase profit, debits decrease it
+        if (entry.ledgerAccountId && incomeAccountIds.includes(entry.ledgerAccountId)) {
+          data.profit += parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0");
+        }
+        
+        // Expense accounts: debits decrease profit, credits increase it
+        if (entry.ledgerAccountId && expenseAccountIds.includes(entry.ledgerAccountId)) {
+          data.profit -= parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+        }
+      }
+
+      // Convert map to array
+      const result = Array.from(monthlyData.entries()).map(([month, data]) => ({
+        month,
+        sales: data.sales,
+        profit: data.profit,
+      }));
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

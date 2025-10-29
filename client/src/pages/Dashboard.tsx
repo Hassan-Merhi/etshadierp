@@ -21,15 +21,11 @@ type ProfitData = {
   netProfit: number;
 };
 
-//todo: remove mock functionality
-const salesData = [
-  { month: "Jan", sales: 45000, profit: 12000 },
-  { month: "Feb", sales: 52000, profit: 15000 },
-  { month: "Mar", sales: 48000, profit: 13500 },
-  { month: "Apr", sales: 61000, profit: 18000 },
-  { month: "May", sales: 55000, profit: 16500 },
-  { month: "Jun", sales: 67000, profit: 21000 },
-];
+type MonthlyData = {
+  month: string;
+  sales: number;
+  profit: number;
+};
 
 const lowStockItems = [
   { name: "Premium Cotton Bales", stock: 12, location: "Main Warehouse" },
@@ -46,6 +42,17 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/stats/net-profit", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch net profit");
+      return await response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch monthly sales and profit data
+  const { data: monthlyData = [], isLoading: monthlyDataLoading } = useQuery<MonthlyData[]>({
+    queryKey: ["/api/stats/monthly-data", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/stats/monthly-data", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch monthly data");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -115,39 +122,59 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Sales & Profit Trend</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={salesData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="month" className="text-xs" />
-              <YAxis className="text-xs" />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="sales"
-                stroke="hsl(var(--chart-1))"
-                strokeWidth={2}
-              />
-              <Line
-                type="monotone"
-                dataKey="profit"
-                stroke="hsl(var(--chart-2))"
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          {monthlyDataLoading ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">Loading chart data...</p>
+            </div>
+          ) : monthlyData.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">No sales data available</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="hsl(var(--chart-1))"
+                  strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="hsl(var(--chart-2))"
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </Card>
 
         <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4">Monthly Sales</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={salesData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="month" className="text-xs" />
-              <YAxis className="text-xs" />
-              <Tooltip />
-              <Bar dataKey="sales" fill="hsl(var(--chart-1))" />
-            </BarChart>
-          </ResponsiveContainer>
+          <h3 className="text-lg font-medium mb-4">Monthly POS Sales</h3>
+          {monthlyDataLoading ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">Loading chart data...</p>
+            </div>
+          ) : monthlyData.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">No sales data available</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" className="text-xs" />
+                <YAxis className="text-xs" />
+                <Tooltip />
+                <Bar dataKey="sales" fill="hsl(var(--chart-1))" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </Card>
       </div>
 
