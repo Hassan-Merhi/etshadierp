@@ -69,6 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.currentRole = firstCompany.role;
         req.session.currentLocationId = firstCompany.assignedLocationId;
         req.session.currentPOSStation = firstCompany.posStation;
+        req.session.cashAccountId = firstCompany.cashAccountId;
       }
       
       // Return user without password
@@ -267,6 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.currentRole = userRole.role;
       req.session.currentLocationId = userRole.assignedLocationId;
       req.session.currentPOSStation = userRole.posStation;
+      req.session.cashAccountId = userRole.cashAccountId;
       
       res.json({ message: "Company set successfully", companyId });
     } catch (error: any) {

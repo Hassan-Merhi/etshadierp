@@ -31,6 +31,7 @@ declare module 'express-session' {
     currentRole?: string;
     currentLocationId?: number | null;
     currentPOSStation?: number | null;
+    cashAccountId?: number | null;
   }
 }
 
