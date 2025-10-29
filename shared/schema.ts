@@ -117,7 +117,12 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   openingBalanceSide: z.enum(["Dr", "Cr"]).optional(),
 });
 
+export const updateLedgerAccountSchema = insertLedgerAccountSchema.partial().extend({
+  id: z.number().min(1, "Account ID is required"),
+}).required({ id: true });
+
 export type InsertLedgerAccount = z.infer<typeof insertLedgerAccountSchema>;
+export type UpdateLedgerAccount = z.infer<typeof updateLedgerAccountSchema>;
 export type LedgerAccount = typeof ledgerAccounts.$inferSelect;
 
 export const employees = pgTable("employees", {
