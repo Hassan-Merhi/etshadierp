@@ -1361,7 +1361,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { locationId, duties, officeCharges, transferCharges, transportFees } = validation.data;
+      const { 
+        locationId, 
+        duties, 
+        dutiesAccountId,
+        officeCharges, 
+        transferCharges, 
+        transportFees,
+        transportAccountId,
+        additionalCharges = []
+      } = validation.data;
 
       // Validate container exists and is not already offloaded
       const container = await storage.getContainerById(containerId);
@@ -1378,9 +1387,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         containerId,
         locationId,
         duties,
+        dutiesAccountId,
         officeCharges,
         transferCharges,
-        transportFees
+        transportFees,
+        transportAccountId,
+        additionalCharges
       );
 
       res.json(offload);

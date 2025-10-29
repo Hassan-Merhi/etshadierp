@@ -141,7 +141,17 @@ export interface IStorage {
   updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
 
   // Container Offload
-  offloadContainer(containerId: number, locationId: number, duties: string, officeCharges: string, transferCharges: string, transportFees: string): Promise<ContainerOffload>;
+  offloadContainer(
+    containerId: number, 
+    locationId: number, 
+    duties: string, 
+    dutiesAccountId: number | null | undefined,
+    officeCharges: string, 
+    transferCharges: string, 
+    transportFees: string,
+    transportAccountId: number | null | undefined,
+    additionalCharges?: Array<{ description: string; amount: number; supplierId: number }>
+  ): Promise<ContainerOffload>;
 
   // Vouchers and Journal Entries
   getAllVouchers(companyId: number): Promise<Voucher[]>;
@@ -573,9 +583,12 @@ export class DbStorage implements IStorage {
     containerId: number, 
     locationId: number, 
     duties: string, 
+    dutiesAccountId: number | null | undefined,
     officeCharges: string, 
     transferCharges: string, 
-    transportFees: string
+    transportFees: string,
+    transportAccountId: number | null | undefined,
+    additionalCharges: Array<{ description: string; amount: number; supplierId: number }> = []
   ): Promise<ContainerOffload> {
     // Get all POs for this container
     const pos = await this.getPurchaseOrdersByContainer(containerId);
@@ -592,12 +605,14 @@ export class DbStorage implements IStorage {
       return sum + parseFloat(item.quantity);
     }, 0);
 
-    // Calculate total charges
+    // Calculate total charges including additional charges
+    const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
     const totalCharges = 
       parseFloat(duties) + 
       parseFloat(officeCharges) + 
       parseFloat(transferCharges) + 
-      parseFloat(transportFees);
+      parseFloat(transportFees) +
+      additionalChargesTotal;
 
     // Calculate additional cost per bale
     const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
@@ -644,6 +659,139 @@ export class DbStorage implements IStorage {
 
     // Update container status to OFFLOADED
     await this.updateContainer(containerId, { status: "OFFLOADED" });
+
+    // Get container and location details for voucher entries
+    const container = await this.getContainerById(containerId);
+    const location = await this.getLocationById(locationId);
+    
+    if (!container || !location) {
+      throw new Error("Container or location not found");
+    }
+
+    // Create voucher entries for charges with associated supplier accounts
+    const voucherDate = new Date().toISOString().split('T')[0];
+    
+    // Find or create "IMPORT_CHARGES" ledger account for debiting inventory-related costs
+    let importChargesAccount = await db
+      .select()
+      .from(schema.ledgerAccounts)
+      .where(
+        and(
+          eq(schema.ledgerAccounts.companyId, location.companyId),
+          eq(schema.ledgerAccounts.code, "IMPORT_CHARGES")
+        )
+      )
+      .limit(1);
+
+    if (!importChargesAccount.length) {
+      const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+        companyId: location.companyId,
+        code: "IMPORT_CHARGES",
+        name: "Import Charges",
+        accountType: "Expense",
+        subType: "Direct Expense",
+        openingBalance: "0",
+        openingBalanceSide: "Debit",
+      }).returning();
+      importChargesAccount = [newAccount];
+    }
+
+    const importChargesLedgerId = importChargesAccount[0].id;
+    
+    // Duties voucher entry
+    if (dutiesAccountId && parseFloat(duties) > 0) {
+      const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
+      const [voucher] = await db.insert(schema.vouchers).values({
+        companyId: location.companyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate,
+        description: `Duties for container ${container.containerNumber}`,
+        totalAmount: duties,
+      }).returning();
+
+      // Debit: Import Charges (Expense increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: importChargesLedgerId,
+        debitAmount: duties,
+        creditAmount: "0",
+        narration: `Duties for container ${container.containerNumber}`,
+      });
+
+      // Credit: Supplier account (Liability increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        supplierId: dutiesAccountId,
+        debitAmount: "0",
+        creditAmount: duties,
+        narration: `Duties for container ${container.containerNumber}`,
+      });
+    }
+
+    // Transport fees voucher entry
+    if (transportAccountId && parseFloat(transportFees) > 0) {
+      const voucherNumber = `TRANS-${container.containerNumber}-${Date.now()}`;
+      const [voucher] = await db.insert(schema.vouchers).values({
+        companyId: location.companyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate,
+        description: `Transport fees for container ${container.containerNumber}`,
+        totalAmount: transportFees,
+      }).returning();
+
+      // Debit: Import Charges (Expense increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: importChargesLedgerId,
+        debitAmount: transportFees,
+        creditAmount: "0",
+        narration: `Transport fees for container ${container.containerNumber}`,
+      });
+
+      // Credit: Supplier account (Liability increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        supplierId: transportAccountId,
+        debitAmount: "0",
+        creditAmount: transportFees,
+        narration: `Transport fees for container ${container.containerNumber}`,
+      });
+    }
+
+    // Additional charges voucher entries
+    for (const charge of additionalCharges) {
+      if (charge.amount > 0) {
+        const voucherNumber = `CHG-${container.containerNumber}-${Date.now()}`;
+        const [voucher] = await db.insert(schema.vouchers).values({
+          companyId: location.companyId,
+          voucherNumber,
+          voucherType: "Payment",
+          voucherDate,
+          description: `${charge.description} for container ${container.containerNumber}`,
+          totalAmount: charge.amount.toFixed(2),
+        }).returning();
+
+        // Debit: Import Charges (Expense increases)
+        await db.insert(schema.voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: importChargesLedgerId,
+          debitAmount: charge.amount.toFixed(2),
+          creditAmount: "0",
+          narration: `${charge.description} for container ${container.containerNumber}`,
+        });
+
+        // Credit: Supplier account (Liability increases)
+        await db.insert(schema.voucherEntries).values({
+          voucherId: voucher.id,
+          supplierId: charge.supplierId,
+          debitAmount: "0",
+          creditAmount: charge.amount.toFixed(2),
+          narration: `${charge.description} for container ${container.containerNumber}`,
+        });
+      }
+    }
 
     // Create offload record with all calculated values
     const [offload] = await db.insert(schema.containerOffloads).values({

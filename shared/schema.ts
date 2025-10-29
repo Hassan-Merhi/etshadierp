@@ -465,6 +465,14 @@ export const insertContainerOffloadSchema = createInsertSchema(containerOffloads
 
 export const offloadRequestSchema = insertContainerOffloadSchema.omit({
   containerId: true,
+}).extend({
+  dutiesAccountId: z.number().nullable().optional(),
+  transportAccountId: z.number().nullable().optional(),
+  additionalCharges: z.array(z.object({
+    description: z.string().min(1, "Description is required"),
+    amount: z.number().min(0, "Amount must be non-negative"),
+    supplierId: z.number().min(1, "Supplier is required"),
+  })).optional(),
 });
 
 export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema>;
