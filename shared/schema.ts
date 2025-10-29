@@ -482,6 +482,7 @@ export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
 export const vouchers = pgTable("vouchers", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
+  locationId: integer("location_id"),
   voucherNumber: varchar("voucher_number", { length: 100 }).notNull().unique(),
   voucherType: text("voucher_type").notNull(),
   voucherDate: date("voucher_date").notNull(),
@@ -495,6 +496,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   createdAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
+  locationId: z.number().optional(),
   voucherNumber: z.string().min(1, "Voucher number is required"),
   voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"]),
   voucherDate: z.string().min(1, "Voucher date is required"),
