@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +14,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertLedgerAccountSchema } from "@shared/schema";
+import type { InsertLedgerAccount } from "@shared/schema";
+import { z } from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Account {
   id: string;
@@ -41,12 +66,15 @@ interface Transaction {
 }
 
 export default function Accounts() {
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
@@ -168,13 +196,193 @@ export default function Accounts() {
 
   const transactionsWithBalance = calculateRunningBalance();
 
+  const form = useForm<InsertLedgerAccount>({
+    resolver: zodResolver(insertLedgerAccountSchema.omit({ companyId: true })),
+    defaultValues: {
+      code: "",
+      name: "",
+      accountType: "Asset",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
+      active: true,
+    },
+  });
+
+  const createLedgerMutation = useMutation({
+    mutationFn: async (data: Omit<InsertLedgerAccount, "companyId">) => {
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected");
+      }
+      return await apiRequest("/api/ledger-accounts", "POST", {
+        ...data,
+        companyId: selectedCompany.id,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Ledger account created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setIsCreateDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create ledger account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: InsertLedgerAccount) => {
+    createLedgerMutation.mutate(data);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Accounts Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          View all accounts, balances, and transaction history
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Accounts Overview</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            View all accounts, balances, and transaction history
+          </p>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              data-testid="button-create-ledger"
+              disabled={!selectedCompany}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Ledger Account
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Ledger Account</DialogTitle>
+              <DialogDescription>
+                Add a new ledger account to your chart of accounts
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ACC001" {...field} data-testid="input-account-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Cash in Hand" {...field} data-testid="input-account-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="accountType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-account-type">
+                            <SelectValue placeholder="Select account type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Asset">Asset</SelectItem>
+                          <SelectItem value="Liability">Liability</SelectItem>
+                          <SelectItem value="Equity">Equity</SelectItem>
+                          <SelectItem value="Income">Income</SelectItem>
+                          <SelectItem value="Expense">Expense</SelectItem>
+                          <SelectItem value="Bank">Bank</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="openingBalance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Opening Balance</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            data-testid="input-opening-balance"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="openingBalanceSide"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Balance Side</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-balance-side">
+                              <SelectValue placeholder="Dr/Cr" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={createLedgerMutation.isPending}
+                    data-testid="button-submit-ledger"
+                  >
+                    {createLedgerMutation.isPending ? "Creating..." : "Create Account"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
