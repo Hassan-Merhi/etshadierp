@@ -149,10 +149,57 @@ export default function AccountingCreate() {
 
 // Location Form Component
 function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+  const [createCashAccount, setCreateCashAccount] = useState(false);
+  const [cashAccountOption, setCashAccountOption] = useState<"new" | "existing">("new");
+  const { toast } = useToast();
+  
+  // Fetch existing bank accounts for linking
+  const { data: bankAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/bank-accounts"],
+    enabled: createCashAccount && cashAccountOption === "existing",
+  });
+
+  const createLocationWithCashMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/locations/with-cash-account", data);
+      return await res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Success",
+        description: `Location "${data.name}" and cash account created successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      form.reset({});
+      setCreateCashAccount(false);
+      setCashAccountOption("new");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create location with cash account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFormSubmit = (data: any) => {
+    if (createCashAccount && cashAccountOption === "new") {
+      // Create location with new cash account
+      createLocationWithCashMutation.mutate(data);
+    } else {
+      // Regular submission (with or without linking existing account)
+      onSubmit(data);
+    }
+  };
+
+  const formIsPending = isPending || createLocationWithCashMutation.isPending;
+  
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -242,7 +289,82 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
             />
           </div>
 
-          <FormButtons onCancel={onCancel} isPending={isPending} />
+          {/* Cash Account Creation Section */}
+          <div className="border-t pt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={createCashAccount}
+                onCheckedChange={(checked) => setCreateCashAccount(!!checked)}
+                data-testid="checkbox-create-cash-account"
+              />
+              <label className="text-sm font-medium">Create/Link Cash Account</label>
+            </div>
+
+            {createCashAccount && (
+              <div className="ml-6 space-y-4 border-l-2 pl-4">
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      value="new"
+                      checked={cashAccountOption === "new"}
+                      onChange={() => setCashAccountOption("new")}
+                      data-testid="radio-cash-new"
+                    />
+                    <span className="text-sm">Create New Cash Account</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      value="existing"
+                      checked={cashAccountOption === "existing"}
+                      onChange={() => setCashAccountOption("existing")}
+                      data-testid="radio-cash-existing"
+                    />
+                    <span className="text-sm">Link Existing Bank Account</span>
+                  </label>
+                </div>
+
+                {cashAccountOption === "existing" && (
+                  <FormField
+                    control={form.control}
+                    name="linkedCashAccountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select Bank Account</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          value={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-bank-account">
+                              <SelectValue placeholder="Select a bank account" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {bankAccounts.map((account: any) => (
+                              <SelectItem key={account.id} value={account.id.toString()}>
+                                {account.code} - {account.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {cashAccountOption === "new" && (
+                  <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
+                    A cash account will be automatically created with code: <strong>{form.watch("code") || "[Location Code]"}-CASH</strong>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <FormButtons onCancel={onCancel} isPending={formIsPending} />
         </form>
       </Form>
     </Card>
