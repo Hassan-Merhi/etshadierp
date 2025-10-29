@@ -206,6 +206,8 @@ function AccountCombobox({
   suppliers,
   rowIndex,
   onFocus,
+  onKeyDown,
+  testIdPrefix = "button-account",
 }: {
   value: { type: string; id: number; name: string } | null;
   onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
@@ -214,6 +216,8 @@ function AccountCombobox({
   suppliers: Supplier[];
   rowIndex: number;
   onFocus?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  testIdPrefix?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -243,8 +247,9 @@ function AccountCombobox({
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between font-normal"
-          data-testid={`button-account-${rowIndex}`}
+          data-testid={`${testIdPrefix}-${rowIndex}`}
           onFocus={onFocus}
+          onKeyDown={onKeyDown}
         >
           {value ? value.name : "Select account..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -292,12 +297,16 @@ function StockItemCombobox({
   stockItems,
   rowIndex,
   onFocus,
+  onKeyDown,
+  testIdPrefix = "button-stock-item",
 }: {
   value: { id: number; name: string } | null;
   onChange: (id: number, name: string) => void;
   stockItems: StockItem[];
   rowIndex: number;
   onFocus?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  testIdPrefix?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -309,8 +318,9 @@ function StockItemCombobox({
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between font-normal"
-          data-testid={`button-stock-item-${rowIndex}`}
+          data-testid={`${testIdPrefix}-${rowIndex}`}
           onFocus={onFocus}
+          onKeyDown={onKeyDown}
         >
           {value ? value.name : "Select stock item..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -916,7 +926,7 @@ export default function Vouchers() {
       const data = formData;
       
       // Get unique source locations for description
-      const uniqueSources = [...new Set(data.entries.map(e => e.sourceLocationId))];
+      const uniqueSources = Array.from(new Set(data.entries.map(e => e.sourceLocationId)));
       const sourceNames = uniqueSources.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(", ");
       const destName = locations.find(l => l.id === data.destinationLocationId)?.name;
       
@@ -1149,26 +1159,40 @@ export default function Vouchers() {
   const handleKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "amount"
+    fieldName: "account" | "amount"
   ) => {
-    if (e.key === "Enter") {
+    const isLastRow = rowIndex === fields.length - 1;
+    
+    // Handle Tab for navigation on comboboxes (let Enter activate them naturally)
+    if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      if (fieldName === "amount") {
-        // Add new row when pressing Enter on amount field
+      setTimeout(() => {
+        const amountInput = document.querySelector(`[data-testid="input-amount-${rowIndex}"]`) as HTMLInputElement;
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    }
+    
+    // Handle both Tab and Enter for navigation on input fields
+    if (fieldName === "amount" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
+      e.preventDefault();
+      // On last field - move to next row or create new row
+      if (isLastRow) {
         append({
           accountType: "ledger",
           accountId: 0,
           accountName: "",
           amount: "",
         });
-        // Focus the Account combobox in the new row after a small delay
-        setTimeout(() => {
-          const newRowButton = document.querySelector(`[data-testid="button-account-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowButton) {
-            newRowButton.focus();
-          }
-        }, 100);
       }
+      setTimeout(() => {
+        const newRowButton = document.querySelector(`[data-testid="button-account-${rowIndex + 1}"]`) as HTMLButtonElement;
+        if (newRowButton) {
+          newRowButton.focus();
+        }
+      }, 100);
     }
   };
 
@@ -1176,12 +1200,37 @@ export default function Vouchers() {
   const handleJournalKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "amount"
+    fieldName: "type" | "account" | "amount"
   ) => {
-    if (e.key === "Enter") {
+    const isLastRow = rowIndex === journalFields.length - 1;
+    
+    // Handle Tab for navigation on Select and Combobox (let Enter activate them naturally)
+    if (fieldName === "type" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      if (fieldName === "amount") {
-        // Add new row when pressing Enter on amount field
+      setTimeout(() => {
+        const accountButton = document.querySelector(`[data-testid="button-journal-account-${rowIndex}"]`) as HTMLButtonElement;
+        if (accountButton) {
+          accountButton.focus();
+        }
+      }, 50);
+    }
+    
+    if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      setTimeout(() => {
+        const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    }
+    
+    // Handle both Tab and Enter for navigation on input fields
+    if (fieldName === "amount" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
+      e.preventDefault();
+      // On last field - move to next row or create new row
+      if (isLastRow) {
         appendJournal({
           type: "DR",
           accountType: "ledger",
@@ -1189,14 +1238,13 @@ export default function Vouchers() {
           accountName: "",
           amount: "",
         });
-        // Focus the DR/CR selector in the new row after a small delay
-        setTimeout(() => {
-          const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowSelect) {
-            newRowSelect.focus();
-          }
-        }, 100);
       }
+      setTimeout(() => {
+        const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+        if (newRowSelect) {
+          newRowSelect.focus();
+        }
+      }, 100);
     }
   };
 
@@ -1204,21 +1252,41 @@ export default function Vouchers() {
   const handleTransferKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "quantity"
+    fieldName: "sourceLocation" | "stockItem" | "quantity" | "rate"
   ) => {
-    if (e.key === "Enter") {
+    const isLastRow = rowIndex === transferFields.length - 1;
+    
+    // Handle both Tab and Enter for navigation
+    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
       e.preventDefault();
-      if (fieldName === "quantity") {
-        // Add new row when pressing Enter on quantity field
-        appendTransfer({
-          sourceLocationId: 0,
-          sourceLocationName: "",
-          stockItemId: 0,
-          stockItemName: "",
-          quantity: "",
-          rate: "",
-        });
-        // Focus the Source Location selector in the new row after a small delay
+      
+      if (fieldName === "sourceLocation") {
+        setTimeout(() => {
+          const stockItemButton = document.querySelector(`[data-testid="button-transfer-stock-${rowIndex}"]`) as HTMLButtonElement;
+          if (stockItemButton) {
+            stockItemButton.focus();
+          }
+        }, 50);
+      } else if (fieldName === "stockItem") {
+        setTimeout(() => {
+          const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${rowIndex}"]`) as HTMLInputElement;
+          if (quantityInput) {
+            quantityInput.focus();
+            quantityInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "quantity") {
+        // On last field - move to next row or create new row
+        if (isLastRow) {
+          appendTransfer({
+            sourceLocationId: 0,
+            sourceLocationName: "",
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          });
+        }
         setTimeout(() => {
           const newRowSelect = document.querySelector(`[data-testid="select-source-location-${rowIndex + 1}"]`) as HTMLButtonElement;
           if (newRowSelect) {
@@ -1233,19 +1301,32 @@ export default function Vouchers() {
   const handleConsumptionKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "quantity"
+    fieldName: "stockItem" | "quantity"
   ) => {
-    if (e.key === "Enter") {
+    const isLastRow = rowIndex === consumptionFields.length - 1;
+    
+    // Handle both Tab and Enter for navigation
+    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
       e.preventDefault();
-      if (fieldName === "quantity") {
-        // Add new row when pressing Enter on quantity field
-        appendConsumption({
-          stockItemId: 0,
-          stockItemName: "",
-          quantity: "",
-          rate: "",
-        });
-        // Focus the Stock Item combobox in the new row after a small delay
+      
+      if (fieldName === "stockItem") {
+        setTimeout(() => {
+          const quantityInput = document.querySelector(`[data-testid="input-consumption-quantity-${rowIndex}"]`) as HTMLInputElement;
+          if (quantityInput) {
+            quantityInput.focus();
+            quantityInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "quantity") {
+        // On last field - move to next row or create new row
+        if (isLastRow) {
+          appendConsumption({
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          });
+        }
         setTimeout(() => {
           const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
           if (newRowButton) {
@@ -1260,19 +1341,32 @@ export default function Vouchers() {
   const handleProductionKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "quantity"
+    fieldName: "stockItem" | "quantity"
   ) => {
-    if (e.key === "Enter") {
+    const isLastRow = rowIndex === productionFields.length - 1;
+    
+    // Handle both Tab and Enter for navigation
+    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
       e.preventDefault();
-      if (fieldName === "quantity") {
-        // Add new row when pressing Enter on quantity field
-        appendProduction({
-          stockItemId: 0,
-          stockItemName: "",
-          quantity: "",
-          rate: "",
-        });
-        // Focus the Stock Item combobox in the new row after a small delay
+      
+      if (fieldName === "stockItem") {
+        setTimeout(() => {
+          const quantityInput = document.querySelector(`[data-testid="input-production-quantity-${rowIndex}"]`) as HTMLInputElement;
+          if (quantityInput) {
+            quantityInput.focus();
+            quantityInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "quantity") {
+        // On last field - move to next row or create new row
+        if (isLastRow) {
+          appendProduction({
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          });
+        }
         setTimeout(() => {
           const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
           if (newRowButton) {
@@ -1475,6 +1569,7 @@ export default function Vouchers() {
                                         bankAccounts={bankAccounts}
                                         suppliers={suppliers}
                                         rowIndex={index}
+                                        onKeyDown={(e) => handleKeyDown(e, index, "account")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -1738,6 +1833,7 @@ export default function Vouchers() {
                                         bankAccounts={bankAccounts}
                                         suppliers={suppliers}
                                         rowIndex={index}
+                                        onKeyDown={(e) => handleKeyDown(e, index, "account")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -1924,7 +2020,7 @@ export default function Vouchers() {
                                   <FormItem>
                                     <Select onValueChange={field.onChange} value={field.value}>
                                       <FormControl>
-                                        <SelectTrigger data-testid={`select-journal-type-${index}`}>
+                                        <SelectTrigger data-testid={`select-journal-type-${index}`} onKeyDown={(e) => handleJournalKeyDown(e, index, "type")}>
                                           <SelectValue placeholder="DR/CR" />
                                         </SelectTrigger>
                                       </FormControl>
@@ -1964,6 +2060,8 @@ export default function Vouchers() {
                                         bankAccounts={bankAccounts}
                                         suppliers={suppliers}
                                         rowIndex={index}
+                                        testIdPrefix="button-journal-account"
+                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "account")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2203,7 +2301,7 @@ export default function Vouchers() {
                                       }}
                                     >
                                       <FormControl>
-                                        <SelectTrigger data-testid={`select-source-location-${index}`}>
+                                        <SelectTrigger data-testid={`select-source-location-${index}`} onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}>
                                           <SelectValue placeholder="Select source..." />
                                         </SelectTrigger>
                                       </FormControl>
@@ -2242,6 +2340,8 @@ export default function Vouchers() {
                                         }}
                                         stockItems={stockItems}
                                         rowIndex={index}
+                                        testIdPrefix="button-transfer-stock"
+                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "stockItem")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2509,6 +2609,7 @@ export default function Vouchers() {
                                           }}
                                           stockItems={stockItems}
                                           rowIndex={index}
+                                          onKeyDown={(e) => handleConsumptionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
                                       <FormMessage />
@@ -2650,6 +2751,7 @@ export default function Vouchers() {
                                           }}
                                           stockItems={stockItems}
                                           rowIndex={index}
+                                          onKeyDown={(e) => handleProductionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
                                       <FormMessage />
