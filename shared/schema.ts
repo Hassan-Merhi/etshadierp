@@ -3,13 +3,53 @@ import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timest
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Companies table - represents different business entities
+export const companies = pgTable("companies", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  code: z.string().min(1, "Code is required"),
+  name: z.string().min(1, "Name is required"),
+});
+
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
+// User-Company-Role junction table - allows users to have different roles in different companies
+export const userCompanyRoles = pgTable("user_company_roles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  companyId: integer("company_id").notNull(),
+  role: text("role").notNull(),
+  assignedLocationId: integer("assigned_location_id"),
+  posStation: integer("pos_station"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertUserCompanyRoleSchema = createInsertSchema(userCompanyRoles).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  userId: z.string().min(1, "User ID is required"),
+  companyId: z.number().min(1, "Company ID is required"),
+  role: z.enum(["Admin", "Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"]),
+});
+
+export type InsertUserCompanyRole = z.infer<typeof insertUserCompanyRoleSchema>;
+export type UserCompanyRole = typeof userCompanyRoles.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("Manager"),
-  assignedLocationId: integer("assigned_location_id"),
-  posStation: integer("pos_station"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -20,7 +60,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
 }).extend({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(4, "Password must be at least 4 characters"),
-  role: z.enum(["Admin", "Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"]),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -28,11 +67,13 @@ export type User = typeof users.$inferSelect;
 
 export const locations = pgTable("locations", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   city: text("city"),
   state: text("state"),
   country: text("country"),
+  linkedCashAccountId: integer("linked_cash_account_id"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -41,6 +82,7 @@ export const insertLocationSchema = createInsertSchema(locations).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
 });
@@ -50,6 +92,7 @@ export type Location = typeof locations.$inferSelect;
 
 export const ledgerAccounts = pgTable("ledger_accounts", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   accountType: text("account_type").notNull(),
@@ -65,6 +108,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash"]),
@@ -78,6 +122,7 @@ export type LedgerAccount = typeof ledgerAccounts.$inferSelect;
 
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
@@ -93,6 +138,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -130,6 +176,7 @@ export type Supplier = typeof suppliers.$inferSelect;
 
 export const stockGroups = pgTable("stock_groups", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   parentId: integer("parent_id"),
@@ -141,6 +188,7 @@ export const insertStockGroupSchema = createInsertSchema(stockGroups).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
 });
@@ -150,6 +198,7 @@ export type StockGroup = typeof stockGroups.$inferSelect;
 
 export const stockItems = pgTable("stock_items", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   barcode: varchar("barcode", { length: 100 }),
@@ -167,6 +216,7 @@ export const insertStockItemSchema = createInsertSchema(stockItems).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   uom: z.string().min(1, "Unit of measure is required"),
@@ -177,6 +227,7 @@ export type StockItem = typeof stockItems.$inferSelect;
 
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   bankName: text("bank_name").notNull(),
@@ -193,6 +244,7 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   bankName: z.string().min(1, "Bank name is required"),
@@ -205,6 +257,7 @@ export type BankAccount = typeof bankAccounts.$inferSelect;
 
 export const fixedAssets = pgTable("fixed_assets", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   category: text("category").notNull(),
@@ -221,6 +274,7 @@ export const insertFixedAssetSchema = createInsertSchema(fixedAssets).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   category: z.string().min(1, "Category is required"),
@@ -234,6 +288,7 @@ export type FixedAsset = typeof fixedAssets.$inferSelect;
 
 export const containers = pgTable("containers", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   containerNumber: varchar("container_number", { length: 100 }).notNull().unique(),
   supplierId: integer("supplier_id").notNull(),
   status: text("status").notNull().default("OTW"),
@@ -248,6 +303,7 @@ export const insertContainerSchema = createInsertSchema(containers).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   containerNumber: z.string().min(1, "Container number is required"),
   supplierId: z.number().min(1, "Supplier is required"),
   importDate: z.string().min(1, "Import date is required"),
@@ -258,6 +314,7 @@ export type Container = typeof containers.$inferSelect;
 
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   poNumber: varchar("po_number", { length: 100 }).notNull(),
   containerId: integer("container_id").notNull(),
   supplierId: integer("supplier_id").notNull(),
@@ -272,6 +329,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   poNumber: z.string().min(1, "PO number is required"),
   containerId: z.number().min(1, "Container is required"),
   supplierId: z.number().min(1, "Supplier is required"),
@@ -353,6 +411,7 @@ export type ImportLog = typeof importLogs.$inferSelect;
 
 export const inventory = pgTable("inventory", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   locationId: integer("location_id").notNull(),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
@@ -364,6 +423,7 @@ export const inventory = pgTable("inventory", {
 export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   locationId: z.number().min(1, "Location is required"),
   stockItemId: z.number().min(1, "Stock item is required"),
   quantity: z.string(),
@@ -413,6 +473,7 @@ export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
 
 export const vouchers = pgTable("vouchers", {
   id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
   voucherNumber: varchar("voucher_number", { length: 100 }).notNull().unique(),
   voucherType: text("voucher_type").notNull(),
   voucherDate: date("voucher_date").notNull(),
@@ -425,6 +486,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   id: true,
   createdAt: true,
 }).extend({
+  companyId: z.number().min(1, "Company is required"),
   voucherNumber: z.string().min(1, "Voucher number is required"),
   voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"]),
   voucherDate: z.string().min(1, "Voucher date is required"),
