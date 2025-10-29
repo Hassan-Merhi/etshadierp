@@ -875,7 +875,6 @@ export default function Settings() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {bankAccounts.map((account: any) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
                             {account.name} ({account.code})

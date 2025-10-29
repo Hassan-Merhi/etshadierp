@@ -149,12 +149,43 @@ export default function AccountingCreate() {
 
 // Location Form Component
 function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+  const { data: companies = [] } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
+  });
   
   return (
     <Card className="p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="companyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company *</FormLabel>
+                  <Select
+                    onValueChange={(v) => field.onChange(parseInt(v))}
+                    value={field.value?.toString() || ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-company">
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {companies.map((company: any) => (
+                        <SelectItem key={company.id} value={company.id.toString()}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="code"
