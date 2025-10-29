@@ -4,6 +4,10 @@ import * as schema from "@shared/schema";
 import type {
   User,
   InsertUser,
+  Company,
+  InsertCompany,
+  UserCompanyRole,
+  InsertUserCompanyRole,
   Location,
   InsertLocation,
   LedgerAccount,
@@ -49,20 +53,32 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined>;
+
+  // Companies
+  getAllCompanies(): Promise<Company[]>;
+  getCompanyById(id: number): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+
+  // User-Company Roles
+  getUserCompaniesWithRoles(userId: string): Promise<UserCompanyRole[]>;
+  createUserCompanyRole(role: InsertUserCompanyRole): Promise<UserCompanyRole>;
+  updateUserCompanyRole(id: number, updates: Partial<InsertUserCompanyRole>): Promise<UserCompanyRole>;
+  deleteUserCompanyRole(id: number): Promise<void>;
 
   // Locations
-  getAllLocations(): Promise<Location[]>;
+  getAllLocations(companyId: number): Promise<Location[]>;
   getLocationById(id: number): Promise<Location | undefined>;
   getLocationByCode(code: string): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
 
   // Ledger Accounts
-  getAllLedgerAccounts(): Promise<LedgerAccount[]>;
+  getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
   getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined>;
   createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
 
   // Employees
-  getAllEmployees(): Promise<Employee[]>;
+  getAllEmployees(companyId: number): Promise<Employee[]>;
   getEmployeeByCode(code: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
 
@@ -72,34 +88,34 @@ export interface IStorage {
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
 
   // Stock Groups
-  getAllStockGroups(): Promise<StockGroup[]>;
+  getAllStockGroups(companyId: number): Promise<StockGroup[]>;
   getStockGroupByCode(code: string): Promise<StockGroup | undefined>;
   createStockGroup(group: InsertStockGroup): Promise<StockGroup>;
 
   // Stock Items
-  getAllStockItems(): Promise<StockItem[]>;
+  getAllStockItems(companyId: number): Promise<StockItem[]>;
   getStockItemByCode(code: string): Promise<StockItem | undefined>;
   createStockItem(item: InsertStockItem): Promise<StockItem>;
 
   // Bank Accounts
-  getAllBankAccounts(): Promise<BankAccount[]>;
+  getAllBankAccounts(companyId: number): Promise<BankAccount[]>;
   getBankAccountByCode(code: string): Promise<BankAccount | undefined>;
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
 
   // Fixed Assets
-  getAllFixedAssets(): Promise<FixedAsset[]>;
+  getAllFixedAssets(companyId: number): Promise<FixedAsset[]>;
   getFixedAssetByCode(code: string): Promise<FixedAsset | undefined>;
   createFixedAsset(asset: InsertFixedAsset): Promise<FixedAsset>;
 
   // Containers
-  getAllContainers(): Promise<Container[]>;
+  getAllContainers(companyId: number): Promise<Container[]>;
   getContainerById(id: number): Promise<Container | undefined>;
   getContainerByNumber(containerNumber: string): Promise<Container | undefined>;
   createContainer(container: InsertContainer): Promise<Container>;
   updateContainer(id: number, updates: Partial<InsertContainer>): Promise<Container>;
 
   // Purchase Orders
-  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]>;
   getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
   createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
@@ -127,7 +143,7 @@ export interface IStorage {
   offloadContainer(containerId: number, locationId: number, duties: string, officeCharges: string, transferCharges: string, transportFees: string): Promise<ContainerOffload>;
 
   // Vouchers and Journal Entries
-  getAllVouchers(): Promise<Voucher[]>;
+  getAllVouchers(companyId: number): Promise<Voucher[]>;
   getVoucherById(id: number): Promise<Voucher | undefined>;
   getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]>;
   getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
@@ -172,9 +188,63 @@ export class DbStorage implements IStorage {
     return user;
   }
 
+  async getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined> {
+    const [role] = await db
+      .select()
+      .from(schema.userCompanyRoles)
+      .where(
+        and(
+          eq(schema.userCompanyRoles.userId, userId),
+          eq(schema.userCompanyRoles.companyId, companyId)
+        )
+      );
+    return role;
+  }
+
+  // Companies
+  async getAllCompanies(): Promise<Company[]> {
+    return await db.select().from(schema.companies);
+  }
+
+  async getCompanyById(id: number): Promise<Company | undefined> {
+    const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, id));
+    return company;
+  }
+
+  async createCompany(company: InsertCompany): Promise<Company> {
+    const [created] = await db.insert(schema.companies).values(company).returning();
+    return created;
+  }
+
+  // User-Company Roles
+  async getUserCompaniesWithRoles(userId: string): Promise<UserCompanyRole[]> {
+    return await db
+      .select()
+      .from(schema.userCompanyRoles)
+      .where(eq(schema.userCompanyRoles.userId, userId));
+  }
+
+  async createUserCompanyRole(role: InsertUserCompanyRole): Promise<UserCompanyRole> {
+    const [created] = await db.insert(schema.userCompanyRoles).values(role).returning();
+    return created;
+  }
+
+  async updateUserCompanyRole(id: number, updates: Partial<InsertUserCompanyRole>): Promise<UserCompanyRole> {
+    const [updated] = await db
+      .update(schema.userCompanyRoles)
+      .set(updates)
+      .where(eq(schema.userCompanyRoles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteUserCompanyRole(id: number): Promise<void> {
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.id, id));
+  }
+
   // Locations
-  async getAllLocations(): Promise<Location[]> {
-    return await db.select().from(schema.locations);
+  async getAllLocations(companyId: number): Promise<Location[]> {
+    return await db.select().from(schema.locations).where(eq(schema.locations.companyId, companyId));
   }
 
   async getLocationById(id: number): Promise<Location | undefined> {
@@ -193,8 +263,8 @@ export class DbStorage implements IStorage {
   }
 
   // Ledger Accounts
-  async getAllLedgerAccounts(): Promise<LedgerAccount[]> {
-    return await db.select().from(schema.ledgerAccounts);
+  async getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]> {
+    return await db.select().from(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, companyId));
   }
 
   async getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined> {
@@ -208,8 +278,8 @@ export class DbStorage implements IStorage {
   }
 
   // Employees
-  async getAllEmployees(): Promise<Employee[]> {
-    return await db.select().from(schema.employees);
+  async getAllEmployees(companyId: number): Promise<Employee[]> {
+    return await db.select().from(schema.employees).where(eq(schema.employees.companyId, companyId));
   }
 
   async getEmployeeByCode(code: string): Promise<Employee | undefined> {
@@ -238,8 +308,8 @@ export class DbStorage implements IStorage {
   }
 
   // Stock Groups
-  async getAllStockGroups(): Promise<StockGroup[]> {
-    return await db.select().from(schema.stockGroups);
+  async getAllStockGroups(companyId: number): Promise<StockGroup[]> {
+    return await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.companyId, companyId));
   }
 
   async getStockGroupByCode(code: string): Promise<StockGroup | undefined> {
@@ -253,8 +323,8 @@ export class DbStorage implements IStorage {
   }
 
   // Stock Items
-  async getAllStockItems(): Promise<StockItem[]> {
-    return await db.select().from(schema.stockItems);
+  async getAllStockItems(companyId: number): Promise<StockItem[]> {
+    return await db.select().from(schema.stockItems).where(eq(schema.stockItems.companyId, companyId));
   }
 
   async getStockItemByCode(code: string): Promise<StockItem | undefined> {
@@ -268,8 +338,8 @@ export class DbStorage implements IStorage {
   }
 
   // Bank Accounts
-  async getAllBankAccounts(): Promise<BankAccount[]> {
-    return await db.select().from(schema.bankAccounts);
+  async getAllBankAccounts(companyId: number): Promise<BankAccount[]> {
+    return await db.select().from(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, companyId));
   }
 
   async getBankAccountByCode(code: string): Promise<BankAccount | undefined> {
@@ -283,8 +353,8 @@ export class DbStorage implements IStorage {
   }
 
   // Fixed Assets
-  async getAllFixedAssets(): Promise<FixedAsset[]> {
-    return await db.select().from(schema.fixedAssets);
+  async getAllFixedAssets(companyId: number): Promise<FixedAsset[]> {
+    return await db.select().from(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, companyId));
   }
 
   async getFixedAssetByCode(code: string): Promise<FixedAsset | undefined> {
@@ -298,8 +368,8 @@ export class DbStorage implements IStorage {
   }
 
   // Containers
-  async getAllContainers(): Promise<Container[]> {
-    return await db.select().from(schema.containers);
+  async getAllContainers(companyId: number): Promise<Container[]> {
+    return await db.select().from(schema.containers).where(eq(schema.containers.companyId, companyId));
   }
 
   async getContainerById(id: number): Promise<Container | undefined> {
@@ -326,8 +396,8 @@ export class DbStorage implements IStorage {
   }
 
   // Purchase Orders
-  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
-    return await db.select().from(schema.purchaseOrders);
+  async getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]> {
+    return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, companyId));
   }
 
   async getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {
@@ -412,6 +482,16 @@ export class DbStorage implements IStorage {
   }
 
   async updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void> {
+    // Get the location's companyId
+    const [location] = await db
+      .select()
+      .from(schema.locations)
+      .where(eq(schema.locations.id, locationId));
+    
+    if (!location) {
+      throw new Error("Location not found");
+    }
+
     // Check if inventory record exists
     const [existing] = await db
       .select()
@@ -435,6 +515,7 @@ export class DbStorage implements IStorage {
     } else {
       // Create new record
       await db.insert(schema.inventory).values({
+        companyId: location.companyId,
         locationId,
         stockItemId,
         quantity,
@@ -539,8 +620,8 @@ export class DbStorage implements IStorage {
   }
 
   // Vouchers and Journal Entries
-  async getAllVouchers(): Promise<Voucher[]> {
-    return await db.select().from(schema.vouchers);
+  async getAllVouchers(companyId: number): Promise<Voucher[]> {
+    return await db.select().from(schema.vouchers).where(eq(schema.vouchers.companyId, companyId));
   }
 
   async getVoucherById(id: number): Promise<Voucher | undefined> {

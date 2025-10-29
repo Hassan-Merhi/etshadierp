@@ -9,7 +9,11 @@ const app = express();
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: User & {
+        role?: string;
+        assignedLocationId?: number | null;
+        posStation?: number | null;
+      };
     }
   }
 }
@@ -23,6 +27,10 @@ declare module 'http' {
 declare module 'express-session' {
   interface SessionData {
     userId?: string;
+    currentCompanyId?: number;
+    currentRole?: string;
+    currentLocationId?: number | null;
+    currentPOSStation?: number | null;
   }
 }
 

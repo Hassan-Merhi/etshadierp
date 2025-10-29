@@ -13,14 +13,32 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ message: "User not found" });
   }
 
-  req.user = user;
+  // Check if a company is selected
+  if (!req.session.currentCompanyId) {
+    return res.status(401).json({ message: "No company selected" });
+  }
+
+  // Load the user's role for the current company
+  const userCompanyRole = await storage.getUserCompanyRole(req.session.userId, req.session.currentCompanyId);
+  if (!userCompanyRole) {
+    return res.status(403).json({ message: "You do not have access to this company" });
+  }
+
+  // Attach user with company-specific role and location info
+  req.user = {
+    ...user,
+    role: userCompanyRole.role,
+    assignedLocationId: userCompanyRole.assignedLocationId,
+    posStation: userCompanyRole.posStation,
+  };
+
   next();
 }
 
 // Role-based authorization middleware
 export function requireRole(...roles: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
+    if (!req.user || !req.user.role) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
@@ -48,7 +66,7 @@ export function canDelete(req: Request, res: Response, next: NextFunction) {
 // Check if user can modify data from a specific date
 export function canModifyDate(dateField: string = "voucherDate") {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
+    if (!req.user || !req.user.role) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
@@ -76,7 +94,7 @@ export function canModifyDate(dateField: string = "voucherDate") {
 
 // Check if POS user can access a specific location
 export function checkPOSLocation(req: Request, res: Response, next: NextFunction) {
-  if (!req.user) {
+  if (!req.user || !req.user.role) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
