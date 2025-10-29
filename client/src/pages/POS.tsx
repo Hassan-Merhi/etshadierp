@@ -405,7 +405,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Print handler
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
-    documentTitle: savedSale ? `Invoice-${savedSale.voucherNumber}` : "Invoice",
+    documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
     onAfterPrint: () => setShowPrintDialog(false),
   });
 
@@ -673,7 +673,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             <div ref={printRef} className="p-8 bg-white text-black">
               <div className="text-center mb-6">
                 <h1 className="text-3xl font-bold mb-2">SALES INVOICE</h1>
-                <p className="text-sm text-gray-600">Invoice #{savedSale?.voucherNumber}</p>
+                <p className="text-sm text-gray-600">Invoice #{savedSale?.voucher?.voucherNumber}</p>
               </div>
               
               <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
