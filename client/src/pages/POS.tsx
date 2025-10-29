@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useLocation, Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MapPin, Wallet, Printer, AlertCircle, Search } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useReactToPrint } from "react-to-print";
 import {
   Select,
   SelectContent,
@@ -28,6 +32,7 @@ interface SaleRow {
   quantity: number;
   rate: number;
   amount: number;
+  stockItemId?: number;
 }
 
 interface InventoryItem {
@@ -52,12 +57,6 @@ interface APIInventoryItem {
   stockGroupName: string | null;
   stockGroupCode: string | null;
 }
-
-const mockCashAccounts = [
-  { value: "cash1", label: "Cash Account - Main" },
-  { value: "cash2", label: "Cash Account - Branch" },
-  { value: "bank1", label: "Bank Account - ABC" },
-];
 
 interface Location {
   id: number;
@@ -101,13 +100,20 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     enabled: !!activeLocation,
   });
 
-  // Transform API inventory to POS format
-  const inventory: InventoryItem[] = apiInventory.map((item) => ({
+  // Transform API inventory to POS format with stockItemId
+  const inventory: (InventoryItem & { stockItemId: number })[] = apiInventory.map((item) => ({
     barcode: item.stockItemBarcode || item.stockItemCode,
     name: item.stockItemName,
     stock: parseFloat(item.quantity),
     price: parseFloat(item.averageRate),
+    stockItemId: item.stockItemId,
   }));
+
+  // Fetch bank accounts for cash account selector
+  const { data: bankAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/bank-accounts"],
+  });
+
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -115,14 +121,26 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     row: 0,
     col: 0,
   });
-  const [cashAccount, setCashAccount] = useState("cash1");
+  const [cashAccount, setCashAccount] = useState("");
+  const [notes, setNotes] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [zeroStockAlert, setZeroStockAlert] = useState(false);
   const [zeroStockItem, setZeroStockItem] = useState("");
+  const [savedSale, setSavedSale] = useState<any>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  // Auto-select first bank account when loaded
+  useEffect(() => {
+    if (bankAccounts.length > 0 && !cashAccount) {
+      setCashAccount(String(bankAccounts[0].id));
+    }
+  }, [bankAccounts, cashAccount]);
 
   const columns = [
     { key: "itemName", label: "Item Name", width: "flex-1" },
@@ -139,7 +157,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     );
   };
 
-  const selectItem = (item: InventoryItem) => {
+  const selectItem = (item: InventoryItem & { stockItemId: number }) => {
     if (item.stock === 0) {
       setZeroStockItem(item.name);
       setZeroStockAlert(true);
@@ -154,6 +172,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       itemName: item.name,
       rate: item.price,
       quantity: newRows[activeRow].quantity || 1,
+      stockItemId: item.stockItemId,
     };
     newRows[activeRow].amount = (newRows[activeRow].quantity || 1) * item.price;
     
@@ -307,6 +326,89 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   }, [highlightedIndex, activeRow]);
 
+  // Save sale mutation
+  const saveMutation = useMutation({
+    mutationFn: async (saleData: any) => {
+      return await apiRequest("POST", "/api/pos/sales", saleData);
+    },
+    onSuccess: (data) => {
+      setSavedSale(data);
+      toast({
+        title: "Sale Saved",
+        description: `Sale ${data.voucherNumber} has been saved successfully.`,
+      });
+      
+      // Clear the form
+      setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
+      setNotes("");
+      
+      // Invalidate inventory query to refresh stock levels
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
+      
+      // Auto-show print dialog
+      setShowPrintDialog(true);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save sale",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveSale = () => {
+    // Validate
+    if (!activeLocation) {
+      toast({
+        title: "Error",
+        description: "Please select a location",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!cashAccount) {
+      toast({
+        title: "Error",
+        description: "Please select a cash account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+    if (validItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item to the sale",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare sale data
+    const saleData = {
+      locationId: activeLocation.id,
+      cashAccountId: parseInt(cashAccount),
+      notes,
+      items: validItems.map(row => ({
+        stockItemId: row.stockItemId,
+        quantity: row.quantity.toString(),
+        rate: row.rate.toString(),
+      })),
+    };
+
+    saveMutation.mutate(saleData);
+  };
+
+  // Print handler
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: savedSale ? `Invoice-${savedSale.voucherNumber}` : "Invoice",
+    onAfterPrint: () => setShowPrintDialog(false),
+  });
+
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
   const filteredItems = getFilteredInventory();
 
@@ -315,11 +417,15 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Point of Sale</h1>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" data-testid="button-print">
-            <Printer className="h-4 w-4" />
-            Print
+          <Button 
+            onClick={handleSaveSale}
+            disabled={saveMutation.isPending}
+            className="gap-2"
+            data-testid="button-complete-sale"
+          >
+            {saveMutation.isPending ? "Saving..." : "Save & Print"}
+            {!saveMutation.isPending && <Check className="h-4 w-4" />}
           </Button>
-          <Button data-testid="button-complete-sale">Complete Sale</Button>
         </div>
       </div>
 
@@ -348,16 +454,26 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
           <Wallet className="h-4 w-4 text-muted-foreground" />
           <Select value={cashAccount} onValueChange={setCashAccount}>
             <SelectTrigger className="w-56" data-testid="select-cash-account">
-              <SelectValue />
+              <SelectValue placeholder="Select cash account" />
             </SelectTrigger>
             <SelectContent>
-              {mockCashAccounts.map((acc) => (
-                <SelectItem key={acc.value} value={acc.value}>
-                  {acc.label}
+              {bankAccounts.map((acc: any) => (
+                <SelectItem key={acc.id} value={String(acc.id)}>
+                  {acc.accountName}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex-1 flex items-center gap-2">
+          <Textarea
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="resize-none h-9"
+            data-testid="input-notes"
+          />
         </div>
       </div>
 
@@ -537,6 +653,93 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
           <AlertDialogFooter>
             <Button onClick={() => setZeroStockAlert(false)} data-testid="button-close-alert">
               OK
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Print Dialog */}
+      <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Print Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sale has been saved successfully. Would you like to print the invoice?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {/* Hidden Print Template */}
+          <div className="hidden">
+            <div ref={printRef} className="p-8 bg-white text-black">
+              <div className="text-center mb-6">
+                <h1 className="text-3xl font-bold mb-2">SALES INVOICE</h1>
+                <p className="text-sm text-gray-600">Invoice #{savedSale?.voucherNumber}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                <div>
+                  <p className="font-semibold mb-1">Location:</p>
+                  <p>{savedSale?.location?.name}</p>
+                  <p>{savedSale?.location?.city}, {savedSale?.location?.state}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold mb-1">Date:</p>
+                  <p>{savedSale?.saleDate}</p>
+                </div>
+              </div>
+
+              <table className="w-full mb-6 border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-black">
+                    <th className="text-left py-2">#</th>
+                    <th className="text-left py-2">Item</th>
+                    <th className="text-right py-2">Qty</th>
+                    <th className="text-right py-2">Rate</th>
+                    <th className="text-right py-2">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {savedSale?.items.map((item: any, idx: number) => (
+                    <tr key={idx} className="border-b">
+                      <td className="py-2">{idx + 1}</td>
+                      <td className="py-2">{item.stockItemName}</td>
+                      <td className="text-right py-2">{item.quantity}</td>
+                      <td className="text-right py-2">${parseFloat(item.rate).toFixed(2)}</td>
+                      <td className="text-right py-2">${item.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex justify-end mb-6">
+                <div className="w-64">
+                  <div className="flex justify-between py-2 text-lg font-bold border-t-2 border-black">
+                    <span>TOTAL:</span>
+                    <span>${savedSale?.grandTotal}</span>
+                  </div>
+                </div>
+              </div>
+
+              {savedSale?.voucher?.description && (
+                <div className="mb-6">
+                  <p className="font-semibold mb-1">Notes:</p>
+                  <p className="text-sm">{savedSale.voucher.description}</p>
+                </div>
+              )}
+
+              <div className="text-center text-sm text-gray-600 mt-8 pt-4 border-t">
+                <p>Thank you for your business!</p>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintDialog(false)} data-testid="button-cancel-print">
+              Close
+            </Button>
+            <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
+              <Printer className="h-4 w-4" />
+              Print Invoice
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

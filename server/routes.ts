@@ -4,6 +4,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
+import { db } from "./db";
 import { requireAuth, requireRole, canDelete } from "./auth";
 import {
   insertLocationSchema,
@@ -18,8 +19,13 @@ import {
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
   insertUserSchema,
+  inventory,
+  stockItems,
+  vouchers,
+  voucherEntries,
 } from "@shared/schema";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -1462,6 +1468,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const entry = await storage.createVoucherEntry(req.body);
       res.json(entry);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POS Sales
+  app.post("/api/pos/sales", requireAuth, async (req, res) => {
+    try {
+      const { locationId, cashAccountId, items, notes } = req.body;
+
+      // Validate required fields
+      if (!locationId) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+      if (!cashAccountId) {
+        return res.status(400).json({ message: "Cash account is required" });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Validate and calculate total
+      let grandTotal = 0;
+      for (const item of items) {
+        if (!item.stockItemId) {
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
+        }
+        if (!item.quantity || parseFloat(item.quantity) <= 0) {
+          return res.status(400).json({ message: "Quantity must be positive for all items" });
+        }
+        if (!item.rate || parseFloat(item.rate) < 0) {
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
+        }
+        grandTotal += parseFloat(item.quantity) * parseFloat(item.rate);
+      }
+
+      // Get or create SALES revenue account (outside transaction for simplicity)
+      const allAccounts = await storage.getAllLedgerAccounts();
+      let salesAccount = allAccounts.find((a: any) => a.code === "SALES");
+      
+      if (!salesAccount) {
+        salesAccount = await storage.createLedgerAccount({
+          code: "SALES",
+          name: "Sales Revenue",
+          accountType: "Income",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Get location details
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      // STEP 1: Execute ALL operations in a transaction with row-level locking
+      const voucherNumber = `SALES-${Date.now()}`;
+      const voucherDate = new Date().toISOString().split('T')[0];
+
+      const result = await db.transaction(async (tx) => {
+        // STEP 1a: Validate and lock inventory rows (SELECT ... FOR UPDATE)
+        const inventoryValidation: Array<{
+          item: any;
+          inventoryRecord: any;
+          currentQty: number;
+          saleQty: number;
+          newQty: number;
+          currentRate: number;
+        }> = [];
+
+        for (const item of items) {
+          // Lock the inventory row to prevent concurrent modifications
+          const [inventoryRecord] = await tx
+            .select()
+            .from(inventory)
+            .where(and(
+              eq(inventory.locationId, locationId),
+              eq(inventory.stockItemId, item.stockItemId)
+            ))
+            .for('update');
+
+          if (!inventoryRecord) {
+            throw new Error(`Inventory not found for item ${item.stockItemId} at location ${locationId}`);
+          }
+
+          const currentQty = parseFloat(inventoryRecord.quantity);
+          const saleQty = parseFloat(item.quantity);
+
+          if (currentQty < saleQty) {
+            throw new Error(`Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`);
+          }
+
+          inventoryValidation.push({
+            item,
+            inventoryRecord,
+            currentQty,
+            saleQty,
+            newQty: currentQty - saleQty,
+            currentRate: parseFloat(inventoryRecord.averageRate),
+          });
+        }
+
+        // STEP 1b: Create accounting records (voucher and entries)
+        // Create Sales voucher
+        const [voucher] = await tx.insert(vouchers).values({
+          voucherNumber,
+          voucherType: "Sales",
+          voucherDate,
+          description: notes || `POS Sale at ${location.name}`,
+          totalAmount: grandTotal.toFixed(2),
+        }).returning();
+
+        // Create voucher entries (double-entry bookkeeping)
+        // Debit: Cash/Bank Account (Asset increases)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          bankAccountId: cashAccountId,
+          debitAmount: grandTotal.toFixed(2),
+          creditAmount: "0",
+          narration: `POS Sale - ${voucherNumber}`,
+        });
+
+        // Credit: Sales Account (Revenue increases)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salesAccount.id,
+          debitAmount: "0",
+          creditAmount: grandTotal.toFixed(2),
+          narration: `POS Sale - ${voucherNumber}`,
+        });
+
+        // Update inventory for each item
+        const saleItems = [];
+        for (const validatedItem of inventoryValidation) {
+          const { item, newQty, currentRate, inventoryRecord } = validatedItem;
+
+          // Calculate new total value
+          const newTotalValue = (newQty * currentRate).toFixed(2);
+
+          // Update inventory using transaction
+          await tx
+            .update(inventory)
+            .set({
+              quantity: newQty.toString(),
+              averageRate: currentRate.toFixed(2),
+              totalValue: newTotalValue,
+              lastUpdated: new Date(),
+            })
+            .where(eq(inventory.id, inventoryRecord.id));
+
+          // Get stock item details for response
+          const [stockItem] = await tx
+            .select()
+            .from(stockItems)
+            .where(eq(stockItems.id, item.stockItemId));
+
+          saleItems.push({
+            ...item,
+            stockItemName: stockItem?.name || "",
+            stockItemCode: stockItem?.code || "",
+            amount: (parseFloat(item.quantity) * parseFloat(item.rate)).toFixed(2),
+          });
+        }
+
+        return { voucher, saleItems };
+      });
+
+      // Return complete sale details
+      res.json({
+        voucher: result.voucher,
+        location,
+        items: result.saleItems,
+        grandTotal: grandTotal.toFixed(2),
+        voucherNumber,
+        saleDate: voucherDate,
+      });
+    } catch (error: any) {
+      // Return appropriate status codes for different error types
+      if (error.message.includes("Inventory not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("Insufficient stock")) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: error.message });
     }
   });
