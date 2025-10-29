@@ -13,6 +13,7 @@ import {
   Wallet,
   Users,
   Receipt,
+  Book,
 } from "lucide-react";
 import {
   Sidebar,
@@ -79,6 +80,11 @@ const menuItems = [
     title: "Vouchers",
     url: "/vouchers",
     icon: Receipt,
+  },
+  {
+    title: "Daybook",
+    url: "/daybook",
+    icon: Book,
   },
   {
     title: "Reports",

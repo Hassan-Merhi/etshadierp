@@ -22,6 +22,7 @@ import Financial from "@/pages/Financial";
 import Accounts from "@/pages/Accounts";
 import Suppliers from "@/pages/Suppliers";
 import Vouchers from "@/pages/Vouchers";
+import Daybook from "@/pages/Daybook";
 import Reports from "@/pages/Reports";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
@@ -66,6 +67,7 @@ function Router({ user }: { user: any }) {
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/vouchers" component={Vouchers} />
+      <Route path="/daybook">{() => <Daybook user={user} />}</Route>
       <Route path="/reports" component={Reports} />
       <Route path="/create" component={AccountingCreate} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
