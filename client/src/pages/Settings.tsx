@@ -130,6 +130,18 @@ export default function Settings() {
     enabled: !!selectedCompanyId && isRoleDialogOpen,
   });
 
+  // Load bank accounts (cash accounts) for the selected company
+  const { data: bankAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/bank-accounts", { companyId: selectedCompanyId }],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const res = await fetch(`/api/bank-accounts?companyId=${selectedCompanyId}`);
+      if (!res.ok) throw new Error("Failed to fetch bank accounts");
+      return res.json();
+    },
+    enabled: !!selectedCompanyId && isRoleDialogOpen,
+  });
+
   const createCompanyMutation = useMutation({
     mutationFn: async (data: CompanyFormData) => {
       if (editingCompany) {
@@ -846,6 +858,35 @@ export default function Settings() {
                   />
                 </>
               )}
+
+              <FormField
+                control={roleForm.control}
+                name="cashAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cash Account (Optional)</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cash-account">
+                          <SelectValue placeholder="Select cash account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {bankAccounts.map((account: any) => (
+                          <SelectItem key={account.id} value={account.id.toString()}>
+                            {account.name} ({account.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex gap-2 justify-end border-t pt-4">
                 <Button
