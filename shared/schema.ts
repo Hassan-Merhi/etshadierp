@@ -30,6 +30,7 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   companyId: integer("company_id").notNull(),
   role: text("role").notNull(),
   assignedLocationId: integer("assigned_location_id"),
+  cashAccountId: integer("cash_account_id"),
   posStation: integer("pos_station"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -73,7 +74,6 @@ export const locations = pgTable("locations", {
   city: text("city"),
   state: text("state"),
   country: text("country"),
-  linkedCashAccountId: integer("linked_cash_account_id"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
