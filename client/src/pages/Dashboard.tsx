@@ -1,6 +1,8 @@
 import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { DollarSign, Package, TrendingUp, AlertTriangle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
 import {
   LineChart,
   Line,
@@ -12,6 +14,12 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+type ProfitData = {
+  totalIncome: number;
+  totalExpenses: number;
+  netProfit: number;
+};
 
 //todo: remove mock functionality
 const salesData = [
@@ -30,6 +38,33 @@ const lowStockItems = [
 ];
 
 export default function Dashboard() {
+  const { selectedCompany } = useCompany();
+  
+  // Fetch net profit data
+  const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
+    queryKey: ["/api/stats/net-profit", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Display error message if query fails
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="text-destructive">Failed to load dashboard data. Please try again.</div>
+      </div>
+    );
+  }
+
+  // Format currency
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -41,18 +76,20 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Total Revenue"
-          value="$328,500"
-          change="+12.5% from last month"
+          title="Total Income"
+          value={isLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
+          change="From all income accounts"
           changeType="positive"
           icon={DollarSign}
+          data-testid="kpi-total-income"
         />
         <KPICard
-          title="Total Profit"
-          value="$96,000"
-          change="+8.2% from last month"
-          changeType="positive"
+          title="Net Profit"
+          value={isLoading ? "Loading..." : formatCurrency(profitData?.netProfit || 0)}
+          change={isLoading ? "" : `Expenses: ${formatCurrency(profitData?.totalExpenses || 0)}`}
+          changeType={(profitData?.netProfit ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
+          data-testid="kpi-net-profit"
         />
         <KPICard
           title="Stock Items"

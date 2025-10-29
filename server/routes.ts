@@ -26,7 +26,7 @@ import {
   voucherEntries,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2150,6 +2150,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       res.status(201).json(adjustment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Financial Stats
+  app.get("/api/stats/net-profit", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all Income and Expense ledger accounts for this company
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      
+      const incomeAccountIds = companyAccounts
+        .filter(acc => acc.accountType === "Income")
+        .map(acc => acc.id);
+      const expenseAccountIds = companyAccounts
+        .filter(acc => acc.accountType === "Expense")
+        .map(acc => acc.id);
+
+      // Get voucher IDs for this company
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(eq(vouchers.companyId, companyId))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map(v => v.id);
+
+      // Get voucher entries only for this company's vouchers
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Calculate total income (credits - debits for income accounts)
+      let totalIncome = 0;
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId && incomeAccountIds.includes(entry.ledgerAccountId)) {
+          totalIncome += parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0");
+        }
+      }
+
+      // Calculate total expenses (debits - credits for expense accounts)
+      let totalExpenses = 0;
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId && expenseAccountIds.includes(entry.ledgerAccountId)) {
+          totalExpenses += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+        }
+      }
+
+      // Calculate net profit
+      const netProfit = totalIncome - totalExpenses;
+
+      res.json({
+        totalIncome,
+        totalExpenses,
+        netProfit,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
