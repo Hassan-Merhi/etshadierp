@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -147,6 +147,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     { key: "quantity", label: "Qty", width: "w-24" },
     { key: "rate", label: "Rate", width: "w-32" },
     { key: "amount", label: "Amount", width: "w-32" },
+    { key: "delete", label: "", width: "w-12" },
   ];
 
   const getFilteredInventory = () => {
@@ -235,8 +236,37 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   };
 
+  const handleDeleteRow = (index: number) => {
+    // Don't allow deleting if it's the only row
+    if (rows.length === 1) {
+      toast({
+        title: "Cannot Delete",
+        description: "At least one row must remain",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Remove the row
+    const newRows = rows.filter((_, i) => i !== index);
+    
+    // Ensure there's always at least one blank row for adding new items
+    const hasBlankRow = newRows.some(row => !row.itemName && row.quantity === 0 && row.rate === 0);
+    if (!hasBlankRow) {
+      newRows.push({
+        id: String(Date.now()),
+        itemName: "",
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+      });
+    }
+    
+    setRows(newRows);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
-    const maxCol = columns.length - 1;
+    const maxCol = columns.length - 2; // Exclude delete column from navigation
     const maxRow = rows.length - 1;
     const isItemNameField = columns[colIndex].key === "itemName";
     const filteredItems = getFilteredInventory();
@@ -511,50 +541,64 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
                           col.key === "amount" ? "bg-muted/30" : ""
                         }`}
                       >
-                        <input
-                          ref={(el) => {
-                            if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
-                          }}
-                          type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
-                          value={
-                            col.key === "amount"
-                              ? row.amount.toFixed(2)
-                              : row[col.key as keyof SaleRow]
-                          }
-                          onChange={(e) => {
-                            if (col.key !== "amount") {
-                              updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                        {col.key === "delete" ? (
+                          <div className="flex items-center justify-center h-full">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteRow(rowIndex)}
+                              className="h-8 w-8"
+                              data-testid={`button-delete-row-${rowIndex}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <input
+                            ref={(el) => {
+                              if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
+                            }}
+                            type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
+                            value={
+                              col.key === "amount"
+                                ? row.amount.toFixed(2)
+                                : row[col.key as keyof SaleRow]
                             }
-                          }}
-                          onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                          onFocus={() => {
-                            setSelectedCell({ row: rowIndex, col: colIndex });
-                            if (col.key === "itemName") {
-                              setActiveRow(rowIndex);
-                              setSearchTerm(row.itemName);
-                              setHighlightedIndex(0);
+                            onChange={(e) => {
+                              if (col.key !== "amount") {
+                                updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                              }
+                            }}
+                            onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                            onFocus={() => {
+                              setSelectedCell({ row: rowIndex, col: colIndex });
+                              if (col.key === "itemName") {
+                                setActiveRow(rowIndex);
+                                setSearchTerm(row.itemName);
+                                setHighlightedIndex(0);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (col.key === "itemName") {
+                                setTimeout(() => {
+                                  setActiveRow(null);
+                                }, 200);
+                              }
+                            }}
+                            readOnly={col.key === "amount"}
+                            className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 ${
+                              col.key === "quantity" || col.key === "rate" || col.key === "amount"
+                                ? "font-mono text-right"
+                                : ""
+                            } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
+                            placeholder={
+                              col.key === "itemName"
+                                ? "Type to search..."
+                                : ""
                             }
-                          }}
-                          onBlur={() => {
-                            if (col.key === "itemName") {
-                              setTimeout(() => {
-                                setActiveRow(null);
-                              }, 200);
-                            }
-                          }}
-                          readOnly={col.key === "amount"}
-                          className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 ${
-                            col.key === "quantity" || col.key === "rate" || col.key === "amount"
-                              ? "font-mono text-right"
-                              : ""
-                          } ${col.key === "amount" ? "cursor-not-allowed" : ""}`}
-                          placeholder={
-                            col.key === "itemName"
-                              ? "Type to search..."
-                              : ""
-                          }
-                          data-testid={`input-${col.key}-${rowIndex}`}
-                        />
+                            data-testid={`input-${col.key}-${rowIndex}`}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
