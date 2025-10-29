@@ -30,6 +30,8 @@ import POImport from "@/pages/POImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
 import Settings from "@/pages/Settings";
+import BalanceSheet from "@/pages/BalanceSheet";
+import ProfitLoss from "@/pages/ProfitLoss";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -70,6 +72,8 @@ function Router({ user }: { user: any }) {
       <Route path="/vouchers" component={Vouchers} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
       <Route path="/reports" component={Reports} />
+      <Route path="/balance-sheet" component={BalanceSheet} />
+      <Route path="/profit-loss" component={ProfitLoss} />
       <Route path="/create" component={AccountingCreate} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />

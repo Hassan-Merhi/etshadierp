@@ -14,6 +14,8 @@ import {
   Users,
   Receipt,
   Book,
+  Scale,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -90,6 +92,16 @@ const menuItems = [
     title: "Reports",
     url: "/reports",
     icon: FileText,
+  },
+  {
+    title: "Balance Sheet",
+    url: "/balance-sheet",
+    icon: Scale,
+  },
+  {
+    title: "Profit & Loss",
+    url: "/profit-loss",
+    icon: TrendingUp,
   },
   {
     title: "Create Master Data",

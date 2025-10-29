@@ -1605,6 +1605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: "Ledger",
             code: account.code,
             name: account.name,
+            accountType: account.accountType,
+            subType: account.subType,
             balance,
             balanceSide,
             active: account.active,
