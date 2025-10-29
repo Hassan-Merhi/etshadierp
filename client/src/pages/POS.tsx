@@ -80,20 +80,6 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Use either the selected location (for Admin/Owner/Manager) or POS user's assigned location
   const activeLocation = posUser ? posLocation : selectedLocation;
 
-  // Redirect to Location Inventory if no location is available (only for non-POS users)
-  if (!activeLocation && !posUser) {
-    return <Redirect to="/location-inventory" />;
-  }
-
-  // Show loading state while fetching POS user's location
-  if (posUser && !posLocation) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Loading location...</p>
-      </div>
-    );
-  }
-
   // Fetch inventory for the active location
   const { data: apiInventory = [], isLoading: inventoryLoading } = useQuery<APIInventoryItem[]>({
     queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
@@ -141,6 +127,21 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       setCashAccount(String(bankAccounts[0].id));
     }
   }, [bankAccounts, cashAccount]);
+
+  // Conditional renders after all hooks are called
+  // Redirect to Location Inventory if no location is available (only for non-POS users)
+  if (!activeLocation && !posUser) {
+    return <Redirect to="/location-inventory" />;
+  }
+
+  // Show loading state while fetching POS user's location
+  if (posUser && !posLocation) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading location...</p>
+      </div>
+    );
+  }
 
   const columns = [
     { key: "itemName", label: "Item Name", width: "flex-1" },
