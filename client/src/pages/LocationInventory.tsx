@@ -4,9 +4,10 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useReactToPrint } from "react-to-print";
 
 interface Location {
   id: number;
@@ -48,9 +49,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
+  const [viewAllItems, setViewAllItems] = useState<boolean>(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
   const [, navigate] = useRoute();
+
+  // Print handler
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
 
   // Fetch all locations (only if not a POS user)
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
@@ -140,11 +148,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const handleBackToLocations = () => {
     setSelectedLocationLocal(null);
     setSelectedGroup(null);
+    setViewAllItems(false);
   };
 
   // Handle back to groups
   const handleBackToGroups = () => {
     setSelectedGroup(null);
+    setViewAllItems(false);
     setSelectedRowIndex(0);
   };
 
@@ -179,7 +189,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
         {!selectedLocationLocal && <span>Select Location</span>}
-        {selectedLocationLocal && !selectedGroup && (
+        {selectedLocationLocal && !selectedGroup && !viewAllItems && (
           <>
             {!posUser && (
               <>
@@ -195,6 +205,33 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </>
             )}
             <span>{selectedLocationLocal.name}</span>
+          </>
+        )}
+        {selectedLocationLocal && viewAllItems && (
+          <>
+            {!posUser && (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={handleBackToLocations}
+                  className="h-auto p-0 text-sm hover:underline"
+                  data-testid="button-back-to-locations-from-all"
+                >
+                  Locations
+                </Button>
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
+            <Button
+              variant="ghost"
+              onClick={handleBackToGroups}
+              className="h-auto p-0 text-sm hover:underline"
+              data-testid="button-back-to-groups-from-all"
+            >
+              {selectedLocationLocal.name}
+            </Button>
+            <ChevronRight className="w-4 h-4" />
+            <span>All Stock Items</span>
           </>
         )}
         {selectedLocationLocal && selectedGroup && (
@@ -275,22 +312,33 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       )}
 
       {/* Stock Group List View */}
-      {selectedLocationLocal && !selectedGroup && (
+      {selectedLocationLocal && !selectedGroup && !viewAllItems && (
         <div>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold">
               {selectedLocationLocal.name} - Stock Groups
             </h1>
-            {!posUser && (
+            <div className="flex items-center gap-2">
               <Button
-                onClick={() => handleUseLocation(selectedLocationLocal)}
-                data-testid="button-use-location"
+                onClick={() => setViewAllItems(true)}
+                data-testid="button-view-all-items"
+                variant="outline"
                 className="gap-2"
               >
-                <ShoppingCart className="w-4 h-4" />
-                Use Location for POS
+                <List className="w-4 h-4" />
+                View All Stock Items
               </Button>
-            )}
+              {!posUser && (
+                <Button
+                  onClick={() => handleUseLocation(selectedLocationLocal)}
+                  data-testid="button-use-location"
+                  className="gap-2"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  Use Location for POS
+                </Button>
+              )}
+            </div>
           </div>
           {inventoryLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -357,7 +405,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         </div>
       )}
 
-      {/* Stock Items Table View */}
+      {/* Stock Items Table View (Single Group) */}
       {selectedLocationLocal && selectedGroup && (
         <div>
           <h1 className="text-3xl font-bold mb-6">
@@ -407,6 +455,119 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 ))}
               </TableBody>
             </Table>
+          </div>
+        </div>
+      )}
+
+      {/* All Stock Items View */}
+      {selectedLocationLocal && viewAllItems && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">
+              {selectedLocationLocal.name} - All Stock Items
+            </h1>
+            <Button
+              onClick={handlePrint}
+              data-testid="button-print-inventory"
+              variant="default"
+              className="gap-2"
+            >
+              <Printer className="w-4 h-4" />
+              Print Inventory
+            </Button>
+          </div>
+
+          {/* Printable area */}
+          <div ref={printRef}>
+            {/* Print header (hidden on screen) */}
+            <div className="hidden print:block mb-6">
+              <h2 className="text-2xl font-bold">{selectedLocationLocal.name}</h2>
+              <p className="text-sm text-muted-foreground">Full Inventory Report</p>
+              <p className="text-sm text-muted-foreground">
+                Printed: {new Date().toLocaleDateString()}
+              </p>
+            </div>
+
+            {inventoryLoading ? (
+              <div className="p-6 text-center">
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : inventory.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  No inventory found at this location.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Barcode</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead>UOM</TableHead>
+                      {!posUser && (
+                        <>
+                          <TableHead className="text-right">Avg Rate</TableHead>
+                          <TableHead className="text-right">Total Value</TableHead>
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventory
+                      .sort((a, b) => {
+                        // Sort by group name, then by item name
+                        const groupCompare = (a.stockGroupName || "").localeCompare(b.stockGroupName || "");
+                        if (groupCompare !== 0) return groupCompare;
+                        return a.stockItemName.localeCompare(b.stockItemName);
+                      })
+                      .map((item) => (
+                        <TableRow
+                          key={item.inventoryId}
+                          data-testid={`row-all-items-${item.stockItemId}`}
+                        >
+                          <TableCell className="font-medium">{item.stockItemCode}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.stockItemBarcode || "-"}
+                          </TableCell>
+                          <TableCell>{item.stockItemName}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.stockGroupName || "Uncategorized"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(item.quantity).toFixed(3)}
+                          </TableCell>
+                          <TableCell>{item.stockItemUom}</TableCell>
+                          {!posUser && (
+                            <>
+                              <TableCell className="text-right font-mono">
+                                ${parseFloat(item.averageRate).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium">
+                                ${parseFloat(item.totalValue).toFixed(2)}
+                              </TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Print summary (hidden on screen, visible when printing) */}
+            {!posUser && (
+              <div className="hidden print:block mt-6">
+                <p className="text-sm">
+                  Total Items: {inventory.length} | Total Inventory Value: $
+                  {inventory.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0).toFixed(2)}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
