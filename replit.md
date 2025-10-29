@@ -115,6 +115,41 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Multi-Company Support (October 29, 2025)
+- **Complete Multi-Tenancy Architecture**: Full support for managing multiple companies within a single instance
+  - New `companies` table for company management
+  - `user_company_roles` junction table for assigning different roles to users across companies
+  - Users can have different roles (Admin, Owner, Manager, POS 1-6) in different companies
+  - Session-based company selection with company switcher in header
+- **Data Isolation**: All business data is scoped by company
+  - Locations, inventory, vouchers, ledger accounts, bank accounts, purchase orders, containers all filtered by companyId
+  - Each company maintains isolated financial records and inventory
+  - **Exception**: Suppliers are GLOBAL entities shared across all companies with aggregate balances
+- **Company Context**: React context provider manages currently selected company throughout the app
+  - Automatic query invalidation when switching companies
+  - Company selector in header for switching between companies
+- **Role-Based Access Control**:
+  - Admin users can create/manage companies and assign user roles
+  - POS users restricted to specific location AND company (requires re-login when switching companies)
+  - Location-based authentication ensures POS users can only access locations in their current company
+- **Enhanced Security**:
+  - All location and inventory endpoints now require authentication
+  - Company verification on all data access endpoints (returns 403 if accessing another company's data)
+  - POS page shows user-friendly error messages when location access is denied
+- **User Management**:
+  - Multi-company role assignment interface in Settings
+  - Can assign users to multiple companies with different roles/locations per company
+  - Real-time cache invalidation for role assignments
+- **Location Management**:
+  - Location creation includes optional cash account auto-creation
+  - Creates CASH ledger account (Asset type) and links to bank account with code {locationCode}-CASH
+  - Reuses existing CASH ledger if available, regardless of account type classification
+- **Supplier Management**:
+  - Clickable supplier names show transaction dialog
+  - Transactions filtered by currently selected company
+  - Supplier balances aggregate across all companies globally
+  - Transaction dialog shows company-specific voucher entries with totals
+
 ### Purchase Order Accounting Integration
 - **Automatic Voucher Creation**: When importing POs via containers, the system now automatically creates accounting vouchers following double-entry bookkeeping principles
   - Debit entry: PURCHASES ledger account (expense increases)
