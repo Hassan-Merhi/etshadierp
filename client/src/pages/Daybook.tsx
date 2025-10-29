@@ -1,9 +1,21 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -43,6 +55,17 @@ import {
 import { Book, Filter, X, Eye, Edit, Trash2 } from "lucide-react";
 import { format, parseISO, isToday } from "date-fns";
 
+// Zod schema for editing vouchers
+const editVoucherSchema = z.object({
+  voucherDate: z.string().min(1, "Voucher date is required"),
+  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"], {
+    required_error: "Voucher type is required",
+  }),
+  description: z.string().optional(),
+});
+
+type EditVoucherForm = z.infer<typeof editVoucherSchema>;
+
 interface Voucher {
   id: number;
   voucherNumber: string;
@@ -63,8 +86,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
+  
+  // Edit form with react-hook-form and zod
+  const editForm = useForm<EditVoucherForm>({
+    resolver: zodResolver(editVoucherSchema),
+    defaultValues: {
+      voucherDate: "",
+      voucherType: "Journal",
+      description: "",
+    },
+  });
 
   // Fetch all vouchers
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
@@ -128,6 +163,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return user?.role === "Admin";
   };
 
+  // Edit voucher mutation
+  const editMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
+      return await apiRequest("PATCH", `/api/vouchers/${id}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({
+        title: "Success",
+        description: "Voucher updated successfully",
+      });
+      setEditDialogOpen(false);
+      setVoucherToEdit(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete voucher mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -158,9 +216,21 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleEdit = (voucher: Voucher) => {
-    toast({
-      title: "Edit Voucher",
-      description: `Edit functionality for ${voucher.voucherNumber} coming soon`,
+    setVoucherToEdit(voucher);
+    editForm.reset({
+      voucherDate: voucher.voucherDate,
+      voucherType: voucher.voucherType as any,
+      description: voucher.description || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = (data: EditVoucherForm) => {
+    if (!voucherToEdit) return;
+    
+    editMutation.mutate({
+      id: voucherToEdit.id,
+      updates: data,
     });
   };
 
@@ -458,6 +528,109 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </div>
               )}
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Voucher Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Voucher</DialogTitle>
+            <DialogDescription>
+              Update voucher information (amounts cannot be changed)
+            </DialogDescription>
+          </DialogHeader>
+          {voucherToEdit && (
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(handleSaveEdit)} className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Voucher Number</p>
+                  <p className="font-mono font-medium">{voucherToEdit.voucherNumber}</p>
+                </div>
+                
+                <FormField
+                  control={editForm.control}
+                  name="voucherDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          data-testid="input-edit-voucher-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="voucherType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-voucher-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Sales">Sales</SelectItem>
+                          <SelectItem value="Purchase">Purchase</SelectItem>
+                          <SelectItem value="Payment">Payment</SelectItem>
+                          <SelectItem value="Receipt">Receipt</SelectItem>
+                          <SelectItem value="Journal">Journal</SelectItem>
+                          <SelectItem value="Contra">Contra</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Optional description"
+                          data-testid="input-edit-voucher-description"
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditDialogOpen(false)}
+                    data-testid="button-cancel-edit"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editMutation.isPending}
+                    data-testid="button-save-edit"
+                  >
+                    {editMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           )}
         </DialogContent>
       </Dialog>

@@ -1787,6 +1787,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a voucher (Admin, Owner, or Manager for today's vouchers)
+  app.patch("/api/vouchers/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions based on role
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      // Admin and Owner can edit all vouchers
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        // Manager can only edit today's vouchers
+        if (userRole === "Manager") {
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          // Other roles cannot edit
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Only allow updating certain fields (not amount or company)
+      const allowedUpdates: Partial<any> = {};
+      if (req.body.voucherDate !== undefined) allowedUpdates.voucherDate = req.body.voucherDate;
+      if (req.body.voucherType !== undefined) allowedUpdates.voucherType = req.body.voucherType;
+      if (req.body.description !== undefined) allowedUpdates.description = req.body.description;
+
+      const updated = await storage.updateVoucher(id, allowedUpdates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create a new voucher entry
   app.post("/api/voucher-entries", async (req, res) => {
     try {

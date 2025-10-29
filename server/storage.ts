@@ -153,6 +153,7 @@ export interface IStorage {
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
   getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
+  updateVoucher(id: number, updates: Partial<InsertVoucher>): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
   deleteVoucher(id: number): Promise<void>;
 
@@ -834,6 +835,15 @@ export class DbStorage implements IStorage {
   async createVoucher(voucher: InsertVoucher): Promise<Voucher> {
     const [created] = await db.insert(schema.vouchers).values(voucher).returning();
     return created;
+  }
+
+  async updateVoucher(id: number, updates: Partial<InsertVoucher>): Promise<Voucher> {
+    const [updated] = await db
+      .update(schema.vouchers)
+      .set(updates)
+      .where(eq(schema.vouchers.id, id))
+      .returning();
+    return updated;
   }
 
   async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
