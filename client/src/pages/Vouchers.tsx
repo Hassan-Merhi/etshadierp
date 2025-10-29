@@ -902,6 +902,16 @@ export default function Vouchers() {
     0
   );
 
+  // Track active transfer row for showing suggestions
+  const [activeTransferRow, setActiveTransferRow] = useState<number | null>(null);
+  const [transferInventorySource, setTransferInventorySource] = useState<number | null>(null);
+
+  // Fetch inventory for the source location of the active row
+  const { data: transferInventory = [] } = useQuery<any[]>({
+    queryKey: transferInventorySource ? [`/api/locations/${transferInventorySource}/inventory`] : [],
+    enabled: !!transferInventorySource && transferInventorySource > 0,
+  });
+
   // Auto-fill rate when source location + stock item are selected
   useEffect(() => {
     transferEntries.forEach((entry, index) => {
@@ -919,6 +929,67 @@ export default function Vouchers() {
       }
     });
   }, [transferEntries.map(e => `${e.sourceLocationId}-${e.stockItemId}`).join(',')]);
+
+  // Helper function to lookup account by code
+  const lookupAccountByCode = (code: string): { type: "ledger" | "bank" | "supplier"; id: number; name: string } | null => {
+    if (!code || code.trim() === "") return null;
+    
+    const searchCode = code.trim().toLowerCase();
+    
+    // Search ledger accounts by code
+    const ledgerAccount = ledgerAccounts.find(
+      (a) => a.code.toLowerCase() === searchCode
+    );
+    if (ledgerAccount) {
+      return {
+        type: "ledger",
+        id: ledgerAccount.id,
+        name: `${ledgerAccount.code} - ${ledgerAccount.name}`,
+      };
+    }
+    
+    // Search bank accounts by accountNumber
+    const bankAccount = bankAccounts.find(
+      (a) => a.accountNumber.toLowerCase() === searchCode
+    );
+    if (bankAccount) {
+      return {
+        type: "bank",
+        id: bankAccount.id,
+        name: `${bankAccount.accountNumber} - ${bankAccount.bankName}`,
+      };
+    }
+    
+    // Search suppliers by code
+    const supplier = suppliers.find(
+      (s) => s.code.toLowerCase() === searchCode
+    );
+    if (supplier) {
+      return {
+        type: "supplier",
+        id: supplier.id,
+        name: `${supplier.code} - ${supplier.legalName}`,
+      };
+    }
+    
+    return null;
+  };
+
+  // Helper function to lookup location by code
+  const lookupLocationByCode = (code: string) => {
+    const location = locations.find(
+      (l) => l.code.toLowerCase() === code.toLowerCase()
+    );
+    return location;
+  };
+
+  // Helper function to lookup stock item by code
+  const lookupStockItemByCode = (code: string) => {
+    const item = stockItems.find(
+      (s) => s.code.toLowerCase() === code.toLowerCase()
+    );
+    return item;
+  };
 
   // Stock Transfer mutation
   const stockTransferMutation = useMutation({
@@ -1204,18 +1275,20 @@ export default function Vouchers() {
   ) => {
     const isLastRow = rowIndex === journalFields.length - 1;
     
-    // Handle Tab for navigation on Select and Combobox (let Enter activate them naturally)
+    // Handle Tab for navigation on Select (let Enter activate it naturally)
     if (fieldName === "type" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       setTimeout(() => {
-        const accountButton = document.querySelector(`[data-testid="button-journal-account-${rowIndex}"]`) as HTMLButtonElement;
-        if (accountButton) {
-          accountButton.focus();
+        const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
+        if (accountInput) {
+          accountInput.focus();
+          accountInput.select();
         }
       }, 50);
     }
     
-    if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
+    // Handle Tab/Enter on account input - move to amount
+    if (fieldName === "account" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
       e.preventDefault();
       setTimeout(() => {
         const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
@@ -1262,9 +1335,10 @@ export default function Vouchers() {
       
       if (fieldName === "sourceLocation") {
         setTimeout(() => {
-          const stockItemButton = document.querySelector(`[data-testid="button-transfer-stock-${rowIndex}"]`) as HTMLButtonElement;
-          if (stockItemButton) {
-            stockItemButton.focus();
+          const stockItemInput = document.querySelector(`[data-testid="input-transfer-stock-${rowIndex}"]`) as HTMLInputElement;
+          if (stockItemInput) {
+            stockItemInput.focus();
+            stockItemInput.select();
           }
         }, 50);
       } else if (fieldName === "stockItem") {
@@ -1276,7 +1350,15 @@ export default function Vouchers() {
           }
         }, 50);
       } else if (fieldName === "quantity") {
-        // On last field - move to next row or create new row
+        setTimeout(() => {
+          const rateInput = document.querySelector(`[data-testid="input-transfer-rate-${rowIndex}"]`) as HTMLInputElement;
+          if (rateInput) {
+            rateInput.focus();
+            rateInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "rate") {
+        // On rate field - move to next row or create new row
         if (isLastRow) {
           appendTransfer({
             sourceLocationId: 0,
@@ -1288,9 +1370,10 @@ export default function Vouchers() {
           });
         }
         setTimeout(() => {
-          const newRowSelect = document.querySelector(`[data-testid="select-source-location-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowSelect) {
-            newRowSelect.focus();
+          const newRowInput = document.querySelector(`[data-testid="input-source-location-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (newRowInput) {
+            newRowInput.focus();
+            newRowInput.select();
           }
         }, 100);
       }
@@ -1301,7 +1384,7 @@ export default function Vouchers() {
   const handleConsumptionKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "stockItem" | "quantity"
+    fieldName: "stockItem" | "quantity" | "rate"
   ) => {
     const isLastRow = rowIndex === consumptionFields.length - 1;
     
@@ -1318,7 +1401,15 @@ export default function Vouchers() {
           }
         }, 50);
       } else if (fieldName === "quantity") {
-        // On last field - move to next row or create new row
+        setTimeout(() => {
+          const rateInput = document.querySelector(`[data-testid="input-consumption-rate-${rowIndex}"]`) as HTMLInputElement;
+          if (rateInput) {
+            rateInput.focus();
+            rateInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "rate") {
+        // On rate field - move to next row or create new row
         if (isLastRow) {
           appendConsumption({
             stockItemId: 0,
@@ -1328,9 +1419,10 @@ export default function Vouchers() {
           });
         }
         setTimeout(() => {
-          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowButton) {
-            newRowButton.focus();
+          const newRowInput = document.querySelector(`[data-testid="input-consumption-stock-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (newRowInput) {
+            newRowInput.focus();
+            newRowInput.select();
           }
         }, 100);
       }
@@ -1341,7 +1433,7 @@ export default function Vouchers() {
   const handleProductionKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "stockItem" | "quantity"
+    fieldName: "stockItem" | "quantity" | "rate"
   ) => {
     const isLastRow = rowIndex === productionFields.length - 1;
     
@@ -1358,7 +1450,15 @@ export default function Vouchers() {
           }
         }, 50);
       } else if (fieldName === "quantity") {
-        // On last field - move to next row or create new row
+        setTimeout(() => {
+          const rateInput = document.querySelector(`[data-testid="input-production-rate-${rowIndex}"]`) as HTMLInputElement;
+          if (rateInput) {
+            rateInput.focus();
+            rateInput.select();
+          }
+        }, 50);
+      } else if (fieldName === "rate") {
+        // On rate field - move to next row or create new row
         if (isLastRow) {
           appendProduction({
             stockItemId: 0,
@@ -1368,9 +1468,10 @@ export default function Vouchers() {
           });
         }
         setTimeout(() => {
-          const newRowButton = document.querySelector(`[data-testid="button-stock-item-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowButton) {
-            newRowButton.focus();
+          const newRowInput = document.querySelector(`[data-testid="input-production-stock-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (newRowInput) {
+            newRowInput.focus();
+            newRowInput.select();
           }
         }, 100);
       }
@@ -2037,31 +2138,29 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={journalForm.control}
-                                name={`entries.${index}.accountId`}
-                                render={({ field: accountField }) => (
+                                name={`entries.${index}.accountName`}
+                                render={({ field: accountNameField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <AccountCombobox
-                                        value={
-                                          journalEntries[index].accountId > 0
-                                            ? {
-                                                type: journalEntries[index].accountType,
-                                                id: journalEntries[index].accountId,
-                                                name: journalEntries[index].accountName,
-                                              }
-                                            : null
-                                        }
-                                        onChange={(type, id, name) => {
-                                          journalForm.setValue(`entries.${index}.accountType`, type);
-                                          journalForm.setValue(`entries.${index}.accountId`, id);
-                                          journalForm.setValue(`entries.${index}.accountName`, name);
-                                        }}
-                                        ledgerAccounts={ledgerAccounts}
-                                        bankAccounts={bankAccounts}
-                                        suppliers={suppliers}
-                                        rowIndex={index}
-                                        testIdPrefix="button-journal-account"
+                                      <Input
+                                        {...accountNameField}
+                                        placeholder="Account code..."
+                                        data-testid={`input-journal-account-${index}`}
                                         onKeyDown={(e) => handleJournalKeyDown(e, index, "account")}
+                                        onChange={(e) => {
+                                          const code = e.target.value;
+                                          accountNameField.onChange(code);
+                                          
+                                          // Lookup account by code
+                                          const account = lookupAccountByCode(code);
+                                          if (account) {
+                                            journalForm.setValue(`entries.${index}.accountType`, account.type);
+                                            journalForm.setValue(`entries.${index}.accountId`, account.id);
+                                            journalForm.setValue(`entries.${index}.accountName`, account.name);
+                                          } else {
+                                            journalForm.setValue(`entries.${index}.accountId`, 0);
+                                          }
+                                        }}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2194,83 +2293,85 @@ export default function Vouchers() {
         </TabsContent>
 
         <TabsContent value="transfer" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stock Transfer Voucher</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...stockTransferForm}>
-                <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)} className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start justify-between gap-4">
-                    <FormField
-                      control={stockTransferForm.control}
-                      name="destinationLocationId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel>Destination Location</FormLabel>
-                          <Select
-                            value={field.value > 0 ? field.value.toString() : ""}
-                            onValueChange={(value) => field.onChange(parseInt(value))}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-destination-location">
-                                <SelectValue placeholder="Select destination location..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {locations.map((location) => (
-                                <SelectItem key={location.id} value={location.id.toString()}>
-                                  {location.code} - {location.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Right: Date picker */}
-                    <FormField
-                      control={stockTransferForm.control}
-                      name="voucherDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
+          <div className="flex gap-4">
+            {/* Main Form Area */}
+            <Card className="flex-1">
+              <CardHeader>
+                <CardTitle>Stock Transfer Voucher</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Form {...stockTransferForm}>
+                  <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)} className="space-y-6">
+                    {/* Header section */}
+                    <div className="flex items-start justify-between gap-4">
+                      <FormField
+                        control={stockTransferForm.control}
+                        name="destinationLocationId"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Destination Location</FormLabel>
+                            <Select
+                              value={field.value > 0 ? field.value.toString() : ""}
+                              onValueChange={(value) => field.onChange(parseInt(value))}
+                            >
                               <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    "w-[200px] justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                  )}
-                                  data-testid="button-transfer-date-picker"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
-                                </Button>
+                                <SelectTrigger data-testid="select-destination-location">
+                                  <SelectValue placeholder="Select destination location..." />
+                                </SelectTrigger>
                               </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="end">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                              <SelectContent>
+                                {locations.map((location) => (
+                                  <SelectItem key={location.id} value={location.id.toString()}>
+                                    {location.code} - {location.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  {/* Spreadsheet table */}
-                  <div className="border rounded-md overflow-hidden">
+                      {/* Right: Date picker */}
+                      <FormField
+                        control={stockTransferForm.control}
+                        name="voucherDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-[200px] justify-start text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    data-testid="button-transfer-date-picker"
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Spreadsheet table */}
+                    <div className="border rounded-md overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
@@ -2288,31 +2389,39 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={stockTransferForm.control}
-                                name={`entries.${index}.sourceLocationId`}
+                                name={`entries.${index}.sourceLocationName`}
                                 render={({ field: locationField }) => (
                                   <FormItem>
-                                    <Select
-                                      value={transferEntries[index].sourceLocationId > 0 ? transferEntries[index].sourceLocationId.toString() : ""}
-                                      onValueChange={(value) => {
-                                        const locationId = parseInt(value);
-                                        const location = locations.find(l => l.id === locationId);
-                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, locationId);
-                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, location ? `${location.code} - ${location.name}` : "");
-                                      }}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger data-testid={`select-source-location-${index}`} onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}>
-                                          <SelectValue placeholder="Select source..." />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {locations.map((location) => (
-                                          <SelectItem key={location.id} value={location.id.toString()}>
-                                            {location.code} - {location.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                      <Input
+                                        {...locationField}
+                                        placeholder="Location code..."
+                                        data-testid={`input-source-location-${index}`}
+                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}
+                                        onChange={(e) => {
+                                          const code = e.target.value;
+                                          locationField.onChange(code);
+                                          
+                                          // Lookup location by code
+                                          const location = lookupLocationByCode(code);
+                                          if (location) {
+                                            stockTransferForm.setValue(`entries.${index}.sourceLocationId`, location.id);
+                                            stockTransferForm.setValue(`entries.${index}.sourceLocationName`, `${location.code} - ${location.name}`);
+                                            // Update inventory source for suggestions
+                                            setTransferInventorySource(location.id);
+                                          } else {
+                                            stockTransferForm.setValue(`entries.${index}.sourceLocationId`, 0);
+                                          }
+                                        }}
+                                        onFocus={() => {
+                                          setActiveTransferRow(index);
+                                          // Set inventory source if location already selected
+                                          if (transferEntries[index].sourceLocationId > 0) {
+                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                          }
+                                        }}
+                                      />
+                                    </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -2321,27 +2430,48 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={stockTransferForm.control}
-                                name={`entries.${index}.stockItemId`}
+                                name={`entries.${index}.stockItemName`}
                                 render={({ field: stockField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <StockItemCombobox
-                                        value={
-                                          transferEntries[index].stockItemId > 0
-                                            ? {
-                                                id: transferEntries[index].stockItemId,
-                                                name: transferEntries[index].stockItemName,
-                                              }
-                                            : null
-                                        }
-                                        onChange={(id, name) => {
-                                          stockTransferForm.setValue(`entries.${index}.stockItemId`, id);
-                                          stockTransferForm.setValue(`entries.${index}.stockItemName`, name);
-                                        }}
-                                        stockItems={stockItems}
-                                        rowIndex={index}
-                                        testIdPrefix="button-transfer-stock"
+                                      <Input
+                                        {...stockField}
+                                        placeholder="Item code..."
+                                        data-testid={`input-transfer-stock-${index}`}
                                         onKeyDown={(e) => handleTransferKeyDown(e, index, "stockItem")}
+                                        onChange={(e) => {
+                                          const code = e.target.value;
+                                          stockField.onChange(code);
+                                          
+                                          // Lookup stock item by code
+                                          const item = lookupStockItemByCode(code);
+                                          if (item) {
+                                            stockTransferForm.setValue(`entries.${index}.stockItemId`, item.id);
+                                            stockTransferForm.setValue(`entries.${index}.stockItemName`, `${item.code} - ${item.name}`);
+                                            
+                                            // Auto-fill rate from inventory if source location is selected
+                                            if (transferEntries[index].sourceLocationId > 0) {
+                                              fetch(`/api/locations/${transferEntries[index].sourceLocationId}/inventory`)
+                                                .then(res => res.json())
+                                                .then(inventory => {
+                                                  const inventoryItem = inventory.find((inv: any) => inv.stockItemId === item.id);
+                                                  if (inventoryItem && inventoryItem.averageRate) {
+                                                    stockTransferForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
+                                                  }
+                                                })
+                                                .catch(err => console.error('Failed to fetch inventory:', err));
+                                            }
+                                          } else {
+                                            stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                          }
+                                        }}
+                                        onFocus={() => {
+                                          setActiveTransferRow(index);
+                                          // Update inventory source if location is selected
+                                          if (transferEntries[index].sourceLocationId > 0) {
+                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                          }
+                                        }}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2385,6 +2515,7 @@ export default function Vouchers() {
                                         placeholder="0.00"
                                         className="font-mono"
                                         data-testid={`input-transfer-rate-${index}`}
+                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "rate")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2490,6 +2621,77 @@ export default function Vouchers() {
               </Form>
             </CardContent>
           </Card>
+
+          {/* Right side panel - Stock Item Suggestions */}
+          {activeTransferRow !== null && transferInventorySource && (
+            <Card className="w-80">
+              <CardHeader>
+                <CardTitle className="text-sm">Available Items</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {locations.find(l => l.id === transferInventorySource)?.name}
+                </p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-[600px] overflow-y-auto">
+                  {transferInventory.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      No inventory at this location
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {transferInventory.map((item: any) => (
+                        <button
+                          key={item.stockItemId}
+                          type="button"
+                          className="w-full p-3 text-left hover-elevate active-elevate-2 transition-colors"
+                          data-testid={`button-suggest-item-${item.stockItemId}`}
+                          onClick={() => {
+                            if (activeTransferRow !== null) {
+                              const stockItem = stockItems.find(s => s.id === item.stockItemId);
+                              if (stockItem) {
+                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
+                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, `${stockItem.code} - ${stockItem.name}`);
+                                stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
+                                
+                                // Move focus to quantity field
+                                setTimeout(() => {
+                                  const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${activeTransferRow}"]`) as HTMLInputElement;
+                                  if (quantityInput) {
+                                    quantityInput.focus();
+                                    quantityInput.select();
+                                  }
+                                }, 50);
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">
+                                {item.stockItemName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.stockItemCode}
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-sm font-medium">
+                                ${parseFloat(item.averageRate || "0").toFixed(2)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Qty: {parseFloat(item.quantity || "0").toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
         </TabsContent>
 
         <TabsContent value="adjustment" className="space-y-4">
@@ -2590,25 +2792,26 @@ export default function Vouchers() {
                               <td className="p-2">
                                 <FormField
                                   control={stockAdjustmentForm.control}
-                                  name={`consumptionEntries.${index}.stockItemId`}
-                                  render={({ field: stockField }) => (
+                                  name={`consumptionEntries.${index}.stockItemName`}
+                                  render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <StockItemCombobox
-                                          value={
-                                            consumptionEntries[index]?.stockItemId > 0
-                                              ? {
-                                                  id: consumptionEntries[index].stockItemId,
-                                                  name: consumptionEntries[index].stockItemName,
-                                                }
-                                              : null
-                                          }
-                                          onChange={(id, name) => {
-                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, id);
-                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemName`, name);
+                                        <Input
+                                          {...field}
+                                          placeholder="Stock code..."
+                                          className="text-sm"
+                                          data-testid={`input-consumption-stock-${index}`}
+                                          onChange={(e) => {
+                                            const code = e.target.value;
+                                            field.onChange(code);
+                                            const item = lookupStockItemByCode(code);
+                                            if (item) {
+                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, item.id);
+                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemName`, `${item.code} - ${item.name}`);
+                                            } else {
+                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, 0);
+                                            }
                                           }}
-                                          stockItems={stockItems}
-                                          rowIndex={index}
                                           onKeyDown={(e) => handleConsumptionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
@@ -2653,6 +2856,7 @@ export default function Vouchers() {
                                           placeholder="0"
                                           className="font-mono text-sm"
                                           data-testid={`input-consumption-rate-${index}`}
+                                          onKeyDown={(e) => handleConsumptionKeyDown(e, index, "rate")}
                                         />
                                       </FormControl>
                                       <FormMessage />
@@ -2732,25 +2936,26 @@ export default function Vouchers() {
                               <td className="p-2">
                                 <FormField
                                   control={stockAdjustmentForm.control}
-                                  name={`productionEntries.${index}.stockItemId`}
-                                  render={({ field: stockField }) => (
+                                  name={`productionEntries.${index}.stockItemName`}
+                                  render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <StockItemCombobox
-                                          value={
-                                            productionEntries[index]?.stockItemId > 0
-                                              ? {
-                                                  id: productionEntries[index].stockItemId,
-                                                  name: productionEntries[index].stockItemName,
-                                                }
-                                              : null
-                                          }
-                                          onChange={(id, name) => {
-                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, id);
-                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemName`, name);
+                                        <Input
+                                          {...field}
+                                          placeholder="Stock code..."
+                                          className="text-sm"
+                                          data-testid={`input-production-stock-${index}`}
+                                          onChange={(e) => {
+                                            const code = e.target.value;
+                                            field.onChange(code);
+                                            const item = lookupStockItemByCode(code);
+                                            if (item) {
+                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, item.id);
+                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemName`, `${item.code} - ${item.name}`);
+                                            } else {
+                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, 0);
+                                            }
                                           }}
-                                          stockItems={stockItems}
-                                          rowIndex={index}
                                           onKeyDown={(e) => handleProductionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
@@ -2795,6 +3000,7 @@ export default function Vouchers() {
                                           placeholder="0"
                                           className="font-mono text-sm"
                                           data-testid={`input-production-rate-${index}`}
+                                          onKeyDown={(e) => handleProductionKeyDown(e, index, "rate")}
                                         />
                                       </FormControl>
                                       <FormMessage />
