@@ -43,6 +43,11 @@ export default function Dashboard() {
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
     queryKey: ["/api/stats/net-profit", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/stats/net-profit", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch net profit");
+      return await response.json();
+    },
     enabled: !!selectedCompany,
   });
 
