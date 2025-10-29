@@ -69,7 +69,7 @@ export interface IStorage {
   // Locations
   getAllLocations(companyId: number): Promise<Location[]>;
   getLocationById(id: number): Promise<Location | undefined>;
-  getLocationByCode(code: string): Promise<Location | undefined>;
+  getLocationByCode(code: string, companyId: number): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
 
   // Ledger Accounts
@@ -252,8 +252,10 @@ export class DbStorage implements IStorage {
     return location;
   }
 
-  async getLocationByCode(code: string): Promise<Location | undefined> {
-    const [location] = await db.select().from(schema.locations).where(eq(schema.locations.code, code));
+  async getLocationByCode(code: string, companyId: number): Promise<Location | undefined> {
+    const [location] = await db.select().from(schema.locations).where(
+      and(eq(schema.locations.code, code), eq(schema.locations.companyId, companyId))
+    );
     return location;
   }
 

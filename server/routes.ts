@@ -290,12 +290,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/locations", async (req, res) => {
+  app.post("/api/locations", requireAuth, async (req, res) => {
     try {
-      const parsed = insertLocationSchema.parse(req.body);
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const parsed = insertLocationSchema.parse({
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      });
       
-      // Check for duplicate code
-      const existing = await storage.getLocationByCode(parsed.code);
+      // Check for duplicate code within the current company
+      const existing = await storage.getLocationByCode(parsed.code, req.session.currentCompanyId);
       if (existing) {
         return res.status(400).json({ message: "Location code already exists" });
       }
@@ -314,10 +321,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const parsed = insertLocationSchema.parse(req.body);
+      const parsed = insertLocationSchema.parse({
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      });
       
-      // Check for duplicate location code
-      const existingLocation = await storage.getLocationByCode(parsed.code);
+      // Check for duplicate location code within the current company
+      const existingLocation = await storage.getLocationByCode(parsed.code, req.session.currentCompanyId);
       if (existingLocation) {
         return res.status(400).json({ message: "Location code already exists" });
       }
