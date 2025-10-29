@@ -1,6 +1,6 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -9,6 +9,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -24,11 +27,25 @@ import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
+import Settings from "@/pages/Settings";
+import { useEffect } from "react";
 
-function Router() {
+function Router({ user }: { user: any }) {
+  const isPOS = user?.role?.startsWith("POS");
+  
+  // POS users only see the POS interface
+  if (isPOS) {
+    return (
+      <Switch>
+        <Route path="/" component={POS} />
+        <Route component={() => <POS />} />
+      </Switch>
+    );
+  }
+
+  // All other users see full interface
   return (
     <Switch>
-      <Route path="/login" component={Login} />
       <Route path="/" component={Dashboard} />
       <Route path="/pos" component={POS} />
       <Route path="/inventory" component={Inventory} />
@@ -41,42 +58,120 @@ function Router() {
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/vouchers" component={Vouchers} />
       <Route path="/reports" component={Reports} />
-      <Route path="/accounting/create" component={AccountingCreate} />
+      <Route path="/create" component={AccountingCreate} />
+      {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-export default function App() {
+function AuthenticatedApp() {
+  const [location, setLocation] = useLocation();
+  
+  const { data: user, isLoading, error } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!isLoading && (error || !user)) {
+      setLocation("/login");
+    }
+  }, [isLoading, error, user, setLocation]);
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout", {});
+      queryClient.clear();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error || !user) {
+    return null; // Will redirect to login
+  }
+
+  const isPOS = user.role.startsWith("POS");
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
+  // POS users get a simplified interface without sidebar
+  if (isPOS) {
+    return (
+      <div className="flex flex-col h-screen w-full">
+        <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">POS Station {user.posStation || ""}</h1>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-sm text-muted-foreground">{user.username}</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
+              <LogOut className="h-4 w-4" />
+            </Button>
+            <ThemeToggle />
+          </div>
+        </header>
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto">
+            <Router user={user} />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Full interface for Admin, Owner, Manager
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar user={user} />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-sm text-muted-foreground">{user.username} ({user.role})</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
+                <LogOut className="h-4 w-4" />
+              </Button>
+              <CompanySelector />
+              <ThemeToggle />
+            </div>
+          </header>
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-7xl mx-auto">
+              <Router user={user} />
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
           <LocationProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <div className="flex flex-col flex-1 overflow-hidden">
-                  <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
-                    <SidebarTrigger data-testid="button-sidebar-toggle" />
-                    <div className="flex items-center gap-2 ml-auto">
-                      <CompanySelector />
-                      <ThemeToggle />
-                    </div>
-                  </header>
-                  <main className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-7xl mx-auto">
-                      <Router />
-                    </div>
-                  </main>
-                </div>
-              </div>
-            </SidebarProvider>
+            <Switch>
+              <Route path="/login" component={Login} />
+              <Route>
+                <AuthenticatedApp />
+              </Route>
+            </Switch>
             <Toaster />
           </LocationProvider>
         </ThemeProvider>

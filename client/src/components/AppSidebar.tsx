@@ -87,7 +87,7 @@ const menuItems = [
   },
   {
     title: "Create Master Data",
-    url: "/accounting/create",
+    url: "/create",
     icon: FolderPlus,
   },
   {
@@ -102,8 +102,21 @@ const menuItems = [
   },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
+
+  // Filter menu items based on user role
+  const visibleMenuItems = menuItems.filter((item) => {
+    // Settings is Admin only
+    if (item.url === "/settings") {
+      return user?.role === "Admin";
+    }
+    return true;
+  });
+
+  const initials = user?.username
+    ? user.username.substring(0, 2).toUpperCase()
+    : "AD";
 
   return (
     <Sidebar>
@@ -125,7 +138,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = location === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -145,12 +158,12 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarFallback>AD</AvatarFallback>
+            <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium truncate">Admin User</span>
+            <span className="text-sm font-medium truncate">{user?.username || "User"}</span>
             <span className="text-xs text-muted-foreground truncate">
-              admin@company.com
+              {user?.role || "Role"}
             </span>
           </div>
         </div>

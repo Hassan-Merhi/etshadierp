@@ -4,6 +4,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
+import { requireAuth, requireRole, canDelete } from "./auth";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -16,11 +17,120 @@ import {
   offloadRequestSchema,
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
+  insertUserSchema,
 } from "@shared/schema";
+import { z } from "zod";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Helper function to hash passwords
+function hashPassword(password: string): string {
+  return crypto.SHA256(password).toString();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const hashedPassword = hashPassword(password);
+      if (user.password !== hashedPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ message: "Account is inactive" });
+      }
+
+      req.session.userId = user.id;
+      
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Failed to logout" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/me", requireAuth, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const { password: _, ...userWithoutPassword } = req.user;
+    res.json(userWithoutPassword);
+  });
+
+  // User management routes (Admin only)
+  app.get("/api/users", requireAuth, requireRole("Admin"), async (_req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/users", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const parsed = insertUserSchema.parse(req.body);
+      
+      // Check for duplicate username
+      const existing = await storage.getUserByUsername(parsed.username);
+      if (existing) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Hash the password
+      const hashedPassword = hashPassword(parsed.password);
+      const user = await storage.createUser({ ...parsed, password: hashedPassword });
+      
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/users/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      // If password is being updated, hash it
+      if (updates.password) {
+        updates.password = hashPassword(updates.password);
+      }
+
+      const user = await storage.updateUser(id, updates);
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Locations
   app.get("/api/locations", async (_req, res) => {
     try {
