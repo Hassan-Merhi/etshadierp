@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { CompanyProvider } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -202,15 +203,17 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <LocationProvider>
-            <Switch>
-              <Route path="/login" component={Login} />
-              <Route>
-                <AuthenticatedApp />
-              </Route>
-            </Switch>
-            <Toaster />
-          </LocationProvider>
+          <CompanyProvider>
+            <LocationProvider>
+              <Switch>
+                <Route path="/login" component={Login} />
+                <Route>
+                  <AuthenticatedApp />
+                </Route>
+              </Switch>
+              <Toaster />
+            </LocationProvider>
+          </CompanyProvider>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
