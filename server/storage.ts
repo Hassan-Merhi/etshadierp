@@ -149,7 +149,7 @@ export interface IStorage {
   getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
-  getVoucherEntriesBySupplier(supplierId: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
   getContainerCountBySupplier(supplierId: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
@@ -746,10 +746,15 @@ export class DbStorage implements IStorage {
 
   async getVoucherEntriesBySupplier(
     supplierId: number,
+    companyId?: number,
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
     const conditions = [eq(schema.voucherEntries.supplierId, supplierId)];
+    
+    if (companyId) {
+      conditions.push(eq(schema.vouchers.companyId, companyId));
+    }
     
     if (startDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
@@ -773,7 +778,8 @@ export class DbStorage implements IStorage {
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-      .where(and(...conditions));
+      .where(and(...conditions))
+      .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
 
     return await query;
   }

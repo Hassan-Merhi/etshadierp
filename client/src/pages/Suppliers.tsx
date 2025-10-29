@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -13,9 +14,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Users, Container, DollarSign } from "lucide-react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { format } from "date-fns";
 
 interface SupplierWithStats {
   id: number;
@@ -32,13 +42,30 @@ interface SupplierWithStats {
 }
 
 export default function Suppliers() {
+  const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
+  const { selectedCompany } = useCompany();
+  
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
     queryKey: ["/api/suppliers/with-stats"],
+  });
+
+  // Fetch transactions for the selected supplier filtered by current company
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
+    queryKey: [`/api/accounts/supplier/${selectedSupplier?.id}/transactions`, { companyId: selectedCompany?.id }],
+    enabled: !!selectedSupplier && !!selectedCompany,
   });
 
   const activeSuppliers = suppliers.filter((s) => s.active);
   const totalContainers = suppliers.reduce((sum, s) => sum + s.containerCount, 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + s.balance, 0);
+  
+  const handleSupplierClick = (supplier: SupplierWithStats) => {
+    setSelectedSupplier(supplier);
+  };
+  
+  const handleCloseDialog = () => {
+    setSelectedSupplier(null);
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -147,7 +174,14 @@ export default function Suppliers() {
                         {supplier.code}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {supplier.legalName}
+                        <Button
+                          variant="ghost"
+                          className="p-0 h-auto font-medium hover:underline text-left"
+                          onClick={() => handleSupplierClick(supplier)}
+                          data-testid={`button-supplier-name-${supplier.id}`}
+                        >
+                          {supplier.legalName}
+                        </Button>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -180,6 +214,101 @@ export default function Suppliers() {
           )}
         </CardContent>
       </Card>
+
+      {/* Supplier Transactions Dialog */}
+      <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedSupplier?.legalName} - Transactions
+              {selectedCompany && <span className="text-sm font-normal text-muted-foreground ml-2">({selectedCompany.name})</span>}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {transactionsLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No transactions found for this supplier in {selectedCompany?.name || "this company"}.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {transactions.length} transaction{transactions.length !== 1 ? "s" : ""}
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Voucher #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Debit</TableHead>
+                    <TableHead className="text-right">Credit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((txn) => (
+                    <TableRow key={txn.entryId}>
+                      <TableCell className="font-mono text-sm">
+                        {format(new Date(txn.voucherDate), "yyyy-MM-dd")}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {txn.voucherNumber}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{txn.voucherType}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {txn.narration || txn.voucherDescription || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {parseFloat(txn.debitAmount) > 0 
+                          ? `$${parseFloat(txn.debitAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {parseFloat(txn.creditAmount) > 0 
+                          ? `$${parseFloat(txn.creditAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Summary */}
+              <div className="border-t pt-4 flex justify-end gap-8">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total Debit: </span>
+                  <span className="font-mono font-semibold">
+                    ${transactions.reduce((sum, t) => sum + parseFloat(t.debitAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total Credit: </span>
+                  <span className="font-mono font-semibold">
+                    ${transactions.reduce((sum, t) => sum + parseFloat(t.creditAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Balance: </span>
+                  <span className="font-mono font-semibold">
+                    ${(
+                      transactions.reduce((sum, t) => sum + parseFloat(t.creditAmount || "0"), 0) -
+                      transactions.reduce((sum, t) => sum + parseFloat(t.debitAmount || "0"), 0)
+                    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

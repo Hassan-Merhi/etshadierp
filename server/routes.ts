@@ -1631,7 +1631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get transactions for a specific supplier with optional date filtering
-  app.get("/api/accounts/supplier/:id/transactions", async (req, res) => {
+  app.get("/api/accounts/supplier/:id/transactions", requireAuth, async (req, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       
@@ -1639,10 +1639,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid supplier ID" });
       }
 
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, companyId } = req.query;
+      
+      // Use query param companyId or session companyId, or undefined for all companies
+      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
 
       const transactions = await storage.getVoucherEntriesBySupplier(
         supplierId,
+        filterCompanyId,
         startDate as string | undefined,
         endDate as string | undefined
       );
