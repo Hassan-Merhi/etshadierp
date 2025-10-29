@@ -21,13 +21,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -39,24 +32,37 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit } from "lucide-react";
-import { insertUserSchema } from "@shared/schema";
+import { Plus, Edit, Building2, Users } from "lucide-react";
+import { insertUserSchema, insertCompanySchema } from "@shared/schema";
 
 const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
 
 type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
+
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
+  });
 
   const { data: users = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/users"],
   });
 
-  const { data: locations = [] } = useQuery<any[]>({
-    queryKey: ["/api/locations"],
+  const companyForm = useForm<CompanyFormData>({
+    resolver: zodResolver(companyFormSchema),
+    defaultValues: {
+      name: "",
+      code: "",
+      active: true,
+    },
   });
 
   const form = useForm<UserFormData>({
@@ -64,12 +70,42 @@ export default function Settings() {
     defaultValues: {
       username: "",
       password: "",
-      role: "Manager",
       active: true,
     },
   });
 
-  const role = form.watch("role");
+  const createCompanyMutation = useMutation({
+    mutationFn: async (data: CompanyFormData) => {
+      if (editingCompany) {
+        const res = await apiRequest("PATCH", `/api/companies/${editingCompany.id}`, data);
+        return await res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/companies", data);
+        return await res.json();
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: editingCompany ? "Company updated successfully" : "Company created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      setIsCompanyDialogOpen(false);
+      setEditingCompany(null);
+      companyForm.reset({
+        name: "",
+        code: "",
+        active: true,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save company",
+        variant: "destructive",
+      });
+    },
+  });
 
   const createUserMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
@@ -92,7 +128,6 @@ export default function Settings() {
       form.reset({
         username: "",
         password: "",
-        role: "Manager",
         active: true,
       });
     },
@@ -105,17 +140,28 @@ export default function Settings() {
     },
   });
 
+  const handleEditCompany = (company: any) => {
+    setEditingCompany(company);
+    companyForm.reset({
+      name: company.name,
+      code: company.code,
+      active: company.active,
+    });
+    setIsCompanyDialogOpen(true);
+  };
+
   const handleEdit = (user: any) => {
     setEditingUser(user);
     form.reset({
       username: user.username,
       password: "",
-      role: user.role,
-      assignedLocationId: user.assignedLocationId,
-      posStation: user.posStation,
       active: user.active,
     });
     setIsDialogOpen(true);
+  };
+
+  const handleSubmitCompany = (data: CompanyFormData) => {
+    createCompanyMutation.mutate(data);
   };
 
   const handleSubmit = (data: UserFormData) => {
@@ -128,37 +174,185 @@ export default function Settings() {
     }
   };
 
-  const isPOSRole = role && role.startsWith("POS");
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">User Management</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              onClick={() => {
-                setEditingUser(null);
-                form.reset({
-                  username: "",
-                  password: "",
-                  role: "Manager",
-                  active: true,
-                });
-              }}
-              data-testid="button-add-user"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editingUser ? "Edit User" : "Create New User"}</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-8">
+      {/* Companies Management Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            <h2 className="text-2xl font-semibold">Company Management</h2>
+          </div>
+          <Dialog open={isCompanyDialogOpen} onOpenChange={setIsCompanyDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => {
+                  setEditingCompany(null);
+                  companyForm.reset({
+                    name: "",
+                    code: "",
+                    active: true,
+                  });
+                }}
+                data-testid="button-add-company"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Company
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingCompany ? "Edit Company" : "Create New Company"}</DialogTitle>
+              </DialogHeader>
+              <Form {...companyForm}>
+                <form onSubmit={companyForm.handleSubmit(handleSubmitCompany)} className="space-y-4">
+                  <FormField
+                    control={companyForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name *</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="ABC Textiles Inc."
+                            data-testid="input-company-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={companyForm.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Code *</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="ABC"
+                            data-testid="input-company-code"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={companyForm.control}
+                    name="active"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-company-active"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Active</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex gap-2 justify-end border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsCompanyDialogOpen(false);
+                        setEditingCompany(null);
+                      }}
+                      disabled={createCompanyMutation.isPending}
+                      data-testid="button-cancel-company"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createCompanyMutation.isPending} data-testid="button-save-company">
+                      {createCompanyMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <Card className="p-6">
+          {isLoadingCompanies ? (
+            <p className="text-center text-muted-foreground">Loading companies...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {companies.map((company: any) => (
+                  <TableRow key={company.id}>
+                    <TableCell className="font-medium" data-testid={`text-company-name-${company.id}`}>
+                      {company.name}
+                    </TableCell>
+                    <TableCell data-testid={`text-company-code-${company.id}`}>{company.code}</TableCell>
+                    <TableCell data-testid={`text-company-status-${company.id}`}>
+                      {company.active ? "Active" : "Inactive"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditCompany(company)}
+                        data-testid={`button-edit-company-${company.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </div>
+
+      {/* User Management Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            <h2 className="text-2xl font-semibold">User Management</h2>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => {
+                  setEditingUser(null);
+                  form.reset({
+                    username: "",
+                    password: "",
+                    active: true,
+                  });
+                }}
+                data-testid="button-add-user"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingUser ? "Edit User" : "Create New User"}</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
                     name="username"
@@ -202,93 +396,9 @@ export default function Settings() {
 
                   <FormField
                     control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-role">
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Owner">Owner</SelectItem>
-                            <SelectItem value="Manager">Manager</SelectItem>
-                            <SelectItem value="POS1">POS 1</SelectItem>
-                            <SelectItem value="POS2">POS 2</SelectItem>
-                            <SelectItem value="POS3">POS 3</SelectItem>
-                            <SelectItem value="POS4">POS 4</SelectItem>
-                            <SelectItem value="POS5">POS 5</SelectItem>
-                            <SelectItem value="POS6">POS 6</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {isPOSRole && (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="assignedLocationId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Assigned Location *</FormLabel>
-                            <Select
-                              onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
-                              value={field.value?.toString() || ""}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-location">
-                                  <SelectValue placeholder="Select location" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {locations.map((loc: any) => (
-                                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                                    {loc.name} ({loc.code})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="posStation"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>POS Station Number</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                min="1"
-                                max="6"
-                                placeholder="1-6"
-                                data-testid="input-pos-station"
-                                onChange={(e) => field.onChange(parseInt(e.target.value))}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  )}
-
-                  <FormField
-                    control={form.control}
                     name="active"
                     render={({ field }) => (
-                      <FormItem className="flex items-center gap-2 space-y-0 pt-8">
+                      <FormItem className="flex items-center gap-2 space-y-0">
                         <FormControl>
                           <Checkbox
                             checked={field.value}
@@ -300,60 +410,47 @@ export default function Settings() {
                       </FormItem>
                     )}
                   />
-                </div>
 
-                <div className="flex gap-2 justify-end border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      setEditingUser(null);
-                    }}
-                    disabled={createUserMutation.isPending}
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createUserMutation.isPending} data-testid="button-save">
-                    {createUserMutation.isPending ? "Saving..." : "Save"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                  <div className="flex gap-2 justify-end border-t pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsDialogOpen(false);
+                        setEditingUser(null);
+                      }}
+                      disabled={createUserMutation.isPending}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createUserMutation.isPending} data-testid="button-save">
+                      {createUserMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-      <Card className="p-6">
-        {isLoading ? (
-          <p className="text-center text-muted-foreground">Loading users...</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>POS Station</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user: any) => {
-                const location = locations.find((l: any) => l.id === user.assignedLocationId);
-                return (
+        <Card className="p-6">
+          {isLoading ? (
+            <p className="text-center text-muted-foreground">Loading users...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user: any) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium" data-testid={`text-username-${user.id}`}>
                       {user.username}
-                    </TableCell>
-                    <TableCell data-testid={`text-role-${user.id}`}>{user.role}</TableCell>
-                    <TableCell data-testid={`text-location-${user.id}`}>
-                      {location ? `${location.name} (${location.code})` : "-"}
-                    </TableCell>
-                    <TableCell data-testid={`text-station-${user.id}`}>
-                      {user.posStation || "-"}
                     </TableCell>
                     <TableCell data-testid={`text-status-${user.id}`}>
                       {user.active ? "Active" : "Inactive"}
@@ -369,12 +466,16 @@ export default function Settings() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        Note: User role assignments per company can be configured in the next section (coming soon).
+      </p>
     </div>
   );
 }
