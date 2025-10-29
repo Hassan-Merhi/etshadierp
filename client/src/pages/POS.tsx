@@ -59,18 +59,46 @@ const mockCashAccounts = [
   { value: "bank1", label: "Bank Account - ABC" },
 ];
 
-export default function POS() {
+interface Location {
+  id: number;
+  code: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+export default function POS({ posUser }: { posUser?: any } = {}) {
   const { selectedLocation } = useLocationContext();
   const [, navigate] = useLocation();
 
-  // Redirect to Location Inventory if no location is selected
-  if (!selectedLocation) {
+  // For POS users, fetch their assigned location
+  const { data: posLocation } = useQuery<Location>({
+    queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
+    enabled: !!posUser?.assignedLocationId,
+  });
+
+  // Use either the selected location (for Admin/Owner/Manager) or POS user's assigned location
+  const activeLocation = posUser ? posLocation : selectedLocation;
+
+  // Redirect to Location Inventory if no location is available (only for non-POS users)
+  if (!activeLocation && !posUser) {
     return <Redirect to="/location-inventory" />;
   }
 
-  // Fetch inventory for the selected location
+  // Show loading state while fetching POS user's location
+  if (posUser && !posLocation) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading location...</p>
+      </div>
+    );
+  }
+
+  // Fetch inventory for the active location
   const { data: apiInventory = [], isLoading: inventoryLoading } = useQuery<APIInventoryItem[]>({
-    queryKey: [`/api/locations/${selectedLocation.id}/inventory`],
+    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
+    enabled: !!activeLocation,
   });
 
   // Transform API inventory to POS format
@@ -298,16 +326,22 @@ export default function POS() {
       <div className="flex gap-4">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-muted-foreground" />
-          <Button
-            variant="outline"
-            onClick={() => navigate("/location-inventory")}
-            className="gap-2"
-            data-testid="button-change-location"
-          >
-            <span className="font-medium">{selectedLocation.name}</span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-xs text-muted-foreground">Change</span>
-          </Button>
+          {posUser ? (
+            <div className="px-3 py-1.5">
+              <span className="font-medium">{activeLocation?.name}</span>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => navigate("/location-inventory")}
+              className="gap-2"
+              data-testid="button-change-location"
+            >
+              <span className="font-medium">{activeLocation?.name}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-xs text-muted-foreground">Change</span>
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

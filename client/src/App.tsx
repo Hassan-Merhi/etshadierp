@@ -45,11 +45,9 @@ function Router({ user }: { user: any }) {
     
     return (
       <Switch>
-        <Route path="/" component={POS} />
-        <Route path="/location-inventory">
-          {() => <LocationInventory posUser={user} />}
-        </Route>
-        <Route component={POS} />
+        <Route path="/">{() => <POS posUser={user} />}</Route>
+        <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
+        <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
   }
@@ -58,9 +56,9 @@ function Router({ user }: { user: any }) {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/pos" component={POS} />
+      <Route path="/pos">{() => <POS />}</Route>
       <Route path="/inventory" component={Inventory} />
-      <Route path="/location-inventory" component={LocationInventory} />
+      <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
       <Route path="/po-import" component={POImport} />
