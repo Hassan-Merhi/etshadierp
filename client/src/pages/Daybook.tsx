@@ -90,6 +90,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
+
+  // Fetch voucher entries when editing
+  const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery({
+    queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
+    enabled: !!voucherToEdit && editDialogOpen,
+  });
   
   // Edit form with react-hook-form and zod
   const editForm = useForm<EditVoucherForm>({
