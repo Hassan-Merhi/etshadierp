@@ -117,6 +117,7 @@ export interface IStorage {
   // Purchase Orders
   getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]>;
   getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
+  getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]>;
   createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
 
@@ -404,6 +405,31 @@ export class DbStorage implements IStorage {
 
   async getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {
     return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.containerId, containerId));
+  }
+
+  async getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]> {
+    const query = db
+      .select({
+        id: schema.purchaseOrders.id,
+        poNumber: schema.purchaseOrders.poNumber,
+        containerNumber: schema.containers.containerNumber,
+        itemsTotal: schema.purchaseOrders.itemsTotal,
+        currency: schema.purchaseOrders.currency,
+        status: schema.purchaseOrders.status,
+        createdAt: schema.purchaseOrders.createdAt,
+        voucherId: schema.purchaseOrders.voucherId,
+      })
+      .from(schema.purchaseOrders)
+      .leftJoin(schema.containers, eq(schema.purchaseOrders.containerId, schema.containers.id))
+      .where(
+        and(
+          eq(schema.purchaseOrders.supplierId, supplierId),
+          eq(schema.purchaseOrders.companyId, companyId)
+        )
+      )
+      .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`);
+
+    return await query;
   }
 
   async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {

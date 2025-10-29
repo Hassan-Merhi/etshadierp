@@ -1734,6 +1734,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get purchase orders for a specific supplier filtered by company
+  app.get("/api/suppliers/:supplierId/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.supplierId);
+      
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const { companyId } = req.query;
+      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      
+      if (!filterCompanyId) {
+        return res.status(400).json({ message: "No company selected or specified" });
+      }
+
+      const purchaseOrders = await storage.getPurchaseOrdersBySupplier(supplierId, filterCompanyId);
+      res.json(purchaseOrders);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create a new voucher
   app.post("/api/vouchers", async (req, res) => {
     try {

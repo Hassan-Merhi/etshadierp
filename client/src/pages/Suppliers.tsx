@@ -55,6 +55,12 @@ export default function Suppliers() {
     enabled: !!selectedSupplier && !!selectedCompany,
   });
 
+  // Fetch PO imports for the selected supplier filtered by current company
+  const { data: poImports = [], isLoading: poImportsLoading } = useQuery<any[]>({
+    queryKey: [`/api/suppliers/${selectedSupplier?.id}/purchase-orders`, { companyId: selectedCompany?.id }],
+    enabled: !!selectedSupplier && !!selectedCompany,
+  });
+
   const activeSuppliers = suppliers.filter((s) => s.active);
   const totalContainers = suppliers.reduce((sum, s) => sum + s.containerCount, 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + s.balance, 0);
@@ -225,18 +231,75 @@ export default function Suppliers() {
             </DialogTitle>
           </DialogHeader>
           
-          {transactionsLoading ? (
+          {transactionsLoading || poImportsLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : transactions.length === 0 ? (
+          ) : transactions.length === 0 && poImports.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No transactions found for this supplier in {selectedCompany?.name || "this company"}.
+              No transactions or purchase orders found for this supplier in {selectedCompany?.name || "this company"}.
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* PO Imports Section */}
+              {poImports.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Purchase Orders</h3>
+                    <Badge variant="secondary">{poImports.length}</Badge>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>PO #</TableHead>
+                        <TableHead>Container</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {poImports.map((po) => (
+                        <TableRow key={po.id}>
+                          <TableCell className="font-mono text-sm">
+                            {format(new Date(po.createdAt), "yyyy-MM-dd")}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm font-medium">
+                            {po.poNumber}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {po.containerNumber}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {po.currency} ${parseFloat(po.itemsTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={po.status === "Closed" ? "secondary" : "default"}>
+                              {po.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="text-right text-sm">
+                    <span className="text-muted-foreground">Total PO Amount: </span>
+                    <span className="font-mono font-semibold">
+                      ${poImports.reduce((sum, po) => sum + parseFloat(po.itemsTotal || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Voucher Transactions Section */}
+              {transactions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Voucher Transactions</h3>
+                    <Badge variant="secondary">{transactions.length}</Badge>
+                  </div>
               <div className="text-sm text-muted-foreground">
                 Showing {transactions.length} transaction{transactions.length !== 1 ? "s" : ""}
               </div>
@@ -305,6 +368,8 @@ export default function Suppliers() {
                   </span>
                 </div>
               </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
