@@ -4,9 +4,9 @@ This guide will help you deploy your ERP/POS system to Render with everything wo
 
 ## What You'll Get
 - ✅ Live website with your own URL
-- ✅ PostgreSQL database (managed by Render)
+- ✅ PostgreSQL database (managed by Neon - free tier)
 - ✅ Backend and frontend working together
-- ✅ Free tier available
+- ✅ Free hosting on Render
 
 ## Step 1: Download Your Code (On Your Mac)
 
@@ -41,7 +41,27 @@ This guide will help you deploy your ERP/POS system to Render with everything wo
    ```
    (You'll need GitHub CLI installed: `brew install gh`)
 
-## Step 3: Deploy on Render
+## Step 3: Create Your Database on Neon
+
+Your app needs a PostgreSQL database. We'll use Neon's free tier (no credit card required!).
+
+1. **Go to https://neon.tech and sign up** (use GitHub to sign in - easiest)
+
+2. **Create a new project:**
+   - Click "Create a project" or "New Project"
+   - Give it a name like "ERP POS System"
+   - Select a region (choose one closest to your Render region)
+   - Click "Create Project"
+
+3. **Copy your connection string:**
+   - You'll see a connection string that looks like:
+     ```
+     postgresql://username:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+     ```
+   - Click "Copy" to copy it
+   - **Save this somewhere safe** - you'll need it in the next step!
+
+## Step 4: Deploy on Render
 
 1. Go to https://render.com and sign up (use GitHub to sign in)
 
@@ -49,28 +69,33 @@ This guide will help you deploy your ERP/POS system to Render with everything wo
 
 3. Connect your GitHub repository
    - Render will ask permission to access your repos
-   - Select your project repository
+   - Select your project repository (erp-pos-system)
 
 4. Render will detect the `render.yaml` file and show:
    - ✅ Web Service: erp-pos-system
-   - ✅ Database: erp-pos-db
 
-5. Click "Apply"
+5. **IMPORTANT: Add your database connection string**
+   - Before clicking "Apply", scroll down to find "Environment Variables"
+   - Click "Add Environment Variable"
+   - Key: `DATABASE_URL`
+   - Value: Paste the Neon connection string you copied in Step 3
+   - Click "Save"
 
-6. Wait 3-5 minutes while Render:
-   - Creates your database
+6. Click "Apply"
+
+7. Wait 3-5 minutes while Render:
    - Builds your application
    - Deploys everything
 
-7. You'll get a URL like: `https://erp-pos-system.onrender.com`
+8. You'll get a URL like: `https://erp-pos-system.onrender.com`
 
-## Step 4: Run Database Migration (One-Time Setup)
+## Step 5: Set Up Database Tables (One-Time Setup)
 
-After your first deployment, you need to set up the database tables:
+After your first deployment, you need to create the database tables:
 
 1. In Render dashboard, click on your **erp-pos-system** web service
 
-2. Click the **"Shell"** tab (in the left sidebar)
+2. Click the **"Shell"** tab (in the left sidebar under "MANAGE")
 
 3. Type this command and press Enter:
    ```bash
@@ -81,46 +106,70 @@ After your first deployment, you need to set up the database tables:
 
 That's it! Your database is now set up with all the tables.
 
-## Step 5: Initial Setup
+## Step 6: Start Using Your App!
 
-After the database migration, visit your URL and:
-1. The app should load automatically
-2. Set up your first user account
-3. Configure your locations and inventory
+Visit your URL (from Step 4) and:
+1. The login page should load
+2. Create your first user account
+3. Set up your companies, locations, and inventory
+4. Start managing your business!
 
 ## Troubleshooting
 
 **If the build fails:**
 - Check the logs in Render's dashboard
-- Most common issue: database migrations - Render handles this automatically
+- Click "Logs" in the left sidebar to see detailed error messages
+- Most common issue: missing DATABASE_URL environment variable
+
+**If you see "Error connecting to database":**
+- Make sure you added the DATABASE_URL in Step 4, #5
+- Double-check the connection string is correct (no extra spaces)
+- Make sure you ran `npm run db:push` in Step 5
 
 **If you need to update the app:**
 1. Make changes in Replit
 2. Download as ZIP again
-3. Push to GitHub (GitHub Desktop will detect changes)
-4. Render automatically redeploys
+3. Push to GitHub (GitHub Desktop will detect changes automatically)
+4. Render automatically redeploys (watch the Events tab)
 
 ## Free Tier Limits
 
-Render's free tier includes:
-- 750 hours/month of web service runtime
-- PostgreSQL database (90 days, then requires upgrade)
-- Your service may spin down after inactivity (takes 30-60 seconds to wake up)
+**Neon (Database):**
+- 0.5 GB storage
+- Unlimited queries
+- No credit card required
+- Database pauses after inactivity (resumes instantly when accessed)
+
+**Render (Web Service):**
+- 750 hours/month of runtime
+- Your service may spin down after inactivity (takes 30-60 seconds to wake up on first visit)
+- 512 MB RAM
+
+These limits are more than enough for testing and small business use!
 
 ## Upgrading
 
 If you need:
-- Faster performance
-- No spin-down delays
-- Permanent database
+- More storage or always-on database → Upgrade Neon ($19/month)
+- Faster performance and no spin-down → Upgrade Render ($7/month)
+- Both for production use → Around $26/month total
 
-Upgrade to Render's paid plans starting at $7/month for the web service.
+## Adding DATABASE_URL Later
+
+If you forgot to add the DATABASE_URL in Step 4:
+
+1. Go to your web service in Render dashboard
+2. Click "Environment" in the left sidebar
+3. Click "Add Environment Variable"
+4. Key: `DATABASE_URL`, Value: your Neon connection string
+5. Click "Save Changes"
+6. Your service will automatically redeploy
 
 ## Need Help?
 
-The `render.yaml` file in your project handles all the configuration automatically. If you need to customize:
-- Database name
+The `render.yaml` file in your project handles the build configuration automatically. If you need to customize:
 - Service name
 - Build commands
+- Environment variables
 
 Edit the `render.yaml` file before deploying.
