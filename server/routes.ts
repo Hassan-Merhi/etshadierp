@@ -982,6 +982,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payroll - Bulk Worker Payment
+  app.post("/api/payroll/bulk-pay-workers", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { payments, bankAccountId, date, notes } = req.body;
+
+      if (!payments || !Array.isArray(payments) || payments.length === 0) {
+        return res.status(400).json({ message: "No payments provided" });
+      }
+
+      if (!bankAccountId || !date) {
+        return res.status(400).json({ message: "Bank account and date are required" });
+      }
+
+      // Validate all payment amounts
+      for (const payment of payments) {
+        const amount = parseFloat(payment.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return res.status(400).json({ message: "All payment amounts must be positive numbers" });
+        }
+      }
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Calculate total amount
+      const totalAmount = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+
+      // Create single voucher for all payments
+      const voucherNumber = `SAL-BULK-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId: req.session.currentCompanyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate: date,
+        description: notes || `Bulk salary payment for ${payments.length} workers`,
+        totalAmount: totalAmount.toFixed(2),
+      }).returning();
+
+      // Create debit entry for total salary expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: totalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
+      });
+
+      // Create credit entry for bank account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        bankAccountId: parseInt(bankAccountId),
+        debitAmount: "0",
+        creditAmount: totalAmount.toFixed(2),
+        narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
+      });
+
+      res.json({
+        voucher,
+        paymentsProcessed: payments.length,
+        totalAmount: totalAmount.toFixed(2),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (_req, res) => {
     try {
