@@ -1112,6 +1112,20 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
 
             <FormField
               control={form.control}
+              name="sellingPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Selling Price</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-selling-price" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="active"
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">

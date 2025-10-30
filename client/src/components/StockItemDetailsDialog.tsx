@@ -36,6 +36,7 @@ interface StockItem {
   barcode: string | null;
   uom: string;
   stockGroupId: number | null;
+  sellingPrice: string;
   active: boolean;
 }
 
@@ -71,6 +72,7 @@ export function StockItemDetailsDialog({
   const [editedBarcode, setEditedBarcode] = useState("");
   const [editedUom, setEditedUom] = useState("");
   const [editedStockGroupId, setEditedStockGroupId] = useState<number | null>(null);
+  const [editedSellingPrice, setEditedSellingPrice] = useState("");
   
   const [editingTransaction, setEditingTransaction] = useState<number | null>(null);
   const [editedStockItemId, setEditedStockItemId] = useState<number | null>(null);
@@ -160,6 +162,7 @@ export function StockItemDetailsDialog({
       setEditedBarcode(stockItem.barcode || "");
       setEditedUom(stockItem.uom);
       setEditedStockGroupId(stockItem.stockGroupId);
+      setEditedSellingPrice(stockItem.sellingPrice || "0");
       setIsEditingDetails(true);
     }
   };
@@ -197,6 +200,7 @@ export function StockItemDetailsDialog({
       barcode: editedBarcode?.trim() || null,
       uom: editedUom.trim(),
       stockGroupId: editedStockGroupId,
+      sellingPrice: editedSellingPrice || "0",
     };
     updateItemMutation.mutate(updates);
   };
@@ -389,7 +393,7 @@ export function StockItemDetailsDialog({
                     )}
                   </div>
 
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2">
                     <Label htmlFor="stockGroup">Stock Group</Label>
                     {isEditingDetails ? (
                       <Select
@@ -410,6 +414,24 @@ export function StockItemDetailsDialog({
                     ) : (
                       <p className="text-sm p-2 bg-muted rounded" data-testid="text-stock-group">
                         {stockGroups.find((g) => g.id === stockItem.stockGroupId)?.name || "Uncategorized"}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sellingPrice">Selling Price</Label>
+                    {isEditingDetails ? (
+                      <Input
+                        id="sellingPrice"
+                        type="number"
+                        step="0.01"
+                        value={editedSellingPrice}
+                        onChange={(e) => setEditedSellingPrice(e.target.value)}
+                        data-testid="input-selling-price"
+                      />
+                    ) : (
+                      <p className="text-sm p-2 bg-muted rounded" data-testid="text-selling-price">
+                        {stockItem.sellingPrice || "0.00"}
                       </p>
                     )}
                   </div>
