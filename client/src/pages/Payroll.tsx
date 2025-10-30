@@ -103,9 +103,9 @@ export default function Payroll() {
   const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
   const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
 
-  // Initialize worker payments when workers load
+  // Initialize worker payments when workers load or change
   useEffect(() => {
-    if (workerStaff.length > 0 && Object.keys(workerPayments).length === 0) {
+    if (workerStaff.length > 0) {
       const initialPayments: Record<number, WorkerPayment> = {};
       workerStaff.forEach((worker) => {
         initialPayments[worker.id] = {
@@ -115,8 +115,10 @@ export default function Payroll() {
         };
       });
       setWorkerPayments(initialPayments);
+    } else {
+      setWorkerPayments({});
     }
-  }, [workerStaff.length]);
+  }, [selectedCompany, workerStaff.length, workerStaff.map(w => w.id).join(',')]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
