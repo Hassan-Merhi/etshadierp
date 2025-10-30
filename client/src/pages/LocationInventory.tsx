@@ -4,10 +4,25 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useReactToPrint } from "react-to-print";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 interface Location {
   id: number;
@@ -45,6 +60,13 @@ interface StockGroupSummary {
   items: InventoryItem[];
 }
 
+interface ImportRow {
+  barcode: string;
+  quantity: string;
+  rate: string;
+  value: string;
+}
+
 export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
@@ -54,6 +76,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
   const [, navigate] = useRoute();
+  const { toast } = useToast();
+
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importComplete, setImportComplete] = useState(false);
 
   // Print handler
   const handlePrint = useReactToPrint({
@@ -183,6 +214,141 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   useEffect(() => {
     setSelectedRowIndex(0);
   }, [selectedGroup]);
+
+  // Import handlers
+  const downloadImportTemplate = () => {
+    const template = [
+      { barcode: "BALE001", quantity: "100", rate: "150.00", value: "15000.00" },
+      { barcode: "BALE002", quantity: "50", rate: "145.50", value: "7275.00" },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory Import");
+    XLSX.writeFile(wb, "inventory_import_template.xlsx");
+
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to prepare your inventory data",
+    });
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setImportFile(selectedFile);
+    setImportErrors([]);
+    setImportPreview([]);
+    setImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      const errors: string[] = [];
+      const rows: ImportRow[] = [];
+
+      jsonData.forEach((row, index) => {
+        const rowNumber = index + 2;
+
+        if (!row.barcode || String(row.barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Barcode is required`);
+        }
+
+        if (!row.quantity || parseFloat(row.quantity) <= 0) {
+          errors.push(`Row ${rowNumber}: Quantity must be greater than 0`);
+        }
+
+        if (!row.rate || parseFloat(row.rate) <= 0) {
+          errors.push(`Row ${rowNumber}: Rate must be greater than 0`);
+        }
+
+        rows.push({
+          barcode: String(row.barcode || "").trim(),
+          quantity: String(row.quantity || "0"),
+          rate: String(row.rate || "0"),
+          value: String(row.value || "0"),
+        });
+      });
+
+      setImportPreview(rows);
+      setImportErrors(errors);
+
+      if (errors.length === 0) {
+        toast({
+          title: "File Validated",
+          description: `${rows.length} inventory items ready to import`,
+        });
+      } else {
+        toast({
+          title: "Validation Errors Found",
+          description: `Found ${errors.length} errors. Please fix them before importing.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error Reading File",
+        description: "Please ensure the file is a valid Excel file (.xlsx)",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (!selectedLocationLocal) {
+      toast({
+        title: "No Location Selected",
+        description: "Please select a location first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (importErrors.length > 0) {
+      toast({
+        title: "Cannot Import",
+        description: "Please fix validation errors first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      await apiRequest("POST", `/api/locations/${selectedLocationLocal.id}/import-inventory`, {
+        items: importPreview,
+      });
+
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationLocal.id}/inventory`] });
+
+      setImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${importPreview.length} inventory items`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import inventory",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleImportDialogClose = () => {
+    setImportDialogOpen(false);
+    setImportFile(null);
+    setImportPreview([]);
+    setImportErrors([]);
+    setImportComplete(false);
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -319,6 +485,147 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {selectedLocationLocal.name} - Stock Groups
             </h1>
             <div className="flex items-center gap-2">
+              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    data-testid="button-import-stock"
+                    className="gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import Stock
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Import Inventory from Excel</DialogTitle>
+                    <DialogDescription>
+                      Upload an Excel file with barcode, quantity, rate, and value columns
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Button
+                        variant="outline"
+                        onClick={downloadImportTemplate}
+                        data-testid="button-download-import-template"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Template
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="import-file-upload">Select Excel File</Label>
+                      <Input
+                        id="import-file-upload"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleImportFileChange}
+                        disabled={isImporting || importComplete}
+                        data-testid="input-import-file-upload"
+                      />
+                      {importFile && (
+                        <p className="text-sm text-muted-foreground">
+                          Selected: {importFile.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {importErrors.length > 0 && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="font-semibold mb-2">
+                            {importErrors.length} validation error{importErrors.length > 1 ? "s" : ""} found:
+                          </div>
+                          <ul className="list-disc list-inside space-y-1">
+                            {importErrors.slice(0, 5).map((error, index) => (
+                              <li key={index} className="text-sm">{error}</li>
+                            ))}
+                            {importErrors.length > 5 && (
+                              <li className="text-sm">... and {importErrors.length - 5} more errors</li>
+                            )}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {importComplete && (
+                      <Alert>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertDescription>
+                          Import completed successfully! {importPreview.length} inventory items have been added.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {importPreview.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Preview ({importPreview.length} items)</p>
+                        <div className="border rounded-md overflow-auto max-h-48">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-2">Barcode</th>
+                                <th className="text-right p-2">Quantity</th>
+                                <th className="text-right p-2">Rate</th>
+                                <th className="text-right p-2">Value</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {importPreview.slice(0, 20).map((item, index) => (
+                                <tr key={index} className="border-b last:border-b-0">
+                                  <td className="p-2">{item.barcode}</td>
+                                  <td className="p-2 text-right">{parseFloat(item.quantity).toLocaleString()}</td>
+                                  <td className="p-2 text-right">${parseFloat(item.rate).toFixed(2)}</td>
+                                  <td className="p-2 text-right">${parseFloat(item.value).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {importPreview.length > 20 && (
+                            <div className="p-2 text-center text-xs text-muted-foreground border-t">
+                              ... and {importPreview.length - 20} more items
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 justify-end">
+                      {!importComplete ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={handleImportDialogClose}
+                            data-testid="button-cancel-import"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleImportSubmit}
+                            disabled={isImporting || importErrors.length > 0 || importPreview.length === 0}
+                            data-testid="button-submit-import"
+                          >
+                            {isImporting ? "Importing..." : "Import"}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          onClick={handleImportDialogClose}
+                          data-testid="button-close-import"
+                        >
+                          Close
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <Button
                 onClick={() => setViewAllItems(true)}
                 data-testid="button-view-all-items"

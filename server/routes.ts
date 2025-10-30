@@ -369,6 +369,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk import inventory for a location
+  app.post("/api/locations/:locationId/import-inventory", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Validate location exists and belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+      }
+
+      const { items } = req.body;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+
+      // Get all stock items for barcode matching
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId);
+      
+      const results = {
+        created: [] as any[],
+        updated: [] as any[],
+        skipped: [] as any[],
+        errors: [] as any[],
+      };
+
+      for (const item of items) {
+        try {
+          // Find stock item by barcode (match on name if barcode not found)
+          let stockItem = allStockItems.find(si => 
+            si.barcode && si.barcode.toLowerCase() === item.barcode.toLowerCase()
+          );
+
+          if (!stockItem) {
+            // Try to match by name if barcode not found
+            stockItem = allStockItems.find(si => 
+              si.name.toLowerCase() === item.barcode.toLowerCase()
+            );
+          }
+
+          if (!stockItem) {
+            results.skipped.push({
+              barcode: item.barcode,
+              reason: "Stock item not found - please create the stock item first",
+            });
+            continue;
+          }
+
+          const quantity = parseFloat(item.quantity || "0");
+          const rate = parseFloat(item.rate || "0");
+          const value = parseFloat(item.value || (quantity * rate).toString());
+
+          // Check if inventory already exists for this item at this location
+          const existingInventory = await storage.getLocationInventory(locationId);
+          const existing = existingInventory.find(inv => inv.stockItemId === stockItem.id);
+
+          if (existing) {
+            // Update existing inventory - add to existing quantities
+            const newQuantity = parseFloat(existing.quantity) + quantity;
+            const newTotalValue = parseFloat(existing.totalValue) + value;
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await storage.updateInventory(
+              locationId,
+              stockItem.id,
+              newQuantity.toString(),
+              newAverageRate.toString(),
+              newTotalValue.toString()
+            );
+
+            results.updated.push({
+              barcode: item.barcode,
+              itemName: stockItem.name,
+              addedQuantity: quantity,
+              newQuantity: newQuantity,
+            });
+          } else {
+            // Create new inventory record
+            await storage.updateInventory(
+              locationId,
+              stockItem.id,
+              quantity.toString(),
+              rate.toString(),
+              value.toString()
+            );
+
+            results.created.push({
+              barcode: item.barcode,
+              itemName: stockItem.name,
+              quantity: quantity,
+            });
+          }
+        } catch (error: any) {
+          results.errors.push({
+            barcode: item.barcode,
+            error: error.message,
+          });
+        }
+      }
+
+      res.json({
+        message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`,
+        results,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Ledger Accounts
   app.get("/api/ledger-accounts", requireAuth, async (req, res) => {
     try {
@@ -637,6 +757,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(item);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Bulk import stock items
+  app.post("/api/stock-items/import", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { items } = req.body;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
+
+      const results = {
+        created: [] as any[],
+        skipped: [] as any[],
+        errors: [] as any[],
+      };
+
+      for (const item of items) {
+        try {
+          // Ensure companyId matches session
+          const itemWithCompany = {
+            ...item,
+            companyId: req.session.currentCompanyId,
+          };
+
+          const parsed = insertStockItemSchema.parse(itemWithCompany);
+          
+          // Check for duplicate code
+          const existing = await storage.getStockItemByCode(parsed.code, req.session.currentCompanyId);
+          if (existing) {
+            results.skipped.push({
+              code: parsed.code,
+              name: parsed.name,
+              reason: "Code already exists",
+            });
+            continue;
+          }
+
+          const created = await storage.createStockItem(parsed);
+          results.created.push(created);
+        } catch (error: any) {
+          results.errors.push({
+            code: item.code,
+            name: item.name,
+            error: error.message,
+          });
+        }
+      }
+
+      res.json({
+        message: `Import completed: ${results.created.length} created, ${results.skipped.length} skipped, ${results.errors.length} errors`,
+        results,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
