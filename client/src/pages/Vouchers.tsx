@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useReactToPrint } from "react-to-print";
+import { useCompany } from "@/contexts/CompanyContext";
 import {
   Card,
   CardContent,
@@ -255,10 +256,10 @@ function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
-        <Command>
-          <CommandInput placeholder="Search accounts..." />
-          <CommandList>
+      <PopoverContent className="w-[400px] p-0 bg-popover">
+        <Command className="bg-popover">
+          <CommandInput placeholder="Search accounts..." className="bg-popover" />
+          <CommandList className="bg-popover">
             <CommandEmpty>No account found.</CommandEmpty>
             <CommandGroup>
               {allAccounts.map((account) => (
@@ -326,10 +327,10 @@ function StockItemCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
-        <Command>
-          <CommandInput placeholder="Search stock items..." />
-          <CommandList>
+      <PopoverContent className="w-[400px] p-0 bg-popover">
+        <Command className="bg-popover">
+          <CommandInput placeholder="Search stock items..." className="bg-popover" />
+          <CommandList className="bg-popover">
             <CommandEmpty>No stock item found.</CommandEmpty>
             <CommandGroup>
               {stockItems.map((item) => (
@@ -462,6 +463,7 @@ const PrintTemplate = ({
 export default function Vouchers() {
   const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">("payment");
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const printRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
@@ -560,6 +562,7 @@ export default function Vouchers() {
       
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        companyId: selectedCompany?.id,
         voucherNumber: `${voucherType.toUpperCase()}-${Date.now()}`,
         voucherType,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
@@ -757,6 +760,7 @@ export default function Vouchers() {
       
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        companyId: selectedCompany?.id,
         voucherType: "Journal",
         voucherDate: data.voucherDate.toISOString(),
         notes: data.notes || "",
@@ -1003,6 +1007,7 @@ export default function Vouchers() {
       
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        companyId: selectedCompany?.id,
         voucherType: "StockTransfer",
         voucherNumber: `TRANSFER-${Date.now()}`,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
@@ -1160,6 +1165,7 @@ export default function Vouchers() {
       
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
+        companyId: selectedCompany?.id,
         voucherType: adjustmentType,
         voucherNumber: `${adjustmentType.toUpperCase()}-${Date.now()}`,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
@@ -2138,29 +2144,31 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={journalForm.control}
-                                name={`entries.${index}.accountName`}
-                                render={({ field: accountNameField }) => (
+                                name={`entries.${index}.accountId`}
+                                render={({ field }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <Input
-                                        {...accountNameField}
-                                        placeholder="Account code..."
-                                        data-testid={`input-journal-account-${index}`}
-                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "account")}
-                                        onChange={(e) => {
-                                          const code = e.target.value;
-                                          accountNameField.onChange(code);
-                                          
-                                          // Lookup account by code
-                                          const account = lookupAccountByCode(code);
-                                          if (account) {
-                                            journalForm.setValue(`entries.${index}.accountType`, account.type);
-                                            journalForm.setValue(`entries.${index}.accountId`, account.id);
-                                            journalForm.setValue(`entries.${index}.accountName`, account.name);
-                                          } else {
-                                            journalForm.setValue(`entries.${index}.accountId`, 0);
-                                          }
+                                      <AccountCombobox
+                                        value={
+                                          journalEntries[index].accountId > 0
+                                            ? {
+                                                type: journalEntries[index].accountType,
+                                                id: journalEntries[index].accountId,
+                                                name: journalEntries[index].accountName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(type, id, name) => {
+                                          journalForm.setValue(`entries.${index}.accountType`, type);
+                                          journalForm.setValue(`entries.${index}.accountId`, id);
+                                          journalForm.setValue(`entries.${index}.accountName`, name);
                                         }}
+                                        ledgerAccounts={ledgerAccounts}
+                                        bankAccounts={bankAccounts}
+                                        suppliers={suppliers}
+                                        rowIndex={index}
+                                        testIdPrefix="button-journal-account"
+                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "account")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2389,39 +2397,43 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={stockTransferForm.control}
-                                name={`entries.${index}.sourceLocationName`}
-                                render={({ field: locationField }) => (
+                                name={`entries.${index}.sourceLocationId`}
+                                render={({ field }) => (
                                   <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...locationField}
-                                        placeholder="Location code..."
-                                        data-testid={`input-source-location-${index}`}
-                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}
-                                        onChange={(e) => {
-                                          const code = e.target.value;
-                                          locationField.onChange(code);
-                                          
-                                          // Lookup location by code
-                                          const location = lookupLocationByCode(code);
-                                          if (location) {
-                                            stockTransferForm.setValue(`entries.${index}.sourceLocationId`, location.id);
-                                            stockTransferForm.setValue(`entries.${index}.sourceLocationName`, `${location.code} - ${location.name}`);
-                                            // Update inventory source for suggestions
-                                            setTransferInventorySource(location.id);
-                                          } else {
-                                            stockTransferForm.setValue(`entries.${index}.sourceLocationId`, 0);
-                                          }
-                                        }}
-                                        onFocus={() => {
-                                          setActiveTransferRow(index);
-                                          // Set inventory source if location already selected
-                                          if (transferEntries[index].sourceLocationId > 0) {
-                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                          }
-                                        }}
-                                      />
-                                    </FormControl>
+                                    <Select
+                                      value={field.value > 0 ? field.value.toString() : ""}
+                                      onValueChange={(value) => {
+                                        const locationId = parseInt(value);
+                                        field.onChange(locationId);
+                                        const location = locations.find(l => l.id === locationId);
+                                        if (location) {
+                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, `${location.code} - ${location.name}`);
+                                          setTransferInventorySource(locationId);
+                                        }
+                                        setActiveTransferRow(index);
+                                      }}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger 
+                                          data-testid={`select-source-location-${index}`}
+                                          onFocus={() => {
+                                            setActiveTransferRow(index);
+                                            if (transferEntries[index].sourceLocationId > 0) {
+                                              setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                            }
+                                          }}
+                                        >
+                                          <SelectValue placeholder="Select source location..." />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {locations.map((location) => (
+                                          <SelectItem key={location.id} value={location.id.toString()}>
+                                            {location.code} - {location.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                   </FormItem>
                                 )}
