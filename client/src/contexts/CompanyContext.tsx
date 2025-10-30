@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 interface Company {
   id: number;
@@ -48,6 +49,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     setSelectedCompany(company);
     // Store in localStorage for persistence
     localStorage.setItem("selectedCompanyId", company.id.toString());
+    
+    // Invalidate all queries to refresh data for the new company
+    // Using a predicate to catch all queries except auth-related ones
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        // Don't invalidate auth-related queries
+        if (typeof key === 'string' && (key.includes('/api/auth') || key.includes('/api/user/companies'))) {
+          return false;
+        }
+        return true;
+      }
+    });
   };
 
   // Restore selected company from localStorage on mount

@@ -482,11 +482,12 @@ export default function Accounts() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
+                  disabled={accountsLoading || !selectedCompany}
                   data-testid="input-account-search"
                 />
               </div>
               
-              {accountsLoading ? (
+              {accountsLoading || !selectedCompany ? (
                 <div className="p-4">
                   <Skeleton className="h-8 w-full" />
                 </div>
@@ -501,6 +502,7 @@ export default function Accounts() {
                       <button
                         key={account.id}
                         onClick={() => handleAccountChange(account.id)}
+                        disabled={accountsLoading || !selectedCompany}
                         className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
                           selectedAccount?.id === account.id
                             ? "bg-accent"
@@ -753,11 +755,12 @@ export default function Accounts() {
                     value={editSearchTerm}
                     onChange={(e) => setEditSearchTerm(e.target.value)}
                     className="pl-9"
+                    disabled={accountsLoading || ledgerAccountsLoading || !selectedCompany}
                     data-testid="input-edit-account-search"
                   />
                 </div>
                 
-                {accountsLoading || ledgerAccountsLoading ? (
+                {accountsLoading || ledgerAccountsLoading || !selectedCompany ? (
                   <div className="p-4">
                     <Skeleton className="h-8 w-full" />
                   </div>
@@ -777,16 +780,9 @@ export default function Accounts() {
                           <button
                             key={account.id}
                             type="button"
+                            disabled={ledgerAccountsLoading || !selectedCompany}
                             onClick={() => {
                               if (isLedger) {
-                                if (ledgerAccountsLoading) {
-                                  toast({
-                                    title: "Loading",
-                                    description: "Please wait while ledger accounts are loading...",
-                                  });
-                                  return;
-                                }
-                                
                                 // Fetch the actual ledger account to edit
                                 const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
                                 if (ledgerAccount) {

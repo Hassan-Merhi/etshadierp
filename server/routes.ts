@@ -1869,19 +1869,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all suppliers with balances and container counts
-  app.get("/api/suppliers/with-stats", async (_req, res) => {
+  // Get all suppliers with balances and container counts (filtered by company if provided)
+  app.get("/api/suppliers/with-stats", requireAuth, async (req, res) => {
     try {
+      const { companyId } = req.query;
+      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      
+      if (!filterCompanyId) {
+        return res.status(400).json({ message: "No company selected or specified" });
+      }
+      
       const suppliers = await storage.getAllSuppliers();
       
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
-          const containerCount = await storage.getContainerCountBySupplier(supplier.id);
+          // Filter container count and balance by company
+          const containerCount = await storage.getContainerCountBySupplier(supplier.id, filterCompanyId);
           
-          // Calculate balance from voucher entries
+          // Calculate balance from voucher entries filtered by company
           // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
           // Balance = Credits - Debits (positive means we owe them)
-          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+          const entries = await storage.getVoucherEntriesBySupplier(supplier.id, filterCompanyId);
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -1896,7 +1904,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      res.json(suppliersWithStats);
+      // Filter to only show suppliers that have activity in this company (containers or balance)
+      const activeSuppliersInCompany = suppliersWithStats.filter(
+        s => s.containerCount > 0 || s.balance !== 0
+      );
+
+      res.json(activeSuppliersInCompany);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

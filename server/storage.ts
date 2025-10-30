@@ -164,7 +164,7 @@ export interface IStorage {
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]>;
-  getContainerCountBySupplier(supplierId: number): Promise<number>;
+  getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   updateVoucher(id: number, updates: Partial<InsertVoucher>): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
@@ -991,11 +991,17 @@ export class DbStorage implements IStorage {
     return await query;
   }
 
-  async getContainerCountBySupplier(supplierId: number): Promise<number> {
+  async getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number> {
+    const conditions = [eq(schema.containers.supplierId, supplierId)];
+    
+    if (companyId !== undefined) {
+      conditions.push(eq(schema.containers.companyId, companyId));
+    }
+    
     const result = await db
       .select({ count: sql<number>`count(*)` })
       .from(schema.containers)
-      .where(eq(schema.containers.supplierId, supplierId));
+      .where(and(...conditions));
     
     return result[0]?.count || 0;
   }

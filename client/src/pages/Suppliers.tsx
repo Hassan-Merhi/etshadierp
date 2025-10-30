@@ -46,7 +46,8 @@ export default function Suppliers() {
   const { selectedCompany } = useCompany();
   
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
-    queryKey: ["/api/suppliers/with-stats"],
+    queryKey: [`/api/suppliers/with-stats?companyId=${selectedCompany?.id}`],
+    enabled: !!selectedCompany,
   });
 
   // Fetch transactions for the selected supplier filtered by current company
