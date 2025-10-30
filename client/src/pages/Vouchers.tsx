@@ -2832,7 +2832,7 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[80px]">
                                 <FormField
                                   control={stockAdjustmentForm.control}
                                   name={`consumptionEntries.${index}.quantity`}
@@ -2854,7 +2854,7 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[80px]">
                                 <FormField
                                   control={stockAdjustmentForm.control}
                                   name={`consumptionEntries.${index}.rate`}
@@ -2876,12 +2876,12 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[100px]">
                                 <div className="text-right font-mono text-sm">
                                   ${(parseFloat(consumptionEntries[index]?.quantity || "0") * parseFloat(consumptionEntries[index]?.rate || "0")).toFixed(2)}
                                 </div>
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[40px]">
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -2976,7 +2976,7 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[80px]">
                                 <FormField
                                   control={stockAdjustmentForm.control}
                                   name={`productionEntries.${index}.quantity`}
@@ -2998,7 +2998,7 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[80px]">
                                 <FormField
                                   control={stockAdjustmentForm.control}
                                   name={`productionEntries.${index}.rate`}
@@ -3020,12 +3020,12 @@ export default function Vouchers() {
                                   )}
                                 />
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[100px]">
                                 <div className="text-right font-mono text-sm">
                                   ${(parseFloat(productionEntries[index]?.quantity || "0") * parseFloat(productionEntries[index]?.rate || "0")).toFixed(2)}
                                 </div>
                               </td>
-                              <td className="p-2">
+                              <td className="p-2 w-[40px]">
                                 <Button
                                   type="button"
                                   variant="ghost"

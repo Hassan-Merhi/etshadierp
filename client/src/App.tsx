@@ -32,6 +32,7 @@ import LocationInventory from "@/pages/LocationInventory";
 import Settings from "@/pages/Settings";
 import BalanceSheet from "@/pages/BalanceSheet";
 import ProfitLoss from "@/pages/ProfitLoss";
+import VoucherEdit from "@/pages/VoucherEdit";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -70,6 +71,7 @@ function Router({ user }: { user: any }) {
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/vouchers" component={Vouchers} />
+      <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
       <Route path="/reports" component={Reports} />
       <Route path="/balance-sheet" component={BalanceSheet} />
