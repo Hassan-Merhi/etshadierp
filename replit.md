@@ -115,6 +115,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Stock Item Enhancements (October 30, 2025)
+- **Stock Group Assignment**: Stock items can now be immediately assigned to stock groups during creation
+  - Manual creation form (Accounting Create page) includes stock group dropdown
+  - Bulk import (Import Stock Items) supports stock group assignment via stockGroupCode column in Excel
+  - Template updated to include barcode and stockGroupCode examples
+  - Import logic automatically maps stock group codes to IDs before creating items
+- **Import Template Updates**: Excel template now includes columns for barcode and stock group code
+  - Preview table shows all imported fields including stock group assignment
+  - Optional fields (barcode, stockGroupCode) only included in payload when provided
+  - Schema-compliant validation ensures clean imports
+
 ### Multi-Company Support (October 29, 2025)
 - **Complete Multi-Tenancy Architecture**: Full support for managing multiple companies within a single instance
   - New `companies` table for company management
