@@ -256,10 +256,10 @@ function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover">
-        <Command className="bg-popover">
-          <CommandInput placeholder="Search accounts..." className="bg-popover" />
-          <CommandList className="bg-popover">
+      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+        <Command className="bg-popover text-popover-foreground">
+          <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
+          <CommandList className="bg-popover text-popover-foreground">
             <CommandEmpty>No account found.</CommandEmpty>
             <CommandGroup>
               {allAccounts.map((account) => (
@@ -327,10 +327,10 @@ function StockItemCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0 bg-popover">
-        <Command className="bg-popover">
-          <CommandInput placeholder="Search stock items..." className="bg-popover" />
-          <CommandList className="bg-popover">
+      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+        <Command className="bg-popover text-popover-foreground">
+          <CommandInput placeholder="Search stock items..." className="bg-popover text-popover-foreground" />
+          <CommandList className="bg-popover text-popover-foreground">
             <CommandEmpty>No stock item found.</CommandEmpty>
             <CommandGroup>
               {stockItems.map((item) => (
@@ -761,8 +761,10 @@ export default function Vouchers() {
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
         companyId: selectedCompany?.id,
+        voucherNumber: `JOURNAL-${Date.now()}`,
         voucherType: "Journal",
-        voucherDate: data.voucherDate.toISOString(),
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: "Journal voucher",
         notes: data.notes || "",
         totalAmount: totalDebit.toString(),
       });
