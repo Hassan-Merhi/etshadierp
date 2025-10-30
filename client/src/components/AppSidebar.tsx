@@ -16,6 +16,7 @@ import {
   Book,
   Scale,
   TrendingUp,
+  UserCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -102,6 +103,11 @@ const menuItems = [
     title: "Profit & Loss",
     url: "/profit-loss",
     icon: TrendingUp,
+  },
+  {
+    title: "Payroll",
+    url: "/payroll",
+    icon: UserCheck,
   },
   {
     title: "Create Master Data",

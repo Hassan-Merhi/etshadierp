@@ -33,6 +33,7 @@ import Settings from "@/pages/Settings";
 import BalanceSheet from "@/pages/BalanceSheet";
 import ProfitLoss from "@/pages/ProfitLoss";
 import VoucherEdit from "@/pages/VoucherEdit";
+import Payroll from "@/pages/Payroll";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -76,6 +77,7 @@ function Router({ user }: { user: any }) {
       <Route path="/reports" component={Reports} />
       <Route path="/balance-sheet" component={BalanceSheet} />
       <Route path="/profit-loss" component={ProfitLoss} />
+      <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
