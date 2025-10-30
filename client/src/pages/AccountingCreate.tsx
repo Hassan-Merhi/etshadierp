@@ -41,6 +41,7 @@ import {
   insertStockGroupSchema,
   insertStockItemSchema,
 } from "@shared/schema";
+import { useCompany } from "@/contexts/CompanyContext";
 
 type EntityType =
   | "location"
@@ -68,6 +69,7 @@ function EntityFormWrapper({
   config: typeof entityConfig[EntityType];
 }) {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   
   const form = useForm({
     resolver: zodResolver(config.schema),
@@ -76,7 +78,12 @@ function EntityFormWrapper({
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", config.endpoint, data);
+      // Only add companyId if not already provided by the form
+      const payload = data.companyId ? data : {
+        ...data,
+        companyId: selectedCompany?.id || (() => { throw new Error("No company selected"); })()
+      };
+      const res = await apiRequest("POST", config.endpoint, payload);
       return await res.json();
     },
     onSuccess: (data: any) => {

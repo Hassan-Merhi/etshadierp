@@ -303,12 +303,12 @@ export default function Accounts() {
     });
   };
 
-  const filteredLedgerAccounts = ledgerAccounts.filter((account) => {
+  const filteredAccountsForEdit = accounts.filter((account) => {
     const searchLower = editSearchTerm.toLowerCase();
     return (
       account.name.toLowerCase().includes(searchLower) ||
       account.code.toLowerCase().includes(searchLower) ||
-      account.accountType.toLowerCase().includes(searchLower)
+      account.type.toLowerCase().includes(searchLower)
     );
   });
 
@@ -738,7 +738,7 @@ export default function Accounts() {
         <TabsContent value="alter" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Alter Ledger Account</CardTitle>
+              <CardTitle className="text-base">Alter Account</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -755,39 +755,57 @@ export default function Accounts() {
                   />
                 </div>
                 
-                {ledgerAccountsLoading ? (
+                {accountsLoading ? (
                   <div className="p-4">
                     <Skeleton className="h-8 w-full" />
                   </div>
                 ) : (
                   <div className="max-h-64 overflow-y-auto border rounded-md">
-                    {filteredLedgerAccounts.length === 0 ? (
+                    {filteredAccountsForEdit.length === 0 ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">
                         No accounts found
                       </div>
                     ) : (
-                      filteredLedgerAccounts.map((account) => (
-                        <button
-                          key={account.id}
-                          onClick={() => handleSelectAccountForEdit(account)}
-                          className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
-                            accountToEdit?.id === account.id
-                              ? "bg-accent"
-                              : ""
-                          }`}
-                          data-testid={`button-select-account-edit-${account.id}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
-                              {account.accountType}
-                            </Badge>
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {account.code}
-                            </span>
-                            <span className="text-sm">{account.name}</span>
-                          </div>
-                        </button>
-                      ))
+                      filteredAccountsForEdit.map((account) => {
+                        // Only allow editing of ledger accounts for now
+                        const isLedger = account.type === "Ledger";
+                        return (
+                          <button
+                            key={account.id}
+                            onClick={() => {
+                              if (isLedger) {
+                                // Fetch the actual ledger account to edit
+                                const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
+                                if (ledgerAccount) {
+                                  handleSelectAccountForEdit(ledgerAccount);
+                                }
+                              }
+                            }}
+                            disabled={!isLedger}
+                            className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
+                              accountToEdit?.id === account.accountId && isLedger
+                                ? "bg-accent"
+                                : ""
+                            } ${!isLedger ? "opacity-50 cursor-not-allowed" : ""}`}
+                            data-testid={`button-select-account-edit-${account.id}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {account.type}
+                              </Badge>
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {account.code}
+                              </span>
+                              <span className="text-sm">{account.name}</span>
+                              {!isLedger && (
+                                <span className="ml-auto text-xs text-muted-foreground italic">
+                                  (View only)
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 )}
