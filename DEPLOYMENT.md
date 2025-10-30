@@ -60,14 +60,30 @@ This guide will help you deploy your ERP/POS system to Render with everything wo
 6. Wait 3-5 minutes while Render:
    - Creates your database
    - Builds your application
-   - Runs database migrations
    - Deploys everything
 
-7. Done! You'll get a URL like: `https://erp-pos-system.onrender.com`
+7. You'll get a URL like: `https://erp-pos-system.onrender.com`
 
-## Step 4: Initial Setup
+## Step 4: Run Database Migration (One-Time Setup)
 
-After deployment, visit your URL and:
+After your first deployment, you need to set up the database tables:
+
+1. In Render dashboard, click on your **erp-pos-system** web service
+
+2. Click the **"Shell"** tab (in the left sidebar)
+
+3. Type this command and press Enter:
+   ```bash
+   npm run db:push
+   ```
+
+4. Wait for it to complete (you'll see "Done!" when finished)
+
+That's it! Your database is now set up with all the tables.
+
+## Step 5: Initial Setup
+
+After the database migration, visit your URL and:
 1. The app should load automatically
 2. Set up your first user account
 3. Configure your locations and inventory
