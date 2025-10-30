@@ -166,17 +166,19 @@ Preferred communication style: Simple, everyday language.
   - Works across all account types: Ledger, Bank, Fixed Asset, and Supplier accounts
 - **Improved UX**: Users can still use custom date ranges if needed, with a clear button to reset all filters at once
 
-### Container Offload Accounting Integration
-- **Ledger Account Selection**: When offloading containers, users can select specific ledger accounts for duties and transport fees
-  - Supports dedicated accounts like "Duty Agent Payable" or "Transporter Payable"
+### Container Offload Accounting Integration (October 30, 2025)
+- **Ledger Account Selection**: When offloading containers, users can select specific ledger accounts for duties, office charges, and transport fees
+  - Supports dedicated accounts like "Duty Agent Payable", "Office Charges Payable", or "Transporter Payable"
+  - Office charges field includes amount input and required account dropdown (disabled when amount is 0)
   - Flexible additional charges section allows custom line items with description, amount, and ledger account selection
 - **Balanced Double-Entry Vouchers**: All offload charges create proper accounting vouchers
   - Debit entry: IMPORT_CHARGES ledger account (expense increases) - auto-created if needed
   - Credit entry: Selected ledger account (liability increases)
   - Each voucher is balanced with equal debit and credit amounts
-- **Comprehensive Cost Tracking**: All import-related costs (duties, transport, additional charges) are properly tracked in the accounting system
-  - Each charge type creates a separate voucher for clear audit trail
+- **Comprehensive Cost Tracking**: All import-related costs (duties, office charges, transport, additional charges) are properly tracked in the accounting system
+  - Each charge type creates a separate voucher for clear audit trail (DUTY-*, OFFICE-*, TRANS-* voucher numbers)
   - Costs are added to inventory valuation through additional cost per bale calculation
+- **Consistent Pattern**: Office charges now follow the exact same pattern as duties and transport fees with dedicated account selection and voucher creation
 
 ### Technical Implementation Notes
 - **Double-Entry Compliance**: All vouchers created by PO import and container offload are properly balanced with equal debit and credit amounts
