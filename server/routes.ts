@@ -427,8 +427,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Items must be an array" });
       }
 
-      // Get all stock items for code matching
+      // Get all stock items and stock groups for code matching
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId);
+      const allStockGroups = await storage.getAllStockGroups(req.session.currentCompanyId);
+      
+      // Find or create "Uncategorized" stock group
+      let uncategorizedGroup = await storage.getStockGroupByCode("UNCATEGORIZED", req.session.currentCompanyId);
+      if (!uncategorizedGroup) {
+        uncategorizedGroup = await storage.createStockGroup({
+          companyId: req.session.currentCompanyId,
+          code: "UNCATEGORIZED",
+          name: "Uncategorized",
+          active: true,
+        });
+      }
       
       const results = {
         created: [] as any[],
@@ -440,16 +452,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of items) {
         try {
           // Find stock item by code
-          const stockItem = allStockItems.find(si => 
+          let stockItem = allStockItems.find(si => 
             si.code.toLowerCase() === item.code.toLowerCase()
           );
 
+          // If stock item doesn't exist, create it
           if (!stockItem) {
-            results.skipped.push({
+            // Map stockGroupCode to stockGroupId
+            let stockGroupId = uncategorizedGroup.id;
+            if (item.stockGroupCode) {
+              const stockGroup = allStockGroups.find(sg => 
+                sg.code.toLowerCase() === item.stockGroupCode.toLowerCase()
+              );
+              if (stockGroup) {
+                stockGroupId = stockGroup.id;
+              }
+            }
+
+            // Create the stock item
+            const newStockItem = await storage.createStockItem({
+              companyId: req.session.currentCompanyId,
               code: item.code,
-              reason: "Stock item not found - please create the stock item first",
+              name: item.code, // Use code as name if not provided
+              uom: "PCS", // Default unit
+              stockGroupId: stockGroupId,
+              active: true,
             });
-            continue;
+            
+            stockItem = newStockItem;
+            allStockItems.push(newStockItem); // Add to cache for subsequent rows
           }
 
           const quantity = parseFloat(item.quantity || "0");
