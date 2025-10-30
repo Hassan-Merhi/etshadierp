@@ -61,7 +61,7 @@ interface StockGroupSummary {
 }
 
 interface ImportRow {
-  barcode: string;
+  code: string;
   quantity: string;
   rate: string;
   value: string;
@@ -218,8 +218,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Import handlers
   const downloadImportTemplate = () => {
     const template = [
-      { barcode: "BALE001", quantity: "100", rate: "150.00", value: "15000.00" },
-      { barcode: "BALE002", quantity: "50", rate: "145.50", value: "7275.00" },
+      { code: "BALE001", quantity: "100", rate: "150.00", value: "15000.00" },
+      { code: "BALE002", quantity: "50", rate: "145.50", value: "7275.00" },
     ];
 
     const ws = XLSX.utils.json_to_sheet(template);
@@ -254,8 +254,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       jsonData.forEach((row, index) => {
         const rowNumber = index + 2;
 
-        if (!row.barcode || String(row.barcode).trim() === "") {
-          errors.push(`Row ${rowNumber}: Barcode is required`);
+        if (!row.code || String(row.code).trim() === "") {
+          errors.push(`Row ${rowNumber}: Code is required`);
         }
 
         if (!row.quantity || parseFloat(row.quantity) <= 0) {
@@ -267,7 +267,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         }
 
         rows.push({
-          barcode: String(row.barcode || "").trim(),
+          code: String(row.code || "").trim(),
           quantity: String(row.quantity || "0"),
           rate: String(row.rate || "0"),
           value: String(row.value || "0"),
@@ -569,7 +569,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b bg-muted/50">
-                                <th className="text-left p-2">Barcode</th>
+                                <th className="text-left p-2">Code</th>
                                 <th className="text-right p-2">Quantity</th>
                                 <th className="text-right p-2">Rate</th>
                                 <th className="text-right p-2">Value</th>
@@ -578,7 +578,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <tbody>
                               {importPreview.slice(0, 20).map((item, index) => (
                                 <tr key={index} className="border-b last:border-b-0">
-                                  <td className="p-2">{item.barcode}</td>
+                                  <td className="p-2">{item.code}</td>
                                   <td className="p-2 text-right">{parseFloat(item.quantity).toLocaleString()}</td>
                                   <td className="p-2 text-right">${parseFloat(item.rate).toFixed(2)}</td>
                                   <td className="p-2 text-right">${parseFloat(item.value).toFixed(2)}</td>
