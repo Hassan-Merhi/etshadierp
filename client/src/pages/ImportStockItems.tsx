@@ -14,8 +14,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface ImportRow {
   code: string;
   name: string;
-  description?: string;
+  barcode?: string;
   unit?: string;
+  stockGroupCode?: string;
 }
 
 interface ValidationError {
@@ -36,8 +37,8 @@ export default function ImportStockItems() {
 
   const downloadTemplate = () => {
     const template = [
-      { code: "ITEM001", name: "Cotton Bale Grade A", description: "Premium quality cotton", unit: "Bale" },
-      { code: "ITEM002", name: "Cotton Bale Grade B", description: "Standard quality cotton", unit: "Bale" },
+      { code: "ITEM001", name: "Cotton Bale Grade A", barcode: "123456789", unit: "Bale", stockGroupCode: "GRP001" },
+      { code: "ITEM002", name: "Cotton Bale Grade B", barcode: "987654321", unit: "Bale", stockGroupCode: "GRP001" },
     ];
 
     const ws = XLSX.utils.json_to_sheet(template);
@@ -91,8 +92,9 @@ export default function ImportStockItems() {
         rows.push({
           code: String(row.code || "").trim(),
           name: String(row.name || "").trim(),
-          description: row.description ? String(row.description).trim() : undefined,
+          barcode: row.barcode ? String(row.barcode).trim() : undefined,
           unit: row.unit ? String(row.unit).trim() : "Bale",
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
         });
       });
 
@@ -142,14 +144,33 @@ export default function ImportStockItems() {
     setIsProcessing(true);
 
     try {
-      const itemsToImport = previewData.map(row => ({
-        companyId: selectedCompany.id,
-        code: row.code,
-        name: row.name,
-        description: row.description || null,
-        unit: row.unit || "Bale",
-        active: true,
-      }));
+      // Fetch stock groups to map codes to IDs
+      const stockGroupsRes = await apiRequest("GET", "/api/stock-groups");
+      const stockGroups = await stockGroupsRes.json();
+      const stockGroupMap = new Map(
+        stockGroups.map((sg: any) => [sg.code, sg.id])
+      );
+
+      const itemsToImport = previewData.map(row => {
+        const item: any = {
+          companyId: selectedCompany.id,
+          code: row.code,
+          name: row.name,
+          uom: row.unit || "Bale",
+          active: true,
+        };
+
+        // Add optional fields only if they have values
+        if (row.barcode) {
+          item.barcode = row.barcode;
+        }
+
+        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) {
+          item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
+        }
+
+        return item;
+      });
 
       await apiRequest("POST", "/api/stock-items/import", { items: itemsToImport });
 
@@ -284,8 +305,9 @@ export default function ImportStockItems() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 text-sm font-medium">Code</th>
                     <th className="text-left p-2 text-sm font-medium">Name</th>
-                    <th className="text-left p-2 text-sm font-medium">Description</th>
+                    <th className="text-left p-2 text-sm font-medium">Barcode</th>
                     <th className="text-left p-2 text-sm font-medium">Unit</th>
+                    <th className="text-left p-2 text-sm font-medium">Stock Group</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -294,9 +316,12 @@ export default function ImportStockItems() {
                       <td className="p-2 text-sm">{item.code}</td>
                       <td className="p-2 text-sm">{item.name}</td>
                       <td className="p-2 text-sm text-muted-foreground">
-                        {item.description || "-"}
+                        {item.barcode || "-"}
                       </td>
                       <td className="p-2 text-sm">{item.unit}</td>
+                      <td className="p-2 text-sm text-muted-foreground">
+                        {item.stockGroupCode || "-"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
