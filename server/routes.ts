@@ -24,10 +24,12 @@ import {
   InsertPurchaseOrder,
   inventory,
   stockItems,
+  stockGroups,
   vouchers,
   voucherEntries,
   locations,
   salesItems,
+  employees,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -702,6 +704,284 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payroll - Employee Balance Deposit
+  app.post("/api/payroll/deposit-employee", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { employeeId, amount, date, notes } = req.body;
+
+      if (!employeeId || !amount || !date) {
+        return res.status(400).json({ message: "Employee, amount, and date are required" });
+      }
+
+      const depositAmount = parseFloat(amount);
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Get or create employee liability account
+      const employeeAccountCode = `EMP-${employee.code}`;
+      let employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+      
+      if (!employeeAccount) {
+        employeeAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: employeeAccountCode,
+          name: `${employee.firstName} ${employee.lastName} - Salary Account`,
+          accountType: "Liability",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Create voucher
+      const voucherNumber = `SAL-DEP-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId: req.session.currentCompanyId,
+        voucherNumber,
+        voucherType: "Journal",
+        voucherDate: date,
+        description: notes || `Salary deposit for ${employee.firstName} ${employee.lastName}`,
+        totalAmount: depositAmount.toFixed(2),
+      }).returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Salary Expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: depositAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary deposit - ${voucherNumber}`,
+      });
+
+      // Credit: Employee Liability Account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: employeeAccount.id,
+        debitAmount: "0",
+        creditAmount: depositAmount.toFixed(2),
+        narration: `Salary deposit - ${voucherNumber}`,
+      });
+
+      // Update employee balance
+      const newBalance = parseFloat(employee.currentBalance) + depositAmount;
+      const newTotalDeposits = parseFloat(employee.totalDeposits) + depositAmount;
+
+      await db.update(employees)
+        .set({
+          currentBalance: newBalance.toFixed(2),
+          totalDeposits: newTotalDeposits.toFixed(2),
+        })
+        .where(eq(employees.id, employeeId));
+
+      res.json({
+        voucher,
+        employee: {
+          ...employee,
+          currentBalance: newBalance.toFixed(2),
+          totalDeposits: newTotalDeposits.toFixed(2),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payroll - Employee Withdrawal
+  app.post("/api/payroll/withdraw-employee", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { employeeId, amount, bankAccountId, date, notes } = req.body;
+
+      if (!employeeId || !amount || !bankAccountId || !date) {
+        return res.status(400).json({ message: "Employee, amount, bank account, and date are required" });
+      }
+
+      const withdrawalAmount = parseFloat(amount);
+      if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      const currentBalance = parseFloat(employee.currentBalance);
+      if (withdrawalAmount > currentBalance) {
+        return res.status(400).json({ message: `Insufficient balance. Current balance: ${currentBalance.toFixed(2)}` });
+      }
+
+      // Get employee liability account
+      const employeeAccountCode = `EMP-${employee.code}`;
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      const employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+      
+      if (!employeeAccount) {
+        return res.status(404).json({ message: "Employee account not found" });
+      }
+
+      // Create voucher
+      const voucherNumber = `SAL-WD-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId: req.session.currentCompanyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate: date,
+        description: notes || `Salary withdrawal for ${employee.firstName} ${employee.lastName}`,
+        totalAmount: withdrawalAmount.toFixed(2),
+      }).returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Employee Liability Account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: employeeAccount.id,
+        debitAmount: withdrawalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary withdrawal - ${voucherNumber}`,
+      });
+
+      // Credit: Bank/Cash Account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        bankAccountId,
+        debitAmount: "0",
+        creditAmount: withdrawalAmount.toFixed(2),
+        narration: `Salary withdrawal - ${voucherNumber}`,
+      });
+
+      // Update employee balance
+      const newBalance = currentBalance - withdrawalAmount;
+      const newTotalWithdrawals = parseFloat(employee.totalWithdrawals) + withdrawalAmount;
+
+      await db.update(employees)
+        .set({
+          currentBalance: newBalance.toFixed(2),
+          totalWithdrawals: newTotalWithdrawals.toFixed(2),
+        })
+        .where(eq(employees.id, employeeId));
+
+      res.json({
+        voucher,
+        employee: {
+          ...employee,
+          currentBalance: newBalance.toFixed(2),
+          totalWithdrawals: newTotalWithdrawals.toFixed(2),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payroll - Worker Direct Payment
+  app.post("/api/payroll/pay-worker", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { employeeId, amount, bankAccountId, date, notes } = req.body;
+
+      if (!employeeId || !amount || !bankAccountId || !date) {
+        return res.status(400).json({ message: "Employee, amount, bank account, and date are required" });
+      }
+
+      const paymentAmount = parseFloat(amount);
+      if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee/worker
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Worker not found" });
+      }
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Create voucher
+      const voucherNumber = `SAL-PAY-${Date.now()}`;
+      const [voucher] = await db.insert(vouchers).values({
+        companyId: req.session.currentCompanyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate: date,
+        description: notes || `Salary payment for ${employee.firstName} ${employee.lastName}`,
+        totalAmount: paymentAmount.toFixed(2),
+      }).returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Salary Expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: paymentAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary payment - ${voucherNumber}`,
+      });
+
+      // Credit: Bank/Cash Account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        bankAccountId,
+        debitAmount: "0",
+        creditAmount: paymentAmount.toFixed(2),
+        narration: `Salary payment - ${voucherNumber}`,
+      });
+
+      res.json({
+        voucher,
+        employee,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (_req, res) => {
     try {
@@ -1122,36 +1402,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all stock items for the company
-      const stockItems = await db
+      const allStockItems = await db
         .select({
-          id: schema.stockItems.id,
-          code: schema.stockItems.code,
-          name: schema.stockItems.name,
-          barcode: schema.stockItems.barcode,
-          uom: schema.stockItems.uom,
-          stockGroupId: schema.stockItems.stockGroupId,
-          stockGroupCode: schema.stockGroups.code,
-          stockGroupName: schema.stockGroups.name,
-          openingQty: schema.stockItems.openingQty,
-          openingRate: schema.stockItems.openingRate,
-          openingValue: schema.stockItems.openingValue,
-          sellingPrice: schema.stockItems.sellingPrice,
-          active: schema.stockItems.active,
+          id: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          barcode: stockItems.barcode,
+          uom: stockItems.uom,
+          stockGroupId: stockItems.stockGroupId,
+          stockGroupCode: stockGroups.code,
+          stockGroupName: stockGroups.name,
+          openingQty: stockItems.openingQty,
+          openingRate: stockItems.openingRate,
+          openingValue: stockItems.openingValue,
+          sellingPrice: stockItems.sellingPrice,
+          active: stockItems.active,
         })
-        .from(schema.stockItems)
-        .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
-        .where(eq(schema.stockItems.companyId, req.session.currentCompanyId));
+        .from(stockItems)
+        .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+        .where(eq(stockItems.companyId, req.session.currentCompanyId));
 
       // Get all inventory records for the company to calculate current qty and value
       const inventoryRecords = await db
         .select({
-          stockItemId: schema.locationInventory.stockItemId,
-          quantity: schema.locationInventory.quantity,
-          totalValue: schema.locationInventory.totalValue,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          totalValue: inventory.totalValue,
         })
-        .from(schema.locationInventory)
-        .innerJoin(schema.locations, eq(schema.locationInventory.locationId, schema.locations.id))
-        .where(eq(schema.locations.companyId, req.session.currentCompanyId));
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(eq(locations.companyId, req.session.currentCompanyId));
 
       // Aggregate inventory by stock item
       const inventoryMap = new Map<number, { totalQty: number; totalValue: number }>();
@@ -1164,12 +1444,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Combine stock items with aggregated inventory
-      const result = stockItems.map((item) => {
-        const inventory = inventoryMap.get(item.id) || { totalQty: 0, totalValue: 0 };
+      const result = allStockItems.map((item) => {
+        const inv = inventoryMap.get(item.id) || { totalQty: 0, totalValue: 0 };
         return {
           ...item,
-          currentQty: inventory.totalQty.toFixed(3),
-          currentValue: inventory.totalValue.toFixed(2),
+          currentQty: inv.totalQty.toFixed(3),
+          currentValue: inv.totalValue.toFixed(2),
         };
       });
 

@@ -136,6 +136,9 @@ export const employees = pgTable("employees", {
   joinDate: date("join_date").notNull(),
   department: text("department"),
   employeeType: text("employee_type").notNull().default("Employee"),
+  currentBalance: decimal("current_balance", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalDeposits: decimal("total_deposits", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalWithdrawals: decimal("total_withdrawals", { precision: 15, scale: 2 }).notNull().default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -143,6 +146,9 @@ export const employees = pgTable("employees", {
 export const insertEmployeeSchema = createInsertSchema(employees).omit({
   id: true,
   createdAt: true,
+  currentBalance: true,
+  totalDeposits: true,
+  totalWithdrawals: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   code: z.string().min(1, "Code is required"),
