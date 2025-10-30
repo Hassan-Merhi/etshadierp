@@ -474,6 +474,7 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
   containerId: true,
 }).extend({
   dutiesAccountId: z.number().nullable().optional(),
+  officeChargesAccountId: z.number().nullable().optional(),
   transportAccountId: z.number().nullable().optional(),
   additionalCharges: z.array(z.object({
     description: z.string().min(1, "Description is required"),

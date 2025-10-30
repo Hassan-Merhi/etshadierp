@@ -149,7 +149,8 @@ export interface IStorage {
     locationId: number, 
     duties: string, 
     dutiesAccountId: number | null | undefined,
-    officeCharges: string, 
+    officeCharges: string,
+    officeChargesAccountId: number | null | undefined, 
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
@@ -607,7 +608,8 @@ export class DbStorage implements IStorage {
     locationId: number, 
     duties: string, 
     dutiesAccountId: number | null | undefined,
-    officeCharges: string, 
+    officeCharges: string,
+    officeChargesAccountId: number | null | undefined, 
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
@@ -749,6 +751,37 @@ export class DbStorage implements IStorage {
         debitAmount: "0",
         creditAmount: duties,
         narration: `Duties for container ${container.containerNumber}`,
+      });
+    }
+
+    // Office charges voucher entry
+    if (officeChargesAccountId && parseFloat(officeCharges) > 0) {
+      const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
+      const [voucher] = await db.insert(schema.vouchers).values({
+        companyId: location.companyId,
+        voucherNumber,
+        voucherType: "Payment",
+        voucherDate,
+        description: `Office charges for container ${container.containerNumber}`,
+        totalAmount: officeCharges,
+      }).returning();
+
+      // Debit: Import Charges (Expense increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: importChargesLedgerId,
+        debitAmount: officeCharges,
+        creditAmount: "0",
+        narration: `Office charges for container ${container.containerNumber}`,
+      });
+
+      // Credit: Office charges account (Liability increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: officeChargesAccountId,
+        debitAmount: "0",
+        creditAmount: officeCharges,
+        narration: `Office charges for container ${container.containerNumber}`,
       });
     }
 

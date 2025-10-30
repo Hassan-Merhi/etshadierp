@@ -17,6 +17,7 @@ import {
   Scale,
   TrendingUp,
   UserCheck,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -113,6 +114,11 @@ const menuItems = [
     title: "Create Master Data",
     url: "/create",
     icon: FolderPlus,
+  },
+  {
+    title: "Import Stock Items",
+    url: "/import-stock-items",
+    icon: FileSpreadsheet,
   },
   {
     title: "Analytics",

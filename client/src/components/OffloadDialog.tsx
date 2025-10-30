@@ -52,6 +52,7 @@ export function OffloadDialog({
   const [duties, setDuties] = useState("0");
   const [dutiesAccountId, setDutiesAccountId] = useState("");
   const [officeCharges, setOfficeCharges] = useState("0");
+  const [officeChargesAccountId, setOfficeChargesAccountId] = useState("");
   const [transferCharges, setTransferCharges] = useState("0");
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
@@ -109,6 +110,11 @@ export function OffloadDialog({
         throw new Error("Please select an account for duties");
       }
 
+      // Validate office charges account if office charges are set
+      if (parseFloat(officeCharges) > 0 && !officeChargesAccountId) {
+        throw new Error("Please select an account for office charges");
+      }
+
       // Validate transport account if transport fees are set
       if (parseFloat(transportFees) > 0 && !transportAccountId) {
         throw new Error("Please select an account for transport fees");
@@ -134,6 +140,7 @@ export function OffloadDialog({
           duties: duties,
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
           officeCharges: officeCharges,
+          officeChargesAccountId: officeChargesAccountId ? parseInt(officeChargesAccountId) : null,
           transferCharges: transferCharges,
           transportFees: transportFees,
           transportAccountId: transportAccountId ? parseInt(transportAccountId) : null,
@@ -215,18 +222,36 @@ export function OffloadDialog({
             </div>
           </div>
 
-          {/* Office Charges */}
+          {/* Office Charges Section */}
           <div className="space-y-2">
-            <Label htmlFor="office-charges">Office Charges</Label>
-            <Input
-              id="office-charges"
-              type="number"
-              step="0.01"
-              min="0"
-              value={officeCharges}
-              onChange={(e) => setOfficeCharges(e.target.value)}
-              data-testid="input-office-charges"
-            />
+            <Label>Office Charges</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Amount"
+                value={officeCharges}
+                onChange={(e) => setOfficeCharges(e.target.value)}
+                data-testid="input-office-charges"
+              />
+              <Select
+                value={officeChargesAccountId}
+                onValueChange={setOfficeChargesAccountId}
+                disabled={parseFloat(officeCharges) === 0}
+              >
+                <SelectTrigger data-testid="select-office-charges-account">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ledgerAccounts.map((account: any) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} ({account.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Transfer Charges */}
