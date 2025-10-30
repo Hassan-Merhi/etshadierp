@@ -106,13 +106,36 @@ After your first deployment, you need to create the database tables:
 
 That's it! Your database is now set up with all the tables.
 
-## Step 6: Start Using Your App!
+## Step 6: Create Your Admin User
+
+Now create your first admin user and company:
+
+1. **Still in the Shell tab**, type this command:
+   ```bash
+   tsx scripts/create-admin.ts
+   ```
+
+2. You'll see a success message with your login credentials:
+   ```
+   You can now login with:
+     Username: admin
+     Password: admin123
+   
+   ⚠️  IMPORTANT: Change this password after first login!
+   ```
+
+3. **Write down these credentials!**
+
+## Step 7: Start Using Your App!
 
 Visit your URL (from Step 4) and:
-1. The login page should load
-2. Create your first user account
-3. Set up your companies, locations, and inventory
-4. Start managing your business!
+1. Login with the credentials from Step 6:
+   - Username: `admin`
+   - Password: `admin123`
+2. **IMPORTANT:** Change your password immediately after login (Settings page)
+3. Set up your locations and inventory
+4. Add more users if needed
+5. Start managing your business!
 
 ## Troubleshooting
 
