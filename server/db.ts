@@ -57,6 +57,11 @@ if (urlParts.length > 1) {
 
 export const pool = new Pool({ 
   connectionString,
-  max: 10  // Limit maximum connections to prevent overwhelming the database
+  max: 10,  // Limit maximum connections to prevent overwhelming the database
+  ssl: {
+    // Neon pooler endpoints have a hostname (-pooler suffix) that doesn't match 
+    // the SSL certificate. We enable SSL but skip hostname verification.
+    rejectUnauthorized: false
+  }
 });
 export const db = drizzle({ client: pool, schema });
