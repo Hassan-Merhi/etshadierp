@@ -115,15 +115,11 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
-### Database Connection Pooling & Stability (October 30, 2025)
-- **Neon Connection Pooler**: Implemented Neon's connection pooler to prevent "too many database connections" errors
-  - Automatically converts direct connection endpoints to pooler endpoints (adds `-pooler` suffix to hostname)
-  - Configured with max 10 connections to prevent overwhelming the database
-  - Improves reliability for high-traffic scenarios and concurrent user sessions
-- **SSL Certificate Configuration**: Added `sslmode=require` parameter to connection string for pooler compatibility
-  - Resolves hostname mismatch errors where SSL certificates don't include `-pooler` hostname variant
-  - Maintains SSL encryption while allowing connection through pooler endpoint
-  - Configuration in `server/db.ts` with automatic detection and parameter injection
+### Database Connection Management (October 30, 2025)
+- **Connection Pool Limits**: Configured connection pool with max 10 connections to prevent overwhelming the database
+  - Uses direct Neon connection for reliable SSL certificate validation
+  - Simple, stable configuration without pooler complexity
+  - Connection management in `server/db.ts` with standard Pool configuration
 
 ### Stock Item Enhancements (October 30, 2025)
 - **Stock Group Assignment**: Stock items can now be immediately assigned to stock groups during creation
