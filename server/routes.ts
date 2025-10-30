@@ -1113,6 +1113,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Query - Aggregated stock data across all locations
+  app.get("/api/stock-query", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all stock items for the company
+      const stockItems = await db
+        .select({
+          id: schema.stockItems.id,
+          code: schema.stockItems.code,
+          name: schema.stockItems.name,
+          barcode: schema.stockItems.barcode,
+          uom: schema.stockItems.uom,
+          stockGroupId: schema.stockItems.stockGroupId,
+          stockGroupCode: schema.stockGroups.code,
+          stockGroupName: schema.stockGroups.name,
+          openingQty: schema.stockItems.openingQty,
+          openingRate: schema.stockItems.openingRate,
+          openingValue: schema.stockItems.openingValue,
+          sellingPrice: schema.stockItems.sellingPrice,
+          active: schema.stockItems.active,
+        })
+        .from(schema.stockItems)
+        .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+        .where(eq(schema.stockItems.companyId, req.session.currentCompanyId));
+
+      // Get all inventory records for the company to calculate current qty and value
+      const inventoryRecords = await db
+        .select({
+          stockItemId: schema.locationInventory.stockItemId,
+          quantity: schema.locationInventory.quantity,
+          totalValue: schema.locationInventory.totalValue,
+        })
+        .from(schema.locationInventory)
+        .innerJoin(schema.locations, eq(schema.locationInventory.locationId, schema.locations.id))
+        .where(eq(schema.locations.companyId, req.session.currentCompanyId));
+
+      // Aggregate inventory by stock item
+      const inventoryMap = new Map<number, { totalQty: number; totalValue: number }>();
+      
+      for (const record of inventoryRecords) {
+        const existing = inventoryMap.get(record.stockItemId) || { totalQty: 0, totalValue: 0 };
+        existing.totalQty += parseFloat(record.quantity || "0");
+        existing.totalValue += parseFloat(record.totalValue || "0");
+        inventoryMap.set(record.stockItemId, existing);
+      }
+
+      // Combine stock items with aggregated inventory
+      const result = stockItems.map((item) => {
+        const inventory = inventoryMap.get(item.id) || { totalQty: 0, totalValue: 0 };
+        return {
+          ...item,
+          currentQty: inventory.totalQty.toFixed(3),
+          currentValue: inventory.totalValue.toFixed(2),
+        };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bank Accounts
   app.get("/api/bank-accounts", requireAuth, async (req, res) => {
     try {

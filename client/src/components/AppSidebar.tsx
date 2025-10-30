@@ -18,6 +18,7 @@ import {
   TrendingUp,
   UserCheck,
   FileSpreadsheet,
+  Search,
 } from "lucide-react";
 import {
   Sidebar,
@@ -119,6 +120,11 @@ const menuItems = [
     title: "Import Stock Items",
     url: "/import-stock-items",
     icon: FileSpreadsheet,
+  },
+  {
+    title: "Stock Query",
+    url: "/stock-query",
+    icon: Search,
   },
   {
     title: "Analytics",

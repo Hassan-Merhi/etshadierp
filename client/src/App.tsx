@@ -35,6 +35,7 @@ import ProfitLoss from "@/pages/ProfitLoss";
 import VoucherEdit from "@/pages/VoucherEdit";
 import Payroll from "@/pages/Payroll";
 import ImportStockItems from "@/pages/ImportStockItems";
+import StockQuery from "@/pages/StockQuery";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -81,6 +82,7 @@ function Router({ user }: { user: any }) {
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
       <Route path="/import-stock-items" component={ImportStockItems} />
+      <Route path="/stock-query" component={StockQuery} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>
