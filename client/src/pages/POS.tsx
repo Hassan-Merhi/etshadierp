@@ -100,6 +100,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Fetch bank accounts for cash account selector
   const { data: bankAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/bank-accounts"],
+    enabled: !!activeLocation, // Only fetch when location is selected
   });
 
   const [rows, setRows] = useState<SaleRow[]>([
@@ -429,7 +430,36 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       case "Enter":
         if (!isItemNameField || filteredItems.length === 0) {
           e.preventDefault();
-          if (rowIndex < maxRow) {
+          
+          // If on rate field (last editable column), check if we should add a new row
+          const isRateField = columns[colIndex].key === "rate";
+          if (isRateField) {
+            const currentRow = rows[rowIndex];
+            const nextRow = rows[rowIndex + 1];
+            
+            // Only handle row creation/navigation if current row has data
+            if (currentRow.stockItemId) {
+              // If next row exists but is empty, move to next row's first field
+              if (nextRow && !nextRow.stockItemId) {
+                setSelectedCell({ row: rowIndex + 1, col: 0 });
+                focusCell(rowIndex + 1, 0);
+              }
+              // If no next row or next row also has data, add new row
+              else if (!nextRow || nextRow.stockItemId) {
+                setRows(prev => [...prev, {
+                  id: String(Date.now()),
+                  itemName: "",
+                  quantity: 0,
+                  rate: 0,
+                  amount: 0,
+                }]);
+                // Focus on item name field of new row after state updates
+                setTimeout(() => {
+                  focusCell(rows.length, 0);
+                }, 50);
+              }
+            }
+          } else if (rowIndex < maxRow) {
             setSelectedCell({ row: rowIndex + 1, col: colIndex });
             focusCell(rowIndex + 1, colIndex);
           }
@@ -726,10 +756,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
                         {item.barcode}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="text-sm font-mono font-semibold">
-                        ${item.price}
-                      </div>
+                    <div className="flex items-center">
                       <div className={`text-xs font-medium px-2 py-0.5 rounded ${
                         item.stock === 0 
                           ? "bg-destructive/10 text-destructive" 
