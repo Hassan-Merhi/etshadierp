@@ -141,6 +141,7 @@ export interface IStorage {
 
   // Inventory - Location-based stock tracking
   getLocationInventory(locationId: number): Promise<any[]>;
+  getCompanyInventory(companyId: number): Promise<any[]>;
   updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
 
   // Container Offload
@@ -553,6 +554,35 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .where(eq(schema.inventory.locationId, locationId));
+    
+    return results;
+  }
+
+  async getCompanyInventory(companyId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        inventoryId: schema.inventory.id,
+        locationId: schema.inventory.locationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+        lastUpdated: schema.inventory.lastUpdated,
+        stockItemCode: schema.stockItems.code,
+        stockItemName: schema.stockItems.name,
+        stockItemBarcode: schema.stockItems.barcode,
+        stockItemUom: schema.stockItems.uom,
+        stockGroupId: schema.stockItems.stockGroupId,
+        stockGroupName: schema.stockGroups.name,
+        stockGroupCode: schema.stockGroups.code,
+      })
+      .from(schema.inventory)
+      .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
+      .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
+      .where(eq(schema.inventory.companyId, companyId));
     
     return results;
   }

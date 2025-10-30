@@ -386,6 +386,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company Inventory - Get all inventory across all locations for current company
+  app.get("/api/inventory", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const inventory = await storage.getCompanyInventory(req.session.currentCompanyId);
+      res.json(inventory);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk import inventory for a location
   app.post("/api/locations/:locationId/import-inventory", requireAuth, async (req, res) => {
     try {
@@ -782,6 +796,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Items must be an array" });
       }
 
+      // Find or create "Uncategorized" stock group for this company
+      let uncategorizedGroup = await storage.getStockGroupByCode("UNCATEGORIZED", req.session.currentCompanyId);
+      if (!uncategorizedGroup) {
+        uncategorizedGroup = await storage.createStockGroup({
+          companyId: req.session.currentCompanyId,
+          code: "UNCATEGORIZED",
+          name: "Uncategorized",
+          active: true,
+        });
+      }
+
+      // Fetch all valid stock groups for this company for validation
+      const validStockGroups = await storage.getAllStockGroups(req.session.currentCompanyId);
+      const validStockGroupIds = new Set(validStockGroups.map(sg => sg.id));
+
       const results = {
         created: [] as any[],
         skipped: [] as any[],
@@ -795,6 +824,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...item,
             companyId: req.session.currentCompanyId,
           };
+
+          // Validate and assign stock group:
+          // - If no stockGroupId provided, assign to Uncategorized
+          // - If stockGroupId is provided but invalid (doesn't exist), assign to Uncategorized
+          if (!itemWithCompany.stockGroupId || !validStockGroupIds.has(itemWithCompany.stockGroupId)) {
+            itemWithCompany.stockGroupId = uncategorizedGroup.id;
+          }
 
           const parsed = insertStockItemSchema.parse(itemWithCompany);
           
@@ -3096,6 +3132,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get stock summary stats for Dashboard
+  app.get("/api/stats/stock-summary", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get total stock items count
+      const stockItems = await storage.getAllStockItems(companyId);
+      const totalStockItems = stockItems.length;
+
+      // Get all inventory for the company
+      const inventory = await storage.getCompanyInventory(companyId);
+
+      // Calculate low stock items (quantity < 20)
+      const lowStockThreshold = 20;
+      const lowStockItems = inventory
+        .filter(item => parseFloat(item.quantity) < lowStockThreshold && parseFloat(item.quantity) > 0)
+        .map(item => ({
+          name: item.stockItemName,
+          stock: parseFloat(item.quantity),
+          location: item.locationName || "Unknown",
+        }))
+        .sort((a, b) => a.stock - b.stock) // Sort by lowest stock first
+        .slice(0, 10); // Limit to top 10 low stock items
+
+      // Count critical items (quantity < 5)
+      const criticalThreshold = 5;
+      const criticalCount = inventory.filter(item => 
+        parseFloat(item.quantity) < criticalThreshold && parseFloat(item.quantity) > 0
+      ).length;
+
+      res.json({
+        totalStockItems,
+        lowStockCount: lowStockItems.length,
+        criticalCount,
+        lowStockItems,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
