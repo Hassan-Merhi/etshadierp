@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Items must be an array" });
       }
 
-      // Get all stock items for barcode matching
+      // Get all stock items for code matching
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId);
       
       const results = {
@@ -425,21 +425,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const item of items) {
         try {
-          // Find stock item by barcode (match on name if barcode not found)
-          let stockItem = allStockItems.find(si => 
-            si.barcode && si.barcode.toLowerCase() === item.barcode.toLowerCase()
+          // Find stock item by code
+          const stockItem = allStockItems.find(si => 
+            si.code.toLowerCase() === item.code.toLowerCase()
           );
 
           if (!stockItem) {
-            // Try to match by name if barcode not found
-            stockItem = allStockItems.find(si => 
-              si.name.toLowerCase() === item.barcode.toLowerCase()
-            );
-          }
-
-          if (!stockItem) {
             results.skipped.push({
-              barcode: item.barcode,
+              code: item.code,
               reason: "Stock item not found - please create the stock item first",
             });
             continue;
@@ -468,7 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             results.updated.push({
-              barcode: item.barcode,
+              code: item.code,
               itemName: stockItem.name,
               addedQuantity: quantity,
               newQuantity: newQuantity,
@@ -484,14 +477,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             results.created.push({
-              barcode: item.barcode,
+              code: item.code,
               itemName: stockItem.name,
               quantity: quantity,
             });
           }
         } catch (error: any) {
           results.errors.push({
-            barcode: item.barcode,
+            code: item.code,
             error: error.message,
           });
         }

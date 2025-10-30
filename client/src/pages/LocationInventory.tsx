@@ -500,7 +500,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <DialogHeader>
                     <DialogTitle>Import Inventory from Excel</DialogTitle>
                     <DialogDescription>
-                      Upload an Excel file with barcode, quantity, rate, and value columns
+                      Upload an Excel file with code, quantity, rate, and value columns
                     </DialogDescription>
                   </DialogHeader>
                   
