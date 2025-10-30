@@ -65,6 +65,9 @@ interface ImportRow {
   quantity: string;
   rate: string;
   value: string;
+  stockItemName?: string;
+  stockGroupName?: string;
+  stockGroupCode?: string;
 }
 
 export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
@@ -248,13 +251,35 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
+      // Fetch stock items and stock groups to enrich the preview
+      let stockItems: any[] = [];
+      let stockGroups: any[] = [];
+      
+      try {
+        const stockItemsRes = await apiRequest("GET", "/api/stock-items");
+        stockItems = await stockItemsRes.json();
+        const stockGroupsRes = await apiRequest("GET", "/api/stock-groups");
+        stockGroups = await stockGroupsRes.json();
+      } catch (error) {
+        toast({
+          title: "Error Loading Data",
+          description: "Could not load stock items or groups for validation. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const stockItemMap = new Map<string, any>(stockItems.map((si: any) => [si.code.toLowerCase(), si]));
+      const stockGroupMap = new Map<number, any>(stockGroups.map((sg: any) => [sg.id, sg]));
+
       const errors: string[] = [];
       const rows: ImportRow[] = [];
 
       jsonData.forEach((row, index) => {
         const rowNumber = index + 2;
+        const code = String(row.code || "").trim();
 
-        if (!row.code || String(row.code).trim() === "") {
+        if (!code) {
           errors.push(`Row ${rowNumber}: Code is required`);
         }
 
@@ -266,11 +291,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           errors.push(`Row ${rowNumber}: Rate must be greater than 0`);
         }
 
+        // Find stock item and its group
+        const stockItem = stockItemMap.get(code.toLowerCase());
+        const stockGroup = stockItem?.stockGroupId ? stockGroupMap.get(stockItem.stockGroupId) : null;
+
+        if (!stockItem) {
+          errors.push(`Row ${rowNumber}: Stock item "${code}" not found`);
+        }
+
         rows.push({
-          code: String(row.code || "").trim(),
+          code: code,
           quantity: String(row.quantity || "0"),
           rate: String(row.rate || "0"),
           value: String(row.value || "0"),
+          stockItemName: stockItem?.name,
+          stockGroupName: stockGroup?.name || "Uncategorized",
+          stockGroupCode: stockGroup?.code,
         });
       });
 
@@ -562,38 +598,61 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       </Alert>
                     )}
 
-                    {importPreview.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium mb-2">Preview ({importPreview.length} items)</p>
-                        <div className="border rounded-md overflow-auto max-h-48">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b bg-muted/50">
-                                <th className="text-left p-2">Code</th>
-                                <th className="text-right p-2">Quantity</th>
-                                <th className="text-right p-2">Rate</th>
-                                <th className="text-right p-2">Value</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {importPreview.slice(0, 20).map((item, index) => (
-                                <tr key={index} className="border-b last:border-b-0">
-                                  <td className="p-2">{item.code}</td>
-                                  <td className="p-2 text-right">{parseFloat(item.quantity).toLocaleString()}</td>
-                                  <td className="p-2 text-right">${parseFloat(item.rate).toFixed(2)}</td>
-                                  <td className="p-2 text-right">${parseFloat(item.value).toFixed(2)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {importPreview.length > 20 && (
-                            <div className="p-2 text-center text-xs text-muted-foreground border-t">
-                              ... and {importPreview.length - 20} more items
-                            </div>
-                          )}
+                    {importPreview.length > 0 && (() => {
+                      // Group preview items by stock group
+                      const groupedItems = importPreview.reduce((acc, item) => {
+                        const groupName = item.stockGroupName || "Uncategorized";
+                        if (!acc[groupName]) {
+                          acc[groupName] = [];
+                        }
+                        acc[groupName].push(item);
+                        return acc;
+                      }, {} as Record<string, ImportRow[]>);
+
+                      return (
+                        <div>
+                          <p className="text-sm font-medium mb-2">
+                            Preview ({importPreview.length} items in {Object.keys(groupedItems).length} group{Object.keys(groupedItems).length !== 1 ? 's' : ''})
+                          </p>
+                          <div className="border rounded-md overflow-auto max-h-96">
+                            {Object.entries(groupedItems).map(([groupName, items], groupIndex) => (
+                              <div key={groupIndex} className="border-b last:border-b-0">
+                                <div className="bg-muted/80 px-3 py-2 font-medium text-sm sticky top-0">
+                                  {groupName} ({items.length} item{items.length !== 1 ? 's' : ''})
+                                </div>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b bg-muted/30">
+                                      <th className="text-left p-2 text-xs">Code</th>
+                                      <th className="text-left p-2 text-xs">Item Name</th>
+                                      <th className="text-right p-2 text-xs">Quantity</th>
+                                      <th className="text-right p-2 text-xs">Rate</th>
+                                      <th className="text-right p-2 text-xs">Value</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {items.slice(0, 10).map((item, index) => (
+                                      <tr key={index} className="border-b last:border-b-0">
+                                        <td className="p-2">{item.code}</td>
+                                        <td className="p-2 text-muted-foreground">{item.stockItemName || '-'}</td>
+                                        <td className="p-2 text-right">{parseFloat(item.quantity).toLocaleString()}</td>
+                                        <td className="p-2 text-right">${parseFloat(item.rate).toFixed(2)}</td>
+                                        <td className="p-2 text-right">${parseFloat(item.value).toFixed(2)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {items.length > 10 && (
+                                  <div className="p-2 text-center text-xs text-muted-foreground">
+                                    ... and {items.length - 10} more items in this group
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     <div className="flex gap-2 justify-end">
                       {!importComplete ? (
