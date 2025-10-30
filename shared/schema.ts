@@ -135,6 +135,7 @@ export const employees = pgTable("employees", {
   phone: text("phone"),
   joinDate: date("join_date").notNull(),
   department: text("department"),
+  employeeType: text("employee_type").notNull().default("Employee"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -149,6 +150,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email format"),
   joinDate: z.string().min(1, "Join date is required"),
+  employeeType: z.enum(["Employee", "Worker"]),
 });
 
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
