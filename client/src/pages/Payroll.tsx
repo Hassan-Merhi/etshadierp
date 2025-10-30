@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +49,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle } from "lucide-react";
 
 const depositSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
@@ -59,8 +64,7 @@ const withdrawalSchema = z.object({
   notes: z.string().optional(),
 });
 
-const workerPaymentSchema = z.object({
-  amount: z.string().min(1, "Amount is required"),
+const bulkPaymentSchema = z.object({
   bankAccountId: z.string().min(1, "Bank account is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
@@ -68,14 +72,21 @@ const workerPaymentSchema = z.object({
 
 type DepositFormData = z.infer<typeof depositSchema>;
 type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
-type WorkerPaymentFormData = z.infer<typeof workerPaymentSchema>;
+type BulkPaymentFormData = z.infer<typeof bulkPaymentSchema>;
+
+interface WorkerPayment {
+  workerId: number;
+  amount: string;
+  selected: boolean;
+}
 
 export default function Payroll() {
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
-  const [workerPaymentDialogOpen, setWorkerPaymentDialogOpen] = useState(false);
+  const [bulkPaymentDialogOpen, setBulkPaymentDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [workerPayments, setWorkerPayments] = useState<Record<number, WorkerPayment>>({});
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
@@ -88,6 +99,24 @@ export default function Payroll() {
     queryKey: ["/api/bank-accounts"],
     enabled: !!selectedCompany,
   });
+
+  const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
+  const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
+
+  // Initialize worker payments when workers load
+  useMemo(() => {
+    if (workerStaff.length > 0 && Object.keys(workerPayments).length === 0) {
+      const initialPayments: Record<number, WorkerPayment> = {};
+      workerStaff.forEach((worker) => {
+        initialPayments[worker.id] = {
+          workerId: worker.id,
+          amount: worker.monthlySalary || "0",
+          selected: true,
+        };
+      });
+      setWorkerPayments(initialPayments);
+    }
+  }, [workerStaff, workerPayments]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -108,10 +137,9 @@ export default function Payroll() {
     },
   });
 
-  const workerPaymentForm = useForm<WorkerPaymentFormData>({
-    resolver: zodResolver(workerPaymentSchema),
+  const bulkPaymentForm = useForm<BulkPaymentFormData>({
+    resolver: zodResolver(bulkPaymentSchema),
     defaultValues: {
-      amount: "",
       bankAccountId: "",
       date: new Date().toISOString().split("T")[0],
       notes: "",
@@ -170,21 +198,21 @@ export default function Payroll() {
     },
   });
 
-  const workerPaymentMutation = useMutation({
-    mutationFn: async (data: WorkerPaymentFormData) => {
-      return await apiRequest("POST", "/api/payroll/pay-worker", {
-        employeeId: selectedEmployee?.id,
+  const bulkPaymentMutation = useMutation({
+    mutationFn: async (data: BulkPaymentFormData) => {
+      const selectedPayments = Object.values(workerPayments).filter(p => p.selected);
+      return await apiRequest("POST", "/api/payroll/bulk-pay-workers", {
+        payments: selectedPayments,
         ...data,
       });
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Payment processed successfully",
+        description: "Bulk payment processed successfully",
       });
-      setWorkerPaymentDialogOpen(false);
-      workerPaymentForm.reset();
-      setSelectedEmployee(null);
+      setBulkPaymentDialogOpen(false);
+      bulkPaymentForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -205,13 +233,39 @@ export default function Payroll() {
     setWithdrawalDialogOpen(true);
   };
 
-  const handleWorkerPayment = (worker: Employee) => {
-    setSelectedEmployee(worker);
-    setWorkerPaymentDialogOpen(true);
+  const handleToggleWorker = (workerId: number) => {
+    setWorkerPayments(prev => ({
+      ...prev,
+      [workerId]: {
+        ...prev[workerId],
+        selected: !prev[workerId]?.selected,
+      },
+    }));
   };
 
-  const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
-  const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
+  const handleUpdateAmount = (workerId: number, amount: string) => {
+    setWorkerPayments(prev => ({
+      ...prev,
+      [workerId]: {
+        ...prev[workerId],
+        amount,
+      },
+    }));
+  };
+
+  const handleSelectAll = () => {
+    const allSelected = Object.values(workerPayments).every(p => p.selected);
+    setWorkerPayments(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(key => {
+        updated[parseInt(key)].selected = !allSelected;
+      });
+      return updated;
+    });
+  };
+
+  const selectedPayments = Object.values(workerPayments).filter(p => p.selected);
+  const totalAmount = selectedPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
   if (employeesLoading) {
     return (
@@ -260,6 +314,7 @@ export default function Payroll() {
                       <TableRow>
                         <TableHead data-testid="header-code">Code</TableHead>
                         <TableHead data-testid="header-name">Name</TableHead>
+                        <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
                         <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
                         <TableHead data-testid="header-total-deposits" className="text-right">Total Deposits</TableHead>
                         <TableHead data-testid="header-total-withdrawals" className="text-right">Total Withdrawals</TableHead>
@@ -275,6 +330,9 @@ export default function Payroll() {
                           </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
                             {employee.firstName} {employee.lastName}
+                          </TableCell>
+                          <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
+                            {parseFloat(employee.monthlySalary).toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono">
                             {parseFloat(employee.currentBalance).toFixed(2)}
@@ -326,12 +384,31 @@ export default function Payroll() {
         <TabsContent value="workers">
           <Card className="p-6">
             <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Shop Floor Staff (Workers)</h2>
-                <p className="text-sm text-muted-foreground">
-                  Workers receive direct salary payments without balance tracking. Each payment is recorded as an expense.
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Shop Floor Staff (Workers)</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Select workers and adjust amounts to process bulk salary payments
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setBulkPaymentDialogOpen(true)}
+                  disabled={selectedPayments.length === 0}
+                  data-testid="button-bulk-payment"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Pay Selected ({selectedPayments.length})
+                </Button>
               </div>
+
+              {selectedPayments.length > 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {totalAmount.toFixed(2)}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {workerStaff.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
@@ -343,48 +420,61 @@ export default function Payroll() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={Object.values(workerPayments).every(p => p.selected)}
+                            onCheckedChange={handleSelectAll}
+                            data-testid="checkbox-select-all"
+                          />
+                        </TableHead>
                         <TableHead data-testid="header-code">Code</TableHead>
                         <TableHead data-testid="header-name">Name</TableHead>
-                        <TableHead data-testid="header-email">Email</TableHead>
-                        <TableHead data-testid="header-phone">Phone</TableHead>
                         <TableHead data-testid="header-department">Department</TableHead>
+                        <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
+                        <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
                         <TableHead data-testid="header-status">Status</TableHead>
-                        <TableHead data-testid="header-actions" className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {workerStaff.map((worker) => (
-                        <TableRow key={worker.id} data-testid={`row-worker-${worker.id}`}>
+                        <TableRow 
+                          key={worker.id} 
+                          data-testid={`row-worker-${worker.id}`}
+                          className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={workerPayments[worker.id]?.selected || false}
+                              onCheckedChange={() => handleToggleWorker(worker.id)}
+                              data-testid={`checkbox-worker-${worker.id}`}
+                            />
+                          </TableCell>
                           <TableCell data-testid={`cell-code-${worker.id}`}>
                             {worker.code}
                           </TableCell>
                           <TableCell data-testid={`cell-name-${worker.id}`}>
                             {worker.firstName} {worker.lastName}
                           </TableCell>
-                          <TableCell data-testid={`cell-email-${worker.id}`}>
-                            {worker.email}
-                          </TableCell>
-                          <TableCell data-testid={`cell-phone-${worker.id}`}>
-                            {worker.phone || "-"}
-                          </TableCell>
                           <TableCell data-testid={`cell-department-${worker.id}`}>
                             {worker.department || "-"}
+                          </TableCell>
+                          <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
+                            {parseFloat(worker.monthlySalary).toFixed(2)}
+                          </TableCell>
+                          <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={workerPayments[worker.id]?.amount || "0"}
+                              onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                              className="w-32 text-right font-mono ml-auto"
+                              data-testid={`input-amount-${worker.id}`}
+                            />
                           </TableCell>
                           <TableCell data-testid={`cell-status-${worker.id}`}>
                             <Badge variant={worker.active ? "default" : "secondary"}>
                               {worker.active ? "Active" : "Inactive"}
                             </Badge>
-                          </TableCell>
-                          <TableCell data-testid={`cell-actions-${worker.id}`} className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleWorkerPayment(worker)}
-                              data-testid={`button-pay-${worker.id}`}
-                            >
-                              <DollarSign className="h-4 w-4 mr-1" />
-                              Pay Salary
-                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -592,47 +682,46 @@ export default function Payroll() {
         </DialogContent>
       </Dialog>
 
-      {/* Worker Payment Dialog */}
-      <Dialog open={workerPaymentDialogOpen} onOpenChange={setWorkerPaymentDialogOpen}>
-        <DialogContent data-testid="dialog-worker-payment">
+      {/* Bulk Payment Dialog */}
+      <Dialog open={bulkPaymentDialogOpen} onOpenChange={setBulkPaymentDialogOpen}>
+        <DialogContent data-testid="dialog-bulk-payment" className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Pay Worker Salary</DialogTitle>
+            <DialogTitle>Process Bulk Payment</DialogTitle>
             <DialogDescription>
-              Direct salary payment to {selectedEmployee?.firstName} {selectedEmployee?.lastName}
+              Pay {selectedPayments.length} workers - Total amount: {totalAmount.toFixed(2)}
             </DialogDescription>
           </DialogHeader>
 
-          <Form {...workerPaymentForm}>
-            <form onSubmit={workerPaymentForm.handleSubmit((data) => workerPaymentMutation.mutate(data))} className="space-y-4">
-              <FormField
-                control={workerPaymentForm.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-worker-amount"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <div className="border rounded-md p-4 mb-4 bg-muted/30 max-h-60 overflow-y-auto">
+            <h4 className="font-semibold mb-3">Payment Summary</h4>
+            <div className="space-y-2">
+              {selectedPayments.map((payment) => {
+                const worker = workerStaff.find(w => w.id === payment.workerId);
+                return (
+                  <div key={payment.workerId} className="flex justify-between text-sm">
+                    <span>{worker?.firstName} {worker?.lastName} ({worker?.code})</span>
+                    <span className="font-mono">{parseFloat(payment.amount).toFixed(2)}</span>
+                  </div>
+                );
+              })}
+              <div className="pt-2 border-t mt-3 flex justify-between font-semibold">
+                <span>Total</span>
+                <span className="font-mono">{totalAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
 
+          <Form {...bulkPaymentForm}>
+            <form onSubmit={bulkPaymentForm.handleSubmit((data) => bulkPaymentMutation.mutate(data))} className="space-y-4">
               <FormField
-                control={workerPaymentForm.control}
+                control={bulkPaymentForm.control}
                 name="bankAccountId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Bank Account</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-worker-bank">
+                        <SelectTrigger data-testid="select-bulk-bank">
                           <SelectValue placeholder="Select bank account" />
                         </SelectTrigger>
                       </FormControl>
@@ -656,13 +745,13 @@ export default function Payroll() {
               />
 
               <FormField
-                control={workerPaymentForm.control}
+                control={bulkPaymentForm.control}
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>Payment Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} data-testid="input-worker-date" />
+                      <Input type="date" {...field} data-testid="input-bulk-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -670,7 +759,7 @@ export default function Payroll() {
               />
 
               <FormField
-                control={workerPaymentForm.control}
+                control={bulkPaymentForm.control}
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
@@ -679,7 +768,7 @@ export default function Payroll() {
                       <Textarea
                         placeholder="Additional notes..."
                         {...field}
-                        data-testid="input-worker-notes"
+                        data-testid="input-bulk-notes"
                       />
                     </FormControl>
                     <FormMessage />
@@ -691,13 +780,13 @@ export default function Payroll() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setWorkerPaymentDialogOpen(false)}
-                  data-testid="button-cancel-worker"
+                  onClick={() => setBulkPaymentDialogOpen(false)}
+                  data-testid="button-cancel-bulk"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={workerPaymentMutation.isPending} data-testid="button-submit-worker">
-                  {workerPaymentMutation.isPending ? "Processing..." : "Pay"}
+                <Button type="submit" disabled={bulkPaymentMutation.isPending} data-testid="button-submit-bulk">
+                  {bulkPaymentMutation.isPending ? "Processing..." : `Pay ${selectedPayments.length} Workers`}
                 </Button>
               </div>
             </form>
