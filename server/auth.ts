@@ -1,15 +1,27 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { isAuthenticated } from "./replitAuth";
 
-// Authentication middleware - checks if user is logged in
+// Authentication middleware - checks if user is logged in via Replit Auth and has company access
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Unauthorized" });
+  // First check Replit Auth
+  const authResult = await new Promise<boolean>((resolve) => {
+    isAuthenticated(req, res, () => resolve(true));
+    res.on('finish', () => resolve(false));
+  });
+
+  if (!authResult) {
+    return; // isAuthenticated already sent the 401 response
   }
 
-  const user = await storage.getUser(req.session.userId);
+  // Get user ID from Replit Auth claims
+  const userId = (req.user as any)?.claims?.sub;
+  if (!userId) {
+    return res.status(401).json({ message: "User not authenticated" });
+  }
+
+  const user = await storage.getUser(userId);
   if (!user) {
-    req.session.userId = undefined;
     return res.status(401).json({ message: "User not found" });
   }
 
@@ -19,7 +31,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   // Load the user's role for the current company
-  const userCompanyRole = await storage.getUserCompanyRole(req.session.userId, req.session.currentCompanyId);
+  const userCompanyRole = await storage.getUserCompanyRole(userId, req.session.currentCompanyId);
   if (!userCompanyRole) {
     return res.status(403).json({ message: "You do not have access to this company" });
   }

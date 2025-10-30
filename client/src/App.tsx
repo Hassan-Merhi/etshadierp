@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -12,9 +12,9 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
-import Login from "@/pages/Login";
+import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import POS from "@/pages/POS";
 import Inventory from "@/pages/Inventory";
@@ -88,28 +88,11 @@ function Router({ user }: { user: any }) {
 }
 
 function AuthenticatedApp() {
-  const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
-  
-  const { data: user, isLoading, error } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-    retry: false,
-  });
+  const { user, isLoading } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading && (error || !user)) {
-      setLocation("/login");
-    }
-  }, [isLoading, error, user, setLocation]);
-
-  const handleLogout = async () => {
-    try {
-      await apiRequest("POST", "/api/auth/logout", {});
-      queryClient.clear();
-      window.location.href = "/login";
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
   };
 
   if (isLoading) {
@@ -120,8 +103,8 @@ function AuthenticatedApp() {
     );
   }
 
-  if (error || !user) {
-    return null; // Will redirect to login
+  if (!user) {
+    return <Landing />;
   }
 
   const isPOS = user.role.startsWith("POS");

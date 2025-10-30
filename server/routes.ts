@@ -2,10 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import crypto from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
-import { requireAuth, requireRole, canDelete } from "./auth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { requireRole, canDelete } from "./auth";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -19,7 +19,6 @@ import {
   offloadRequestSchema,
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
-  insertUserSchema,
   insertUserCompanyRoleSchema,
   InsertPurchaseOrder,
   inventory,
@@ -33,12 +32,9 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Helper function to hash passwords
-function hashPassword(password: string): string {
-  return crypto.SHA256(password).toString();
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup Replit Auth
+  await setupAuth(app);
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {
     try {
@@ -50,72 +46,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Authentication routes
-  app.post("/api/auth/login", async (req, res) => {
+  // Get current authenticated user and their company context
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      console.log('Login attempt started for username:', req.body.username);
-      const { username, password } = req.body;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
-
-      console.log('Fetching user from database...');
-      const user = await Promise.race([
-        storage.getUserByUsername(username),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
-      ]) as any;
-      console.log('User fetch complete:', user ? 'Found' : 'Not found');
       if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
+        return res.status(404).json({ message: "User not found" });
       }
 
-      const hashedPassword = hashPassword(password);
-      if (user.password !== hashedPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      // Auto-select first company if not already set
+      if (!req.session.currentCompanyId) {
+        const userCompanies = await storage.getUserCompaniesWithRoles(userId);
+        if (userCompanies.length > 0) {
+          const firstCompany = userCompanies[0];
+          req.session.currentCompanyId = firstCompany.companyId;
+          req.session.currentRole = firstCompany.role;
+          req.session.currentLocationId = firstCompany.assignedLocationId;
+          req.session.currentPOSStation = firstCompany.posStation;
+          req.session.cashAccountId = firstCompany.cashAccountId;
+        }
       }
 
-      if (!user.active) {
-        return res.status(403).json({ message: "Account is inactive" });
-      }
-
-      req.session.userId = user.id;
-      
-      // Auto-select first company
-      const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
-      if (userCompanies.length > 0) {
-        const firstCompany = userCompanies[0];
-        req.session.currentCompanyId = firstCompany.companyId;
-        req.session.currentRole = firstCompany.role;
-        req.session.currentLocationId = firstCompany.assignedLocationId;
-        req.session.currentPOSStation = firstCompany.posStation;
-        req.session.cashAccountId = firstCompany.cashAccountId;
-      }
-      
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      // Return user with session context
+      res.json({
+        ...user,
+        currentCompanyId: req.session.currentCompanyId,
+        currentRole: req.session.currentRole,
+        currentLocationId: req.session.currentLocationId,
+        currentPOSStation: req.session.currentPOSStation,
+        cashAccountId: req.session.cashAccountId,
+      });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
-  });
-
-  app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ message: "Failed to logout" });
-      }
-      res.json({ message: "Logged out successfully" });
-    });
-  });
-
-  app.get("/api/auth/me", requireAuth, async (req, res) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    
-    const { password: _, ...userWithoutPassword } = req.user;
-    res.json(userWithoutPassword);
   });
 
   // User management routes (Admin only)
