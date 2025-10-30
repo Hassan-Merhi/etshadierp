@@ -53,11 +53,11 @@ type EntityType =
 
 const entityConfig = {
   location: { label: "Location", endpoint: "/api/locations", schema: insertLocationSchema },
-  ledger: { label: "Ledger Account", endpoint: "/api/ledger-accounts", schema: insertLedgerAccountSchema },
-  employee: { label: "Employee", endpoint: "/api/employees", schema: insertEmployeeSchema },
+  ledger: { label: "Ledger Account", endpoint: "/api/ledger-accounts", schema: insertLedgerAccountSchema.omit({ companyId: true }) },
+  employee: { label: "Employee", endpoint: "/api/employees", schema: insertEmployeeSchema.omit({ companyId: true }) },
   supplier: { label: "Supplier", endpoint: "/api/suppliers", schema: insertSupplierSchema },
-  stockGroup: { label: "Stock Group", endpoint: "/api/stock-groups", schema: insertStockGroupSchema },
-  stockItem: { label: "Stock Item", endpoint: "/api/stock-items", schema: insertStockItemSchema },
+  stockGroup: { label: "Stock Group", endpoint: "/api/stock-groups", schema: insertStockGroupSchema.omit({ companyId: true }) },
+  stockItem: { label: "Stock Item", endpoint: "/api/stock-items", schema: insertStockItemSchema.omit({ companyId: true }) },
 };
 
 // Wrapper component to properly recreate form when entity changes
@@ -291,6 +291,7 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 // Ledger Account Form Component
 function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   const [isParentDialogOpen, setIsParentDialogOpen] = useState(false);
@@ -320,7 +321,7 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
 
   // Form for creating parent account
   const parentForm = useForm({
-    resolver: zodResolver(insertLedgerAccountSchema),
+    resolver: zodResolver(insertLedgerAccountSchema.omit({ companyId: true })),
     defaultValues: {
       code: "",
       name: "",
@@ -332,7 +333,10 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
   // Mutation for creating parent account
   const createParentMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/ledger-accounts", data);
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected");
+      }
+      const res = await apiRequest("POST", "/api/ledger-accounts", { ...data, companyId: selectedCompany.id });
       return await res.json();
     },
     onSuccess: (data: any) => {

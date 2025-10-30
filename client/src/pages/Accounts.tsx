@@ -81,6 +81,7 @@ export default function Accounts() {
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
+    enabled: !!selectedCompany,
   });
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } = useQuery<LedgerAccount[]>({
@@ -221,7 +222,7 @@ export default function Accounts() {
       if (!selectedCompany?.id) {
         throw new Error("No company selected");
       }
-      return await apiRequest("/api/ledger-accounts", "POST", {
+      return await apiRequest("POST", "/api/ledger-accounts", {
         ...data,
         companyId: selectedCompany.id,
       });
@@ -232,6 +233,7 @@ export default function Accounts() {
         description: "Ledger account created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateDialogOpen(false);
       form.reset();
     },
@@ -265,14 +267,14 @@ export default function Accounts() {
       if (!accountToEdit) {
         throw new Error("No account selected");
       }
-      return await apiRequest(`/api/ledger-accounts/${accountToEdit.id}`, "PUT", data);
+      return await apiRequest("PUT", `/api/ledger-accounts/${accountToEdit.id}`, data);
     },
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Account updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setAccountToEdit(null);
       editForm.reset();
@@ -755,7 +757,7 @@ export default function Accounts() {
                   />
                 </div>
                 
-                {accountsLoading ? (
+                {accountsLoading || ledgerAccountsLoading ? (
                   <div className="p-4">
                     <Skeleton className="h-8 w-full" />
                   </div>
@@ -769,24 +771,35 @@ export default function Accounts() {
                       filteredAccountsForEdit.map((account) => {
                         // Only allow editing of ledger accounts for now
                         const isLedger = account.type === "Ledger";
+                        const isSelected = accountToEdit?.id === account.accountId && isLedger;
+                        
                         return (
                           <button
                             key={account.id}
+                            type="button"
                             onClick={() => {
                               if (isLedger) {
                                 // Fetch the actual ledger account to edit
                                 const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
                                 if (ledgerAccount) {
                                   handleSelectAccountForEdit(ledgerAccount);
+                                } else {
+                                  toast({
+                                    title: "Error",
+                                    description: "Could not find ledger account details",
+                                    variant: "destructive",
+                                  });
                                 }
+                              } else {
+                                toast({
+                                  title: "Not Editable",
+                                  description: "Only ledger accounts can be edited at this time",
+                                });
                               }
                             }}
-                            disabled={!isLedger}
-                            className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
-                              accountToEdit?.id === account.accountId && isLedger
-                                ? "bg-accent"
-                                : ""
-                            } ${!isLedger ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`w-full p-3 text-left border-b last:border-b-0 ${
+                              isSelected ? "bg-accent" : "hover-elevate"
+                            } ${!isLedger ? "opacity-60" : ""}`}
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
                             <div className="flex items-center gap-2">
