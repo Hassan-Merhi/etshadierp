@@ -116,10 +116,19 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes (October 2025)
 
 ### Database Connection Management (October 30, 2025)
-- **Connection Pool Limits**: Configured connection pool with max 10 connections to prevent overwhelming the database
-  - Uses direct Neon connection for reliable SSL certificate validation
-  - Simple, stable configuration without pooler complexity
-  - Connection management in `server/db.ts` with standard Pool configuration
+- **Critical Issue - Database Connectivity**: The application cannot connect to the Neon database. All queries timeout after 3 seconds regardless of connection method.
+  - **Investigation Summary**:
+    - Attempted WebSocket connection with ws library: Connection established but queries hang indefinitely
+    - Attempted WebSocket without ws library: Same timeout behavior
+    - Attempted HTTP mode using neon() function: Same timeout behavior  
+    - Attempted removing `sslmode=require` parameter: Same timeout behavior
+    - Attempted using pooler endpoint: DATABASE_URL doesn't include pooler
+    - Health check consistently times out: `SELECT 1` query never completes
+  - **Current Configuration**: Using HTTP-based Neon driver (`drizzle-orm/neon-http` with `neon()` function)
+    - Connection string sanitized to remove incompatible SSL parameters
+    - No WebSocket configuration (following best practices for Replit)
+  - **Root Cause**: DATABASE_URL appears to point to an inaccessible or deprovisioned database instance
+  - **Next Steps**: Database needs to be reprovisioned or DATABASE_URL needs to be updated with a working endpoint
 
 ### Stock Item Enhancements (October 30, 2025)
 - **Stock Group Assignment**: Stock items can now be immediately assigned to stock groups during creation

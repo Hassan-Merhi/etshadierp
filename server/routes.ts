@@ -39,16 +39,38 @@ function hashPassword(password: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Database health check endpoint
+  app.get("/api/health/db", async (_req, res) => {
+    try {
+      console.log('Testing database connection...');
+      const result = await Promise.race([
+        db.execute(sql`SELECT 1 as test`),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB health check timeout')), 3000))
+      ]);
+      console.log('Database connection successful:', result);
+      res.json({ status: 'ok', message: 'Database connection successful' });
+    } catch (error: any) {
+      console.error('Database connection failed:', error.message);
+      res.status(500).json({ status: 'error', message: error.message });
+    }
+  });
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
+      console.log('Login attempt started for username:', req.body.username);
       const { username, password } = req.body;
       
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      const user = await storage.getUserByUsername(username);
+      console.log('Fetching user from database...');
+      const user = await Promise.race([
+        storage.getUserByUsername(username),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
+      ]) as any;
+      console.log('User fetch complete:', user ? 'Found' : 'Not found');
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
