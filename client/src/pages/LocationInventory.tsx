@@ -62,6 +62,7 @@ interface StockGroupSummary {
 
 interface ImportRow {
   code: string;
+  stockGroupCode?: string;
   quantity: string;
   rate: string;
   value: string;
@@ -218,8 +219,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Import handlers
   const downloadImportTemplate = () => {
     const template = [
-      { code: "BALE001", quantity: "100", rate: "150.00", value: "15000.00" },
-      { code: "BALE002", quantity: "50", rate: "145.50", value: "7275.00" },
+      { code: "BALE001", stockGroupCode: "FABRIC", quantity: "100", rate: "150.00", value: "15000.00" },
+      { code: "BALE002", stockGroupCode: "TEXTILE", quantity: "50", rate: "145.50", value: "7275.00" },
     ];
 
     const ws = XLSX.utils.json_to_sheet(template);
@@ -268,6 +269,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
         rows.push({
           code: String(row.code || "").trim(),
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
           quantity: String(row.quantity || "0"),
           rate: String(row.rate || "0"),
           value: String(row.value || "0"),
