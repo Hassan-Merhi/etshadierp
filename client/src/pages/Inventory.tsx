@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Upload, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 
 interface InventoryItem {
   inventoryId: number;
@@ -27,11 +28,20 @@ interface InventoryItem {
 
 export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
+  const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   // Fetch all inventory across all locations for the current company
   const { data: inventory = [], isLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/inventory"],
   });
+
+  const handleStockItemClick = (stockItemId: number, stockItemName: string) => {
+    setSelectedStockItemId(stockItemId);
+    setSelectedStockItemName(stockItemName);
+    setDetailsDialogOpen(true);
+  };
 
   const filteredInventory = inventory.filter((item) =>
     item.stockItemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -118,7 +128,15 @@ export default function Inventory() {
                         className="h-14 border-t hover-elevate"
                         data-testid={`row-inventory-${item.inventoryId}`}
                       >
-                        <td className="px-4 font-medium">{item.stockItemName}</td>
+                        <td className="px-4 font-medium">
+                          <button
+                            onClick={() => handleStockItemClick(item.stockItemId, item.stockItemName)}
+                            className="text-left hover:underline text-primary cursor-pointer"
+                            data-testid={`button-stock-item-${item.stockItemId}`}
+                          >
+                            {item.stockItemName}
+                          </button>
+                        </td>
                         <td className="px-4 font-mono text-muted-foreground">
                           {item.stockItemCode}
                         </td>
@@ -151,6 +169,15 @@ export default function Inventory() {
           </div>
         )}
       </Card>
+
+      {selectedStockItemId && (
+        <StockItemDetailsDialog
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+          stockItemId={selectedStockItemId}
+          stockItemName={selectedStockItemName}
+        />
+      )}
     </div>
   );
 }

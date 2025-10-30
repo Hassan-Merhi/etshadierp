@@ -784,6 +784,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single stock item by ID
+  app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const stockItem = await storage.getStockItemById(stockItemId);
+      if (!stockItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (stockItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      res.json(stockItem);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk import stock items
   app.post("/api/stock-items/import", requireAuth, async (req, res) => {
     try {
@@ -887,15 +914,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
       }
 
+      // Trim and validate required fields
+      const updates: any = {};
+      
+      if (req.body.code !== undefined) {
+        const trimmedCode = String(req.body.code).trim();
+        if (trimmedCode === "") {
+          return res.status(400).json({ message: "Code is required" });
+        }
+        updates.code = trimmedCode;
+      }
+      
+      if (req.body.name !== undefined) {
+        const trimmedName = String(req.body.name).trim();
+        if (trimmedName === "") {
+          return res.status(400).json({ message: "Name is required" });
+        }
+        updates.name = trimmedName;
+      }
+      
+      if (req.body.uom !== undefined) {
+        const trimmedUom = String(req.body.uom).trim();
+        if (trimmedUom === "") {
+          return res.status(400).json({ message: "Unit of measure is required" });
+        }
+        updates.uom = trimmedUom;
+      }
+      
+      if (req.body.barcode !== undefined) {
+        updates.barcode = req.body.barcode ? String(req.body.barcode).trim() : null;
+      }
+      
+      if (req.body.stockGroupId !== undefined) {
+        updates.stockGroupId = req.body.stockGroupId;
+      }
+      
+      if (req.body.active !== undefined) {
+        updates.active = req.body.active;
+      }
+
       // If updating code, check for duplicates
-      if (req.body.code && req.body.code !== existingItem.code) {
-        const duplicate = await storage.getStockItemByCode(req.body.code, req.session.currentCompanyId);
+      if (updates.code && updates.code !== existingItem.code) {
+        const duplicate = await storage.getStockItemByCode(updates.code, req.session.currentCompanyId);
         if (duplicate) {
           return res.status(400).json({ message: "Stock item code already exists" });
         }
       }
 
-      const updated = await storage.updateStockItem(stockItemId, req.body);
+      const updated = await storage.updateStockItem(stockItemId, updates);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -950,6 +1016,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      // Validate numeric fields if provided
+      if (req.body.quantity !== undefined) {
+        const qty = parseFloat(req.body.quantity);
+        if (isNaN(qty)) {
+          return res.status(400).json({ message: "Quantity must be a valid number" });
+        }
+      }
+      if (req.body.rate !== undefined) {
+        const rate = parseFloat(req.body.rate);
+        if (isNaN(rate) || rate < 0) {
+          return res.status(400).json({ message: "Rate must be a valid non-negative number" });
+        }
+      }
+      if (req.body.stockItemId !== undefined) {
+        const stockItemId = parseInt(req.body.stockItemId);
+        if (isNaN(stockItemId)) {
+          return res.status(400).json({ message: "Stock item ID must be a valid number" });
+        }
+      }
+
       const updated = await storage.updateStockTransferItem(itemId, req.body);
       res.json(updated);
     } catch (error: any) {
@@ -967,6 +1053,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Validate numeric fields if provided
+      if (req.body.quantity !== undefined) {
+        const qty = parseFloat(req.body.quantity);
+        if (isNaN(qty)) {
+          return res.status(400).json({ message: "Quantity must be a valid number" });
+        }
+      }
+      if (req.body.rate !== undefined) {
+        const rate = parseFloat(req.body.rate);
+        if (isNaN(rate) || rate < 0) {
+          return res.status(400).json({ message: "Rate must be a valid non-negative number" });
+        }
+      }
+      if (req.body.stockItemId !== undefined) {
+        const stockItemId = parseInt(req.body.stockItemId);
+        if (isNaN(stockItemId)) {
+          return res.status(400).json({ message: "Stock item ID must be a valid number" });
+        }
       }
 
       const updated = await storage.updateStockAdjustmentItem(itemId, req.body);

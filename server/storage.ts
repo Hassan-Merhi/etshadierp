@@ -1185,17 +1185,23 @@ export class DbStorage implements IStorage {
   }
 
   async updateStockTransferItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockTransferItem> {
+    // Fetch current item to get existing values for recalculation
+    const [currentItem] = await db.select().from(schema.stockTransferItems).where(eq(schema.stockTransferItems.id, id));
+    if (!currentItem) {
+      throw new Error("Stock transfer item not found");
+    }
+
     const updateData: any = {};
     if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
-    if (updates.quantity !== undefined) {
-      updateData.quantity = updates.quantity;
-      if (updates.rate !== undefined) {
-        const qty = parseFloat(updates.quantity);
-        const rate = parseFloat(updates.rate);
-        updateData.totalAmount = (qty * rate).toFixed(2);
-      }
-    }
+    if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
     if (updates.rate !== undefined) updateData.rate = updates.rate;
+    
+    // Recalculate total amount using new or existing values
+    const finalQuantity = updates.quantity !== undefined ? updates.quantity : currentItem.quantity;
+    const finalRate = updates.rate !== undefined ? updates.rate : currentItem.rate;
+    const qty = parseFloat(finalQuantity);
+    const rate = parseFloat(finalRate);
+    updateData.totalAmount = (qty * rate).toFixed(2);
     
     const [updated] = await db
       .update(schema.stockTransferItems)
@@ -1206,17 +1212,23 @@ export class DbStorage implements IStorage {
   }
 
   async updateStockAdjustmentItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockAdjustmentItem> {
+    // Fetch current item to get existing values for recalculation
+    const [currentItem] = await db.select().from(schema.stockAdjustmentItems).where(eq(schema.stockAdjustmentItems.id, id));
+    if (!currentItem) {
+      throw new Error("Stock adjustment item not found");
+    }
+
     const updateData: any = {};
     if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
-    if (updates.quantity !== undefined) {
-      updateData.quantity = updates.quantity;
-      if (updates.rate !== undefined) {
-        const qty = parseFloat(updates.quantity);
-        const rate = parseFloat(updates.rate);
-        updateData.totalAmount = (qty * rate).toFixed(2);
-      }
-    }
+    if (updates.quantity !== undefined) updateData.quantity = updates.quantity;
     if (updates.rate !== undefined) updateData.rate = updates.rate;
+    
+    // Recalculate total amount using new or existing values
+    const finalQuantity = updates.quantity !== undefined ? updates.quantity : currentItem.quantity;
+    const finalRate = updates.rate !== undefined ? updates.rate : currentItem.rate;
+    const qty = parseFloat(finalQuantity);
+    const rate = parseFloat(finalRate);
+    updateData.totalAmount = (qty * rate).toFixed(2);
     
     const [updated] = await db
       .update(schema.stockAdjustmentItems)
