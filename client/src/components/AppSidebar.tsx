@@ -19,6 +19,7 @@ import {
   UserCheck,
   FileSpreadsheet,
   Search,
+  PieChart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -125,6 +126,11 @@ const menuItems = [
     title: "Stock Query",
     url: "/stock-query",
     icon: Search,
+  },
+  {
+    title: "Sales Report",
+    url: "/sales-report",
+    icon: PieChart,
   },
   {
     title: "Analytics",

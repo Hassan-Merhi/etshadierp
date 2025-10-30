@@ -637,3 +637,34 @@ export const insertStockAdjustmentItemSchema = createInsertSchema(stockAdjustmen
 
 export type InsertStockAdjustmentItem = z.infer<typeof insertStockAdjustmentItemSchema>;
 export type StockAdjustmentItem = typeof stockAdjustmentItems.$inferSelect;
+
+// Sales Items - tracks item-level details for POS sales
+export const salesItems = pgTable("sales_items", {
+  id: serial("id").primaryKey(),
+  voucherId: integer("voucher_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
+  costPrice: decimal("cost_price", { precision: 15, scale: 2 }).notNull(),
+  totalSales: decimal("total_sales", { precision: 15, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 15, scale: 2 }).notNull(),
+  profit: decimal("profit", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSalesItemSchema = createInsertSchema(salesItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.number().min(1, "Voucher is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
+  sellingPrice: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Selling price must be non-negative"),
+  costPrice: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost price must be non-negative"),
+  totalSales: z.string(),
+  totalCost: z.string(),
+  profit: z.string(),
+});
+
+export type InsertSalesItem = z.infer<typeof insertSalesItemSchema>;
+export type SalesItem = typeof salesItems.$inferSelect;

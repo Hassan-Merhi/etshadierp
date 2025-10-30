@@ -27,6 +27,7 @@ import {
   vouchers,
   voucherEntries,
   locations,
+  salesItems,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -3116,11 +3117,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(stockItems)
             .where(eq(stockItems.id, item.stockItemId));
 
+          const qty = parseFloat(item.quantity);
+          const sellingPrice = parseFloat(item.rate);
+          const costPrice = currentRate;
+          const totalSales = qty * sellingPrice;
+          const totalCost = qty * costPrice;
+          const profit = totalSales - totalCost;
+
+          // Insert sales item record for reporting
+          await tx.insert(salesItems).values({
+            voucherId: voucher.id,
+            stockItemId: item.stockItemId,
+            quantity: qty.toString(),
+            sellingPrice: sellingPrice.toFixed(2),
+            costPrice: costPrice.toFixed(2),
+            totalSales: totalSales.toFixed(2),
+            totalCost: totalCost.toFixed(2),
+            profit: profit.toFixed(2),
+          });
+
           saleItems.push({
             ...item,
             stockItemName: stockItem?.name || "",
             stockItemCode: stockItem?.code || "",
-            amount: (parseFloat(item.quantity) * parseFloat(item.rate)).toFixed(2),
+            amount: totalSales.toFixed(2),
           });
         }
 
@@ -3489,6 +3509,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         criticalCount,
         lowStockItems,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Sales Report - gain/loss from POS transactions
+  app.get("/api/sales-report", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { startDate, endDate, locationId, stockItemId } = req.query;
+
+      // Build query to join sales_items with vouchers, stock_items, and locations
+      let query = db
+        .select({
+          id: salesItems.id,
+          voucherId: salesItems.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          locationId: vouchers.locationId,
+          locationName: locations.name,
+          stockItemId: salesItems.stockItemId,
+          stockItemCode: stockItems.code,
+          stockItemName: stockItems.name,
+          quantity: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          costPrice: salesItems.costPrice,
+          totalSales: salesItems.totalSales,
+          totalCost: salesItems.totalCost,
+          profit: salesItems.profit,
+          createdAt: salesItems.createdAt,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(eq(vouchers.companyId, companyId));
+
+      // Apply filters
+      const conditions = [eq(vouchers.companyId, companyId)];
+
+      if (startDate) {
+        conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+      }
+      if (endDate) {
+        conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+      }
+      if (locationId) {
+        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+      }
+      if (stockItemId) {
+        conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
+      }
+
+      const salesData = await db
+        .select({
+          id: salesItems.id,
+          voucherId: salesItems.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          locationId: vouchers.locationId,
+          locationName: locations.name,
+          stockItemId: salesItems.stockItemId,
+          stockItemCode: stockItems.code,
+          stockItemName: stockItems.name,
+          quantity: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          costPrice: salesItems.costPrice,
+          totalSales: salesItems.totalSales,
+          totalCost: salesItems.totalCost,
+          profit: salesItems.profit,
+          createdAt: salesItems.createdAt,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(and(...conditions))
+        .orderBy(vouchers.voucherDate);
+
+      res.json(salesData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
