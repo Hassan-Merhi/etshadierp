@@ -21,6 +21,7 @@ import {
   insertStockAdjustmentVoucherSchema,
   insertUserSchema,
   insertUserCompanyRoleSchema,
+  InsertPurchaseOrder,
   inventory,
   stockItems,
   vouchers,
@@ -1473,6 +1474,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a single purchase order by ID (Admin/Owner only)
+  app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+
+      // Check role permissions - only Admin and Owner can view purchase orders
+      const userRole = req.session.currentRole;
+      if (!userRole || (userRole !== "Admin" && userRole !== "Owner")) {
+        return res.status(403).json({ message: "Only Admin and Owner can view purchase orders" });
+      }
+
+      const po = await storage.getPurchaseOrderById(id);
+      if (!po) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+
+      // Verify purchase order belongs to current company
+      if (po.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Purchase order belongs to a different company" });
+      }
+
+      // Get line items for this PO
+      const lineItems = await storage.getLineItemsByPO(id);
+
+      res.json({
+        ...po,
+        items: lineItems
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a purchase order
+  app.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+
+      const existingPO = await storage.getPurchaseOrderById(id);
+      if (!existingPO) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+
+      // Verify purchase order belongs to current company
+      if (existingPO.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Purchase order belongs to a different company" });
+      }
+
+      // Check edit permissions based on role
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      // Only Admin and Owner can edit purchase orders
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin and Owner can edit purchase orders" });
+      }
+
+      // Only allow updating specific fields
+      const allowedUpdates: Partial<InsertPurchaseOrder> = {};
+      if (req.body.poNumber !== undefined) allowedUpdates.poNumber = req.body.poNumber;
+      if (req.body.itemsTotal !== undefined) allowedUpdates.itemsTotal = req.body.itemsTotal;
+      if (req.body.currency !== undefined) allowedUpdates.currency = req.body.currency;
+      if (req.body.status !== undefined) allowedUpdates.status = req.body.status;
+
+      const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Backfill voucher entries for existing POs
   app.post("/api/po-import/backfill", requireAuth, async (req, res) => {
     try {
@@ -1971,9 +2051,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const entries = await storage.getVoucherEntriesByVoucher(id);
       
+      // If this is a Purchase voucher, also fetch the linked purchase order
+      let purchaseOrder = null;
+      if (voucher.voucherType === "Purchase") {
+        const allPOs = await storage.getAllPurchaseOrders(voucher.companyId);
+        const linkedPO = allPOs.find(po => po.voucherId === id);
+        if (linkedPO) {
+          const lineItems = await storage.getLineItemsByPO(linkedPO.id);
+          purchaseOrder = {
+            ...linkedPO,
+            items: lineItems
+          };
+        }
+      }
+      
       res.json({
         ...voucher,
         entries,
+        purchaseOrder,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

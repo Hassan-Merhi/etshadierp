@@ -118,6 +118,7 @@ export interface IStorage {
 
   // Purchase Orders
   getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]>;
+  getPurchaseOrderById(id: number): Promise<PurchaseOrder | undefined>;
   getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]>;
   getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]>;
   createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
@@ -442,6 +443,11 @@ export class DbStorage implements IStorage {
   // Purchase Orders
   async getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]> {
     return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, companyId));
+  }
+
+  async getPurchaseOrderById(id: number): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, id));
+    return po;
   }
 
   async getPurchaseOrdersByContainer(containerId: number): Promise<PurchaseOrder[]> {

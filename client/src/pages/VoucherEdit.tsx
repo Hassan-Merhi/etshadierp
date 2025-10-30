@@ -96,6 +96,28 @@ interface VoucherEntry {
   narration: string | null;
 }
 
+interface PurchaseOrderLineItem {
+  id: number;
+  stockItemId: number;
+  itemName: string;
+  quantity: string;
+  rate: string;
+  lineTotal: string;
+}
+
+interface PurchaseOrderData {
+  id: number;
+  companyId: number;
+  poNumber: string;
+  containerId: number;
+  supplierId: number;
+  voucherId: number | null;
+  currency: string;
+  itemsTotal: string;
+  status: string;
+  items: PurchaseOrderLineItem[];
+}
+
 interface VoucherData {
   id: number;
   companyId: number;
@@ -106,6 +128,7 @@ interface VoucherData {
   description: string | null;
   totalAmount: string;
   entries: VoucherEntry[];
+  purchaseOrder?: PurchaseOrderData | null;
 }
 
 // Form entry schemas
@@ -278,6 +301,7 @@ export default function VoucherEdit() {
   const voucherType = voucher?.voucherType;
   const isPaymentOrReceipt = voucherType === "Payment" || voucherType === "Receipt";
   const isJournal = voucherType === "Journal";
+  const isPurchase = voucherType === "Purchase" && voucher?.purchaseOrder;
 
   // Payment/Receipt Form
   const paymentForm = useForm<VoucherFormData>({
@@ -542,8 +566,8 @@ export default function VoucherEdit() {
     );
   }
 
-  // Not supported voucher type
-  if (!isPaymentOrReceipt && !isJournal) {
+  // Not supported voucher type (except Purchase which we handle separately)
+  if (!isPaymentOrReceipt && !isJournal && !isPurchase) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -560,6 +584,110 @@ export default function VoucherEdit() {
                 Editing {voucherType} vouchers is not currently supported.
               </p>
               <Button onClick={handleCancel} className="mt-4" data-testid="button-back-to-daybook">
+                Back to Daybook
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Purchase Order editing (when voucher type is Purchase and PO is linked)
+  if (isPurchase && voucher.purchaseOrder) {
+    const po = voucher.purchaseOrder;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Purchase Order: {po.poNumber}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View and verify purchase order details
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Purchase Order Details</CardTitle>
+            <CardDescription>
+              This purchase order was automatically created during container import
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">PO Number</p>
+                <p className="text-base font-semibold">{po.poNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Currency</p>
+                <p className="text-base font-semibold">{po.currency}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Items Total</p>
+                <p className="text-base font-semibold">
+                  ${parseFloat(po.itemsTotal || "0").toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <p className="text-base font-semibold">{po.status}</p>
+              </div>
+            </div>
+
+            {po.items && po.items.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Line Items</p>
+                <div className="border rounded-md">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-2 text-sm font-medium">Item</th>
+                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
+                        <th className="text-right p-2 text-sm font-medium">Rate</th>
+                        <th className="text-right p-2 text-sm font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {po.items.map((item, index) => (
+                        <tr key={item.id} className={index < po.items.length - 1 ? "border-b" : ""}>
+                          <td className="p-2 text-sm">{item.itemName}</td>
+                          <td className="p-2 text-sm text-right">{parseFloat(item.quantity).toLocaleString()}</td>
+                          <td className="p-2 text-sm text-right">
+                            ${parseFloat(item.rate).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-2 text-sm text-right font-medium">
+                            ${parseFloat(item.lineTotal).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleCancel}
+                data-testid="button-back-to-daybook"
+              >
                 Back to Daybook
               </Button>
             </div>
