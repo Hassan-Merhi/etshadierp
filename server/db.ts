@@ -6,14 +6,16 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
-// Remove all query parameters from DATABASE_URL (like sslmode, pooler, etc.)
-const connectionString = process.env.DATABASE_URL.split('?')[0];
+// Try using pooler endpoint for better connection reliability in serverless environments
+// Transform: ep-xxx.c-2.region.aws.neon.tech -> ep-xxx-pooler.c-2.region.aws.neon.tech
+const connectionString = process.env.DATABASE_URL.replace(
+  /(@ep-[^.]+)(\.c-\d+\..*\.aws\.neon\.tech)/,
+  '$1-pooler$2'
+);
 
-console.log('Initializing database connection (HTTP mode)...');
-console.log('Connection string format:', connectionString.replace(/:[^:@]*@/, ':***@'));
+console.log('Database URL transformed:', connectionString !== process.env.DATABASE_URL);
+console.log('Connection endpoint:', connectionString.replace(/:[^:@]*@/, ':***@'));
 
-// Use HTTP-based Neon client instead of WebSocket Pool
-// This is much more reliable in Replit and other serverless environments
+// Use HTTP-based connection (recommended for Replit)
 const sql = neon(connectionString);
-
 export const db = drizzle(sql, { schema });

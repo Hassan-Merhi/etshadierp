@@ -42,15 +42,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {
     try {
-      console.log('Testing database connection...');
-      const result = await Promise.race([
-        db.execute(sql`SELECT 1 as test`),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('DB health check timeout')), 3000))
-      ]);
-      console.log('Database connection successful:', result);
+      const result = await db.execute(sql`SELECT 1 as test`);
       res.json({ status: 'ok', message: 'Database connection successful' });
     } catch (error: any) {
-      console.error('Database connection failed:', error.message);
+      console.error('Database connection failed:', error);
       res.status(500).json({ status: 'error', message: error.message });
     }
   });
