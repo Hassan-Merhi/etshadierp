@@ -86,6 +86,14 @@ export default function Accounts() {
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany) return [];
+      const response = await fetch(`/api/ledger-accounts?companyId=${selectedCompany.id}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch ledger accounts");
+      return await response.json();
+    },
     enabled: !!selectedCompany,
   });
 

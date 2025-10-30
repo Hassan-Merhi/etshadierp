@@ -371,10 +371,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ledger Accounts
   app.get("/api/ledger-accounts", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
+      const { companyId } = req.query;
+      const effectiveCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      
+      if (!effectiveCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const accounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      const accounts = await storage.getAllLedgerAccounts(effectiveCompanyId);
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

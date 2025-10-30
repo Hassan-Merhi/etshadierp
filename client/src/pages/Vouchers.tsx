@@ -2430,48 +2430,46 @@ export default function Vouchers() {
                             <td className="p-2">
                               <FormField
                                 control={stockTransferForm.control}
-                                name={`entries.${index}.stockItemName`}
-                                render={({ field: stockField }) => (
+                                name={`entries.${index}.stockItemId`}
+                                render={({ field }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <Input
-                                        {...stockField}
-                                        placeholder="Item code..."
-                                        data-testid={`input-transfer-stock-${index}`}
-                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "stockItem")}
-                                        onChange={(e) => {
-                                          const code = e.target.value;
-                                          stockField.onChange(code);
+                                      <StockItemCombobox
+                                        value={
+                                          transferEntries[index].stockItemId > 0
+                                            ? {
+                                                id: transferEntries[index].stockItemId,
+                                                name: transferEntries[index].stockItemName,
+                                              }
+                                            : null
+                                        }
+                                        onChange={(id, name) => {
+                                          stockTransferForm.setValue(`entries.${index}.stockItemId`, id);
+                                          stockTransferForm.setValue(`entries.${index}.stockItemName`, name);
                                           
-                                          // Lookup stock item by code
-                                          const item = lookupStockItemByCode(code);
-                                          if (item) {
-                                            stockTransferForm.setValue(`entries.${index}.stockItemId`, item.id);
-                                            stockTransferForm.setValue(`entries.${index}.stockItemName`, `${item.code} - ${item.name}`);
-                                            
-                                            // Auto-fill rate from inventory if source location is selected
-                                            if (transferEntries[index].sourceLocationId > 0) {
-                                              fetch(`/api/locations/${transferEntries[index].sourceLocationId}/inventory`)
-                                                .then(res => res.json())
-                                                .then(inventory => {
-                                                  const inventoryItem = inventory.find((inv: any) => inv.stockItemId === item.id);
-                                                  if (inventoryItem && inventoryItem.averageRate) {
-                                                    stockTransferForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
-                                                  }
-                                                })
-                                                .catch(err => console.error('Failed to fetch inventory:', err));
-                                            }
-                                          } else {
-                                            stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                          // Auto-fill rate from inventory if source location is selected
+                                          if (transferEntries[index].sourceLocationId > 0) {
+                                            fetch(`/api/locations/${transferEntries[index].sourceLocationId}/inventory`)
+                                              .then(res => res.json())
+                                              .then(inventory => {
+                                                const inventoryItem = inventory.find((inv: any) => inv.stockItemId === id);
+                                                if (inventoryItem && inventoryItem.averageRate) {
+                                                  stockTransferForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
+                                                }
+                                              })
+                                              .catch(err => console.error('Failed to fetch inventory:', err));
                                           }
                                         }}
+                                        stockItems={stockItems}
+                                        rowIndex={index}
+                                        testIdPrefix="button-transfer-stock"
                                         onFocus={() => {
                                           setActiveTransferRow(index);
-                                          // Update inventory source if location is selected
                                           if (transferEntries[index].sourceLocationId > 0) {
                                             setTransferInventorySource(transferEntries[index].sourceLocationId);
                                           }
                                         }}
+                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "stockItem")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2792,26 +2790,26 @@ export default function Vouchers() {
                               <td className="p-2">
                                 <FormField
                                   control={stockAdjustmentForm.control}
-                                  name={`consumptionEntries.${index}.stockItemName`}
+                                  name={`consumptionEntries.${index}.stockItemId`}
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="Stock code..."
-                                          className="text-sm"
-                                          data-testid={`input-consumption-stock-${index}`}
-                                          onChange={(e) => {
-                                            const code = e.target.value;
-                                            field.onChange(code);
-                                            const item = lookupStockItemByCode(code);
-                                            if (item) {
-                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, item.id);
-                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemName`, `${item.code} - ${item.name}`);
-                                            } else {
-                                              stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, 0);
-                                            }
+                                        <StockItemCombobox
+                                          value={
+                                            consumptionEntries[index].stockItemId > 0
+                                              ? {
+                                                  id: consumptionEntries[index].stockItemId,
+                                                  name: consumptionEntries[index].stockItemName,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemId`, id);
+                                            stockAdjustmentForm.setValue(`consumptionEntries.${index}.stockItemName`, name);
                                           }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                          testIdPrefix="button-consumption-stock"
                                           onKeyDown={(e) => handleConsumptionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
@@ -2936,26 +2934,26 @@ export default function Vouchers() {
                               <td className="p-2">
                                 <FormField
                                   control={stockAdjustmentForm.control}
-                                  name={`productionEntries.${index}.stockItemName`}
+                                  name={`productionEntries.${index}.stockItemId`}
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="Stock code..."
-                                          className="text-sm"
-                                          data-testid={`input-production-stock-${index}`}
-                                          onChange={(e) => {
-                                            const code = e.target.value;
-                                            field.onChange(code);
-                                            const item = lookupStockItemByCode(code);
-                                            if (item) {
-                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, item.id);
-                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemName`, `${item.code} - ${item.name}`);
-                                            } else {
-                                              stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, 0);
-                                            }
+                                        <StockItemCombobox
+                                          value={
+                                            productionEntries[index].stockItemId > 0
+                                              ? {
+                                                  id: productionEntries[index].stockItemId,
+                                                  name: productionEntries[index].stockItemName,
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemId`, id);
+                                            stockAdjustmentForm.setValue(`productionEntries.${index}.stockItemName`, name);
                                           }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                          testIdPrefix="button-production-stock"
                                           onKeyDown={(e) => handleProductionKeyDown(e, index, "stockItem")}
                                         />
                                       </FormControl>
