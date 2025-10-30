@@ -136,6 +136,7 @@ export const employees = pgTable("employees", {
   joinDate: date("join_date").notNull(),
   department: text("department"),
   employeeType: text("employee_type").notNull().default("Employee"),
+  monthlySalary: decimal("monthly_salary", { precision: 15, scale: 2 }).notNull().default("0"),
   currentBalance: decimal("current_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   totalDeposits: decimal("total_deposits", { precision: 15, scale: 2 }).notNull().default("0"),
   totalWithdrawals: decimal("total_withdrawals", { precision: 15, scale: 2 }).notNull().default("0"),
