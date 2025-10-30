@@ -120,7 +120,7 @@ export default function Payroll() {
 
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
-      return await apiRequest("/api/payroll/deposit-employee", "POST", {
+      return await apiRequest("POST", "/api/payroll/deposit-employee", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
@@ -146,7 +146,7 @@ export default function Payroll() {
 
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
-      return await apiRequest("/api/payroll/withdraw-employee", "POST", {
+      return await apiRequest("POST", "/api/payroll/withdraw-employee", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
@@ -172,7 +172,7 @@ export default function Payroll() {
 
   const workerPaymentMutation = useMutation({
     mutationFn: async (data: WorkerPaymentFormData) => {
-      return await apiRequest("/api/payroll/pay-worker", "POST", {
+      return await apiRequest("POST", "/api/payroll/pay-worker", {
         employeeId: selectedEmployee?.id,
         ...data,
       });
