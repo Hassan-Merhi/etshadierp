@@ -865,6 +865,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update stock item
+  app.patch("/api/stock-items/:id", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      // If updating code, check for duplicates
+      if (req.body.code && req.body.code !== existingItem.code) {
+        const duplicate = await storage.getStockItemByCode(req.body.code, req.session.currentCompanyId);
+        if (duplicate) {
+          return res.status(400).json({ message: "Stock item code already exists" });
+        }
+      }
+
+      const updated = await storage.updateStockItem(stockItemId, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get stock item transactions (transfers and adjustments)
+  app.get("/api/stock-items/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      const { startDate, endDate } = req.query;
+      const transactions = await storage.getStockItemTransactions(
+        stockItemId,
+        req.session.currentCompanyId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update stock transfer item
+  app.patch("/api/stock-transfer-items/:id", requireAuth, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: "Invalid item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const updated = await storage.updateStockTransferItem(itemId, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update stock adjustment item
+  app.patch("/api/stock-adjustment-items/:id", requireAuth, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: "Invalid item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const updated = await storage.updateStockAdjustmentItem(itemId, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bank Accounts
   app.get("/api/bank-accounts", requireAuth, async (req, res) => {
     try {

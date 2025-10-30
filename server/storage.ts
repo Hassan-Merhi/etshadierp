@@ -97,7 +97,9 @@ export interface IStorage {
   // Stock Items
   getAllStockItems(companyId: number): Promise<StockItem[]>;
   getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined>;
+  getStockItemById(id: number): Promise<StockItem | undefined>;
   createStockItem(item: InsertStockItem): Promise<StockItem>;
+  updateStockItem(id: number, updates: Partial<InsertStockItem>): Promise<StockItem>;
 
   // Bank Accounts
   getAllBankAccounts(companyId: number): Promise<BankAccount[]>;
@@ -167,11 +169,14 @@ export interface IStorage {
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]>;
+  getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number>;
   createVoucher(voucher: InsertVoucher): Promise<Voucher>;
   updateVoucher(id: number, updates: Partial<InsertVoucher>): Promise<Voucher>;
   createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry>;
   updateVoucherEntry(id: number, updates: Partial<InsertVoucherEntry>): Promise<VoucherEntry>;
+  updateStockTransferItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockTransferItem>;
+  updateStockAdjustmentItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockAdjustmentItem>;
   deleteVoucherEntry(id: number): Promise<void>;
   deleteVoucher(id: number): Promise<void>;
 
@@ -379,9 +384,23 @@ export class DbStorage implements IStorage {
     return item;
   }
 
+  async getStockItemById(id: number): Promise<StockItem | undefined> {
+    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.id, id));
+    return item;
+  }
+
   async createStockItem(item: InsertStockItem): Promise<StockItem> {
     const [created] = await db.insert(schema.stockItems).values(item).returning();
     return created;
+  }
+
+  async updateStockItem(id: number, updates: Partial<InsertStockItem>): Promise<StockItem> {
+    const [updated] = await db
+      .update(schema.stockItems)
+      .set(updates)
+      .where(eq(schema.stockItems.id, id))
+      .returning();
+    return updated;
   }
 
   // Bank Accounts
@@ -1093,6 +1112,64 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
   }
 
+  async getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]> {
+    const conditions: any[] = [eq(schema.vouchers.companyId, companyId)];
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    // Get stock transfer items for this stock item
+    const transferItems = await db
+      .select({
+        id: schema.stockTransferItems.id,
+        type: sql<string>`'transfer'`.as('type'),
+        voucherId: schema.stockTransferVouchers.voucherId,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherDate: schema.vouchers.voucherDate,
+        quantity: schema.stockTransferItems.quantity,
+        rate: schema.stockTransferItems.rate,
+        totalAmount: schema.stockTransferItems.totalAmount,
+        stockItemId: schema.stockTransferItems.stockItemId,
+        notes: schema.stockTransferVouchers.notes,
+      })
+      .from(schema.stockTransferItems)
+      .leftJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.transferId, schema.stockTransferVouchers.id))
+      .leftJoin(schema.vouchers, eq(schema.stockTransferVouchers.voucherId, schema.vouchers.id))
+      .where(and(eq(schema.stockTransferItems.stockItemId, stockItemId), ...conditions));
+
+    // Get stock adjustment items for this stock item
+    const adjustmentItems = await db
+      .select({
+        id: schema.stockAdjustmentItems.id,
+        type: sql<string>`'adjustment'`.as('type'),
+        voucherId: schema.stockAdjustmentVouchers.voucherId,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherDate: schema.vouchers.voucherDate,
+        quantity: schema.stockAdjustmentItems.quantity,
+        rate: schema.stockAdjustmentItems.rate,
+        totalAmount: schema.stockAdjustmentItems.totalAmount,
+        stockItemId: schema.stockAdjustmentItems.stockItemId,
+        notes: schema.stockAdjustmentVouchers.notes,
+      })
+      .from(schema.stockAdjustmentItems)
+      .leftJoin(schema.stockAdjustmentVouchers, eq(schema.stockAdjustmentItems.adjustmentId, schema.stockAdjustmentVouchers.id))
+      .leftJoin(schema.vouchers, eq(schema.stockAdjustmentVouchers.voucherId, schema.vouchers.id))
+      .where(and(eq(schema.stockAdjustmentItems.stockItemId, stockItemId), ...conditions));
+
+    // Combine and sort by date
+    const allTransactions = [...transferItems, ...adjustmentItems].sort((a, b) => {
+      if (!a.voucherDate || !b.voucherDate) return 0;
+      return new Date(b.voucherDate).getTime() - new Date(a.voucherDate).getTime();
+    });
+
+    return allTransactions;
+  }
+
   async createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
     const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
     return created;
@@ -1103,6 +1180,48 @@ export class DbStorage implements IStorage {
       .update(schema.voucherEntries)
       .set(updates)
       .where(eq(schema.voucherEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateStockTransferItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockTransferItem> {
+    const updateData: any = {};
+    if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
+    if (updates.quantity !== undefined) {
+      updateData.quantity = updates.quantity;
+      if (updates.rate !== undefined) {
+        const qty = parseFloat(updates.quantity);
+        const rate = parseFloat(updates.rate);
+        updateData.totalAmount = (qty * rate).toFixed(2);
+      }
+    }
+    if (updates.rate !== undefined) updateData.rate = updates.rate;
+    
+    const [updated] = await db
+      .update(schema.stockTransferItems)
+      .set(updateData)
+      .where(eq(schema.stockTransferItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateStockAdjustmentItem(id: number, updates: Partial<{ stockItemId: number; quantity: string; rate: string }>): Promise<StockAdjustmentItem> {
+    const updateData: any = {};
+    if (updates.stockItemId !== undefined) updateData.stockItemId = updates.stockItemId;
+    if (updates.quantity !== undefined) {
+      updateData.quantity = updates.quantity;
+      if (updates.rate !== undefined) {
+        const qty = parseFloat(updates.quantity);
+        const rate = parseFloat(updates.rate);
+        updateData.totalAmount = (qty * rate).toFixed(2);
+      }
+    }
+    if (updates.rate !== undefined) updateData.rate = updates.rate;
+    
+    const [updated] = await db
+      .update(schema.stockAdjustmentItems)
+      .set(updateData)
+      .where(eq(schema.stockAdjustmentItems.id, id))
       .returning();
     return updated;
   }
