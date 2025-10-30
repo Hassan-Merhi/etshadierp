@@ -730,6 +730,28 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
             <FormField
               control={form.control}
+              name="employeeType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-employee-type">
+                        <SelectValue placeholder="Select employee type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Employee">Employee (Warehouse Staff)</SelectItem>
+                      <SelectItem value="Worker">Worker (Shop Floor Staff)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="active"
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
