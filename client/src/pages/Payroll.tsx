@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -104,7 +104,7 @@ export default function Payroll() {
   const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
 
   // Initialize worker payments when workers load
-  useMemo(() => {
+  useEffect(() => {
     if (workerStaff.length > 0 && Object.keys(workerPayments).length === 0) {
       const initialPayments: Record<number, WorkerPayment> = {};
       workerStaff.forEach((worker) => {
@@ -116,7 +116,7 @@ export default function Payroll() {
       });
       setWorkerPayments(initialPayments);
     }
-  }, [workerStaff, workerPayments]);
+  }, [workerStaff.length]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -211,6 +211,7 @@ export default function Payroll() {
         title: "Success",
         description: "Bulk payment processed successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setBulkPaymentDialogOpen(false);
       bulkPaymentForm.reset();
     },
