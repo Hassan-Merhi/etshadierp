@@ -215,6 +215,7 @@ export const stockItems = pgTable("stock_items", {
   openingRate: decimal("opening_rate", { precision: 15, scale: 2 }).default("0"),
   openingValue: decimal("opening_value", { precision: 15, scale: 2 }).default("0"),
   reorderLevel: decimal("reorder_level", { precision: 15, scale: 3 }).default("0"),
+  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
