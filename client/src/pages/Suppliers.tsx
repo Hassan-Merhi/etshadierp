@@ -51,13 +51,13 @@ export default function Suppliers() {
 
   // Fetch transactions for the selected supplier filtered by current company
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
-    queryKey: [`/api/accounts/supplier/${selectedSupplier?.id}/transactions`, { companyId: selectedCompany?.id }],
+    queryKey: [`/api/accounts/supplier/${selectedSupplier?.id}/transactions?companyId=${selectedCompany?.id}`],
     enabled: !!selectedSupplier && !!selectedCompany,
   });
 
   // Fetch PO imports for the selected supplier filtered by current company
   const { data: poImports = [], isLoading: poImportsLoading } = useQuery<any[]>({
-    queryKey: [`/api/suppliers/${selectedSupplier?.id}/purchase-orders`, { companyId: selectedCompany?.id }],
+    queryKey: [`/api/suppliers/${selectedSupplier?.id}/purchase-orders?companyId=${selectedCompany?.id}`],
     enabled: !!selectedSupplier && !!selectedCompany,
   });
 

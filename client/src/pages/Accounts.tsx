@@ -779,6 +779,14 @@ export default function Accounts() {
                             type="button"
                             onClick={() => {
                               if (isLedger) {
+                                if (ledgerAccountsLoading) {
+                                  toast({
+                                    title: "Loading",
+                                    description: "Please wait while ledger accounts are loading...",
+                                  });
+                                  return;
+                                }
+                                
                                 // Fetch the actual ledger account to edit
                                 const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
                                 if (ledgerAccount) {
@@ -786,7 +794,7 @@ export default function Accounts() {
                                 } else {
                                   toast({
                                     title: "Error",
-                                    description: "Could not find ledger account details",
+                                    description: `Ledger account not found. Account ID: ${account.accountId}. Available accounts: ${ledgerAccounts.length}`,
                                     variant: "destructive",
                                   });
                                 }
