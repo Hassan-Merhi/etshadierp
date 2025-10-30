@@ -17,8 +17,6 @@ interface ImportRow {
   barcode?: string;
   unit?: string;
   stockGroupCode?: string;
-  stockGroupName?: string;
-  stockGroupValid?: boolean;
 }
 
 interface ValidationError {
@@ -69,24 +67,6 @@ export default function ImportStockItems() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-      // Fetch stock groups to validate and enrich the preview
-      let stockGroups: any[] = [];
-      try {
-        const stockGroupsRes = await apiRequest("GET", "/api/stock-groups");
-        stockGroups = await stockGroupsRes.json();
-      } catch (error) {
-        toast({
-          title: "Error Loading Stock Groups",
-          description: "Could not load stock groups for validation. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const stockGroupMap = new Map<string, any>(
-        stockGroups.map((sg: any) => [sg.code.toLowerCase(), sg])
-      );
-
       const validationErrors: ValidationError[] = [];
       const rows: ImportRow[] = [];
 
@@ -109,26 +89,12 @@ export default function ImportStockItems() {
           });
         }
 
-        const stockGroupCode = row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined;
-        const stockGroup = stockGroupCode ? stockGroupMap.get(stockGroupCode.toLowerCase()) : null;
-
-        // Warn if stock group code provided but not found
-        if (stockGroupCode && !stockGroup) {
-          validationErrors.push({
-            row: rowNumber,
-            field: "stockGroupCode",
-            message: `Stock group "${stockGroupCode}" not found`,
-          });
-        }
-
         rows.push({
           code: String(row.code || "").trim(),
           name: String(row.name || "").trim(),
           barcode: row.barcode ? String(row.barcode).trim() : undefined,
           unit: row.unit ? String(row.unit).trim() : "Bale",
-          stockGroupCode: stockGroupCode,
-          stockGroupName: stockGroup?.name,
-          stockGroupValid: stockGroupCode ? !!stockGroup : true,
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
         });
       });
 
@@ -178,11 +144,11 @@ export default function ImportStockItems() {
     setIsProcessing(true);
 
     try {
-      // Fetch stock groups to map codes to IDs (case-insensitive)
+      // Fetch stock groups to map codes to IDs
       const stockGroupsRes = await apiRequest("GET", "/api/stock-groups");
       const stockGroups = await stockGroupsRes.json();
       const stockGroupMap = new Map(
-        stockGroups.map((sg: any) => [sg.code.toLowerCase(), sg.id])
+        stockGroups.map((sg: any) => [sg.code, sg.id])
       );
 
       const itemsToImport = previewData.map(row => {
@@ -199,11 +165,8 @@ export default function ImportStockItems() {
           item.barcode = row.barcode;
         }
 
-        if (row.stockGroupCode) {
-          const stockGroupId = stockGroupMap.get(row.stockGroupCode.toLowerCase());
-          if (stockGroupId) {
-            item.stockGroupId = stockGroupId;
-          }
+        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) {
+          item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
         }
 
         return item;
@@ -356,15 +319,8 @@ export default function ImportStockItems() {
                         {item.barcode || "-"}
                       </td>
                       <td className="p-2 text-sm">{item.unit}</td>
-                      <td className="p-2 text-sm">
-                        {item.stockGroupCode ? (
-                          <span className={item.stockGroupValid ? "text-foreground" : "text-destructive"}>
-                            {item.stockGroupName || item.stockGroupCode}
-                            {!item.stockGroupValid && " (not found)"}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
+                      <td className="p-2 text-sm text-muted-foreground">
+                        {item.stockGroupCode || "-"}
                       </td>
                     </tr>
                   ))}

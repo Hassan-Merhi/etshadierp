@@ -3,7 +3,7 @@ import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
   User,
-  UpsertUser,
+  InsertUser,
   Company,
   InsertCompany,
   UserCompanyRole,
@@ -47,10 +47,12 @@ import type {
 } from "@shared/schema";
 
 export interface IStorage {
-  // Users (Replit Auth)
+  // Users
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUserByUsername(username: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined>;
 
   // Companies
@@ -180,29 +182,29 @@ export interface IStorage {
 }
 
 export class DbStorage implements IStorage {
-  // Users (Replit Auth)
+  // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(schema.users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: schema.users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(schema.users).values(insertUser).returning();
     return user;
   }
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(schema.users);
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
+    const [user] = await db.update(schema.users).set(updates).where(eq(schema.users.id, id)).returning();
+    return user;
   }
 
   async getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined> {
