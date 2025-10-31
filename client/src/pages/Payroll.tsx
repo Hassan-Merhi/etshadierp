@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -112,6 +112,12 @@ export default function Payroll() {
   const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
   const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
 
+  // Create stable worker IDs key for dependency tracking
+  const workerIds = useMemo(() => 
+    workerStaff.map(w => w.id).sort().join(','),
+    [workerStaff.map(w => w.id).join(',')]
+  );
+
   // Initialize worker payments when workers load or change
   useEffect(() => {
     if (workerStaff.length > 0) {
@@ -130,7 +136,7 @@ export default function Payroll() {
     } else {
       setWorkerPayments({});
     }
-  }, [selectedCompany, workerStaff.length]);
+  }, [selectedCompany, workerIds, workerStaff]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -264,8 +270,9 @@ export default function Payroll() {
     setWorkerPayments(prev => ({
       ...prev,
       [workerId]: {
-        ...prev[workerId],
+        workerId,
         amount,
+        selected: prev[workerId]?.selected ?? true,
       },
     }));
   };
