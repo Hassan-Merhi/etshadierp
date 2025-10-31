@@ -1,7 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { neon } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import type { User } from "@shared/schema";
@@ -60,10 +59,10 @@ const sessionConfig: session.SessionOptions = {
 
 // Use PostgreSQL session store in production
 if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
-  const sql = neon(process.env.DATABASE_URL);
   sessionConfig.store = new PgSession({
     conObject: {
       connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // Required for Render's managed PostgreSQL
     },
     createTableIfMissing: true,
   });

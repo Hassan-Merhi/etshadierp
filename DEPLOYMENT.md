@@ -206,6 +206,28 @@ If your business grows and you need more capacity:
 
 You can upgrade/downgrade anytime from the Render dashboard.
 
+## Technical Notes
+
+### Database Driver Configuration
+
+This application uses the native PostgreSQL driver (`pg` with `drizzle-orm/node-postgres`), which is compatible with:
+- ✅ Render's managed PostgreSQL databases
+- ✅ Neon serverless PostgreSQL
+- ✅ Any standard PostgreSQL database
+
+**SSL Configuration:**
+- Production (Render): SSL is enabled with `rejectUnauthorized: false`
+- Development: SSL is disabled for local databases
+
+The configuration automatically adapts based on `NODE_ENV`. No manual configuration needed.
+
+### Database Connection
+
+The app connects to PostgreSQL using a connection pool for optimal performance:
+- Connection pooling for efficient resource usage
+- Automatic reconnection on failures
+- SSL support for secure production connections
+
 ## Need Help?
 
 The `render.yaml` file in your project handles the build configuration automatically. If you need to customize:
