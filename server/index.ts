@@ -43,6 +43,12 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Trust proxy for Render's HTTPS termination
+// This allows secure cookies to work behind the reverse proxy
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 // Session middleware
 const PgSession = connectPgSimple(session);
 
@@ -54,6 +60,7 @@ const sessionConfig: session.SessionOptions = {
     secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax', // Allow cookies with redirects
   },
 };
 

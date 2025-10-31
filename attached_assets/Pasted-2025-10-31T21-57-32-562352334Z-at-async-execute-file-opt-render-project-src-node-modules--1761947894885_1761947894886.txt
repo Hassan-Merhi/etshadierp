@@ -1,0 +1,122 @@
+2025-10-31T21:57:32.562352334Z       at async execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1548:15)
+2025-10-31T21:57:32.562354645Z       at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:57:32.562356825Z     [cause]: Error: connect ECONNREFUSED 10.230.66.54:443
+2025-10-31T21:57:32.562359085Z         at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1636:16) {
+2025-10-31T21:57:32.562361355Z       errno: -111,
+2025-10-31T21:57:32.562363525Z       code: 'ECONNREFUSED',
+2025-10-31T21:57:32.562365705Z       syscall: 'connect',
+2025-10-31T21:57:32.562367915Z       address: '10.230.66.54',
+2025-10-31T21:57:32.562370185Z       port: 443
+2025-10-31T21:57:32.562372355Z     }
+2025-10-31T21:57:32.562374505Z   }
+2025-10-31T21:57:32.562376725Z }
+2025-10-31T21:57:32.562918266Z 9:57:32 PM [express] GET /api/health/db 500 in 4ms :: {"status":"error","message":"Error connecting …
+2025-10-31T21:57:40.50284766Z Deploy cancelled
+2025-10-31T21:57:42.561692826Z Database connection failed: NeonDbError: Error connecting to database: fetch failed
+2025-10-31T21:57:42.561720947Z     at execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1549:24)
+2025-10-31T21:57:42.561727177Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:57:42.561733787Z     at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:57:42.561739947Z   severity: undefined,
+2025-10-31T21:57:42.561745467Z   code: undefined,
+2025-10-31T21:57:42.561749057Z   detail: undefined,
+2025-10-31T21:57:42.561752537Z   hint: undefined,
+2025-10-31T21:57:42.561756037Z   position: undefined,
+2025-10-31T21:57:42.561761968Z   internalPosition: undefined,
+2025-10-31T21:57:42.561765528Z   internalQuery: undefined,
+2025-10-31T21:57:42.561769018Z   where: undefined,
+2025-10-31T21:57:42.561772588Z   schema: undefined,
+2025-10-31T21:57:42.561776058Z   table: undefined,
+2025-10-31T21:57:42.561779498Z   column: undefined,
+2025-10-31T21:57:42.561782928Z   dataType: undefined,
+2025-10-31T21:57:42.561788438Z   constraint: undefined,
+2025-10-31T21:57:42.561791988Z   file: undefined,
+2025-10-31T21:57:42.561795508Z   line: undefined,
+2025-10-31T21:57:42.561798938Z   routine: undefined,
+2025-10-31T21:57:42.561804918Z   sourceError: TypeError: fetch failed
+2025-10-31T21:57:42.561811089Z       at node:internal/deps/undici/undici:13510:13
+2025-10-31T21:57:42.561816799Z       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:57:42.561835259Z       at async execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1548:15)
+2025-10-31T21:57:42.561837889Z       at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:57:42.561840099Z     [cause]: Error: connect ECONNREFUSED 10.230.66.54:443
+2025-10-31T21:57:42.561842199Z         at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1636:16) {
+2025-10-31T21:57:42.561844349Z       errno: -111,
+2025-10-31T21:57:42.561846489Z       code: 'ECONNREFUSED',
+2025-10-31T21:57:42.56184861Z       syscall: 'connect',
+2025-10-31T21:57:42.561850959Z       address: '10.230.66.54',
+2025-10-31T21:57:42.561853159Z       port: 443
+2025-10-31T21:57:42.561855259Z     }
+2025-10-31T21:57:42.56185742Z   }
+2025-10-31T21:57:42.56185957Z }
+2025-10-31T21:57:42.562301779Z 9:57:42 PM [express] GET /api/health/db 500 in 4ms :: {"status":"error","message":"Error connecting …
+2025-10-31T21:57:52.561883396Z Database connection failed: NeonDbError: Error connecting to database: fetch failed
+2025-10-31T21:57:52.561911027Z     at execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1549:24)
+2025-10-31T21:57:52.561916016Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:57:52.561920727Z     at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:57:52.561925427Z   severity: undefined,
+2025-10-31T21:57:52.561929827Z   code: undefined,
+2025-10-31T21:57:52.561934117Z   detail: undefined,
+2025-10-31T21:57:52.561938617Z   hint: undefined,
+2025-10-31T21:57:52.561942637Z   position: undefined,
+2025-10-31T21:57:52.561947647Z   internalPosition: undefined,
+2025-10-31T21:57:52.561952157Z   internalQuery: undefined,
+2025-10-31T21:57:52.561956107Z   where: undefined,
+2025-10-31T21:57:52.561960168Z   schema: undefined,
+2025-10-31T21:57:52.561963948Z   table: undefined,
+2025-10-31T21:57:52.561968468Z   column: undefined,
+2025-10-31T21:57:52.561972908Z   dataType: undefined,
+2025-10-31T21:57:52.561977078Z   constraint: undefined,
+2025-10-31T21:57:52.561981568Z   file: undefined,
+2025-10-31T21:57:52.561985518Z   line: undefined,
+2025-10-31T21:57:52.561990008Z   routine: undefined,
+2025-10-31T21:57:52.561995138Z   sourceError: TypeError: fetch failed
+2025-10-31T21:57:52.562000148Z       at node:internal/deps/undici/undici:13510:13
+2025-10-31T21:57:52.562004268Z       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:57:52.562008209Z       at async execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1548:15)
+2025-10-31T21:57:52.562012498Z       at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:57:52.562016349Z     [cause]: Error: connect ECONNREFUSED 10.230.66.54:443
+2025-10-31T21:57:52.562020939Z         at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1636:16) {
+2025-10-31T21:57:52.562025369Z       errno: -111,
+2025-10-31T21:57:52.562029409Z       code: 'ECONNREFUSED',
+2025-10-31T21:57:52.562033399Z       syscall: 'connect',
+2025-10-31T21:57:52.562037459Z       address: '10.230.66.54',
+2025-10-31T21:57:52.562041799Z       port: 443
+2025-10-31T21:57:52.562046099Z     }
+2025-10-31T21:57:52.562050419Z   }
+2025-10-31T21:57:52.562054559Z }
+2025-10-31T21:57:52.562504568Z 9:57:52 PM [express] GET /api/health/db 500 in 4ms :: {"status":"error","message":"Error connecting …
+2025-10-31T21:58:02.561673368Z Database connection failed: NeonDbError: Error connecting to database: fetch failed
+2025-10-31T21:58:02.561703829Z     at execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1549:24)
+2025-10-31T21:58:02.561706399Z     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:58:02.561709159Z     at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:58:02.561711549Z   severity: undefined,
+2025-10-31T21:58:02.561713349Z   code: undefined,
+2025-10-31T21:58:02.561715029Z   detail: undefined,
+2025-10-31T21:58:02.561716669Z   hint: undefined,
+2025-10-31T21:58:02.5617183Z   position: undefined,
+2025-10-31T21:58:02.56172066Z   internalPosition: undefined,
+2025-10-31T21:58:02.561722449Z   internalQuery: undefined,
+2025-10-31T21:58:02.561726189Z   where: undefined,
+2025-10-31T21:58:02.561728Z   schema: undefined,
+2025-10-31T21:58:02.5617297Z   table: undefined,
+2025-10-31T21:58:02.56173135Z   column: undefined,
+2025-10-31T21:58:02.56173301Z   dataType: undefined,
+2025-10-31T21:58:02.56173469Z   constraint: undefined,
+2025-10-31T21:58:02.56173635Z   file: undefined,
+2025-10-31T21:58:02.56173825Z   line: undefined,
+2025-10-31T21:58:02.56173999Z   routine: undefined,
+2025-10-31T21:58:02.56174269Z   sourceError: TypeError: fetch failed
+2025-10-31T21:58:02.56174489Z       at node:internal/deps/undici/undici:13510:13
+2025-10-31T21:58:02.56174666Z       at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2025-10-31T21:58:02.56175078Z       at async execute (file:///opt/render/project/src/node_modules/@neondatabase/serverless/index.mjs:1548:15)
+2025-10-31T21:58:02.56175261Z       at async file:///opt/render/project/src/dist/index.js:1704:22 {
+2025-10-31T21:58:02.56175429Z     [cause]: Error: connect ECONNREFUSED 10.230.66.54:443
+2025-10-31T21:58:02.56175601Z         at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1636:16) {
+2025-10-31T21:58:02.5617577Z       errno: -111,
+2025-10-31T21:58:02.56175943Z       code: 'ECONNREFUSED',
+2025-10-31T21:58:02.56176115Z       syscall: 'connect',
+2025-10-31T21:58:02.56176282Z       address: '10.230.66.54',
+2025-10-31T21:58:02.56176458Z       port: 443
+2025-10-31T21:58:02.56176631Z     }
+2025-10-31T21:58:02.561768041Z   }
+2025-10-31T21:58:02.561769761Z }
+2025-10-31T21:58:02.562345212Z 9:58:02 PM [express] GET /api/health/db 500 in 4ms :: {"status":"error","message":"Error connecting …

@@ -4,6 +4,8 @@
 
 This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sale) system for multi-company warehouse management. It handles inventory tracking across multiple locations, purchase order management, container tracking, financial accounting, and reporting. Built as a full-stack TypeScript application, it targets businesses managing bulk inventory with complex supply chain requirements, including international container shipments. Its primary purpose is to streamline operations and provide robust financial oversight for multi-entity businesses.
 
+**Deployment**: Configured for Render cloud hosting at $14/month (Web Service: $7 + PostgreSQL: $7) with automatic deployments from GitHub.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -27,10 +29,11 @@ The frontend uses React with TypeScript and Vite. It implements the shadcn/ui de
     - **Development**: Custom Vite integration with HMR.
     - **Production**: `esbuild` for server bundling, Vite for client assets.
 - **Data Storage**:
-    - **Database**: PostgreSQL via Neon serverless driver.
+    - **Database**: PostgreSQL using native `pg` driver with connection pooling. Compatible with Render, Neon, and any standard PostgreSQL database.
     - **ORM**: Drizzle ORM for type-safe queries, schema-first approach, and Zod integration.
     - **Schema**: Comprehensive database schema including Users, Locations, Ledger accounts, Employees, Suppliers, Stock groups/items, Bank accounts, Fixed assets, Purchase orders, Vouchers, supporting multi-currency and opening balances.
     - **Migrations**: Drizzle Kit for schema migrations.
+    - **Sessions**: PostgreSQL-backed sessions in production using `connect-pg-simple` with SSL support.
 
 ### Feature Specifications
 
@@ -58,7 +61,7 @@ The frontend uses React with TypeScript and Vite. It implements the shadcn/ui de
 ## External Dependencies
 
 - **UI Component Libraries**: Radix UI, Tailwind CSS, `class-variance-authority`, `clsx`, `cmdk`, `embla-carousel-react`, `recharts`, `date-fns`, `react-day-picker`.
-- **Database & Backend**: `@neondatabase/serverless` (PostgreSQL driver), `drizzle-orm`, `connect-pg-simple` (PostgreSQL session store).
+- **Database & Backend**: `pg` (node-postgres driver), `drizzle-orm`, `connect-pg-simple` (PostgreSQL session store with SSL).
 - **Form Handling**: `react-hook-form`, `@hookform/resolvers`, `zod`, `drizzle-zod`.
 - **Development Tools**: `tsx`, `ws` (for Neon connection), Replit-specific plugins.
 - **Build Tools**: Vite, `esbuild`, PostCSS with Autoprefixer.
