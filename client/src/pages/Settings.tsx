@@ -890,7 +890,7 @@ export default function Settings() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {bankAccounts.map((account: any) => (
+                        {cashAccounts.map((account: any) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
                             {account.name} ({account.code})
                           </SelectItem>
