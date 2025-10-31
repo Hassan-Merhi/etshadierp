@@ -1368,21 +1368,28 @@ export default function Vouchers() {
     }
   };
 
-  // Keyboard navigation handlers for Consumption Table
-  const handleConsumptionKeyDown = (
+  // Keyboard navigation handlers for Production/Consumption Table
+  const handleAdjustmentKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "stockItem" | "quantity" | "rate"
+    fieldName: "type" | "stockItem" | "quantity" | "rate"
   ) => {
-    const isLastRow = rowIndex === consumptionFields.length - 1;
+    const isLastRow = rowIndex === adjustmentFields.length - 1;
     
-    // Handle both Tab and Enter for navigation
-    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
+    // Handle Tab for navigation
+    if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       
-      if (fieldName === "stockItem") {
+      if (fieldName === "type") {
         setTimeout(() => {
-          const quantityInput = document.querySelector(`[data-testid="input-consumption-quantity-${rowIndex}"]`) as HTMLInputElement;
+          const stockItemButton = document.querySelector(`[data-testid="button-adjustment-stock-${rowIndex}"]`) as HTMLButtonElement;
+          if (stockItemButton) {
+            stockItemButton.focus();
+          }
+        }, 50);
+      } else if (fieldName === "stockItem") {
+        setTimeout(() => {
+          const quantityInput = document.querySelector(`[data-testid="input-adjustment-quantity-${rowIndex}"]`) as HTMLInputElement;
           if (quantityInput) {
             quantityInput.focus();
             quantityInput.select();
@@ -1390,79 +1397,33 @@ export default function Vouchers() {
         }, 50);
       } else if (fieldName === "quantity") {
         setTimeout(() => {
-          const rateInput = document.querySelector(`[data-testid="input-consumption-rate-${rowIndex}"]`) as HTMLInputElement;
+          const rateInput = document.querySelector(`[data-testid="input-adjustment-rate-${rowIndex}"]`) as HTMLInputElement;
           if (rateInput) {
             rateInput.focus();
             rateInput.select();
           }
         }, 50);
-      } else if (fieldName === "rate") {
-        // On rate field - move to next row or create new row
-        if (isLastRow) {
-          appendConsumption({
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          });
-        }
-        setTimeout(() => {
-          const newRowInput = document.querySelector(`[data-testid="input-consumption-stock-${rowIndex + 1}"]`) as HTMLInputElement;
-          if (newRowInput) {
-            newRowInput.focus();
-            newRowInput.select();
-          }
-        }, 100);
       }
     }
-  };
-
-  // Keyboard navigation handlers for Production Table
-  const handleProductionKeyDown = (
-    e: React.KeyboardEvent,
-    rowIndex: number,
-    fieldName: "stockItem" | "quantity" | "rate"
-  ) => {
-    const isLastRow = rowIndex === productionFields.length - 1;
     
-    // Handle both Tab and Enter for navigation
-    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
+    // Handle Enter on Rate - create new row and focus Type of new row
+    if (fieldName === "rate" && e.key === "Enter") {
       e.preventDefault();
-      
-      if (fieldName === "stockItem") {
-        setTimeout(() => {
-          const quantityInput = document.querySelector(`[data-testid="input-production-quantity-${rowIndex}"]`) as HTMLInputElement;
-          if (quantityInput) {
-            quantityInput.focus();
-            quantityInput.select();
-          }
-        }, 50);
-      } else if (fieldName === "quantity") {
-        setTimeout(() => {
-          const rateInput = document.querySelector(`[data-testid="input-production-rate-${rowIndex}"]`) as HTMLInputElement;
-          if (rateInput) {
-            rateInput.focus();
-            rateInput.select();
-          }
-        }, 50);
-      } else if (fieldName === "rate") {
-        // On rate field - move to next row or create new row
-        if (isLastRow) {
-          appendProduction({
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          });
-        }
-        setTimeout(() => {
-          const newRowInput = document.querySelector(`[data-testid="input-production-stock-${rowIndex + 1}"]`) as HTMLInputElement;
-          if (newRowInput) {
-            newRowInput.focus();
-            newRowInput.select();
-          }
-        }, 100);
+      if (isLastRow) {
+        appendAdjustment({
+          type: "CONSUME",
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        });
       }
+      setTimeout(() => {
+        const newRowSelect = document.querySelector(`[data-testid="select-adjustment-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+        if (newRowSelect) {
+          newRowSelect.focus();
+        }
+      }, 100);
     }
   };
 
@@ -2789,7 +2750,10 @@ export default function Vouchers() {
                                       onValueChange={field.onChange}
                                     >
                                       <FormControl>
-                                        <SelectTrigger data-testid={`select-adjustment-type-${index}`}>
+                                        <SelectTrigger 
+                                          data-testid={`select-adjustment-type-${index}`}
+                                          onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "type")}
+                                        >
                                           <SelectValue placeholder="Select..." />
                                         </SelectTrigger>
                                       </FormControl>
@@ -2826,6 +2790,7 @@ export default function Vouchers() {
                                         stockItems={stockItems}
                                         rowIndex={index}
                                         testIdPrefix="button-adjustment-stock"
+                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "stockItem")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2847,6 +2812,7 @@ export default function Vouchers() {
                                         placeholder="0.000"
                                         className="font-mono"
                                         data-testid={`input-adjustment-quantity-${index}`}
+                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "quantity")}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -2868,6 +2834,7 @@ export default function Vouchers() {
                                         placeholder="0.00"
                                         className="font-mono"
                                         data-testid={`input-adjustment-rate-${index}`}
+                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "rate")}
                                       />
                                     </FormControl>
                                     <FormMessage />
