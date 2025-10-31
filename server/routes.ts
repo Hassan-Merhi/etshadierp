@@ -4928,9 +4928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!item.quantity || parseFloat(item.quantity) === 0) {
           return res.status(400).json({ message: "Quantity cannot be zero for any items" });
         }
-        if (parseFloat(item.quantity) < 0) {
-          return res.status(400).json({ message: "Quantity must be positive for all items" });
-        }
+        // Note: Negative quantities are allowed for consumption items
         if (!item.rate || parseFloat(item.rate) < 0) {
           return res.status(400).json({ message: "Rate must be non-negative for all items" });
         }
