@@ -1497,7 +1497,7 @@ export default function VoucherEdit() {
                   <div>
                     <FormLabel>PO Number</FormLabel>
                     <Input
-                      value={po.poNumber}
+                      value={po?.poNumber || "N/A"}
                       disabled
                       className="mt-2"
                       data-testid="input-po-number"
@@ -1508,7 +1508,7 @@ export default function VoucherEdit() {
                   <div>
                     <FormLabel>Currency</FormLabel>
                     <Input
-                      value={po.currency}
+                      value={po?.currency || "USD"}
                       disabled
                       className="mt-2"
                       data-testid="input-currency"
@@ -1519,7 +1519,7 @@ export default function VoucherEdit() {
                   <div>
                     <FormLabel>Status</FormLabel>
                     <Input
-                      value={po.status}
+                      value={po?.status || "Open"}
                       disabled
                       className="mt-2"
                       data-testid="input-status"
