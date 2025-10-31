@@ -461,9 +461,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // If stock item doesn't exist, create it
           if (!stockItem) {
-            // Map stockGroupCode to stockGroupId
+            // Auto-detect stock group from item code prefix (first 2-3 uppercase letters)
             let stockGroupId = uncategorizedGroup.id;
-            if (item.stockGroupCode) {
+            
+            // Normalize and try to extract prefix from Item_barcode
+            const normalizedCode = item.Item_barcode.trim().toUpperCase();
+            
+            // Try 3-letter prefix first, then 2-letter (e.g., "UN259" -> "UN", "GCC123" -> "GCC")
+            const prefixes = [];
+            if (normalizedCode.length >= 3) prefixes.push(normalizedCode.substring(0, 3));
+            if (normalizedCode.length >= 2) prefixes.push(normalizedCode.substring(0, 2));
+            
+            for (const prefix of prefixes) {
+              const stockGroup = allStockGroups.find(sg => 
+                sg.code.toUpperCase() === prefix
+              );
+              if (stockGroup) {
+                stockGroupId = stockGroup.id;
+                break; // Found a match, stop searching
+              }
+            }
+            
+            // Fall back to stockGroupCode column if provided and prefix didn't match
+            if (stockGroupId === uncategorizedGroup.id && item.stockGroupCode) {
               const stockGroup = allStockGroups.find(sg => 
                 sg.code.toLowerCase() === item.stockGroupCode.toLowerCase()
               );
