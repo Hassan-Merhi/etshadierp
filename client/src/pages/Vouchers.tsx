@@ -1350,10 +1350,9 @@ export default function Vouchers() {
       
       if (fieldName === "sourceLocation") {
         setTimeout(() => {
-          const stockItemInput = document.querySelector(`[data-testid="input-transfer-stock-${rowIndex}"]`) as HTMLInputElement;
-          if (stockItemInput) {
-            stockItemInput.focus();
-            stockItemInput.select();
+          const stockItemButton = document.querySelector(`[data-testid="button-transfer-stock-${rowIndex}"]`) as HTMLButtonElement;
+          if (stockItemButton) {
+            stockItemButton.focus();
           }
         }, 50);
       } else if (fieldName === "stockItem") {
@@ -1373,24 +1372,25 @@ export default function Vouchers() {
           }
         }, 50);
       } else if (fieldName === "rate") {
-        // On rate field - move to next row or create new row
-        if (isLastRow) {
-          appendTransfer({
-            sourceLocationId: 0,
-            sourceLocationName: "",
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          });
-        }
-        setTimeout(() => {
-          const newRowInput = document.querySelector(`[data-testid="input-source-location-${rowIndex + 1}"]`) as HTMLInputElement;
-          if (newRowInput) {
-            newRowInput.focus();
-            newRowInput.select();
+        // On rate field (ENTER only) - create new row and focus source location
+        if (e.key === "Enter") {
+          if (isLastRow) {
+            appendTransfer({
+              sourceLocationId: 0,
+              sourceLocationName: "",
+              stockItemId: 0,
+              stockItemName: "",
+              quantity: "",
+              rate: "",
+            });
           }
-        }, 100);
+          setTimeout(() => {
+            const newRowSelect = document.querySelector(`[data-testid="select-source-location-${rowIndex + 1}"]`) as HTMLButtonElement;
+            if (newRowSelect) {
+              newRowSelect.focus();
+            }
+          }, 100);
+        }
       }
     }
   };
@@ -2431,6 +2431,7 @@ export default function Vouchers() {
                                               setTransferInventorySource(transferEntries[index].sourceLocationId);
                                             }
                                           }}
+                                          onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}
                                         >
                                           <SelectValue placeholder="Select source location..." />
                                         </SelectTrigger>
