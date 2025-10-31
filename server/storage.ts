@@ -544,9 +544,9 @@ export class DbStorage implements IStorage {
     return created;
   }
 
-  // Stock Items - Barcode lookup
+  // Stock Items - Code/Barcode lookup
   async getStockItemByBarcode(barcode: string): Promise<StockItem | undefined> {
-    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.barcode, barcode));
+    const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.code, barcode));
     return item;
   }
 
