@@ -454,9 +454,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const item of items) {
         try {
-          // Find stock item by code
+          // Find stock item by Item_barcode (which maps to code field)
           let stockItem = allStockItems.find(si => 
-            si.code.toLowerCase() === item.code.toLowerCase()
+            si.code.toLowerCase() === item.Item_barcode.toLowerCase()
           );
 
           // If stock item doesn't exist, create it
@@ -475,8 +475,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Create the stock item
             const newStockItem = await storage.createStockItem({
               companyId: req.session.currentCompanyId,
-              code: item.code,
-              name: item.code, // Use code as name if not provided
+              code: item.Item_barcode,
+              name: item.Item_barcode, // Use Item_barcode as name if not provided
               uom: "PCS", // Default unit
               stockGroupId: stockGroupId,
               active: true,
@@ -509,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             results.updated.push({
-              code: item.code,
+              code: item.Item_barcode,
               itemName: stockItem.name,
               addedQuantity: quantity,
               newQuantity: newQuantity,
@@ -525,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             results.created.push({
-              code: item.code,
+              code: item.Item_barcode,
               itemName: stockItem.name,
               quantity: quantity,
             });
