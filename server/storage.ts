@@ -945,7 +945,10 @@ export class DbStorage implements IStorage {
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
-    const conditions = [eq(schema.voucherEntries.ledgerAccountId, ledgerAccountId)];
+    const conditions = [
+      eq(schema.voucherEntries.ledgerAccountId, ledgerAccountId),
+      eq(schema.vouchers.optional, false)
+    ];
     
     if (startDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
@@ -979,7 +982,10 @@ export class DbStorage implements IStorage {
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
-    const conditions = [eq(schema.voucherEntries.bankAccountId, bankAccountId)];
+    const conditions = [
+      eq(schema.voucherEntries.bankAccountId, bankAccountId),
+      eq(schema.vouchers.optional, false)
+    ];
     
     if (startDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
@@ -1013,7 +1019,10 @@ export class DbStorage implements IStorage {
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
-    const conditions = [eq(schema.voucherEntries.fixedAssetId, fixedAssetId)];
+    const conditions = [
+      eq(schema.voucherEntries.fixedAssetId, fixedAssetId),
+      eq(schema.vouchers.optional, false)
+    ];
     
     if (startDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
@@ -1048,7 +1057,10 @@ export class DbStorage implements IStorage {
     startDate?: string,
     endDate?: string
   ): Promise<any[]> {
-    const conditions = [eq(schema.voucherEntries.supplierId, supplierId)];
+    const conditions = [
+      eq(schema.voucherEntries.supplierId, supplierId),
+      eq(schema.vouchers.optional, false)
+    ];
     
     if (companyId) {
       conditions.push(eq(schema.vouchers.companyId, companyId));

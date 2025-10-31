@@ -503,6 +503,7 @@ export const vouchers = pgTable("vouchers", {
   voucherDate: date("voucher_date").notNull(),
   description: text("description"),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  optional: boolean("optional").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -513,9 +514,10 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   companyId: z.number().min(1, "Company is required"),
   locationId: z.number().optional(),
   voucherNumber: z.string().min(1, "Voucher number is required"),
-  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"]),
+  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer"]),
   voucherDate: z.string().min(1, "Voucher date is required"),
   totalAmount: z.string().min(1, "Total amount is required"),
+  optional: z.boolean().optional().default(false),
 });
 
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;

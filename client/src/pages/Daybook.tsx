@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -26,6 +28,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -53,8 +74,65 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Book, Filter, X, Eye, Edit, Trash2 } from "lucide-react";
+import { Book, Filter, X, Eye, Edit, Trash2, Plus, ChevronDown, Check, ChevronsUpDown, FileDown } from "lucide-react";
 import { format, parseISO, isToday } from "date-fns";
+import { cn } from "@/lib/utils";
+import { utils, writeFile } from "xlsx";
+
+// Account types
+interface LedgerAccount {
+  id: number;
+  code: string;
+  name: string;
+  accountType: string;
+}
+
+interface BankAccount {
+  id: number;
+  code: string;
+  name: string;
+  accountNumber: string;
+  bankName: string;
+}
+
+interface Supplier {
+  id: number;
+  code: string;
+  legalName: string;
+}
+
+// Zod schema for new entry rows
+const newEntryRowSchema = z.object({
+  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountId: z.number().min(1, "Please select an account"),
+  accountName: z.string(),
+  debitAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
+    message: "Must be a valid number",
+  }),
+  creditAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
+    message: "Must be a valid number",
+  }),
+  narration: z.string().optional(),
+});
+
+// Zod schema for creating vouchers with entries
+const createVoucherSchema = z.object({
+  voucherType: z.enum(["Journal", "Payment", "Receipt", "Stock Transfer", "Sales", "Purchase", "Contra"], {
+    required_error: "Voucher type is required",
+  }),
+  voucherDate: z.string().min(1, "Voucher date is required"),
+  description: z.string().optional(),
+  optional: z.boolean().default(false),
+  entries: z.array(newEntryRowSchema).min(2, "At least 2 entries required"),
+}).refine((data) => {
+  // Calculate total debits and credits
+  const totalDebits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
+  const totalCredits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
+  return Math.abs(totalDebits - totalCredits) < 0.01; // Allow for floating point precision
+}, {
+  message: "Total debits must equal total credits",
+  path: ["entries"],
+});
 
 // Zod schema for editing voucher entries
 const entryEditSchema = z.object({
@@ -70,7 +148,7 @@ const entryEditSchema = z.object({
 // Zod schema for editing vouchers with entries
 const editVoucherSchema = z.object({
   voucherDate: z.string().min(1, "Voucher date is required"),
-  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra"], {
+  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer"], {
     required_error: "Voucher type is required",
   }),
   description: z.string().optional(),
@@ -85,6 +163,7 @@ const editVoucherSchema = z.object({
   path: ["entries"],
 });
 
+type CreateVoucherForm = z.infer<typeof createVoucherSchema>;
 type EditVoucherForm = z.infer<typeof editVoucherSchema>;
 
 interface Voucher {
@@ -94,6 +173,7 @@ interface Voucher {
   voucherDate: string;
   description: string | null;
   totalAmount: string;
+  optional: boolean;
   createdAt: string;
 }
 
@@ -106,10 +186,99 @@ interface VoucherEntry {
   accountName: string;
   debitAmount: string;
   creditAmount: string;
+  narration: string | null;
+}
+
+// Account Combobox Component
+function AccountCombobox({
+  value,
+  onChange,
+  ledgerAccounts,
+  bankAccounts,
+  suppliers,
+  rowIndex,
+  testIdPrefix = "button-account",
+}: {
+  value: { type: string; id: number; name: string } | null;
+  onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
+  ledgerAccounts: LedgerAccount[];
+  bankAccounts: BankAccount[];
+  suppliers: Supplier[];
+  rowIndex: number;
+  testIdPrefix?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const allAccounts = [
+    ...ledgerAccounts.map((a) => ({
+      type: "ledger" as const,
+      id: a.id,
+      name: `${a.code} - ${a.name}`,
+    })),
+    ...bankAccounts.map((a) => ({
+      type: "bank" as const,
+      id: a.id,
+      name: `${a.code} - ${a.name}`,
+    })),
+    ...suppliers.map((s) => ({
+      type: "supplier" as const,
+      id: s.id,
+      name: `${s.code} - ${s.legalName}`,
+    })),
+  ];
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+          data-testid={`${testIdPrefix}-${rowIndex}`}
+        >
+          {value ? value.name : "Select account..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+        <Command className="bg-popover text-popover-foreground">
+          <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
+          <CommandList className="bg-popover text-popover-foreground">
+            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandGroup>
+              {allAccounts.map((account) => (
+                <CommandItem
+                  key={`${account.type}-${account.id}`}
+                  value={account.name}
+                  onSelect={() => {
+                    onChange(account.type, account.id, account.name);
+                    setOpen(false);
+                  }}
+                  data-testid={`option-account-${account.type}-${account.id}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value?.type === account.type && value?.id === account.id
+                        ? "opacity-100"
+                        : "opacity-0"
+                    )}
+                  />
+                  {account.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const [filters, setFilters] = useState({
     startDate: "",
     endDate: "",
@@ -118,16 +287,51 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createFormInitialized, setCreateFormInitialized] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<Voucher | null>(null);
 
+  // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
+  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/ledger-accounts"],
+  });
+
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ["/api/bank-accounts"],
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+  });
+
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
     queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
     enabled: !!voucherToEdit && editDialogOpen,
+  });
+  
+  // Create form with react-hook-form and zod
+  const createForm = useForm<CreateVoucherForm>({
+    resolver: zodResolver(createVoucherSchema),
+    defaultValues: {
+      voucherType: "Journal",
+      voucherDate: format(new Date(), "yyyy-MM-dd"),
+      description: "",
+      optional: false,
+      entries: [
+        { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
+        { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
+      ],
+    },
+  });
+
+  const { fields: createFields, append: createAppend, remove: createRemove } = useFieldArray({
+    control: createForm.control,
+    name: "entries",
   });
   
   // Edit form with react-hook-form and zod
@@ -220,6 +424,66 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return user?.role === "Admin";
   };
 
+  // Create voucher mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateVoucherForm) => {
+      if (!selectedCompany) {
+        throw new Error("No company selected");
+      }
+
+      const voucherNumber = `${data.voucherType.toUpperCase().replace(/\s+/g, '')}-${Date.now()}`;
+      const totalAmount = data.entries.reduce((sum, entry) => 
+        sum + Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")), 0
+      );
+
+      const voucher = {
+        companyId: selectedCompany,
+        voucherNumber,
+        voucherType: data.voucherType,
+        voucherDate: data.voucherDate,
+        description: data.description,
+        optional: data.optional,
+        totalAmount: totalAmount.toString(),
+      };
+
+      const entries = data.entries.map(entry => ({
+        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        debitAmount: entry.debitAmount,
+        creditAmount: entry.creditAmount,
+        narration: entry.narration || null,
+      }));
+
+      return await apiRequest("POST", "/api/vouchers/with-entries", { voucher, entries });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({
+        title: "Success",
+        description: "Voucher created successfully",
+      });
+      setCreateDialogOpen(false);
+      createForm.reset({
+        voucherType: "Journal",
+        voucherDate: format(new Date(), "yyyy-MM-dd"),
+        description: "",
+        optional: false,
+        entries: [
+          { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
+          { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
+        ],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Edit voucher mutation
   const editMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: EditVoucherForm }) => {
@@ -248,6 +512,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       });
       setEditDialogOpen(false);
       setVoucherToEdit(null);
+      setEditFormInitialized(false);
     },
     onError: (error: any) => {
       toast({
@@ -287,10 +552,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
     setViewDialogOpen(true);
   };
 
-  const [, navigate] = useLocation();
+  const handleNewEntry = (voucherType: string) => {
+    createForm.setValue("voucherType", voucherType as any);
+    setCreateDialogOpen(true);
+  };
+
+  const handleSaveCreate = (data: CreateVoucherForm) => {
+    createMutation.mutate(data);
+  };
 
   const handleEdit = (voucher: Voucher) => {
-    navigate(`/vouchers/${voucher.id}/edit`);
+    setVoucherToEdit(voucher);
+    setEditDialogOpen(true);
   };
 
   const handleSaveEdit = (data: EditVoucherForm) => {
@@ -311,6 +584,38 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (voucherToDelete) {
       deleteMutation.mutate(voucherToDelete.id);
     }
+  };
+
+  const handleExportToExcel = () => {
+    if (filteredVouchers.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no vouchers to export based on current filters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = filteredVouchers.map((voucher) => ({
+      "Voucher Number": voucher.voucherNumber,
+      "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+      "Type": voucher.voucherType,
+      "Description": voucher.description || "",
+      "Total Amount": parseFloat(voucher.totalAmount).toFixed(2),
+      "Optional": voucher.optional ? "Yes" : "No",
+    }));
+
+    const worksheet = utils.json_to_sheet(exportData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Daybook");
+
+    const fileName = `Daybook_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    writeFile(workbook, fileName);
+
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${filteredVouchers.length} records.`,
+    });
   };
 
   const clearFilters = () => {
@@ -354,6 +659,71 @@ export default function Daybook({ user }: { user?: any } = {}) {
           <p className="text-muted-foreground mt-1">
             View all accounting transactions chronologically
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportToExcel}
+            disabled={filteredVouchers.length === 0}
+            data-testid="button-export-excel"
+            className="gap-2"
+          >
+            <FileDown className="w-4 h-4" />
+            Export to Excel
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button data-testid="button-new-entry" className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Entry
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Journal")}
+                data-testid="menu-item-journal"
+              >
+                Journal
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Payment")}
+                data-testid="menu-item-payment"
+              >
+                Payment
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Receipt")}
+                data-testid="menu-item-receipt"
+              >
+                Receipt
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Stock Transfer")}
+                data-testid="menu-item-stock-transfer"
+              >
+                Stock Transfer
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Sales")}
+                data-testid="menu-item-sales"
+              >
+                Sales
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Purchase")}
+                data-testid="menu-item-purchase"
+              >
+                Purchase
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleNewEntry("Contra")}
+                data-testid="menu-item-contra"
+              >
+                Contra
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -500,12 +870,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {voucher.voucherNumber}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={getVoucherTypeBadgeVariant(voucher.voucherType)}
-                          data-testid={`badge-type-${voucher.id}`}
-                        >
-                          {voucher.voucherType}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={getVoucherTypeBadgeVariant(voucher.voucherType)}
+                            data-testid={`badge-type-${voucher.id}`}
+                          >
+                            {voucher.voucherType}
+                          </Badge>
+                          {voucher.optional && (
+                            <Badge
+                              variant="outline"
+                              data-testid={`badge-optional-${voucher.id}`}
+                              className="text-xs"
+                            >
+                              Optional
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-md truncate">
                         {voucher.description || "-"}
@@ -553,6 +934,294 @@ export default function Daybook({ user }: { user?: any } = {}) {
           )}
         </CardContent>
       </Card>
+
+      {/* Create Voucher Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Voucher</DialogTitle>
+            <DialogDescription>
+              Create a new accounting voucher with multiple entries. Debits must equal credits.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...createForm}>
+            <form onSubmit={createForm.handleSubmit(handleSaveCreate)} className="space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={createForm.control}
+                  name="voucherType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Voucher Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-create-voucher-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Journal">Journal</SelectItem>
+                          <SelectItem value="Payment">Payment</SelectItem>
+                          <SelectItem value="Receipt">Receipt</SelectItem>
+                          <SelectItem value="Stock Transfer">Stock Transfer</SelectItem>
+                          <SelectItem value="Sales">Sales</SelectItem>
+                          <SelectItem value="Purchase">Purchase</SelectItem>
+                          <SelectItem value="Contra">Contra</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={createForm.control}
+                  name="voucherDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          data-testid="input-create-voucher-date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={createForm.control}
+                  name="optional"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-md border p-3 space-y-0">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm">Optional</FormLabel>
+                        <div className="text-xs text-muted-foreground">
+                          Does not affect books
+                        </div>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-create-optional"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={createForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Enter voucher description (optional)"
+                        rows={2}
+                        data-testid="textarea-create-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Entry Rows */}
+              <div className="border rounded-md p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Voucher Entries</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createAppend({ 
+                      accountType: "ledger", 
+                      accountId: 0, 
+                      accountName: "", 
+                      debitAmount: "0", 
+                      creditAmount: "0", 
+                      narration: "" 
+                    })}
+                    data-testid="button-add-entry"
+                    className="gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Entry
+                  </Button>
+                </div>
+
+                {createFields.map((field, index) => (
+                  <div key={field.id} className="border rounded-md p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Entry {index + 1}
+                      </span>
+                      {createFields.length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => createRemove(index)}
+                          data-testid={`button-remove-entry-${index}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <FormField
+                      control={createForm.control}
+                      name={`entries.${index}.accountType`}
+                      render={({ field: typeField }) => (
+                        <FormItem>
+                          <FormLabel>Account</FormLabel>
+                          <FormControl>
+                            <AccountCombobox
+                              value={
+                                createForm.watch(`entries.${index}.accountId`)
+                                  ? {
+                                      type: typeField.value,
+                                      id: createForm.watch(`entries.${index}.accountId`),
+                                      name: createForm.watch(`entries.${index}.accountName`),
+                                    }
+                                  : null
+                              }
+                              onChange={(type, id, name) => {
+                                createForm.setValue(`entries.${index}.accountType`, type);
+                                createForm.setValue(`entries.${index}.accountId`, id);
+                                createForm.setValue(`entries.${index}.accountName`, name);
+                              }}
+                              ledgerAccounts={ledgerAccounts}
+                              bankAccounts={bankAccounts}
+                              suppliers={suppliers}
+                              rowIndex={index}
+                              testIdPrefix="button-create-account"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={createForm.control}
+                        name={`entries.${index}.debitAmount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Debit Amount</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="font-mono"
+                                data-testid={`input-create-debit-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={createForm.control}
+                        name={`entries.${index}.creditAmount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Credit Amount</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="font-mono"
+                                data-testid={`input-create-credit-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={createForm.control}
+                      name={`entries.${index}.narration`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Narration (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter narration"
+                              data-testid={`input-create-narration-${index}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+
+                {/* Totals Display */}
+                {createForm.watch("entries") && createForm.watch("entries").length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="grid grid-cols-2 gap-4 text-sm font-mono">
+                      <div className="text-right">
+                        <span className="text-muted-foreground mr-2">Total Debits:</span>
+                        <span className="font-bold">
+                          ${createForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-muted-foreground mr-2">Total Credits:</span>
+                        <span className="font-bold">
+                          ${createForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    {createForm.formState.errors.entries && (
+                      <p className="text-sm text-destructive mt-2 text-center">
+                        {createForm.formState.errors.entries.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                  data-testid="button-cancel-create"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  data-testid="button-save-create"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Voucher"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       {/* View Voucher Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>

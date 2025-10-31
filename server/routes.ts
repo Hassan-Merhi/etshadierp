@@ -830,6 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         voucherDate: date,
         description: notes || `Salary deposit for ${employee.firstName} ${employee.lastName}`,
         totalAmount: depositAmount.toFixed(2),
+        optional: false,
       }).returning();
 
       // Create voucher entries (double-entry)
@@ -922,6 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         voucherDate: date,
         description: notes || `Salary withdrawal for ${employee.firstName} ${employee.lastName}`,
         totalAmount: withdrawalAmount.toFixed(2),
+        optional: false,
       }).returning();
 
       // Create voucher entries (double-entry)
@@ -1015,6 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         voucherDate: date,
         description: notes || `Salary payment for ${employee.firstName} ${employee.lastName}`,
         totalAmount: paymentAmount.toFixed(2),
+        optional: false,
       }).returning();
 
       // Create voucher entries (double-entry)
@@ -1097,6 +1100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         voucherDate: date,
         description: notes || `Bulk salary payment for ${payments.length} workers`,
         totalAmount: totalAmount.toFixed(2),
+        optional: false,
       }).returning();
 
       // Create debit entry for total salary expense
@@ -2148,6 +2152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherDate: importDate,
           description: `Purchase Order ${poNumber} - Container ${containerNumber}`,
           totalAmount: poTotal.toString(),
+          optional: false,
         });
 
         // Create voucher entries for double-entry bookkeeping
@@ -2607,6 +2612,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherDate: container.importDate,
           description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Backfilled)`,
           totalAmount: po.itemsTotal || "0",
+          optional: false,
         });
 
         // Debit: Purchases account (Expense increases)
@@ -3136,6 +3142,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a voucher with entries in one transaction
+  app.post("/api/vouchers/with-entries", requireAuth, async (req, res) => {
+    try {
+      const { voucher, entries } = req.body;
+      
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Validate voucher data
+      if (!voucher || !entries || !Array.isArray(entries) || entries.length === 0) {
+        return res.status(400).json({ message: "Voucher and entries are required" });
+      }
+
+      // Validate that debits equal credits
+      const totalDebits = entries.reduce((sum: number, entry: any) => 
+        sum + parseFloat(entry.debitAmount || "0"), 0);
+      const totalCredits = entries.reduce((sum: number, entry: any) => 
+        sum + parseFloat(entry.creditAmount || "0"), 0);
+      
+      if (Math.abs(totalDebits - totalCredits) >= 0.01) {
+        return res.status(400).json({ message: "Total debits must equal total credits" });
+      }
+
+      const result = await db.transaction(async (tx) => {
+        // Create voucher
+        const [createdVoucher] = await tx.insert(vouchers).values({
+          companyId: req.session.currentCompanyId!,
+          locationId: voucher.locationId || null,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description || null,
+          totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+          optional: voucher.optional ?? false,
+        }).returning();
+
+        // Create voucher entries
+        const createdEntries = [];
+        for (const entry of entries) {
+          const [createdEntry] = await tx.insert(voucherEntries).values({
+            voucherId: createdVoucher.id,
+            ledgerAccountId: entry.ledgerAccountId || null,
+            bankAccountId: entry.bankAccountId || null,
+            fixedAssetId: entry.fixedAssetId || null,
+            supplierId: entry.supplierId || null,
+            debitAmount: entry.debitAmount || "0",
+            creditAmount: entry.creditAmount || "0",
+            narration: entry.narration || null,
+          }).returning();
+          createdEntries.push(createdEntry);
+        }
+
+        return { voucher: createdVoucher, entries: createdEntries };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
@@ -3635,6 +3703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherDate,
           description: notes || `POS Sale at ${location.name}`,
           totalAmount: grandTotal.toFixed(2),
+          optional: false,
         }).returning();
 
         // Create voucher entries (double-entry bookkeeping)
