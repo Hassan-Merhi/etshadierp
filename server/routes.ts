@@ -35,6 +35,8 @@ import {
   stockAdjustmentItems,
   stockTransferVouchers,
   stockTransferItems,
+  purchaseOrders,
+  poLineItems,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -3625,6 +3627,484 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await db
         .update(vouchers)
         .set({ optional })
+        .where(eq(vouchers.id, id))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a sales voucher with line items
+  app.patch("/api/vouchers/:id/sales", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { voucherDate, description, items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify this is a Sales voucher
+      if (existingVoucher.voucherType !== "Sales") {
+        return res.status(400).json({ message: "This endpoint only updates Sales vouchers" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions based on role
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      // Admin and Owner can edit all vouchers
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        // Manager can only edit today's vouchers
+        if (userRole === "Manager") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          // Other roles cannot edit
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Fetch stock items to calculate cost prices
+      const stockItemIds = items.map(item => item.stockItemId);
+      const stockItemsData = await db
+        .select()
+        .from(stockItems)
+        .where(inArray(stockItems.id, stockItemIds));
+
+      const stockItemsMap = new Map(stockItemsData.map(item => [item.id, item]));
+
+      // Calculate totals and prepare items data
+      let totalSalesAmount = 0;
+      const salesItemsData = items.map((item: any) => {
+        const stockItem = stockItemsMap.get(item.stockItemId);
+        if (!stockItem) {
+          throw new Error(`Stock item ${item.stockItemId} not found`);
+        }
+
+        const quantity = parseFloat(item.quantity);
+        const sellingPrice = parseFloat(item.sellingPrice);
+        const costPrice = parseFloat(stockItem.openingRate || "0");
+
+        const totalSales = quantity * sellingPrice;
+        const totalCost = quantity * costPrice;
+        const profit = totalSales - totalCost;
+
+        totalSalesAmount += totalSales;
+
+        return {
+          voucherId: id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          sellingPrice: item.sellingPrice,
+          costPrice: costPrice.toFixed(2),
+          totalSales: totalSales.toFixed(2),
+          totalCost: totalCost.toFixed(2),
+          profit: profit.toFixed(2),
+        };
+      });
+
+      // Delete existing sales items
+      await db
+        .delete(salesItems)
+        .where(eq(salesItems.voucherId, id));
+
+      // Insert new sales items
+      await db.insert(salesItems).values(salesItemsData);
+
+      // Update the voucher
+      const voucherUpdates: any = {
+        totalAmount: totalSalesAmount.toFixed(2),
+      };
+      if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
+      if (description !== undefined) voucherUpdates.description = description;
+
+      const updated = await db
+        .update(vouchers)
+        .set(voucherUpdates)
+        .where(eq(vouchers.id, id))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a purchase voucher with line items
+  app.patch("/api/vouchers/:id/purchase", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { voucherDate, description, items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify this is a Purchase voucher
+      if (existingVoucher.voucherType !== "Purchase") {
+        return res.status(400).json({ message: "This endpoint only updates Purchase vouchers" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions based on role
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      // Admin and Owner can edit all vouchers
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        // Manager can only edit today's vouchers
+        if (userRole === "Manager") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          // Other roles cannot edit
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Find the associated purchase order
+      const [po] = await db
+        .select()
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.voucherId, id))
+        .limit(1);
+
+      if (!po) {
+        return res.status(404).json({ message: "Associated purchase order not found" });
+      }
+
+      // Calculate totals and prepare items data
+      let totalAmount = 0;
+      const poItemsData = items.map((item: any) => {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const lineTotal = quantity * rate;
+
+        totalAmount += lineTotal;
+
+        return {
+          poId: po.id,
+          stockItemId: item.stockItemId || 0, // Default to 0 if not provided
+          itemName: item.itemName,
+          quantity: item.quantity,
+          rate: item.rate,
+          lineTotal: lineTotal.toFixed(2),
+        };
+      });
+
+      // Delete existing PO line items
+      await db
+        .delete(poLineItems)
+        .where(eq(poLineItems.poId, po.id));
+
+      // Insert new PO line items
+      await db.insert(poLineItems).values(poItemsData);
+
+      // Update the purchase order total
+      await db
+        .update(purchaseOrders)
+        .set({ itemsTotal: totalAmount.toFixed(2) })
+        .where(eq(purchaseOrders.id, po.id));
+
+      // Update the voucher
+      const voucherUpdates: any = {
+        totalAmount: totalAmount.toFixed(2),
+      };
+      if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
+      if (description !== undefined) voucherUpdates.description = description;
+
+      const updated = await db
+        .update(vouchers)
+        .set(voucherUpdates)
+        .where(eq(vouchers.id, id))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update an adjustment voucher (Consumption or Mixed) with line items
+  app.patch("/api/vouchers/:id/adjustment", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { voucherDate, description, locationId, items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify this is a Consumption or Mixed voucher
+      if (existingVoucher.voucherType !== "Consumption" && existingVoucher.voucherType !== "Mixed") {
+        return res.status(400).json({ message: "This endpoint only updates Consumption or Mixed vouchers" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole === "Manager") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Find the associated adjustment voucher
+      const [adjustmentVoucher] = await db
+        .select()
+        .from(stockAdjustmentVouchers)
+        .where(eq(stockAdjustmentVouchers.voucherId, id))
+        .limit(1);
+
+      if (!adjustmentVoucher) {
+        return res.status(404).json({ message: "Associated adjustment voucher not found" });
+      }
+
+      // Calculate totals and prepare items data
+      let totalAmount = 0;
+      const adjustmentItemsData = items.map((item: any) => {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const itemTotal = quantity * rate;
+
+        totalAmount += itemTotal;
+
+        return {
+          adjustmentId: adjustmentVoucher.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+          totalAmount: itemTotal.toFixed(2),
+        };
+      });
+
+      // Delete existing adjustment items
+      await db
+        .delete(stockAdjustmentItems)
+        .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+      // Insert new adjustment items
+      await db.insert(stockAdjustmentItems).values(adjustmentItemsData);
+
+      // Update the adjustment voucher (location can be changed, but shouldn't affect old inventory)
+      await db
+        .update(stockAdjustmentVouchers)
+        .set({ locationId: parseInt(locationId) })
+        .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
+
+      // Update the main voucher
+      const voucherUpdates: any = {
+        totalAmount: totalAmount.toFixed(2),
+      };
+      if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
+      if (description !== undefined) voucherUpdates.description = description;
+
+      const updated = await db
+        .update(vouchers)
+        .set(voucherUpdates)
+        .where(eq(vouchers.id, id))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update a stock transfer voucher with line items
+  app.patch("/api/vouchers/:id/transfer", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { voucherDate, description, sourceLocationId, destinationLocationId, items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      if (!sourceLocationId || !destinationLocationId) {
+        return res.status(400).json({ message: "Source and destination locations are required" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify this is a Stock Transfer voucher
+      if (existingVoucher.voucherType !== "Stock Transfer") {
+        return res.status(400).json({ message: "This endpoint only updates Stock Transfer vouchers" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        if (userRole === "Manager") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Find the associated transfer voucher
+      const [transferVoucher] = await db
+        .select()
+        .from(stockTransferVouchers)
+        .where(eq(stockTransferVouchers.voucherId, id))
+        .limit(1);
+
+      if (!transferVoucher) {
+        return res.status(404).json({ message: "Associated transfer voucher not found" });
+      }
+
+      // Calculate totals and prepare items data
+      let totalAmount = 0;
+      const transferItemsData = items.map((item: any) => {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const itemTotal = quantity * rate;
+
+        totalAmount += itemTotal;
+
+        return {
+          transferId: transferVoucher.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+          totalAmount: itemTotal.toFixed(2),
+        };
+      });
+
+      // Delete existing transfer items
+      await db
+        .delete(stockTransferItems)
+        .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+      // Insert new transfer items
+      await db.insert(stockTransferItems).values(transferItemsData);
+
+      // Update the transfer voucher (locations can be changed, but shouldn't affect old inventory)
+      await db
+        .update(stockTransferVouchers)
+        .set({
+          sourceLocationId: parseInt(sourceLocationId),
+          destinationLocationId: parseInt(destinationLocationId),
+        })
+        .where(eq(stockTransferVouchers.id, transferVoucher.id));
+
+      // Update the main voucher
+      const voucherUpdates: any = {
+        totalAmount: totalAmount.toFixed(2),
+      };
+      if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
+      if (description !== undefined) voucherUpdates.description = description;
+
+      const updated = await db
+        .update(vouchers)
+        .set(voucherUpdates)
         .where(eq(vouchers.id, id))
         .returning();
 

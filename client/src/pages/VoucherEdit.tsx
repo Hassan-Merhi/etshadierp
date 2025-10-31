@@ -223,6 +223,70 @@ const journalEntrySchema = z.object({
     }),
 });
 
+const salesLineItemSchema = z.object({
+  id: z.number().optional(),
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string()
+    .min(1, "Quantity required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Quantity must be a positive number",
+    }),
+  sellingPrice: z.string()
+    .min(1, "Selling price required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Selling price must be a positive number",
+    }),
+});
+
+const purchaseLineItemSchema = z.object({
+  id: z.number().optional(),
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string()
+    .min(1, "Quantity required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Quantity must be a positive number",
+    }),
+  rate: z.string()
+    .min(1, "Rate required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Rate must be a positive number",
+    }),
+});
+
+const adjustmentLineItemSchema = z.object({
+  id: z.number().optional(),
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string()
+    .min(1, "Quantity required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Quantity must be a positive number",
+    }),
+  rate: z.string()
+    .min(1, "Rate required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Rate must be a positive number",
+    }),
+});
+
+const transferLineItemSchema = z.object({
+  id: z.number().optional(),
+  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemName: z.string(),
+  quantity: z.string()
+    .min(1, "Quantity required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Quantity must be a positive number",
+    }),
+  rate: z.string()
+    .min(1, "Rate required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Rate must be a positive number",
+    }),
+});
+
 // Form schemas
 const voucherFormSchema = z.object({
   paymentAccountType: z.enum(["ledger", "bank", "supplier"]),
@@ -239,8 +303,103 @@ const journalFormSchema = z.object({
   notes: z.string().optional(),
 });
 
+const salesFormSchema = z.object({
+  voucherDate: z.date(),
+  locationId: z.number().min(1, "Location is required"),
+  items: z.array(salesLineItemSchema).min(1, "Add at least one item"),
+  notes: z.string().optional(),
+});
+
+const purchaseFormSchema = z.object({
+  voucherDate: z.date(),
+  items: z.array(purchaseLineItemSchema).min(1, "Add at least one item"),
+  notes: z.string().optional(),
+});
+
+const adjustmentFormSchema = z.object({
+  voucherDate: z.date(),
+  locationId: z.number().min(1, "Location is required"),
+  items: z.array(adjustmentLineItemSchema).min(1, "Add at least one item"),
+  notes: z.string().optional(),
+});
+
+const transferFormSchema = z.object({
+  voucherDate: z.date(),
+  sourceLocationId: z.number().min(1, "Source location is required"),
+  destinationLocationId: z.number().min(1, "Destination location is required"),
+  items: z.array(transferLineItemSchema).min(1, "Add at least one item"),
+  notes: z.string().optional(),
+});
+
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
 type JournalFormData = z.infer<typeof journalFormSchema>;
+type SalesFormData = z.infer<typeof salesFormSchema>;
+type PurchaseFormData = z.infer<typeof purchaseFormSchema>;
+type AdjustmentFormData = z.infer<typeof adjustmentFormSchema>;
+type TransferFormData = z.infer<typeof transferFormSchema>;
+
+// Stock Item Combobox Component
+function StockItemCombobox({
+  value,
+  onChange,
+  stockItems,
+  rowIndex,
+  testIdPrefix = "button-stock-item",
+}: {
+  value: { id: number; name: string } | null;
+  onChange: (id: number, name: string) => void;
+  stockItems: StockItem[];
+  rowIndex: number;
+  testIdPrefix?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+          data-testid={`${testIdPrefix}-${rowIndex}`}
+        >
+          {value ? value.name : "Select item..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0 bg-popover text-popover-foreground">
+        <Command className="bg-popover text-popover-foreground">
+          <CommandInput placeholder="Search stock items..." className="bg-popover text-popover-foreground" />
+          <CommandList className="bg-popover text-popover-foreground">
+            <CommandEmpty>No stock item found.</CommandEmpty>
+            <CommandGroup>
+              {stockItems.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={`${item.code} - ${item.name}`}
+                  onSelect={() => {
+                    onChange(item.id, `${item.code} - ${item.name}`);
+                    setOpen(false);
+                  }}
+                  data-testid={`option-stock-item-${item.id}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value?.id === item.id ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {item.code} - {item.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // Account Combobox Component
 function AccountCombobox({
@@ -405,6 +564,70 @@ export default function VoucherEdit() {
     name: "entries",
   });
 
+  // Sales Form
+  const salesForm = useForm<SalesFormData>({
+    resolver: zodResolver(salesFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      locationId: 0,
+      items: [],
+      notes: "",
+    },
+  });
+
+  const { fields: salesFields, append: salesAppend, remove: salesRemove } = useFieldArray({
+    control: salesForm.control,
+    name: "items",
+  });
+
+  // Purchase Form
+  const purchaseForm = useForm<PurchaseFormData>({
+    resolver: zodResolver(purchaseFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      items: [],
+      notes: "",
+    },
+  });
+
+  const { fields: purchaseFields, append: purchaseAppend, remove: purchaseRemove } = useFieldArray({
+    control: purchaseForm.control,
+    name: "items",
+  });
+
+  // Adjustment Form (for Consumption/Mixed)
+  const adjustmentForm = useForm<AdjustmentFormData>({
+    resolver: zodResolver(adjustmentFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      locationId: 0,
+      items: [],
+      notes: "",
+    },
+  });
+
+  const { fields: adjustmentFields, append: adjustmentAppend, remove: adjustmentRemove } = useFieldArray({
+    control: adjustmentForm.control,
+    name: "items",
+  });
+
+  // Transfer Form (for Stock Transfer)
+  const transferForm = useForm<TransferFormData>({
+    resolver: zodResolver(transferFormSchema),
+    defaultValues: {
+      voucherDate: new Date(),
+      sourceLocationId: 0,
+      destinationLocationId: 0,
+      items: [],
+      notes: "",
+    },
+  });
+
+  const { fields: transferFields, append: transferAppend, remove: transferRemove } = useFieldArray({
+    control: transferForm.control,
+    name: "items",
+  });
+
   // Helper function to find account details by ID
   const findAccountDetails = (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
@@ -502,8 +725,64 @@ export default function VoucherEdit() {
         notes: voucher.description || "",
       });
       setFormInitialized(true);
+    } else if (isSales && voucher.salesItems && voucher.salesItems.length > 0) {
+      salesForm.reset({
+        voucherDate: parseISO(voucher.voucherDate),
+        locationId: voucher.locationId || 0,
+        items: voucher.salesItems.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
+          quantity: item.quantity,
+          sellingPrice: item.sellingPrice,
+        })),
+        notes: voucher.description || "",
+      });
+      setFormInitialized(true);
+    } else if (isPurchase && voucher.purchaseOrder && voucher.purchaseOrder.items && voucher.purchaseOrder.items.length > 0) {
+      purchaseForm.reset({
+        voucherDate: parseISO(voucher.voucherDate),
+        items: voucher.purchaseOrder.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          stockItemName: item.itemName,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+        notes: voucher.description || "",
+      });
+      setFormInitialized(true);
+    } else if (isConsumption && voucher.adjustmentData && voucher.adjustmentData.items && voucher.adjustmentData.items.length > 0) {
+      adjustmentForm.reset({
+        voucherDate: parseISO(voucher.voucherDate),
+        locationId: voucher.adjustmentData.locationId,
+        items: voucher.adjustmentData.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+        notes: voucher.adjustmentData.notes || "",
+      });
+      setFormInitialized(true);
+    } else if (isStockTransfer && voucher.transferData && voucher.transferData.items && voucher.transferData.items.length > 0) {
+      transferForm.reset({
+        voucherDate: parseISO(voucher.voucherDate),
+        sourceLocationId: voucher.transferData.sourceLocationId,
+        destinationLocationId: voucher.transferData.destinationLocationId,
+        items: voucher.transferData.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+        notes: voucher.transferData.notes || "",
+      });
+      setFormInitialized(true);
     }
-  }, [voucher, voucherType, ledgerAccounts, bankAccounts, suppliers, formInitialized, isPaymentOrReceipt, isJournal, paymentForm, journalForm]);
+  }, [voucher, voucherType, ledgerAccounts, bankAccounts, suppliers, formInitialized, isPaymentOrReceipt, isJournal, isSales, isPurchase, isConsumption, isStockTransfer, paymentForm, journalForm, salesForm, purchaseForm, adjustmentForm, transferForm]);
 
   // Update mutation
   const updateMutation = useMutation({
@@ -560,6 +839,142 @@ export default function VoucherEdit() {
     },
   });
 
+  // Sales update mutation
+  const updateSalesMutation = useMutation({
+    mutationFn: async (data: SalesFormData) => {
+      const salesData = {
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: data.notes,
+        items: data.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          sellingPrice: item.sellingPrice,
+        })),
+      };
+      return await apiRequest("PATCH", `/api/vouchers/${id}/sales`, salesData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      toast({
+        title: "Success",
+        description: "Sales voucher updated successfully",
+      });
+      navigate("/daybook");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update sales voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Purchase update mutation
+  const updatePurchaseMutation = useMutation({
+    mutationFn: async (data: PurchaseFormData) => {
+      const purchaseData = {
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: data.notes,
+        items: data.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          itemName: item.stockItemName,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+      };
+      return await apiRequest("PATCH", `/api/vouchers/${id}/purchase`, purchaseData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      toast({
+        title: "Success",
+        description: "Purchase voucher updated successfully",
+      });
+      navigate("/daybook");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update purchase voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Adjustment update mutation (for Consumption/Mixed)
+  const updateAdjustmentMutation = useMutation({
+    mutationFn: async (data: AdjustmentFormData) => {
+      const adjustmentData = {
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: data.notes,
+        locationId: data.locationId,
+        items: data.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+      };
+      return await apiRequest("PATCH", `/api/vouchers/${id}/adjustment`, adjustmentData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      toast({
+        title: "Success",
+        description: "Adjustment voucher updated successfully",
+      });
+      navigate("/daybook");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update adjustment voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Transfer update mutation
+  const updateTransferMutation = useMutation({
+    mutationFn: async (data: TransferFormData) => {
+      const transferData = {
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: data.notes,
+        sourceLocationId: data.sourceLocationId,
+        destinationLocationId: data.destinationLocationId,
+        items: data.items.map(item => ({
+          id: item.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+        })),
+      };
+      return await apiRequest("PATCH", `/api/vouchers/${id}/transfer`, transferData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      toast({
+        title: "Success",
+        description: "Stock transfer voucher updated successfully",
+      });
+      navigate("/daybook");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update stock transfer voucher",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Submit handlers
   const onSubmitPaymentReceipt = (data: VoucherFormData) => {
     const voucherUpdates = {
@@ -601,6 +1016,22 @@ export default function VoucherEdit() {
     }));
 
     updateMutation.mutate({ voucherUpdates, entriesUpdates });
+  };
+
+  const onSubmitSales = (data: SalesFormData) => {
+    updateSalesMutation.mutate(data);
+  };
+
+  const onSubmitPurchase = (data: PurchaseFormData) => {
+    updatePurchaseMutation.mutate(data);
+  };
+
+  const onSubmitAdjustment = (data: AdjustmentFormData) => {
+    updateAdjustmentMutation.mutate(data);
+  };
+
+  const onSubmitTransfer = (data: TransferFormData) => {
+    updateTransferMutation.mutate(data);
   };
 
   // Handle cancel
@@ -684,10 +1115,16 @@ export default function VoucherEdit() {
     );
   }
 
-  // Sales viewing (when voucher type is Sales and items are linked)
+  // Sales editing (when voucher type is Sales and items are linked)
   if (isSales && voucher.salesItems) {
-    const salesItems = voucher.salesItems;
     const location = locations.find(l => l.id === voucher.locationId);
+    
+    // Calculate grand total
+    const salesGrandTotal = salesForm.watch("items").reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const price = parseFloat(item.sellingPrice) || 0;
+      return sum + (qty * price);
+    }, 0);
     
     return (
       <div className="space-y-6">
@@ -697,138 +1134,285 @@ export default function VoucherEdit() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              Sales Invoice: {voucher.voucherNumber}
+              Edit Sales Invoice
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              View sales transaction details
+            <p className="text-muted-foreground mt-1">
+              Voucher #{voucher.voucherNumber}
             </p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sales Details</CardTitle>
-            <CardDescription>
-              Point of Sale transaction
-            </CardDescription>
+            <CardTitle>Edit Sales Voucher</CardTitle>
+            <CardDescription>Update sales invoice details and line items</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Invoice Number</p>
-                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Date</p>
-                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Location</p>
-                <p className="text-base font-semibold">{location?.name || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                <p className="text-base font-semibold">
-                  ${parseFloat(voucher.totalAmount || "0").toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-            </div>
+          <CardContent>
+            <Form {...salesForm}>
+              <form onSubmit={salesForm.handleSubmit(onSubmitSales)} className="space-y-6">
+                {/* Header section with date and location */}
+                <div className="flex items-start justify-between gap-4">
+                  {/* Date picker */}
+                  <FormField
+                    control={salesForm.control}
+                    name="voucherDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-[200px] justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="button-date-picker"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <div className="flex items-center gap-2 py-2 border-y">
-              <Switch
-                id="optional-toggle"
-                checked={voucher.optional}
-                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
-                disabled={toggleOptionalMutation.isPending}
-                data-testid="switch-optional"
-              />
-              <Label htmlFor="optional-toggle" className="cursor-pointer">
-                Optional (Does not affect books)
-              </Label>
-            </div>
-
-            {salesItems && salesItems.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Items Sold</p>
-                <div className="border rounded-md">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-2 text-sm font-medium">Item</th>
-                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
-                        <th className="text-right p-2 text-sm font-medium">Price</th>
-                        <th className="text-right p-2 text-sm font-medium">Total</th>
-                        <th className="text-right p-2 text-sm font-medium">Profit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salesItems.map((item, index) => (
-                        <tr key={item.id} className={index < salesItems.length - 1 ? "border-b" : ""}>
-                          <td className="p-2 text-sm">
-                            {item.stockItemCode} - {item.stockItemName}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            ${parseFloat(item.sellingPrice).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
-                            ${parseFloat(item.totalSales).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium text-green-600">
-                            ${parseFloat(item.profit).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="border-t font-semibold bg-muted/30">
-                        <td className="p-2 text-sm" colSpan={3}>Total</td>
-                        <td className="p-2 text-sm text-right">
-                          ${salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                        <td className="p-2 text-sm text-right text-green-600">
-                          ${salesItems.reduce((sum, item) => sum + parseFloat(item.profit), 0).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Location (readonly) */}
+                  <div className="flex-1">
+                    <FormLabel>Location</FormLabel>
+                    <Input
+                      value={location?.name || "N/A"}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-location"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Location cannot be changed to maintain inventory accuracy
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {voucher.description && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm">{voucher.description}</p>
-              </div>
-            )}
+                {/* Optional toggle */}
+                <div className="flex items-center gap-2 py-2 border-y">
+                  <Switch
+                    id="optional-toggle-sales"
+                    checked={voucher.optional}
+                    onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                    disabled={toggleOptionalMutation.isPending}
+                    data-testid="switch-optional"
+                  />
+                  <Label htmlFor="optional-toggle-sales" className="cursor-pointer">
+                    Optional (Does not affect books)
+                  </Label>
+                </div>
 
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCancel}
-                data-testid="button-back-to-daybook"
-              >
-                Back to Daybook
-              </Button>
-            </div>
+                {/* Line items table */}
+                <div>
+                  <FormLabel className="mb-2 block">Line Items</FormLabel>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Price</th>
+                          <th className="text-right p-3 font-medium w-[25%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salesFields.map((field, index) => {
+                          const qty = parseFloat(salesForm.watch(`items.${index}.quantity`)) || 0;
+                          const price = parseFloat(salesForm.watch(`items.${index}.sellingPrice`)) || 0;
+                          const lineTotal = qty * price;
+
+                          return (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={salesForm.control}
+                                  name={`items.${index}.stockItemId`}
+                                  render={({ field: itemField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            salesForm.watch(`items.${index}.stockItemId`) > 0
+                                              ? {
+                                                  id: salesForm.watch(`items.${index}.stockItemId`),
+                                                  name: salesForm.watch(`items.${index}.stockItemName`),
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            salesForm.setValue(`items.${index}.stockItemId`, id);
+                                            salesForm.setValue(`items.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={salesForm.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono"
+                                          data-testid={`input-quantity-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={salesForm.control}
+                                  name={`items.${index}.sellingPrice`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="font-mono"
+                                          data-testid={`input-price-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
+                                  ${lineTotal.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                {salesFields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => salesRemove(index)}
+                                    data-testid={`button-remove-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                salesAppend({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  sellingPrice: "",
+                                })
+                              }
+                              data-testid="button-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono">
+                              ${salesGrandTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Notes field */}
+                <FormField
+                  control={salesForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Additional notes..."
+                          rows={3}
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={updateSalesMutation.isPending}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateSalesMutation.isPending || salesGrandTotal === 0}
+                    data-testid="button-save-changes"
+                  >
+                    {updateSalesMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>
@@ -839,122 +1423,12 @@ export default function VoucherEdit() {
   if (isPurchase && voucher.purchaseOrder) {
     const po = voucher.purchaseOrder;
     
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              Purchase Order: {po.poNumber}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              View and verify purchase order details
-            </p>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Purchase Order Details</CardTitle>
-            <CardDescription>
-              This purchase order was automatically created during container import
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">PO Number</p>
-                <p className="text-base font-semibold">{po.poNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Currency</p>
-                <p className="text-base font-semibold">{po.currency}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Items Total</p>
-                <p className="text-base font-semibold">
-                  ${parseFloat(po.itemsTotal || "0").toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <p className="text-base font-semibold">{po.status}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 py-2 border-y">
-              <Switch
-                id="optional-toggle-po"
-                checked={voucher.optional}
-                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
-                disabled={toggleOptionalMutation.isPending}
-                data-testid="switch-optional"
-              />
-              <Label htmlFor="optional-toggle-po" className="cursor-pointer">
-                Optional (Does not affect books)
-              </Label>
-            </div>
-
-            {po.items && po.items.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Line Items</p>
-                <div className="border rounded-md">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-2 text-sm font-medium">Item</th>
-                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
-                        <th className="text-right p-2 text-sm font-medium">Rate</th>
-                        <th className="text-right p-2 text-sm font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {po.items.map((item, index) => (
-                        <tr key={item.id} className={index < po.items.length - 1 ? "border-b" : ""}>
-                          <td className="p-2 text-sm">{item.itemName}</td>
-                          <td className="p-2 text-sm text-right">{parseFloat(item.quantity).toLocaleString()}</td>
-                          <td className="p-2 text-sm text-right">
-                            ${parseFloat(item.rate).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
-                            ${parseFloat(item.lineTotal).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCancel}
-                data-testid="button-back-to-daybook"
-              >
-                Back to Daybook
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Consumption/Mixed viewing (when voucher type is Consumption or Mixed)
-  if (isConsumption && voucher.adjustmentData) {
-    const adjustment = voucher.adjustmentData;
+    // Calculate grand total
+    const purchaseGrandTotal = purchaseForm.watch("items").reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      return sum + (qty * rate);
+    }, 0);
     
     return (
       <div className="space-y-6">
@@ -964,126 +1438,630 @@ export default function VoucherEdit() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              {voucherType} Voucher: {voucher.voucherNumber}
+              Edit Purchase Order
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              View stock adjustment details
+            <p className="text-muted-foreground mt-1">
+              Voucher #{voucher.voucherNumber}
             </p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>{voucherType} Details</CardTitle>
-            <CardDescription>
-              Stock adjustment at {adjustment.locationName}
-            </CardDescription>
+            <CardTitle>Edit Purchase Voucher</CardTitle>
+            <CardDescription>Update purchase order details and line items</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Voucher Number</p>
-                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Date</p>
-                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Location</p>
-                <p className="text-base font-semibold">{adjustment.locationName}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                <p className="text-base font-semibold">
-                  ${parseFloat(voucher.totalAmount || "0").toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-            </div>
+          <CardContent>
+            <Form {...purchaseForm}>
+              <form onSubmit={purchaseForm.handleSubmit(onSubmitPurchase)} className="space-y-6">
+                {/* Header section with date and readonly fields */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Date picker */}
+                  <FormField
+                    control={purchaseForm.control}
+                    name="voucherDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="button-date-picker"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <div className="flex items-center gap-2 py-2 border-y">
-              <Switch
-                id="optional-toggle-adjustment"
-                checked={voucher.optional}
-                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
-                disabled={toggleOptionalMutation.isPending}
-                data-testid="switch-optional"
-              />
-              <Label htmlFor="optional-toggle-adjustment" className="cursor-pointer">
-                Optional (Does not affect books)
-              </Label>
-            </div>
+                  {/* PO Number (readonly) */}
+                  <div>
+                    <FormLabel>PO Number</FormLabel>
+                    <Input
+                      value={po.poNumber}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-po-number"
+                    />
+                  </div>
 
-            {adjustment.items && adjustment.items.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Items</p>
-                <div className="border rounded-md">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-2 text-sm font-medium">Item</th>
-                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
-                        <th className="text-right p-2 text-sm font-medium">Rate</th>
-                        <th className="text-right p-2 text-sm font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adjustment.items.map((item, index) => (
-                        <tr key={item.id} className={index < adjustment.items.length - 1 ? "border-b" : ""}>
-                          <td className="p-2 text-sm">
-                            {item.stockItemCode} - {item.stockItemName}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            ${parseFloat(item.rate).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
-                            ${parseFloat(item.totalAmount).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* Currency (readonly) */}
+                  <div>
+                    <FormLabel>Currency</FormLabel>
+                    <Input
+                      value={po.currency}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-currency"
+                    />
+                  </div>
+
+                  {/* Status (readonly) */}
+                  <div>
+                    <FormLabel>Status</FormLabel>
+                    <Input
+                      value={po.status}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-status"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {adjustment.notes && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm">{adjustment.notes}</p>
-              </div>
-            )}
+                {/* Optional toggle */}
+                <div className="flex items-center gap-2 py-2 border-y">
+                  <Switch
+                    id="optional-toggle-purchase"
+                    checked={voucher.optional}
+                    onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                    disabled={toggleOptionalMutation.isPending}
+                    data-testid="switch-optional"
+                  />
+                  <Label htmlFor="optional-toggle-purchase" className="cursor-pointer">
+                    Optional (Does not affect books)
+                  </Label>
+                </div>
 
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCancel}
-                data-testid="button-back-to-daybook"
-              >
-                Back to Daybook
-              </Button>
-            </div>
+                {/* Line items table */}
+                <div>
+                  <FormLabel className="mb-2 block">Line Items</FormLabel>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
+                          <th className="text-right p-3 font-medium w-[25%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchaseFields.map((field, index) => {
+                          const qty = parseFloat(purchaseForm.watch(`items.${index}.quantity`)) || 0;
+                          const rate = parseFloat(purchaseForm.watch(`items.${index}.rate`)) || 0;
+                          const lineTotal = qty * rate;
+
+                          return (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={purchaseForm.control}
+                                  name={`items.${index}.stockItemId`}
+                                  render={({ field: itemField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            purchaseForm.watch(`items.${index}.stockItemId`) > 0
+                                              ? {
+                                                  id: purchaseForm.watch(`items.${index}.stockItemId`),
+                                                  name: purchaseForm.watch(`items.${index}.stockItemName`),
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            purchaseForm.setValue(`items.${index}.stockItemId`, id);
+                                            purchaseForm.setValue(`items.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={purchaseForm.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono"
+                                          data-testid={`input-quantity-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={purchaseForm.control}
+                                  name={`items.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="font-mono"
+                                          data-testid={`input-rate-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
+                                  ${lineTotal.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                {purchaseFields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => purchaseRemove(index)}
+                                    data-testid={`button-remove-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                purchaseAppend({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  rate: "",
+                                })
+                              }
+                              data-testid="button-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono" data-testid="text-grand-total">
+                              ${purchaseGrandTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Notes field */}
+                <FormField
+                  control={purchaseForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Additional notes..."
+                          rows={3}
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={updatePurchaseMutation.isPending}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updatePurchaseMutation.isPending || purchaseGrandTotal === 0}
+                    data-testid="button-save-changes"
+                  >
+                    {updatePurchaseMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Stock Transfer viewing (when voucher type is Stock Transfer)
+  // Consumption/Mixed editing (when voucher type is Consumption or Mixed)
+  if (isConsumption && voucher.adjustmentData) {
+    const adjustment = voucher.adjustmentData;
+    const location = locations.find(l => l.id === adjustment.locationId);
+    
+    // Calculate grand total
+    const adjustmentGrandTotal = adjustmentForm.watch("items").reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      return sum + (qty * rate);
+    }, 0);
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Edit {voucherType} Voucher
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Voucher #{voucher.voucherNumber}
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit {voucherType} Voucher</CardTitle>
+            <CardDescription>Update stock adjustment details and line items</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...adjustmentForm}>
+              <form onSubmit={adjustmentForm.handleSubmit(onSubmitAdjustment)} className="space-y-6">
+                {/* Header section with date and location */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Date picker */}
+                  <FormField
+                    control={adjustmentForm.control}
+                    name="voucherDate"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-[200px] justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="button-date-picker"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Location (readonly) */}
+                  <div className="flex-1">
+                    <FormLabel>Location</FormLabel>
+                    <Input
+                      value={location?.name || "N/A"}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-location"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Location cannot be changed to maintain inventory accuracy
+                    </p>
+                  </div>
+                </div>
+
+                {/* Optional toggle */}
+                <div className="flex items-center gap-2 py-2 border-y">
+                  <Switch
+                    id="optional-toggle-adjustment"
+                    checked={voucher.optional}
+                    onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                    disabled={toggleOptionalMutation.isPending}
+                    data-testid="switch-optional"
+                  />
+                  <Label htmlFor="optional-toggle-adjustment" className="cursor-pointer">
+                    Optional (Does not affect books)
+                  </Label>
+                </div>
+
+                {/* Line items table */}
+                <div>
+                  <FormLabel className="mb-2 block">Line Items</FormLabel>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
+                          <th className="text-right p-3 font-medium w-[25%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adjustmentFields.map((field, index) => {
+                          const qty = parseFloat(adjustmentForm.watch(`items.${index}.quantity`)) || 0;
+                          const rate = parseFloat(adjustmentForm.watch(`items.${index}.rate`)) || 0;
+                          const lineTotal = qty * rate;
+
+                          return (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={adjustmentForm.control}
+                                  name={`items.${index}.stockItemId`}
+                                  render={({ field: itemField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            adjustmentForm.watch(`items.${index}.stockItemId`) > 0
+                                              ? {
+                                                  id: adjustmentForm.watch(`items.${index}.stockItemId`),
+                                                  name: adjustmentForm.watch(`items.${index}.stockItemName`),
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            adjustmentForm.setValue(`items.${index}.stockItemId`, id);
+                                            adjustmentForm.setValue(`items.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={adjustmentForm.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono"
+                                          data-testid={`input-quantity-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={adjustmentForm.control}
+                                  name={`items.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="font-mono"
+                                          data-testid={`input-rate-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
+                                  ${lineTotal.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                {adjustmentFields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => adjustmentRemove(index)}
+                                    data-testid={`button-remove-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                adjustmentAppend({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  rate: "",
+                                })
+                              }
+                              data-testid="button-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono" data-testid="text-grand-total">
+                              ${adjustmentGrandTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Notes field */}
+                <FormField
+                  control={adjustmentForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Additional notes..."
+                          rows={3}
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={updateAdjustmentMutation.isPending}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateAdjustmentMutation.isPending || adjustmentGrandTotal === 0}
+                    data-testid="button-save-changes"
+                  >
+                    {updateAdjustmentMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Stock Transfer editing (when voucher type is Stock Transfer)
   if (isStockTransfer && voucher.transferData) {
     const transfer = voucher.transferData;
     
+    // Calculate grand total
+    const transferGrandTotal = transferForm.watch("items").reduce((sum, item) => {
+      const qty = parseFloat(item.quantity) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      return sum + (qty * rate);
+    }, 0);
+
+    // Get source location name
+    const sourceLocation = locations.find(l => l.id === transfer.sourceLocationId);
+    const destinationLocation = locations.find(l => l.id === transfer.destinationLocationId);
+    
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -1092,111 +2070,298 @@ export default function VoucherEdit() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              Stock Transfer: {voucher.voucherNumber}
+              Edit Stock Transfer
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              View stock transfer details
+            <p className="text-muted-foreground mt-1">
+              Voucher #{voucher.voucherNumber}
             </p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Stock Transfer Details</CardTitle>
+            <CardTitle>Edit Stock Transfer Voucher</CardTitle>
             <CardDescription>
-              Transfer from {transfer.sourceLocationName} to {transfer.destinationLocationName}
+              Transfer from {sourceLocation?.name || "Unknown"} to {destinationLocation?.name || "Unknown"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Transfer Number</p>
-                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Date</p>
-                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">From Location</p>
-                <p className="text-base font-semibold">{transfer.sourceLocationName}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">To Location</p>
-                <p className="text-base font-semibold">{transfer.destinationLocationName}</p>
-              </div>
-            </div>
+          <CardContent>
+            <Form {...transferForm}>
+              <form onSubmit={transferForm.handleSubmit(onSubmitTransfer)} className="space-y-6">
+                {/* Header section with date and locations */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Date picker */}
+                  <FormField
+                    control={transferForm.control}
+                    name="voucherDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="button-date-picker"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <div className="flex items-center gap-2 py-2 border-y">
-              <Switch
-                id="optional-toggle-transfer"
-                checked={voucher.optional}
-                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
-                disabled={toggleOptionalMutation.isPending}
-                data-testid="switch-optional"
-              />
-              <Label htmlFor="optional-toggle-transfer" className="cursor-pointer">
-                Optional (Does not affect books)
-              </Label>
-            </div>
+                  <div></div>
 
-            {transfer.items && transfer.items.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Items Transferred</p>
-                <div className="border rounded-md">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left p-2 text-sm font-medium">Item</th>
-                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
-                        <th className="text-right p-2 text-sm font-medium">Rate</th>
-                        <th className="text-right p-2 text-sm font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transfer.items.map((item, index) => (
-                        <tr key={item.id} className={index < transfer.items.length - 1 ? "border-b" : ""}>
-                          <td className="p-2 text-sm">
-                            {item.stockItemCode} - {item.stockItemName}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
-                          </td>
-                          <td className="p-2 text-sm text-right">
-                            ${parseFloat(item.rate).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
-                            ${parseFloat(item.totalAmount).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* Source Location (readonly) */}
+                  <div>
+                    <FormLabel>From Location (Source)</FormLabel>
+                    <Input
+                      value={sourceLocation?.name || "Unknown"}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-source-location"
+                    />
+                  </div>
+
+                  {/* Destination Location (readonly) */}
+                  <div>
+                    <FormLabel>To Location (Destination)</FormLabel>
+                    <Input
+                      value={destinationLocation?.name || "Unknown"}
+                      disabled
+                      className="mt-2"
+                      data-testid="input-destination-location"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {transfer.notes && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm">{transfer.notes}</p>
-              </div>
-            )}
+                {/* Optional toggle */}
+                <div className="flex items-center gap-2 py-2 border-y">
+                  <Switch
+                    id="optional-toggle-transfer"
+                    checked={voucher.optional}
+                    onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                    disabled={toggleOptionalMutation.isPending}
+                    data-testid="switch-optional"
+                  />
+                  <Label htmlFor="optional-toggle-transfer" className="cursor-pointer">
+                    Optional (Does not affect books)
+                  </Label>
+                </div>
 
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCancel}
-                data-testid="button-back-to-daybook"
-              >
-                Back to Daybook
-              </Button>
-            </div>
+                {/* Line items table */}
+                <div>
+                  <FormLabel className="mb-2 block">Line Items</FormLabel>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
+                          <th className="text-left p-3 font-medium w-[15%]">Rate</th>
+                          <th className="text-right p-3 font-medium w-[25%]">Total</th>
+                          <th className="w-[5%]"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transferFields.map((field, index) => {
+                          const qty = parseFloat(transferForm.watch(`items.${index}.quantity`)) || 0;
+                          const rate = parseFloat(transferForm.watch(`items.${index}.rate`)) || 0;
+                          const lineTotal = qty * rate;
+
+                          return (
+                            <tr key={field.id} className="border-t">
+                              <td className="p-2">
+                                <FormField
+                                  control={transferForm.control}
+                                  name={`items.${index}.stockItemId`}
+                                  render={({ field: itemField }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <StockItemCombobox
+                                          value={
+                                            transferForm.watch(`items.${index}.stockItemId`) > 0
+                                              ? {
+                                                  id: transferForm.watch(`items.${index}.stockItemId`),
+                                                  name: transferForm.watch(`items.${index}.stockItemName`),
+                                                }
+                                              : null
+                                          }
+                                          onChange={(id, name) => {
+                                            transferForm.setValue(`items.${index}.stockItemId`, id);
+                                            transferForm.setValue(`items.${index}.stockItemName`, name);
+                                          }}
+                                          stockItems={stockItems}
+                                          rowIndex={index}
+                                          testIdPrefix="button-stock-item-transfer"
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={transferForm.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.001"
+                                          placeholder="0"
+                                          className="font-mono"
+                                          data-testid={`input-quantity-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <FormField
+                                  control={transferForm.control}
+                                  name={`items.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="font-mono"
+                                          data-testid={`input-rate-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
+                                  ${lineTotal.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                              </td>
+                              <td className="p-2">
+                                {transferFields.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => transferRemove(index)}
+                                    data-testid={`button-remove-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-muted/30 border-t-2">
+                        <tr>
+                          <td colSpan={3} className="p-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                transferAppend({
+                                  stockItemId: 0,
+                                  stockItemName: "",
+                                  quantity: "",
+                                  rate: "",
+                                })
+                              }
+                              data-testid="button-add-row"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Row
+                            </Button>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-right font-bold font-mono" data-testid="text-grand-total">
+                              ${transferGrandTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Notes field */}
+                <FormField
+                  control={transferForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Additional notes..."
+                          rows={3}
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={updateTransferMutation.isPending}
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={updateTransferMutation.isPending || transferGrandTotal === 0}
+                    data-testid="button-save-changes"
+                  >
+                    {updateTransferMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>
