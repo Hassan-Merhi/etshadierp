@@ -563,7 +563,6 @@ export class DbStorage implements IStorage {
         lastUpdated: schema.inventory.lastUpdated,
         stockItemCode: schema.stockItems.code,
         stockItemName: schema.stockItems.name,
-        stockItemBarcode: schema.stockItems.barcode,
         stockItemUom: schema.stockItems.uom,
         stockGroupId: schema.stockItems.stockGroupId,
         stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
