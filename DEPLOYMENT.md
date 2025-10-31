@@ -56,7 +56,7 @@ Render will automatically create and configure your PostgreSQL database using th
 
 4. Render will detect the `render.yaml` file and show:
    - ✅ Web Service: erp-pos-system (Starter Plan - $7/month)
-   - ✅ PostgreSQL Database: erp-database (Starter Plan - $7/month)
+   - ✅ PostgreSQL Database: erp-database (Basic Plan - $7/month)
    - **Total: $14/month**
 
 5. Review the plan details:
@@ -199,7 +199,7 @@ If your business grows and you need more capacity:
 - Pro: $85/month (4 GB RAM, 2 CPUs)
 
 **Database Plans:**
-- Starter: $7/month (1 GB storage - current plan)
+- Basic: $7/month (1 GB storage - current plan)
 - Standard: $20/month (10 GB storage)
 - Pro: $90/month (100 GB storage)
 
