@@ -176,6 +176,7 @@ const stockTransferFormSchema = z.object({
 });
 
 const stockAdjustmentEntrySchema = z.object({
+  type: z.enum(["CONSUME", "PRODUCE"]),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
   quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) !== 0, "Quantity cannot be zero"),
@@ -185,13 +186,9 @@ const stockAdjustmentEntrySchema = z.object({
 const stockAdjustmentFormSchema = z.object({
   voucherDate: z.date(),
   locationId: z.number().min(1, "Location required"),
-  consumptionEntries: z.array(stockAdjustmentEntrySchema),
-  productionEntries: z.array(stockAdjustmentEntrySchema),
+  entries: z.array(stockAdjustmentEntrySchema).min(1, "At least one entry is required"),
   notes: z.string().optional(),
-}).refine(
-  (data) => data.consumptionEntries.length > 0 || data.productionEntries.length > 0,
-  { message: "At least one entry (consumption or production) is required" }
-);
+});
 
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
 type JournalFormData = z.infer<typeof journalFormSchema>;
@@ -1100,68 +1097,50 @@ export default function Vouchers() {
     defaultValues: {
       voucherDate: new Date(),
       locationId: 0,
-      consumptionEntries: [],
-      productionEntries: [],
+      entries: [],
       notes: "",
     },
   });
 
   const {
-    fields: consumptionFields,
-    append: appendConsumption,
-    remove: removeConsumption,
+    fields: adjustmentFields,
+    append: appendAdjustment,
+    remove: removeAdjustment,
   } = useFieldArray({
     control: stockAdjustmentForm.control,
-    name: "consumptionEntries",
+    name: "entries",
   });
 
-  const {
-    fields: productionFields,
-    append: appendProduction,
-    remove: removeProduction,
-  } = useFieldArray({
-    control: stockAdjustmentForm.control,
-    name: "productionEntries",
-  });
-
-  const consumptionEntries = stockAdjustmentForm.watch("consumptionEntries") || [];
-  const productionEntries = stockAdjustmentForm.watch("productionEntries") || [];
-  const consumptionTotal = consumptionEntries.reduce(
-    (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
-    0
-  );
-  const productionTotal = productionEntries.reduce(
-    (sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")),
-    0
-  );
+  const adjustmentEntries = stockAdjustmentForm.watch("entries") || [];
+  const consumptionTotal = adjustmentEntries
+    .filter(entry => entry.type === "CONSUME")
+    .reduce((sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")), 0);
+  const productionTotal = adjustmentEntries
+    .filter(entry => entry.type === "PRODUCE")
+    .reduce((sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")), 0);
 
   // Stock Adjustment mutation
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (formData: StockAdjustmentFormData) => {
       const data = formData;
       
-      // Determine adjustment type based on which arrays have entries
-      const hasConsumption = data.consumptionEntries.length > 0;
-      const hasProduction = data.productionEntries.length > 0;
+      // Determine adjustment type based on entry types
+      const hasConsumption = data.entries.some(e => e.type === "CONSUME");
+      const hasProduction = data.entries.some(e => e.type === "PRODUCE");
       const adjustmentType = hasConsumption && hasProduction 
         ? "Mixed" 
         : hasProduction 
           ? "Production" 
           : "Consumption";
       
-      // Combine both arrays with consumption quantities negated
-      const combinedItems = [
-        ...data.consumptionEntries.map(entry => ({
-          stockItemId: entry.stockItemId,
-          quantity: (-parseFloat(entry.quantity)).toString(), // Negate for consumption
-          rate: entry.rate,
-        })),
-        ...data.productionEntries.map(entry => ({
-          stockItemId: entry.stockItemId,
-          quantity: entry.quantity, // Keep positive for production
-          rate: entry.rate,
-        })),
-      ];
+      // Map entries with consumption quantities negated
+      const items = data.entries.map(entry => ({
+        stockItemId: entry.stockItemId,
+        quantity: entry.type === "CONSUME" 
+          ? (-parseFloat(entry.quantity)).toString() 
+          : entry.quantity,
+        rate: entry.rate,
+      }));
 
       const totalAmount = consumptionTotal + productionTotal;
       
@@ -1176,13 +1155,13 @@ export default function Vouchers() {
       });
       const voucher = await voucherRes.json();
 
-      // Create stock adjustment with combined items
+      // Create stock adjustment
       await apiRequest("POST", "/api/stock-adjustments", {
         voucherId: voucher.id,
         locationId: data.locationId,
         adjustmentType: adjustmentType,
         notes: data.notes || "",
-        items: combinedItems,
+        items: items,
       });
 
       return voucher;
@@ -1197,8 +1176,7 @@ export default function Vouchers() {
       stockAdjustmentForm.reset({
         voucherDate: new Date(),
         locationId: 0,
-        consumptionEntries: [],
-        productionEntries: [],
+        entries: [],
         notes: "",
       });
     },
@@ -1212,20 +1190,15 @@ export default function Vouchers() {
   });
 
   const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
-    // Validate consumption entries
-    const validConsumption = data.consumptionEntries.filter(
+    // Validate entries
+    const validEntries = data.entries.filter(
       (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
     );
 
-    // Validate production entries
-    const validProduction = data.productionEntries.filter(
-      (entry) => entry.stockItemId > 0 && parseFloat(entry.quantity) > 0
-    );
-
-    if (validConsumption.length === 0 && validProduction.length === 0) {
+    if (validEntries.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid entry in consumption or production",
+        description: "Please add at least one valid entry",
         variant: "destructive",
       });
       return;
