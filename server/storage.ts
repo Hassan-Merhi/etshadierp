@@ -1070,6 +1070,7 @@ export class DbStorage implements IStorage {
         voucherType: schema.vouchers.voucherType,
         voucherDate: schema.vouchers.voucherDate,
         voucherDescription: schema.vouchers.description,
+        companyId: schema.vouchers.companyId,
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))

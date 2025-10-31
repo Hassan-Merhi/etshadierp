@@ -20,12 +20,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign } from "lucide-react";
+import { Users, Container, DollarSign, Download } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
+import * as XLSX from "xlsx";
 
 interface SupplierWithStats {
   id: number;
@@ -43,23 +51,27 @@ interface SupplierWithStats {
 
 export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const { selectedCompany } = useCompany();
   
+  // Fetch global supplier statistics (no company filter)
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
-    queryKey: [`/api/suppliers/with-stats?companyId=${selectedCompany?.id}`],
-    enabled: !!selectedCompany,
+    queryKey: ["/api/suppliers/with-stats"],
   });
 
-  // Fetch transactions for the selected supplier filtered by current company
-  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
-    queryKey: [`/api/accounts/supplier/${selectedSupplier?.id}/transactions?companyId=${selectedCompany?.id}`],
-    enabled: !!selectedSupplier && !!selectedCompany,
+  // Fetch all companies for the filter dropdown
+  const { data: companies = [] } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
   });
 
-  // Fetch PO imports for the selected supplier filtered by current company
-  const { data: poImports = [], isLoading: poImportsLoading } = useQuery<any[]>({
-    queryKey: [`/api/suppliers/${selectedSupplier?.id}/purchase-orders?companyId=${selectedCompany?.id}`],
-    enabled: !!selectedSupplier && !!selectedCompany,
+  // Fetch unified ledger for the selected supplier (with optional company filter)
+  const unifiedLedgerUrl = companyFilter !== "all" 
+    ? `/api/suppliers/${selectedSupplier?.id}/unified-ledger?companyId=${companyFilter}`
+    : `/api/suppliers/${selectedSupplier?.id}/unified-ledger`;
+  
+  const { data: unifiedLedger = [], isLoading: ledgerLoading } = useQuery<any[]>({
+    queryKey: [unifiedLedgerUrl],
+    enabled: !!selectedSupplier,
   });
 
   const activeSuppliers = suppliers.filter((s) => s.active);
@@ -68,10 +80,34 @@ export default function Suppliers() {
   
   const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
+    setCompanyFilter("all"); // Reset filter when opening
   };
   
   const handleCloseDialog = () => {
     setSelectedSupplier(null);
+    setCompanyFilter("all");
+  };
+
+  const handleExportToExcel = () => {
+    if (!selectedSupplier || unifiedLedger.length === 0) return;
+
+    const exportData = unifiedLedger.map((txn: any) => ({
+      Date: txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "",
+      Company: txn.companyName,
+      "Doc Number": txn.docNumber,
+      Type: txn.voucherType,
+      Description: txn.description,
+      Debit: txn.debit,
+      Credit: txn.credit,
+      Balance: txn.balance,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Supplier Ledger");
+    
+    const fileName = `${selectedSupplier.legalName}_Ledger_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   };
 
   return (
@@ -222,157 +258,138 @@ export default function Suppliers() {
         </CardContent>
       </Card>
 
-      {/* Supplier Transactions Dialog */}
+      {/* Supplier Unified Ledger Dialog */}
       <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {selectedSupplier?.legalName} - Transactions
-              {selectedCompany && <span className="text-sm font-normal text-muted-foreground ml-2">({selectedCompany.name})</span>}
+              {selectedSupplier?.legalName} - Unified Ledger (All Companies)
             </DialogTitle>
+            <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Filter by Company:</label>
+                <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                  <SelectTrigger className="w-48" data-testid="select-company-filter">
+                    <SelectValue placeholder="All Companies" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Companies</SelectItem>
+                    {companies.map((company: any) => (
+                      <SelectItem key={company.id} value={company.id.toString()}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportToExcel}
+                disabled={unifiedLedger.length === 0}
+                data-testid="button-export-excel"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to Excel
+              </Button>
+            </div>
           </DialogHeader>
           
-          {transactionsLoading || poImportsLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : transactions.length === 0 && poImports.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No transactions or purchase orders found for this supplier in {selectedCompany?.name || "this company"}.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* PO Imports Section */}
-              {poImports.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Purchase Orders</h3>
-                    <Badge variant="secondary">{poImports.length}</Badge>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>PO #</TableHead>
-                        <TableHead>Container</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Status</TableHead>
+          <div className="flex-1 overflow-y-auto">
+            {ledgerLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : unifiedLedger.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No transactions found for this supplier
+                {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                  ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                  : ""}.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {unifiedLedger.length} transaction{unifiedLedger.length !== 1 ? "s" : ""}
+                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                    ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                    : " from all companies"}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Doc #</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="max-w-xs">Description</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unifiedLedger.map((txn: any, idx: number) => (
+                      <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                        <TableCell className="font-mono text-sm">
+                          {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <Badge variant="secondary">{txn.companyName}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm font-medium">
+                          {txn.docNumber}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{txn.voucherType}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate text-sm">
+                          {txn.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {txn.debit > 0 
+                            ? `$${txn.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {txn.credit > 0 
+                            ? `$${txn.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold">
+                          ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {poImports.map((po) => (
-                        <TableRow key={po.id}>
-                          <TableCell className="font-mono text-sm">
-                            {format(new Date(po.createdAt), "yyyy-MM-dd")}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm font-medium">
-                            {po.poNumber}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {po.containerNumber}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {po.currency} ${parseFloat(po.itemsTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={po.status === "Closed" ? "secondary" : "default"}>
-                              {po.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <div className="text-right text-sm">
-                    <span className="text-muted-foreground">Total PO Amount: </span>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                {/* Summary */}
+                <div className="border-t pt-4 flex justify-end gap-8">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Total Debit: </span>
                     <span className="font-mono font-semibold">
-                      ${poImports.reduce((sum, po) => sum + parseFloat(po.itemsTotal || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${unifiedLedger.reduce((sum: number, t: any) => sum + t.debit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Total Credit: </span>
+                    <span className="font-mono font-semibold">
+                      ${unifiedLedger.reduce((sum: number, t: any) => sum + t.credit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Final Balance: </span>
+                    <span className="font-mono font-semibold">
+                      ${(unifiedLedger[unifiedLedger.length - 1]?.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
-              )}
-              
-              {/* Voucher Transactions Section */}
-              {transactions.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Voucher Transactions</h3>
-                    <Badge variant="secondary">{transactions.length}</Badge>
-                  </div>
-              <div className="text-sm text-muted-foreground">
-                Showing {transactions.length} transaction{transactions.length !== 1 ? "s" : ""}
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Voucher #</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((txn) => (
-                    <TableRow key={txn.entryId}>
-                      <TableCell className="font-mono text-sm">
-                        {format(new Date(txn.voucherDate), "yyyy-MM-dd")}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {txn.voucherNumber}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{txn.voucherType}</Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        {txn.narration || txn.voucherDescription || "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(txn.debitAmount) > 0 
-                          ? `$${parseFloat(txn.debitAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(txn.creditAmount) > 0 
-                          ? `$${parseFloat(txn.creditAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              {/* Summary */}
-              <div className="border-t pt-4 flex justify-end gap-8">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Total Debit: </span>
-                  <span className="font-mono font-semibold">
-                    ${transactions.reduce((sum, t) => sum + parseFloat(t.debitAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Total Credit: </span>
-                  <span className="font-mono font-semibold">
-                    ${transactions.reduce((sum, t) => sum + parseFloat(t.creditAmount || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Balance: </span>
-                  <span className="font-mono font-semibold">
-                    ${(
-                      transactions.reduce((sum, t) => sum + parseFloat(t.creditAmount || "0"), 0) -
-                      transactions.reduce((sum, t) => sum + parseFloat(t.debitAmount || "0"), 0)
-                    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

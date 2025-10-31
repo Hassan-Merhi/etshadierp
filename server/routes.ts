@@ -2897,27 +2897,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all suppliers with balances and container counts (filtered by company if provided)
+  // Get all suppliers with balances and container counts (global across all companies)
   app.get("/api/suppliers/with-stats", requireAuth, async (req, res) => {
     try {
-      const { companyId } = req.query;
-      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
-      
-      if (!filterCompanyId) {
-        return res.status(400).json({ message: "No company selected or specified" });
-      }
-      
       const suppliers = await storage.getAllSuppliers();
       
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
-          // Filter container count and balance by company
-          const containerCount = await storage.getContainerCountBySupplier(supplier.id, filterCompanyId);
+          // Aggregate container count across ALL companies (no filter)
+          const containerCount = await storage.getContainerCountBySupplier(supplier.id);
           
-          // Calculate balance from voucher entries filtered by company
+          // Calculate balance from voucher entries across ALL companies
           // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
           // Balance = Credits - Debits (positive means we owe them)
-          const entries = await storage.getVoucherEntriesBySupplier(supplier.id, filterCompanyId);
+          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -2932,12 +2925,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Filter to only show suppliers that have activity in this company (containers or balance)
+      // Filter to only show suppliers that have any activity (containers or balance)
       const activeSuppliersInCompany = suppliersWithStats.filter(
         s => s.containerCount > 0 || s.balance !== 0
       );
 
       res.json(activeSuppliersInCompany);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get unified ledger for a supplier across all companies
+  app.get("/api/suppliers/:supplierId/unified-ledger", requireAuth, async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.supplierId);
+      
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const { companyId, startDate, endDate } = req.query;
+      const filterCompanyId = companyId ? parseInt(companyId as string) : undefined;
+
+      // Get voucher entries (filtered by company if specified)
+      const voucherEntries = await storage.getVoucherEntriesBySupplier(
+        supplierId,
+        filterCompanyId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      // Get all companies to map IDs to names
+      const companies = await storage.getAllCompanies();
+      const companyMap = new Map(companies.map(c => [c.id, c]));
+
+      // Get purchase orders (filtered by company if specified)
+      const allPOs: any[] = [];
+      if (filterCompanyId) {
+        const pos = await storage.getPurchaseOrdersBySupplier(supplierId, filterCompanyId);
+        allPOs.push(...pos.map(po => ({ ...po, companyId: filterCompanyId })));
+      } else {
+        // Get POs from all companies
+        for (const company of companies) {
+          const pos = await storage.getPurchaseOrdersBySupplier(supplierId, company.id);
+          allPOs.push(...pos.map(po => ({ ...po, companyId: company.id })));
+        }
+      }
+
+      // Combine all transactions with company information
+      const transactions: any[] = [];
+
+      // Add voucher entries
+      for (const entry of voucherEntries) {
+        const company = companyMap.get(entry.companyId);
+        transactions.push({
+          type: 'voucher',
+          date: entry.voucherDate,
+          companyId: entry.companyId,
+          companyName: company?.name || 'Unknown',
+          docNumber: entry.voucherNumber,
+          description: entry.narration || entry.voucherDescription || '',
+          voucherType: entry.voucherType,
+          debit: parseFloat(entry.debitAmount || "0"),
+          credit: parseFloat(entry.creditAmount || "0"),
+        });
+      }
+
+      // Add purchase orders
+      for (const po of allPOs) {
+        const company = companyMap.get(po.companyId);
+        const amount = parseFloat(po.itemsTotal || "0");
+        transactions.push({
+          type: 'purchase_order',
+          date: po.createdAt,
+          companyId: po.companyId,
+          companyName: company?.name || 'Unknown',
+          docNumber: po.poNumber,
+          description: `Container ${po.containerNumber}`,
+          voucherType: 'Purchase',
+          debit: 0,
+          credit: amount, // PO creates payable (credit)
+        });
+      }
+
+      // Sort by date (newest first)
+      transactions.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      // Calculate running balance
+      let balance = 0;
+      const transactionsWithBalance = transactions.map(t => {
+        balance += t.credit - t.debit;
+        return {
+          ...t,
+          balance: balance,
+        };
+      });
+
+      res.json(transactionsWithBalance.reverse()); // Return chronological order with running balance
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2953,14 +3042,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { companyId } = req.query;
-      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      const filterCompanyId = companyId ? parseInt(companyId as string) : undefined;
       
       if (!filterCompanyId) {
-        return res.status(400).json({ message: "No company selected or specified" });
+        // If no company filter, get POs from all companies
+        const companies = await storage.getAllCompanies();
+        const allPOs: any[] = [];
+        
+        for (const company of companies) {
+          const pos = await storage.getPurchaseOrdersBySupplier(supplierId, company.id);
+          allPOs.push(...pos.map(po => ({ ...po, companyName: company.name })));
+        }
+        
+        return res.json(allPOs);
       }
 
       const purchaseOrders = await storage.getPurchaseOrdersBySupplier(supplierId, filterCompanyId);
-      res.json(purchaseOrders);
+      const company = await storage.getCompanyById(filterCompanyId);
+      const posWithCompanyName = purchaseOrders.map(po => ({ ...po, companyName: company?.name }));
+      
+      res.json(posWithCompanyName);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
