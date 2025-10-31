@@ -46,6 +46,17 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -458,7 +469,7 @@ const PrintTemplate = ({
 };
 
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">("payment");
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups">("payment");
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const printRef = useRef<HTMLDivElement>(null);
@@ -483,6 +494,77 @@ export default function Vouchers() {
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
+
+  const { data: employees = [] } = useQuery<any[]>({
+    queryKey: ["/api/employees"],
+  });
+
+  const { data: employeeGroups = [] } = useQuery<any[]>({
+    queryKey: ["/api/employee-groups"],
+  });
+
+  // Employee Groups state
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+
+  // Employee Groups mutations
+  const createGroupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/employee-groups", {
+        name: newGroupName,
+        description: newGroupDescription,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee group created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups"] });
+      setNewGroupName("");
+      setNewGroupDescription("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create employee group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: number) => {
+      await apiRequest("DELETE", `/api/employee-groups/${groupId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee group deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete employee group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateGroup = () => {
+    if (!newGroupName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a group name",
+        variant: "destructive",
+      });
+      return;
+    }
+    createGroupMutation.mutate();
+  };
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -1466,7 +1548,7 @@ export default function Vouchers() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups")}>
         <TabsList>
           <TabsTrigger value="payment" data-testid="tab-payment">
             Payment
@@ -1482,6 +1564,9 @@ export default function Vouchers() {
           </TabsTrigger>
           <TabsTrigger value="adjustment" data-testid="tab-adjustment">
             Production/Consumption
+          </TabsTrigger>
+          <TabsTrigger value="employeeGroups" data-testid="tab-employee-groups">
+            Employee Groups
           </TabsTrigger>
         </TabsList>
 
@@ -2953,6 +3038,97 @@ export default function Vouchers() {
                   </div>
                 </form>
               </Form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="employeeGroups" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Employee Groups Management</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Create New Group Form */}
+                <div className="p-4 border rounded-lg">
+                  <h3 className="font-semibold mb-4">Create New Group</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      placeholder="Group Name (e.g., Hadi 1, Hadi 2)"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      data-testid="input-group-name"
+                    />
+                    <Input
+                      placeholder="Description (optional)"
+                      value={newGroupDescription}
+                      onChange={(e) => setNewGroupDescription(e.target.value)}
+                      data-testid="input-group-description"
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <Button
+                      onClick={handleCreateGroup}
+                      disabled={createGroupMutation.isPending}
+                      data-testid="button-create-group"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {createGroupMutation.isPending ? "Creating..." : "Create Group"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Groups List */}
+                <div>
+                  <h3 className="font-semibold mb-4">Existing Groups</h3>
+                  {employeeGroups.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No employee groups created yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {employeeGroups.map((group: any) => (
+                        <div key={group.id} className="p-4 border rounded-lg" data-testid={`group-item-${group.id}`}>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-medium">{group.name}</h4>
+                              {group.description && (
+                                <p className="text-sm text-muted-foreground">{group.description}</p>
+                              )}
+                            </div>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  data-testid={`button-delete-group-${group.id}`}
+                                >
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete the employee group "{group.name}". This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteGroupMutation.mutate(group.id)}
+                                    className="bg-destructive text-destructive-foreground hover-elevate"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

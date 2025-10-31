@@ -84,6 +84,16 @@ export interface IStorage {
   getEmployeeByCode(code: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
 
+  // Employee Groups
+  getAllEmployeeGroups(companyId: number): Promise<schema.EmployeeGroup[]>;
+  getEmployeeGroupById(id: number): Promise<schema.EmployeeGroup | undefined>;
+  createEmployeeGroup(group: schema.InsertEmployeeGroup): Promise<schema.EmployeeGroup>;
+  updateEmployeeGroup(id: number, updates: Partial<schema.InsertEmployeeGroup>): Promise<schema.EmployeeGroup>;
+  deleteEmployeeGroup(id: number): Promise<void>;
+  getEmployeeGroupMembers(groupId: number): Promise<any[]>;
+  addEmployeeToGroup(groupId: number, employeeId: number): Promise<void>;
+  removeEmployeeFromGroup(groupId: number, employeeId: number): Promise<void>;
+
   // Suppliers
   getAllSuppliers(): Promise<Supplier[]>;
   getSupplierByCode(code: string): Promise<Supplier | undefined>;
@@ -337,6 +347,85 @@ export class DbStorage implements IStorage {
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
     const [created] = await db.insert(schema.employees).values(employee).returning();
     return created;
+  }
+
+  // Employee Groups
+  async getAllEmployeeGroups(companyId: number): Promise<schema.EmployeeGroup[]> {
+    return await db.select().from(schema.employeeGroups).where(eq(schema.employeeGroups.companyId, companyId));
+  }
+
+  async getEmployeeGroupById(id: number): Promise<schema.EmployeeGroup | undefined> {
+    const [group] = await db.select().from(schema.employeeGroups).where(eq(schema.employeeGroups.id, id));
+    return group;
+  }
+
+  async createEmployeeGroup(group: schema.InsertEmployeeGroup): Promise<schema.EmployeeGroup> {
+    const [created] = await db.insert(schema.employeeGroups).values(group).returning();
+    return created;
+  }
+
+  async updateEmployeeGroup(id: number, updates: Partial<schema.InsertEmployeeGroup>): Promise<schema.EmployeeGroup> {
+    const [updated] = await db
+      .update(schema.employeeGroups)
+      .set(updates)
+      .where(eq(schema.employeeGroups.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmployeeGroup(id: number): Promise<void> {
+    // First, delete all members
+    await db.delete(schema.employeeGroupMembers).where(eq(schema.employeeGroupMembers.employeeGroupId, id));
+    // Then delete the group
+    await db.delete(schema.employeeGroups).where(eq(schema.employeeGroups.id, id));
+  }
+
+  async getEmployeeGroupMembers(groupId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        id: schema.employeeGroupMembers.id,
+        employeeId: schema.employees.id,
+        employeeCode: schema.employees.code,
+        firstName: schema.employees.firstName,
+        lastName: schema.employees.lastName,
+        email: schema.employees.email,
+        department: schema.employees.department,
+      })
+      .from(schema.employeeGroupMembers)
+      .leftJoin(schema.employees, eq(schema.employeeGroupMembers.employeeId, schema.employees.id))
+      .where(eq(schema.employeeGroupMembers.employeeGroupId, groupId));
+    return results;
+  }
+
+  async addEmployeeToGroup(groupId: number, employeeId: number): Promise<void> {
+    // Check if already exists
+    const [existing] = await db
+      .select()
+      .from(schema.employeeGroupMembers)
+      .where(
+        and(
+          eq(schema.employeeGroupMembers.employeeGroupId, groupId),
+          eq(schema.employeeGroupMembers.employeeId, employeeId)
+        )
+      );
+    
+    if (!existing) {
+      await db.insert(schema.employeeGroupMembers).values({
+        employeeGroupId: groupId,
+        employeeId: employeeId,
+      });
+    }
+  }
+
+  async removeEmployeeFromGroup(groupId: number, employeeId: number): Promise<void> {
+    await db
+      .delete(schema.employeeGroupMembers)
+      .where(
+        and(
+          eq(schema.employeeGroupMembers.employeeGroupId, groupId),
+          eq(schema.employeeGroupMembers.employeeId, employeeId)
+        )
+      );
   }
 
   // Suppliers

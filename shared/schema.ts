@@ -163,6 +163,45 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Employee = typeof employees.$inferSelect;
 
+export const employeeGroups = pgTable("employee_groups", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertEmployeeGroupSchema = createInsertSchema(employeeGroups).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  name: z.string().min(1, "Group name is required").refine(val => val.trim().length > 0, "Group name cannot be only whitespace"),
+  description: z.string().optional(),
+});
+
+export type InsertEmployeeGroup = z.infer<typeof insertEmployeeGroupSchema>;
+export type EmployeeGroup = typeof employeeGroups.$inferSelect;
+
+export const employeeGroupMembers = pgTable("employee_group_members", {
+  id: serial("id").primaryKey(),
+  employeeGroupId: integer("employee_group_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertEmployeeGroupMemberSchema = createInsertSchema(employeeGroupMembers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  employeeGroupId: z.number().min(1, "Employee group is required"),
+  employeeId: z.number().min(1, "Employee is required"),
+});
+
+export type InsertEmployeeGroupMember = z.infer<typeof insertEmployeeGroupMemberSchema>;
+export type EmployeeGroupMember = typeof employeeGroupMembers.$inferSelect;
+
 export const suppliers = pgTable("suppliers", {
   id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
