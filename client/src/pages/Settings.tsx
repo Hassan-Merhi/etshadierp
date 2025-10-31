@@ -142,6 +142,21 @@ export default function Settings() {
     enabled: !!selectedCompanyId && isRoleDialogOpen,
   });
 
+  // Load ledger accounts for the selected company
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts", { companyId: selectedCompanyId }],
+    queryFn: async () => {
+      if (!selectedCompanyId) return [];
+      const res = await fetch(`/api/ledger-accounts?companyId=${selectedCompanyId}`);
+      if (!res.ok) throw new Error("Failed to fetch ledger accounts");
+      return res.json();
+    },
+    enabled: !!selectedCompanyId && isRoleDialogOpen,
+  });
+
+  // Filter for Cash type ledger accounts only
+  const cashAccounts = ledgerAccounts.filter((account: any) => account.accountType === "Cash");
+
   const createCompanyMutation = useMutation({
     mutationFn: async (data: CompanyFormData) => {
       if (editingCompany) {
