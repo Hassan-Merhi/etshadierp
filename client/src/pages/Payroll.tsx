@@ -115,19 +115,22 @@ export default function Payroll() {
   // Initialize worker payments when workers load or change
   useEffect(() => {
     if (workerStaff.length > 0) {
-      const initialPayments: Record<number, WorkerPayment> = {};
-      workerStaff.forEach((worker) => {
-        initialPayments[worker.id] = {
-          workerId: worker.id,
-          amount: worker.monthlySalary || "0",
-          selected: true,
-        };
+      setWorkerPayments(prev => {
+        const newPayments: Record<number, WorkerPayment> = {};
+        workerStaff.forEach((worker) => {
+          // Preserve existing amount if already set, otherwise use monthly salary
+          newPayments[worker.id] = prev[worker.id] || {
+            workerId: worker.id,
+            amount: worker.monthlySalary || "0",
+            selected: true,
+          };
+        });
+        return newPayments;
       });
-      setWorkerPayments(initialPayments);
     } else {
       setWorkerPayments({});
     }
-  }, [selectedCompany, workerStaff.length, workerStaff.map(w => w.id).join(',')]);
+  }, [selectedCompany, workerStaff.length]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
