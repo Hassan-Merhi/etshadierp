@@ -578,7 +578,7 @@ export default function Vouchers() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
@@ -1686,7 +1686,7 @@ export default function Vouchers() {
               // Navigate to appropriate editing interface based on voucher type
               const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase"];
               if (editableTypes.includes(voucher.voucherType)) {
-                navigate(`/vouchers/${voucher.id}/edit`);
+                setLocation(`/vouchers/${voucher.id}/edit`);
               } else {
                 // For other types, show the generic dialog (temporary fallback)
                 setEditVoucherId(voucher.id);

@@ -546,11 +546,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
     createMutation.mutate(data);
   };
 
+  const [, setLocation] = useLocation();
+
   const handleEdit = (voucher: Voucher) => {
     // Navigate to appropriate editing interface based on voucher type
     const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase"];
     if (editableTypes.includes(voucher.voucherType)) {
-      navigate(`/vouchers/${voucher.id}/edit`);
+      setLocation(`/vouchers/${voucher.id}/edit`);
     } else {
       // For other types, show the generic dialog (temporary fallback)
       setVoucherToEdit(voucher);
