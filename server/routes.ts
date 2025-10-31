@@ -31,6 +31,10 @@ import {
   locations,
   salesItems,
   employees,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  stockTransferVouchers,
+  stockTransferItems,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -3442,11 +3446,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // If this is a Consumption or Mixed voucher, fetch adjustment details
+      let adjustmentData = null;
+      if (voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") {
+        const adjustment = await db
+          .select()
+          .from(stockAdjustmentVouchers)
+          .where(eq(stockAdjustmentVouchers.voucherId, id))
+          .limit(1);
+        
+        if (adjustment.length > 0) {
+          const items = await db
+            .select()
+            .from(stockAdjustmentItems)
+            .where(eq(stockAdjustmentItems.adjustmentId, adjustment[0].id));
+          
+          const itemsWithDetails = await Promise.all(
+            items.map(async (item) => {
+              const stockItem = await storage.getStockItemById(item.stockItemId);
+              return {
+                ...item,
+                stockItemCode: stockItem?.code || "",
+                stockItemName: stockItem?.name || "",
+                stockItemUom: stockItem?.uom || "",
+              };
+            })
+          );
+          
+          const location = await storage.getLocationById(adjustment[0].locationId);
+          
+          adjustmentData = {
+            ...adjustment[0],
+            locationName: location?.name || "",
+            items: itemsWithDetails,
+          };
+        }
+      }
+      
+      // If this is a Stock Transfer voucher, fetch transfer details
+      let transferData = null;
+      if (voucher.voucherType === "Stock Transfer") {
+        const transfer = await db
+          .select()
+          .from(stockTransferVouchers)
+          .where(eq(stockTransferVouchers.voucherId, id))
+          .limit(1);
+        
+        if (transfer.length > 0) {
+          const items = await db
+            .select()
+            .from(stockTransferItems)
+            .where(eq(stockTransferItems.transferId, transfer[0].id));
+          
+          const itemsWithDetails = await Promise.all(
+            items.map(async (item) => {
+              const stockItem = await storage.getStockItemById(item.stockItemId);
+              return {
+                ...item,
+                stockItemCode: stockItem?.code || "",
+                stockItemName: stockItem?.name || "",
+                stockItemUom: stockItem?.uom || "",
+              };
+            })
+          );
+          
+          const sourceLocation = await storage.getLocationById(transfer[0].sourceLocationId);
+          const destLocation = await storage.getLocationById(transfer[0].destinationLocationId);
+          
+          transferData = {
+            ...transfer[0],
+            sourceLocationName: sourceLocation?.name || "",
+            destinationLocationName: destLocation?.name || "",
+            items: itemsWithDetails,
+          };
+        }
+      }
+      
       res.json({
         ...voucher,
         entries,
         purchaseOrder,
         salesItems: salesItemsList,
+        adjustmentData,
+        transferData,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -3504,6 +3586,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateVoucher(id, allowedUpdates);
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle optional status for a voucher
+  app.patch("/api/vouchers/:id/optional", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { optional } = req.body;
+      if (typeof optional !== "boolean") {
+        return res.status(400).json({ message: "Optional must be a boolean value" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Only Admin and Owner can toggle optional status
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Only Admin and Owner can toggle optional status" });
+      }
+
+      // Update the optional field
+      const updated = await db
+        .update(vouchers)
+        .set({ optional })
+        .where(eq(vouchers.id, id))
+        .returning();
+
+      res.json(updated[0]);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

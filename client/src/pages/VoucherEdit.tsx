@@ -46,6 +46,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X } from "lucide-react";
@@ -133,6 +135,51 @@ interface SalesItem {
   stockItemUom: string;
 }
 
+interface AdjustmentItem {
+  id: number;
+  adjustmentId: number;
+  stockItemId: number;
+  quantity: string;
+  rate: string;
+  totalAmount: string;
+  stockItemCode: string;
+  stockItemName: string;
+  stockItemUom: string;
+}
+
+interface AdjustmentData {
+  id: number;
+  voucherId: number;
+  locationId: number;
+  adjustmentType: string;
+  notes: string | null;
+  locationName: string;
+  items: AdjustmentItem[];
+}
+
+interface TransferItem {
+  id: number;
+  transferId: number;
+  stockItemId: number;
+  quantity: string;
+  rate: string;
+  totalAmount: string;
+  stockItemCode: string;
+  stockItemName: string;
+  stockItemUom: string;
+}
+
+interface TransferData {
+  id: number;
+  voucherId: number;
+  sourceLocationId: number;
+  destinationLocationId: number;
+  notes: string | null;
+  sourceLocationName: string;
+  destinationLocationName: string;
+  items: TransferItem[];
+}
+
 interface VoucherData {
   id: number;
   companyId: number;
@@ -142,9 +189,12 @@ interface VoucherData {
   voucherDate: string;
   description: string | null;
   totalAmount: string;
+  optional: boolean;
   entries: VoucherEntry[];
   purchaseOrder?: PurchaseOrderData | null;
   salesItems?: SalesItem[] | null;
+  adjustmentData?: AdjustmentData | null;
+  transferData?: TransferData | null;
 }
 
 // Form entry schemas
@@ -319,6 +369,8 @@ export default function VoucherEdit() {
   const isJournal = voucherType === "Journal";
   const isPurchase = voucherType === "Purchase" && voucher?.purchaseOrder;
   const isSales = voucherType === "Sales" && voucher?.salesItems;
+  const isConsumption = (voucherType === "Consumption" || voucherType === "Mixed") && voucher?.adjustmentData;
+  const isStockTransfer = voucherType === "Stock Transfer" && voucher?.transferData;
 
   // Payment/Receipt Form
   const paymentForm = useForm<VoucherFormData>({
@@ -486,6 +538,28 @@ export default function VoucherEdit() {
     },
   });
 
+  // Optional toggle mutation
+  const toggleOptionalMutation = useMutation({
+    mutationFn: async (optional: boolean) => {
+      return await apiRequest("PATCH", `/api/vouchers/${id}/optional`, { optional });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      toast({
+        title: "Success",
+        description: "Optional status updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update optional status",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Submit handlers
   const onSubmitPaymentReceipt = (data: VoucherFormData) => {
     const voucherUpdates = {
@@ -583,8 +657,8 @@ export default function VoucherEdit() {
     );
   }
 
-  // Not supported voucher type (except Purchase and Sales which we handle separately)
-  if (!isPaymentOrReceipt && !isJournal && !isPurchase && !isSales) {
+  // Not supported voucher type (except Purchase, Sales, Consumption/Mixed, and Stock Transfer which we handle separately)
+  if (!isPaymentOrReceipt && !isJournal && !isPurchase && !isSales && !isConsumption && !isStockTransfer) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -661,6 +735,19 @@ export default function VoucherEdit() {
                   })}
                 </p>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 py-2 border-y">
+              <Switch
+                id="optional-toggle"
+                checked={voucher.optional}
+                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                disabled={toggleOptionalMutation.isPending}
+                data-testid="switch-optional"
+              />
+              <Label htmlFor="optional-toggle" className="cursor-pointer">
+                Optional (Does not affect books)
+              </Label>
             </div>
 
             {salesItems && salesItems.length > 0 && (
@@ -800,6 +887,19 @@ export default function VoucherEdit() {
               </div>
             </div>
 
+            <div className="flex items-center gap-2 py-2 border-y">
+              <Switch
+                id="optional-toggle-po"
+                checked={voucher.optional}
+                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                disabled={toggleOptionalMutation.isPending}
+                data-testid="switch-optional"
+              />
+              <Label htmlFor="optional-toggle-po" className="cursor-pointer">
+                Optional (Does not affect books)
+              </Label>
+            </div>
+
             {po.items && po.items.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">Line Items</p>
@@ -835,6 +935,257 @@ export default function VoucherEdit() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleCancel}
+                data-testid="button-back-to-daybook"
+              >
+                Back to Daybook
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Consumption/Mixed viewing (when voucher type is Consumption or Mixed)
+  if (isConsumption && voucher.adjustmentData) {
+    const adjustment = voucher.adjustmentData;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              {voucherType} Voucher: {voucher.voucherNumber}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View stock adjustment details
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{voucherType} Details</CardTitle>
+            <CardDescription>
+              Stock adjustment at {adjustment.locationName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Voucher Number</p>
+                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Location</p>
+                <p className="text-base font-semibold">{adjustment.locationName}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
+                <p className="text-base font-semibold">
+                  ${parseFloat(voucher.totalAmount || "0").toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 py-2 border-y">
+              <Switch
+                id="optional-toggle-adjustment"
+                checked={voucher.optional}
+                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                disabled={toggleOptionalMutation.isPending}
+                data-testid="switch-optional"
+              />
+              <Label htmlFor="optional-toggle-adjustment" className="cursor-pointer">
+                Optional (Does not affect books)
+              </Label>
+            </div>
+
+            {adjustment.items && adjustment.items.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Items</p>
+                <div className="border rounded-md">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-2 text-sm font-medium">Item</th>
+                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
+                        <th className="text-right p-2 text-sm font-medium">Rate</th>
+                        <th className="text-right p-2 text-sm font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adjustment.items.map((item, index) => (
+                        <tr key={item.id} className={index < adjustment.items.length - 1 ? "border-b" : ""}>
+                          <td className="p-2 text-sm">
+                            {item.stockItemCode} - {item.stockItemName}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            ${parseFloat(item.rate).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-2 text-sm text-right font-medium">
+                            ${parseFloat(item.totalAmount).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {adjustment.notes && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm">{adjustment.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleCancel}
+                data-testid="button-back-to-daybook"
+              >
+                Back to Daybook
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Stock Transfer viewing (when voucher type is Stock Transfer)
+  if (isStockTransfer && voucher.transferData) {
+    const transfer = voucher.transferData;
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Stock Transfer: {voucher.voucherNumber}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View stock transfer details
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Transfer Details</CardTitle>
+            <CardDescription>
+              Transfer from {transfer.sourceLocationName} to {transfer.destinationLocationName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Transfer Number</p>
+                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">From Location</p>
+                <p className="text-base font-semibold">{transfer.sourceLocationName}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">To Location</p>
+                <p className="text-base font-semibold">{transfer.destinationLocationName}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 py-2 border-y">
+              <Switch
+                id="optional-toggle-transfer"
+                checked={voucher.optional}
+                onCheckedChange={(checked) => toggleOptionalMutation.mutate(checked)}
+                disabled={toggleOptionalMutation.isPending}
+                data-testid="switch-optional"
+              />
+              <Label htmlFor="optional-toggle-transfer" className="cursor-pointer">
+                Optional (Does not affect books)
+              </Label>
+            </div>
+
+            {transfer.items && transfer.items.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Items Transferred</p>
+                <div className="border rounded-md">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-2 text-sm font-medium">Item</th>
+                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
+                        <th className="text-right p-2 text-sm font-medium">Rate</th>
+                        <th className="text-right p-2 text-sm font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transfer.items.map((item, index) => (
+                        <tr key={item.id} className={index < transfer.items.length - 1 ? "border-b" : ""}>
+                          <td className="p-2 text-sm">
+                            {item.stockItemCode} - {item.stockItemName}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            ${parseFloat(item.rate).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-2 text-sm text-right font-medium">
+                            ${parseFloat(item.totalAmount).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {transfer.notes && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm">{transfer.notes}</p>
               </div>
             )}
 
