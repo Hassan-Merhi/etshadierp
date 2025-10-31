@@ -3943,15 +3943,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Find the associated adjustment voucher
-      const [adjustmentVoucher] = await db
+      // Find or create the associated adjustment voucher
+      let adjustmentVoucher = await db
         .select()
         .from(stockAdjustmentVouchers)
         .where(eq(stockAdjustmentVouchers.voucherId, id))
-        .limit(1);
+        .limit(1)
+        .then(rows => rows[0]);
 
+      // If no adjustment voucher exists, create one
       if (!adjustmentVoucher) {
-        return res.status(404).json({ message: "Associated adjustment voucher not found" });
+        const adjustmentType = existingVoucher.voucherType === "Consumption" ? "consumption" : "production";
+        const [newAdjustment] = await db
+          .insert(stockAdjustmentVouchers)
+          .values({
+            voucherId: id,
+            locationId: parseInt(locationId),
+            adjustmentType: adjustmentType,
+            notes: description || "",
+          })
+          .returning();
+        adjustmentVoucher = newAdjustment;
       }
 
       // Calculate totals and prepare items data
@@ -3972,7 +3984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Delete existing adjustment items
+      // Delete existing adjustment items (if any)
       await db
         .delete(stockAdjustmentItems)
         .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
@@ -3983,7 +3995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the adjustment voucher (location can be changed, but shouldn't affect old inventory)
       await db
         .update(stockAdjustmentVouchers)
-        .set({ locationId: parseInt(locationId) })
+        .set({ locationId: parseInt(locationId), notes: description || "" })
         .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
 
       // Update the main voucher
@@ -4061,15 +4073,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Find the associated transfer voucher
-      const [transferVoucher] = await db
+      // Find or create the associated transfer voucher
+      let transferVoucher = await db
         .select()
         .from(stockTransferVouchers)
         .where(eq(stockTransferVouchers.voucherId, id))
-        .limit(1);
+        .limit(1)
+        .then(rows => rows[0]);
 
+      // If no transfer voucher exists, create one
       if (!transferVoucher) {
-        return res.status(404).json({ message: "Associated transfer voucher not found" });
+        const [newTransfer] = await db
+          .insert(stockTransferVouchers)
+          .values({
+            voucherId: id,
+            sourceLocationId: parseInt(sourceLocationId),
+            destinationLocationId: parseInt(destinationLocationId),
+            notes: description || "",
+          })
+          .returning();
+        transferVoucher = newTransfer;
       }
 
       // Calculate totals and prepare items data
@@ -4090,7 +4113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Delete existing transfer items
+      // Delete existing transfer items (if any)
       await db
         .delete(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferVoucher.id));
@@ -4104,6 +4127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({
           sourceLocationId: parseInt(sourceLocationId),
           destinationLocationId: parseInt(destinationLocationId),
+          notes: description || "",
         })
         .where(eq(stockTransferVouchers.id, transferVoucher.id));
 

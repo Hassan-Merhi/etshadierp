@@ -752,11 +752,11 @@ export default function VoucherEdit() {
         notes: voucher.description || "",
       });
       setFormInitialized(true);
-    } else if (isConsumption && voucher.adjustmentData && voucher.adjustmentData.items && voucher.adjustmentData.items.length > 0) {
+    } else if (isConsumption && voucher.adjustmentData) {
       adjustmentForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
         locationId: voucher.adjustmentData.locationId,
-        items: voucher.adjustmentData.items.map(item => ({
+        items: (voucher.adjustmentData.items || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
@@ -766,12 +766,12 @@ export default function VoucherEdit() {
         notes: voucher.adjustmentData.notes || "",
       });
       setFormInitialized(true);
-    } else if (isStockTransfer && voucher.transferData && voucher.transferData.items && voucher.transferData.items.length > 0) {
+    } else if (isStockTransfer && voucher.transferData) {
       transferForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
         sourceLocationId: voucher.transferData.sourceLocationId,
         destinationLocationId: voucher.transferData.destinationLocationId,
-        items: voucher.transferData.items.map(item => ({
+        items: (voucher.transferData.items || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
