@@ -1,0 +1,67 @@
+🧾 Daybook Edit Function — Full Editable Voucher for All Types
+Goal: Make the Edit button in the Daybook work for all voucher types (Purchase, Sales, Payment, Journal, Receipt, etc.). When I click “Edit,” it should open a complete editable version of that voucher — not just a blank form or partial modal — with all details already filled in exactly as they appear in the Daybook or voucher entry.
+
+✅ 1. What should happen when I click Edit
+* When I click Edit on any voucher in the Daybook (no matter the type):
+    * The system opens a full editable view of that exact voucher.
+    * Every field and value for that voucher is already prefilled:
+        * Voucher Number
+        * Date
+        * Type (Purchase, Payment, Sales, Journal, etc.)
+        * Description / Narration
+        * Optional toggle (on/off)
+        * All Voucher Entries with:
+            * Account (dropdown pre-selected)
+            * Debit amount
+            * Credit amount
+            * Narration (if any)
+        * Related party (supplier/customer)
+        * Any linked document (e.g., PO, invoice, container, etc.)
+        * Any attached file or note
+    * This should apply to all voucher types, not just the Purchase Receipt — the logic should automatically load the correct fields based on voucher type.
+
+🧩 2. Editing behavior
+* All fields that are normally editable when creating a new voucher should be editable here too.
+* I can change accounts, debit/credit amounts, date, or narration — and also add or remove voucher entry lines.
+* The Optional toggle remains functional — if ON, the voucher saves as “non-posting” (kept for reference only, not affecting books).
+* Add buttons:
+    * Save
+    * Cancel
+    * Save & Recalculate (if totals or linked values need recalculation)
+
+⚙️ 3. Validation rules
+* For active (non-optional) vouchers:
+    * Debits must equal Credits before saving.
+    * Required fields: date, at least one entry with a non-zero amount, and an account selected for each line.
+* For Optional vouchers:
+    * Debits/Credits mismatch allowed but flagged visually (“Optional – not posted”).
+* Validation must cover all voucher types automatically, not only Purchase.
+
+💾 4. What happens on Save
+* When I edit and click Save:
+    * The system updates the existing voucher record with the new values.
+    * It automatically updates all linked records depending on the voucher type:
+        * Supplier balances (if supplier involved — affects all companies globally).
+        * Inventory/stock movements (if it’s a stock-related voucher).
+        * Ledger entries (for all financial vouchers).
+    * If “Optional” is ON → it updates the voucher data but skips posting to ledgers or inventory.
+    * The Daybook list should refresh immediately to show updated data.
+
+🧠 5. Apply this rule globally
+* This edit behavior applies to all voucher types in the Daybook:
+    * Purchases
+    * Sales
+    * Receipts
+    * Payments
+    * Journals
+    * Transfers
+    * Any other voucher that appears in Daybook
+* The system should automatically detect the type and load its correct fields and layout for editing.
+* In short: Click Edit → Full editable voucher appears → Save → Data updates across system.
+
+🔐 6. Optional enhancements
+* Add an audit trail that logs who edited the voucher, what changed, and when.
+* If another user is editing the same voucher, show a lock or warning to prevent conflicts.
+* Support keyboard navigation (Tab to move between Account → Debit → Credit → Narration).
+
+In summary for the agent: When I click Edit on any voucher, it should open that exact voucher with all its data already there — not a new blank form — and I should be able to edit every field, save changes, and have it correctly update ledgers, suppliers, and stock based on the voucher type.
