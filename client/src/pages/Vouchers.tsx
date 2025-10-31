@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useReactToPrint } from "react-to-print";
+import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { VoucherEditDialog } from "@/components/VoucherEditDialog";
 import {
@@ -471,7 +472,7 @@ const PrintTemplate = ({
 
 // Daybook Tab Component
 interface DaybookTabProps {
-  onEditVoucher: (id: number) => void;
+  onEditVoucher: (voucher: Voucher) => void;
 }
 
 interface Voucher {
@@ -554,7 +555,7 @@ function DaybookTab({ onEditVoucher }: DaybookTabProps) {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onEditVoucher(voucher.id)}
+                        onClick={() => onEditVoucher(voucher)}
                         data-testid={`button-edit-voucher-${voucher.id}`}
                       >
                         <Pencil className="h-4 w-4" />
@@ -577,6 +578,7 @@ export default function Vouchers() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const [, navigate] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
@@ -1680,9 +1682,20 @@ export default function Vouchers() {
 
         <TabsContent value="daybook" className="space-y-4">
           <DaybookTab
-            onEditVoucher={(id) => {
-              setEditVoucherId(id);
-              setEditDialogOpen(true);
+            onEditVoucher={(voucher) => {
+              // Navigate to appropriate editing interface based on voucher type
+              const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase"];
+              if (editableTypes.includes(voucher.voucherType)) {
+                navigate(`/vouchers/${voucher.id}/edit`);
+              } else {
+                // For other types, show the generic dialog (temporary fallback)
+                setEditVoucherId(voucher.id);
+                setEditDialogOpen(true);
+                toast({
+                  title: "Info",
+                  description: `Editing ${voucher.voucherType} vouchers is not fully supported yet.`,
+                });
+              }
             }}
           />
         </TabsContent>

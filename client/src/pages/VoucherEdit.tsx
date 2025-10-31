@@ -118,6 +118,21 @@ interface PurchaseOrderData {
   items: PurchaseOrderLineItem[];
 }
 
+interface SalesItem {
+  id: number;
+  voucherId: number;
+  stockItemId: number;
+  quantity: string;
+  sellingPrice: string;
+  costPrice: string;
+  totalSales: string;
+  totalCost: string;
+  profit: string;
+  stockItemCode: string;
+  stockItemName: string;
+  stockItemUom: string;
+}
+
 interface VoucherData {
   id: number;
   companyId: number;
@@ -129,6 +144,7 @@ interface VoucherData {
   totalAmount: string;
   entries: VoucherEntry[];
   purchaseOrder?: PurchaseOrderData | null;
+  salesItems?: SalesItem[] | null;
 }
 
 // Form entry schemas
@@ -302,6 +318,7 @@ export default function VoucherEdit() {
   const isPaymentOrReceipt = voucherType === "Payment" || voucherType === "Receipt";
   const isJournal = voucherType === "Journal";
   const isPurchase = voucherType === "Purchase" && voucher?.purchaseOrder;
+  const isSales = voucherType === "Sales" && voucher?.salesItems;
 
   // Payment/Receipt Form
   const paymentForm = useForm<VoucherFormData>({
@@ -566,8 +583,8 @@ export default function VoucherEdit() {
     );
   }
 
-  // Not supported voucher type (except Purchase which we handle separately)
-  if (!isPaymentOrReceipt && !isJournal && !isPurchase) {
+  // Not supported voucher type (except Purchase and Sales which we handle separately)
+  if (!isPaymentOrReceipt && !isJournal && !isPurchase && !isSales) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -584,6 +601,144 @@ export default function VoucherEdit() {
                 Editing {voucherType} vouchers is not currently supported.
               </p>
               <Button onClick={handleCancel} className="mt-4" data-testid="button-back-to-daybook">
+                Back to Daybook
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Sales viewing (when voucher type is Sales and items are linked)
+  if (isSales && voucher.salesItems) {
+    const salesItems = voucher.salesItems;
+    const location = locations.find(l => l.id === voucher.locationId);
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              Sales Invoice: {voucher.voucherNumber}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              View sales transaction details
+            </p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sales Details</CardTitle>
+            <CardDescription>
+              Point of Sale transaction
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Invoice Number</p>
+                <p className="text-base font-semibold">{voucher.voucherNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-base font-semibold">{format(parseISO(voucher.voucherDate), "PPP")}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Location</p>
+                <p className="text-base font-semibold">{location?.name || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
+                <p className="text-base font-semibold">
+                  ${parseFloat(voucher.totalAmount || "0").toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {salesItems && salesItems.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Items Sold</p>
+                <div className="border rounded-md">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-2 text-sm font-medium">Item</th>
+                        <th className="text-right p-2 text-sm font-medium">Quantity</th>
+                        <th className="text-right p-2 text-sm font-medium">Price</th>
+                        <th className="text-right p-2 text-sm font-medium">Total</th>
+                        <th className="text-right p-2 text-sm font-medium">Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesItems.map((item, index) => (
+                        <tr key={item.id} className={index < salesItems.length - 1 ? "border-b" : ""}>
+                          <td className="p-2 text-sm">
+                            {item.stockItemCode} - {item.stockItemName}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            {parseFloat(item.quantity).toLocaleString()} {item.stockItemUom}
+                          </td>
+                          <td className="p-2 text-sm text-right">
+                            ${parseFloat(item.sellingPrice).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-2 text-sm text-right font-medium">
+                            ${parseFloat(item.totalSales).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-2 text-sm text-right font-medium text-green-600">
+                            ${parseFloat(item.profit).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="border-t font-semibold bg-muted/30">
+                        <td className="p-2 text-sm" colSpan={3}>Total</td>
+                        <td className="p-2 text-sm text-right">
+                          ${salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="p-2 text-sm text-right text-green-600">
+                          ${salesItems.reduce((sum, item) => sum + parseFloat(item.profit), 0).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {voucher.description && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm">{voucher.description}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleCancel}
+                data-testid="button-back-to-daybook"
+              >
                 Back to Daybook
               </Button>
             </div>

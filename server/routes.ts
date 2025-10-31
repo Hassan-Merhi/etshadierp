@@ -3418,10 +3418,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // If this is a Sales voucher, also fetch the linked sales items
+      let salesItemsList = null;
+      if (voucher.voucherType === "Sales") {
+        const items = await db
+          .select()
+          .from(salesItems)
+          .where(eq(salesItems.voucherId, id));
+        
+        if (items.length > 0) {
+          const itemsWithDetails = await Promise.all(
+            items.map(async (item) => {
+              const stockItem = await storage.getStockItemById(item.stockItemId);
+              return {
+                ...item,
+                stockItemCode: stockItem?.code || "",
+                stockItemName: stockItem?.name || "",
+                stockItemUom: stockItem?.uom || "",
+              };
+            })
+          );
+          salesItemsList = itemsWithDetails;
+        }
+      }
+      
       res.json({
         ...voucher,
         entries,
         purchaseOrder,
+        salesItems: salesItemsList,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -547,8 +547,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleEdit = (voucher: Voucher) => {
-    setVoucherToEdit(voucher);
-    setEditDialogOpen(true);
+    // Navigate to appropriate editing interface based on voucher type
+    const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase"];
+    if (editableTypes.includes(voucher.voucherType)) {
+      navigate(`/vouchers/${voucher.id}/edit`);
+    } else {
+      // For other types, show the generic dialog (temporary fallback)
+      setVoucherToEdit(voucher);
+      setEditDialogOpen(true);
+      toast({
+        title: "Info",
+        description: `Editing ${voucher.voucherType} vouchers is not fully supported yet.`,
+      });
+    }
   };
 
   const handleSaveEdit = (data: EditVoucherForm) => {
