@@ -1,5 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { neon } from "@neondatabase/serverless";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import type { User } from "@shared/schema";
@@ -43,18 +45,31 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false }));
 
 // Session middleware
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+const PgSession = connectPgSimple(session);
+
+const sessionConfig: session.SessionOptions = {
+  secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+};
+
+// Use PostgreSQL session store in production
+if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+  const sql = neon(process.env.DATABASE_URL);
+  sessionConfig.store = new PgSession({
+    conObject: {
+      connectionString: process.env.DATABASE_URL,
     },
-  })
-);
+    createTableIfMissing: true,
+  });
+}
+
+app.use(session(sessionConfig));
 
 app.use((req, res, next) => {
   const start = Date.now();
