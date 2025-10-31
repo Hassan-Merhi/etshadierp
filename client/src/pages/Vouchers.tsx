@@ -1283,20 +1283,19 @@ export default function Vouchers() {
   ) => {
     const isLastRow = rowIndex === journalFields.length - 1;
     
-    // Handle Tab for navigation on Select (let Enter activate it naturally)
+    // Handle Tab on DR/CR Select - move to Account
     if (fieldName === "type" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       setTimeout(() => {
-        const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
-        if (accountInput) {
-          accountInput.focus();
-          accountInput.select();
+        const accountButton = document.querySelector(`[data-testid="button-journal-account-${rowIndex}"]`) as HTMLButtonElement;
+        if (accountButton) {
+          accountButton.focus();
         }
       }, 50);
     }
     
-    // Handle Tab/Enter on account input - move to amount
-    if (fieldName === "account" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
+    // Handle Tab on Account button - move to Amount
+    if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       setTimeout(() => {
         const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
@@ -1307,10 +1306,10 @@ export default function Vouchers() {
       }, 50);
     }
     
-    // Handle both Tab and Enter for navigation on input fields
-    if (fieldName === "amount" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
+    // Handle Enter on Amount - create new row if last row, then focus DR/CR of new row
+    if (fieldName === "amount" && e.key === "Enter") {
       e.preventDefault();
-      // On last field - move to next row or create new row
+      // On last row - create new row
       if (isLastRow) {
         appendJournal({
           type: "DR",
@@ -1319,13 +1318,21 @@ export default function Vouchers() {
           accountName: "",
           amount: "",
         });
+        setTimeout(() => {
+          const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (newRowSelect) {
+            newRowSelect.focus();
+          }
+        }, 100);
+      } else {
+        // Not last row - move to DR/CR of next row
+        setTimeout(() => {
+          const nextRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+          if (nextRowSelect) {
+            nextRowSelect.focus();
+          }
+        }, 50);
       }
-      setTimeout(() => {
-        const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
-        if (newRowSelect) {
-          newRowSelect.focus();
-        }
-      }, 100);
     }
   };
 
