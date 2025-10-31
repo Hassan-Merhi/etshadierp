@@ -526,8 +526,8 @@ export default function VoucherEdit() {
   const voucherType = voucher?.voucherType;
   const isPaymentOrReceipt = voucherType === "Payment" || voucherType === "Receipt";
   const isJournal = voucherType === "Journal";
-  const isPurchase = voucherType === "Purchase" && voucher?.purchaseOrder;
-  const isSales = voucherType === "Sales" && voucher?.salesItems;
+  const isPurchase = voucherType === "Purchase";
+  const isSales = voucherType === "Sales";
   const isConsumption = voucherType === "Consumption" || voucherType === "Mixed";
   const isStockTransfer = voucherType === "Stock Transfer";
 
@@ -725,11 +725,11 @@ export default function VoucherEdit() {
         notes: voucher.description || "",
       });
       setFormInitialized(true);
-    } else if (isSales && voucher.salesItems && voucher.salesItems.length > 0) {
+    } else if (isSales) {
       salesForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
         locationId: voucher.locationId || 0,
-        items: voucher.salesItems.map(item => ({
+        items: (voucher.salesItems || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
@@ -739,10 +739,10 @@ export default function VoucherEdit() {
         notes: voucher.description || "",
       });
       setFormInitialized(true);
-    } else if (isPurchase && voucher.purchaseOrder && voucher.purchaseOrder.items && voucher.purchaseOrder.items.length > 0) {
+    } else if (isPurchase) {
       purchaseForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        items: voucher.purchaseOrder.items.map(item => ({
+        items: (voucher.purchaseOrder?.items || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: item.itemName,
@@ -752,33 +752,33 @@ export default function VoucherEdit() {
         notes: voucher.description || "",
       });
       setFormInitialized(true);
-    } else if (isConsumption && voucher.adjustmentData) {
+    } else if (isConsumption) {
       adjustmentForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        locationId: voucher.adjustmentData.locationId,
-        items: (voucher.adjustmentData.items || []).map(item => ({
+        locationId: voucher.adjustmentData?.locationId || voucher.locationId || 0,
+        items: (voucher.adjustmentData?.items || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
           quantity: item.quantity,
           rate: item.rate,
         })),
-        notes: voucher.adjustmentData.notes || "",
+        notes: voucher.adjustmentData?.notes || voucher.description || "",
       });
       setFormInitialized(true);
-    } else if (isStockTransfer && voucher.transferData) {
+    } else if (isStockTransfer) {
       transferForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        sourceLocationId: voucher.transferData.sourceLocationId,
-        destinationLocationId: voucher.transferData.destinationLocationId,
-        items: (voucher.transferData.items || []).map(item => ({
+        sourceLocationId: voucher.transferData?.sourceLocationId || voucher.locationId || 0,
+        destinationLocationId: voucher.transferData?.destinationLocationId || 0,
+        items: (voucher.transferData?.items || []).map(item => ({
           id: item.id,
           stockItemId: item.stockItemId,
           stockItemName: `${item.stockItemCode} - ${item.stockItemName}`,
           quantity: item.quantity,
           rate: item.rate,
         })),
-        notes: voucher.transferData.notes || "",
+        notes: voucher.transferData?.notes || voucher.description || "",
       });
       setFormInitialized(true);
     }
@@ -1115,8 +1115,8 @@ export default function VoucherEdit() {
     );
   }
 
-  // Sales editing (when voucher type is Sales and items are linked)
-  if (isSales && voucher.salesItems) {
+  // Sales editing (when voucher type is Sales)
+  if (isSales) {
     const location = locations.find(l => l.id === voucher.locationId);
     
     // Calculate grand total
@@ -1419,8 +1419,8 @@ export default function VoucherEdit() {
     );
   }
 
-  // Purchase Order editing (when voucher type is Purchase and PO is linked)
-  if (isPurchase && voucher.purchaseOrder) {
+  // Purchase Order editing (when voucher type is Purchase)
+  if (isPurchase) {
     const po = voucher.purchaseOrder;
     
     // Calculate grand total
