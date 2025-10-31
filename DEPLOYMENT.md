@@ -1,12 +1,13 @@
 # Deploy to Render - Step by Step Guide
 
-This guide will help you deploy your ERP/POS system to Render with everything working (backend, database, and frontend).
+This guide will help you deploy your ERP/POS system to Render with everything working (backend, database, and frontend) at a **fixed monthly price of $14**.
 
 ## What You'll Get
 - ✅ Live website with your own URL
-- ✅ PostgreSQL database (managed by Neon - free tier)
+- ✅ PostgreSQL database with automatic backups
 - ✅ Backend and frontend working together
-- ✅ Free hosting on Render
+- ✅ Fixed monthly cost: **$14** (Web $7 + Database $7)
+- ✅ No surprises - predictable pricing
 
 ## Step 1: Download Your Code (On Your Mac)
 
@@ -41,27 +42,9 @@ This guide will help you deploy your ERP/POS system to Render with everything wo
    ```
    (You'll need GitHub CLI installed: `brew install gh`)
 
-## Step 3: Create Your Database on Neon
+## Step 3: Deploy on Render (Includes Database Setup)
 
-Your app needs a PostgreSQL database. We'll use Neon's free tier (no credit card required!).
-
-1. **Go to https://neon.tech and sign up** (use GitHub to sign in - easiest)
-
-2. **Create a new project:**
-   - Click "Create a project" or "New Project"
-   - Give it a name like "ERP POS System"
-   - Select a region (choose one closest to your Render region)
-   - Click "Create Project"
-
-3. **Copy your connection string:**
-   - You'll see a connection string that looks like:
-     ```
-     postgresql://username:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
-     ```
-   - Click "Copy" to copy it
-   - **Save this somewhere safe** - you'll need it in the next step!
-
-## Step 4: Deploy on Render
+Render will automatically create and configure your PostgreSQL database using the `render.yaml` blueprint.
 
 1. Go to https://render.com and sign up (use GitHub to sign in)
 
@@ -72,64 +55,94 @@ Your app needs a PostgreSQL database. We'll use Neon's free tier (no credit card
    - Select your project repository (erp-pos-system)
 
 4. Render will detect the `render.yaml` file and show:
-   - ✅ Web Service: erp-pos-system
+   - ✅ Web Service: erp-pos-system (Starter Plan - $7/month)
+   - ✅ PostgreSQL Database: erp-database (Starter Plan - $7/month)
+   - **Total: $14/month**
 
-5. **IMPORTANT: Add your database connection string**
-   - Before clicking "Apply", scroll down to find "Environment Variables"
-   - Click "Add Environment Variable"
-   - Key: `DATABASE_URL`
-   - Value: Paste the Neon connection string you copied in Step 3
-   - Click "Save"
+5. Review the plan details:
+   - **Web Service ($7/month):**
+     - 512 MB RAM
+     - Shared CPU
+     - Automatic deployments
+     - Free SSL certificate
+     - Custom domain support
+   
+   - **Database ($7/month):**
+     - 256 MB RAM
+     - 1 GB storage
+     - Daily automatic backups
+     - Connection pooling
 
-6. Click "Apply"
+6. Click "Apply" to start deployment
 
-7. Wait 3-5 minutes while Render:
+7. **Add your payment method** when prompted (required for paid plans)
+   - You'll be charged $14/month starting now
+   - First month is prorated if you start mid-month
+
+8. Wait 3-5 minutes while Render:
+   - Creates your PostgreSQL database
    - Builds your application
+   - Runs database migrations
    - Deploys everything
 
-8. You'll get a URL like: `https://erp-pos-system.onrender.com`
+9. You'll get a URL like: `https://erp-pos-system.onrender.com`
 
-## Step 5: Set Up Database Tables (One-Time Setup)
+## Step 4: Verify Database Setup
 
-After your first deployment, you need to create the database tables:
+The database tables are automatically created during deployment (via the build command in `render.yaml`). To verify:
 
 1. In Render dashboard, click on your **erp-pos-system** web service
 
-2. Click the **"Shell"** tab (in the left sidebar under "MANAGE")
-
-3. Type this command and press Enter:
-   ```bash
-   npm run db:push
+2. Click the **"Logs"** tab and look for:
+   ```
+   ✓ Database schema created successfully
    ```
 
-4. Wait for it to complete (you'll see "Done!" when finished)
+If you see any errors, you can manually run migrations:
+1. Click the **"Shell"** tab
+2. Type: `npm run db:push`
+3. Wait for completion
 
-That's it! Your database is now set up with all the tables.
+## Step 5: Create Your Admin User
 
-## Step 6: Create Your Admin User
+You'll need to create your first admin user and company manually:
 
-Now create your first admin user and company:
+1. In Render dashboard, go to your **erp-database** PostgreSQL service
 
-1. **Still in the Shell tab**, type this command:
-   ```bash
-   tsx scripts/create-admin.ts
-   ```
+2. Click **"Connect"** → Copy the **External Connection String**
 
-2. You'll see a success message with your login credentials:
-   ```
-   You can now login with:
-     Username: admin
-     Password: admin123
-   
-   ⚠️  IMPORTANT: Change this password after first login!
-   ```
+3. Use a PostgreSQL client (like TablePlus, pgAdmin, or psql) to connect
 
-3. **Write down these credentials!**
+4. Run these SQL commands:
 
-## Step 7: Start Using Your App!
+```sql
+-- Create initial company
+INSERT INTO companies (code, name, active) 
+VALUES ('COMP001', 'Your Company Name', true);
 
-Visit your URL (from Step 4) and:
-1. Login with the credentials from Step 6:
+-- Create admin user (password is SHA256 hash of 'admin123')
+INSERT INTO users (username, password, active) 
+VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', true);
+
+-- Link user to company with Admin role  
+INSERT INTO user_company_roles (user_id, company_id, role) 
+VALUES (
+  (SELECT id FROM users WHERE username = 'admin'), 
+  (SELECT id FROM companies WHERE code = 'COMP001'), 
+  'Admin'
+);
+```
+
+**Default login credentials:**
+- Username: `admin`
+- Password: `admin123`
+
+⚠️ **IMPORTANT:** Change this password immediately after first login!
+
+## Step 6: Start Using Your App!
+
+Visit your URL (from Step 3, #9) and:
+1. Login with the credentials from Step 5:
    - Username: `admin`
    - Password: `admin123`
 2. **IMPORTANT:** Change your password immediately after login (Settings page)
@@ -142,51 +155,55 @@ Visit your URL (from Step 4) and:
 **If the build fails:**
 - Check the logs in Render's dashboard
 - Click "Logs" in the left sidebar to see detailed error messages
-- Most common issue: missing DATABASE_URL environment variable
+- Verify database was created successfully
 
 **If you see "Error connecting to database":**
-- Make sure you added the DATABASE_URL in Step 4, #5
-- Double-check the connection string is correct (no extra spaces)
-- Make sure you ran `npm run db:push` in Step 5
+- Check that both web service and database are running
+- Verify DATABASE_URL is automatically set (it should be)
+- Check database connection in Shell: `echo $DATABASE_URL`
 
 **If you need to update the app:**
-1. Make changes in Replit
-2. Download as ZIP again
-3. Push to GitHub (GitHub Desktop will detect changes automatically)
-4. Render automatically redeploys (watch the Events tab)
+1. Make changes in your code
+2. Push to GitHub (GitHub Desktop will detect changes automatically)
+3. Render automatically redeploys (watch the Events tab)
+4. Updates are free - no extra charges
 
-## Free Tier Limits
+## What's Included in $14/Month
 
-**Neon (Database):**
-- 0.5 GB storage
-- Unlimited queries
-- No credit card required
-- Database pauses after inactivity (resumes instantly when accessed)
-
-**Render (Web Service):**
-- 750 hours/month of runtime
-- Your service may spin down after inactivity (takes 30-60 seconds to wake up on first visit)
+**Web Service ($7/month):**
 - 512 MB RAM
+- Shared CPU
+- Automatic deployments from GitHub
+- Free SSL certificate (HTTPS)
+- Custom domain support
+- DDoS protection
+- Always-on (no spin down)
+- Automatic restarts if crashes
 
-These limits are more than enough for testing and small business use!
+**PostgreSQL Database ($7/month):**
+- 256 MB RAM
+- 1 GB storage
+- Daily automatic backups (7-day retention)
+- Connection pooling
+- Always-on (no pauses)
+- High availability
+- Monitoring and metrics
 
-## Upgrading
+## Upgrading for More Resources
 
-If you need:
-- More storage or always-on database → Upgrade Neon ($19/month)
-- Faster performance and no spin-down → Upgrade Render ($7/month)
-- Both for production use → Around $26/month total
+If your business grows and you need more capacity:
 
-## Adding DATABASE_URL Later
+**Web Service Plans:**
+- Starter: $7/month (current plan)
+- Standard: $25/month (2 GB RAM, 1 CPU)
+- Pro: $85/month (4 GB RAM, 2 CPUs)
 
-If you forgot to add the DATABASE_URL in Step 4:
+**Database Plans:**
+- Starter: $7/month (1 GB storage - current plan)
+- Standard: $20/month (10 GB storage)
+- Pro: $90/month (100 GB storage)
 
-1. Go to your web service in Render dashboard
-2. Click "Environment" in the left sidebar
-3. Click "Add Environment Variable"
-4. Key: `DATABASE_URL`, Value: your Neon connection string
-5. Click "Save Changes"
-6. Your service will automatically redeploy
+You can upgrade/downgrade anytime from the Render dashboard.
 
 ## Need Help?
 
