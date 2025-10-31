@@ -6,6 +6,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { useReactToPrint } from "react-to-print";
 import { useCompany } from "@/contexts/CompanyContext";
+import { VoucherEditDialog } from "@/components/VoucherEditDialog";
 import {
   Card,
   CardContent,
@@ -63,7 +64,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -468,8 +469,112 @@ const PrintTemplate = ({
   );
 };
 
+// Daybook Tab Component
+interface DaybookTabProps {
+  onEditVoucher: (id: number) => void;
+}
+
+interface Voucher {
+  id: number;
+  voucherNumber: string;
+  voucherType: string;
+  voucherDate: string;
+  description: string | null;
+  totalAmount: string;
+  optional: boolean;
+}
+
+function DaybookTab({ onEditVoucher }: DaybookTabProps) {
+  const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
+    queryKey: ["/api/vouchers"],
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">Loading vouchers...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>All Vouchers (Daybook)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b">
+              <tr>
+                <th className="text-left py-2 px-2">Voucher #</th>
+                <th className="text-left py-2 px-2">Date</th>
+                <th className="text-left py-2 px-2">Type</th>
+                <th className="text-left py-2 px-2">Description</th>
+                <th className="text-right py-2 px-2">Amount</th>
+                <th className="text-center py-2 px-2">Status</th>
+                <th className="text-center py-2 px-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vouchers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No vouchers found. Create your first voucher using the tabs above.
+                  </td>
+                </tr>
+              ) : (
+                vouchers.map((voucher) => (
+                  <tr
+                    key={voucher.id}
+                    className="border-b hover-elevate"
+                    data-testid={`voucher-row-${voucher.id}`}
+                  >
+                    <td className="py-2 px-2 font-mono text-xs">{voucher.voucherNumber}</td>
+                    <td className="py-2 px-2">{format(new Date(voucher.voucherDate), "PPP")}</td>
+                    <td className="py-2 px-2">{voucher.voucherType}</td>
+                    <td className="py-2 px-2">{voucher.description || "-"}</td>
+                    <td className="py-2 px-2 text-right font-mono">
+                      ${parseFloat(voucher.totalAmount).toFixed(2)}
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      {voucher.optional ? (
+                        <span className="text-xs px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300">
+                          Optional
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-md bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                          Active
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEditVoucher(voucher.id)}
+                        data-testid={`button-edit-voucher-${voucher.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups">("payment");
+  const [activeTab, setActiveTab] = useState<"daybook" | "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups">("daybook");
+  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const printRef = useRef<HTMLDivElement>(null);
@@ -1548,8 +1653,11 @@ export default function Vouchers() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "daybook" | "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "employeeGroups")}>
         <TabsList>
+          <TabsTrigger value="daybook" data-testid="tab-daybook">
+            Daybook
+          </TabsTrigger>
           <TabsTrigger value="payment" data-testid="tab-payment">
             Payment
           </TabsTrigger>
@@ -1569,6 +1677,15 @@ export default function Vouchers() {
             Employee Groups
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="daybook" className="space-y-4">
+          <DaybookTab
+            onEditVoucher={(id) => {
+              setEditVoucherId(id);
+              setEditDialogOpen(true);
+            }}
+          />
+        </TabsContent>
 
         <TabsContent value="payment" className="space-y-4">
           <Card>
@@ -3133,6 +3250,18 @@ export default function Vouchers() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Voucher Edit Dialog */}
+      <VoucherEditDialog
+        voucherId={editVoucherId}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            setEditVoucherId(null);
+          }
+        }}
+      />
     </div>
   );
 }

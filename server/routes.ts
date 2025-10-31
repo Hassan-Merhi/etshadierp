@@ -3326,14 +3326,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Voucher and entries are required" });
       }
 
-      // Validate that debits equal credits
+      // Validate that debits equal credits (only for non-optional vouchers)
       const totalDebits = entries.reduce((sum: number, entry: any) => 
         sum + parseFloat(entry.debitAmount || "0"), 0);
       const totalCredits = entries.reduce((sum: number, entry: any) => 
         sum + parseFloat(entry.creditAmount || "0"), 0);
       
-      if (Math.abs(totalDebits - totalCredits) >= 0.01) {
-        return res.status(400).json({ message: "Total debits must equal total credits" });
+      // For active (non-optional) vouchers, enforce debit=credit balance
+      if (!voucher.optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
+        return res.status(400).json({ message: "Total debits must equal total credits for active vouchers" });
       }
 
       // Create voucher with error handling
@@ -3532,14 +3533,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Validate that debits equal credits
+      // Validate that debits equal credits (only for non-optional vouchers)
       const totalDebits = entries.reduce((sum: number, entry: any) => 
         sum + parseFloat(entry.debitAmount || "0"), 0);
       const totalCredits = entries.reduce((sum: number, entry: any) => 
         sum + parseFloat(entry.creditAmount || "0"), 0);
       
-      if (Math.abs(totalDebits - totalCredits) >= 0.01) {
-        return res.status(400).json({ message: "Total debits must equal total credits" });
+      // For active (non-optional) vouchers, enforce debit=credit balance
+      if (!voucher.optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
+        return res.status(400).json({ message: "Total debits must equal total credits for active vouchers" });
       }
 
       // Update voucher with error handling

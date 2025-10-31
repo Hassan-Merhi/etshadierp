@@ -1,0 +1,614 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Types
+interface VoucherEditDialogProps {
+  voucherId: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+interface LedgerAccount {
+  id: number;
+  code: string;
+  name: string;
+  accountType: string;
+}
+
+interface BankAccount {
+  id: number;
+  accountNumber: string;
+  bankName: string;
+}
+
+interface Supplier {
+  id: number;
+  code: string;
+  name: string;
+  legalName: string;
+}
+
+interface FixedAsset {
+  id: number;
+  assetCode: string;
+  assetName: string;
+}
+
+interface VoucherEntry {
+  ledgerAccountId: number | null;
+  bankAccountId: number | null;
+  fixedAssetId: number | null;
+  supplierId: number | null;
+  debitAmount: string;
+  creditAmount: string;
+  narration: string;
+}
+
+const voucherEntrySchema = z.object({
+  ledgerAccountId: z.number().nullable(),
+  bankAccountId: z.number().nullable(),
+  fixedAssetId: z.number().nullable(),
+  supplierId: z.number().nullable(),
+  debitAmount: z.string(),
+  creditAmount: z.string(),
+  narration: z.string(),
+});
+
+const voucherSchema = z.object({
+  voucherNumber: z.string().min(1, "Voucher number is required"),
+  voucherType: z.string().min(1, "Voucher type is required"),
+  voucherDate: z.date(),
+  description: z.string(),
+  optional: z.boolean(),
+  entries: z.array(voucherEntrySchema).min(1, "At least one entry is required"),
+});
+
+type VoucherFormData = z.infer<typeof voucherSchema>;
+
+export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEditDialogProps) {
+  const { toast } = useToast();
+  const [showOptionalWarning, setShowOptionalWarning] = useState(false);
+
+  // Fetch reference data
+  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({ 
+    queryKey: ["/api/ledger-accounts"],
+    enabled: open,
+  });
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ 
+    queryKey: ["/api/bank-accounts"],
+    enabled: open,
+  });
+  const { data: suppliers = [] } = useQuery<Supplier[]>({ 
+    queryKey: ["/api/suppliers"],
+    enabled: open,
+  });
+  const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({ 
+    queryKey: ["/api/fixed-assets"],
+    enabled: open,
+  });
+
+  // Fetch voucher data
+  const { data: voucherData, isLoading } = useQuery({
+    queryKey: ["/api/vouchers", voucherId],
+    enabled: open && !!voucherId,
+  });
+
+  const form = useForm<VoucherFormData>({
+    resolver: zodResolver(voucherSchema),
+    defaultValues: {
+      voucherNumber: "",
+      voucherType: "Journal",
+      voucherDate: new Date(),
+      description: "",
+      optional: false,
+      entries: [
+        {
+          ledgerAccountId: null,
+          bankAccountId: null,
+          fixedAssetId: null,
+          supplierId: null,
+          debitAmount: "0",
+          creditAmount: "0",
+          narration: "",
+        },
+      ],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "entries",
+  });
+
+  // Load voucher data into form
+  useEffect(() => {
+    if (voucherData && open) {
+      const voucherDate = new Date(voucherData.voucherDate);
+      
+      form.reset({
+        voucherNumber: voucherData.voucherNumber || "",
+        voucherType: voucherData.voucherType || "Journal",
+        voucherDate: voucherDate,
+        description: voucherData.description || "",
+        optional: voucherData.optional || false,
+        entries: voucherData.entries && voucherData.entries.length > 0
+          ? voucherData.entries.map((entry: any) => ({
+              ledgerAccountId: entry.ledgerAccountId || null,
+              bankAccountId: entry.bankAccountId || null,
+              fixedAssetId: entry.fixedAssetId || null,
+              supplierId: entry.supplierId || null,
+              debitAmount: entry.debitAmount || "0",
+              creditAmount: entry.creditAmount || "0",
+              narration: entry.narration || "",
+            }))
+          : [
+              {
+                ledgerAccountId: null,
+                bankAccountId: null,
+                fixedAssetId: null,
+                supplierId: null,
+                debitAmount: "0",
+                creditAmount: "0",
+                narration: "",
+              },
+            ],
+      });
+    }
+  }, [voucherData, open, form]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: VoucherFormData) => {
+      if (!voucherId) throw new Error("Voucher ID is required");
+
+      const voucherPayload = {
+        voucherType: data.voucherType,
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        description: data.description,
+        optional: data.optional,
+      };
+
+      const entriesPayload = data.entries.map(entry => ({
+        ledgerAccountId: entry.ledgerAccountId,
+        bankAccountId: entry.bankAccountId,
+        fixedAssetId: entry.fixedAssetId,
+        supplierId: entry.supplierId,
+        debitAmount: entry.debitAmount,
+        creditAmount: entry.creditAmount,
+        narration: entry.narration,
+      }));
+
+      return await apiRequest("PUT", `/api/vouchers/${voucherId}/with-entries`, {
+        voucher: voucherPayload,
+        entries: entriesPayload,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Voucher updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: VoucherFormData) => {
+    // Calculate totals
+    const totalDebits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
+    const totalCredits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
+
+    // Show warning for optional vouchers with mismatched debits/credits
+    if (data.optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
+      setShowOptionalWarning(true);
+    } else {
+      setShowOptionalWarning(false);
+    }
+
+    updateMutation.mutate(data);
+  };
+
+  // Calculate totals
+  const entries = form.watch("entries");
+  const totalDebits = entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
+  const totalCredits = entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
+  const isBalanced = Math.abs(totalDebits - totalCredits) < 0.01;
+  const isOptional = form.watch("optional");
+
+  const getAccountName = (entry: VoucherEntry) => {
+    if (entry.ledgerAccountId) {
+      const account = ledgerAccounts.find(a => a.id === entry.ledgerAccountId);
+      return account ? `${account.code} - ${account.name}` : "";
+    }
+    if (entry.bankAccountId) {
+      const account = bankAccounts.find(a => a.id === entry.bankAccountId);
+      return account ? `${account.accountNumber} - ${account.bankName}` : "";
+    }
+    if (entry.supplierId) {
+      const supplier = suppliers.find(s => s.id === entry.supplierId);
+      return supplier ? `${supplier.code} - ${supplier.name}` : "";
+    }
+    if (entry.fixedAssetId) {
+      const asset = fixedAssets.find(a => a.id === entry.fixedAssetId);
+      return asset ? `${asset.assetCode} - ${asset.assetName}` : "";
+    }
+    return "";
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Voucher</DialogTitle>
+          <DialogDescription>
+            Modify voucher details and entries. {!isOptional && "Debits must equal credits for active vouchers."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="text-center py-8">Loading voucher data...</div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Voucher Header */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <FormField
+                  control={form.control}
+                  name="voucherNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Voucher Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-voucher-number" disabled />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="voucherType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-voucher-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Payment">Payment</SelectItem>
+                          <SelectItem value="Receipt">Receipt</SelectItem>
+                          <SelectItem value="Journal">Journal</SelectItem>
+                          <SelectItem value="Sales">Sales</SelectItem>
+                          <SelectItem value="Purchase">Purchase</SelectItem>
+                          <SelectItem value="Contra">Contra</SelectItem>
+                          <SelectItem value="Stock Transfer">Stock Transfer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="voucherDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              data-testid="button-select-date"
+                            >
+                              {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="optional"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col justify-end">
+                      <div className="flex items-center space-x-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-optional"
+                          />
+                        </FormControl>
+                        <Label>Optional (non-posting)</Label>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} data-testid="input-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Voucher Entries */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Voucher Entries</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      append({
+                        ledgerAccountId: null,
+                        bankAccountId: null,
+                        fixedAssetId: null,
+                        supplierId: null,
+                        debitAmount: "0",
+                        creditAmount: "0",
+                        narration: "",
+                      })
+                    }
+                    data-testid="button-add-entry"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Entry
+                  </Button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b">
+                      <tr>
+                        <th className="text-left py-2 px-2 w-[30%]">Account</th>
+                        <th className="text-right py-2 px-2 w-[15%]">Debit</th>
+                        <th className="text-right py-2 px-2 w-[15%]">Credit</th>
+                        <th className="text-left py-2 px-2 w-[35%]">Narration</th>
+                        <th className="text-center py-2 px-2 w-[5%]"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fields.map((field, index) => (
+                        <tr key={field.id} className="border-b">
+                          <td className="py-2 px-2">
+                            <div className="space-y-1">
+                              <Select
+                                value={
+                                  form.watch(`entries.${index}.ledgerAccountId`)?.toString() ||
+                                  form.watch(`entries.${index}.bankAccountId`)?.toString() ||
+                                  form.watch(`entries.${index}.supplierId`)?.toString() ||
+                                  form.watch(`entries.${index}.fixedAssetId`)?.toString() ||
+                                  ""
+                                }
+                                onValueChange={(value) => {
+                                  const [type, id] = value.split("-");
+                                  form.setValue(`entries.${index}.ledgerAccountId`, null);
+                                  form.setValue(`entries.${index}.bankAccountId`, null);
+                                  form.setValue(`entries.${index}.supplierId`, null);
+                                  form.setValue(`entries.${index}.fixedAssetId`, null);
+
+                                  if (type === "ledger") form.setValue(`entries.${index}.ledgerAccountId`, parseInt(id));
+                                  if (type === "bank") form.setValue(`entries.${index}.bankAccountId`, parseInt(id));
+                                  if (type === "supplier") form.setValue(`entries.${index}.supplierId`, parseInt(id));
+                                  if (type === "asset") form.setValue(`entries.${index}.fixedAssetId`, parseInt(id));
+                                }}
+                              >
+                                <SelectTrigger data-testid={`select-account-${index}`}>
+                                  <SelectValue placeholder="Select account" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <div className="text-xs font-semibold px-2 py-1 text-muted-foreground">Ledger Accounts</div>
+                                  {ledgerAccounts.map((acc) => (
+                                    <SelectItem key={`ledger-${acc.id}`} value={`ledger-${acc.id}`}>
+                                      {acc.code} - {acc.name}
+                                    </SelectItem>
+                                  ))}
+                                  <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Bank Accounts</div>
+                                  {bankAccounts.map((acc) => (
+                                    <SelectItem key={`bank-${acc.id}`} value={`bank-${acc.id}`}>
+                                      {acc.accountNumber} - {acc.bankName}
+                                    </SelectItem>
+                                  ))}
+                                  <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Suppliers</div>
+                                  {suppliers.map((sup) => (
+                                    <SelectItem key={`supplier-${sup.id}`} value={`supplier-${sup.id}`}>
+                                      {sup.code} - {sup.name}
+                                    </SelectItem>
+                                  ))}
+                                  <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Fixed Assets</div>
+                                  {fixedAssets.map((asset) => (
+                                    <SelectItem key={`asset-${asset.id}`} value={`asset-${asset.id}`}>
+                                      {asset.assetCode} - {asset.assetName}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              {...form.register(`entries.${index}.debitAmount`)}
+                              className="text-right"
+                              data-testid={`input-debit-${index}`}
+                              onKeyDown={(e) => {
+                                if (e.key === "Tab") {
+                                  e.preventDefault();
+                                  const creditInput = document.querySelector(`[data-testid="input-credit-${index}"]`) as HTMLInputElement;
+                                  if (creditInput) creditInput.focus();
+                                }
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              {...form.register(`entries.${index}.creditAmount`)}
+                              className="text-right"
+                              data-testid={`input-credit-${index}`}
+                              onKeyDown={(e) => {
+                                if (e.key === "Tab") {
+                                  e.preventDefault();
+                                  const narrationInput = document.querySelector(`[data-testid="input-narration-${index}"]`) as HTMLInputElement;
+                                  if (narrationInput) narrationInput.focus();
+                                }
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 px-2">
+                            <Input
+                              {...form.register(`entries.${index}.narration`)}
+                              data-testid={`input-narration-${index}`}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => remove(index)}
+                                data-testid={`button-remove-entry-${index}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t-2 font-semibold">
+                      <tr>
+                        <td className="py-2 px-2 text-right">Totals:</td>
+                        <td className="py-2 px-2 text-right font-mono" data-testid="text-total-debits">
+                          ${totalDebits.toFixed(2)}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono" data-testid="text-total-credits">
+                          ${totalCredits.toFixed(2)}
+                        </td>
+                        <td colSpan={2} className="py-2 px-2">
+                          {!isBalanced && !isOptional && (
+                            <div className="flex items-center gap-2 text-destructive text-sm">
+                              <AlertTriangle className="h-4 w-4" />
+                              Debits must equal credits
+                            </div>
+                          )}
+                          {!isBalanced && isOptional && showOptionalWarning && (
+                            <div className="flex items-center gap-2 text-amber-500 text-sm">
+                              <AlertTriangle className="h-4 w-4" />
+                              Optional – not posted to ledgers
+                            </div>
+                          )}
+                          {isBalanced && (
+                            <div className="text-sm text-muted-foreground">✓ Balanced</div>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateMutation.isPending || (!isBalanced && !isOptional)}
+                  data-testid="button-save"
+                >
+                  {updateMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
