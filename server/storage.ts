@@ -566,8 +566,8 @@ export class DbStorage implements IStorage {
         stockItemBarcode: schema.stockItems.barcode,
         stockItemUom: schema.stockItems.uom,
         stockGroupId: schema.stockItems.stockGroupId,
-        stockGroupName: schema.stockGroups.name,
-        stockGroupCode: schema.stockGroups.code,
+        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+        stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
       })
       .from(schema.inventory)
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
@@ -594,8 +594,8 @@ export class DbStorage implements IStorage {
         stockItemBarcode: schema.stockItems.barcode,
         stockItemUom: schema.stockItems.uom,
         stockGroupId: schema.stockItems.stockGroupId,
-        stockGroupName: schema.stockGroups.name,
-        stockGroupCode: schema.stockGroups.code,
+        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+        stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
       })
       .from(schema.inventory)
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
