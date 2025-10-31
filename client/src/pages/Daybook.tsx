@@ -134,37 +134,8 @@ const createVoucherSchema = z.object({
   path: ["entries"],
 });
 
-// Zod schema for editing voucher entries
-const entryEditSchema = z.object({
-  id: z.number(),
-  debitAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-    message: "Must be a valid number",
-  }),
-  creditAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-    message: "Must be a valid number",
-  }),
-});
-
-// Zod schema for editing vouchers with entries
-const editVoucherSchema = z.object({
-  voucherDate: z.string().min(1, "Voucher date is required"),
-  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer"], {
-    required_error: "Voucher type is required",
-  }),
-  description: z.string().optional(),
-  entries: z.array(entryEditSchema).min(2, "At least 2 entries required"),
-}).refine((data) => {
-  // Calculate total debits and credits
-  const totalDebits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
-  const totalCredits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
-  return Math.abs(totalDebits - totalCredits) < 0.01; // Allow for floating point precision
-}, {
-  message: "Total debits must equal total credits",
-  path: ["entries"],
-});
-
 type CreateVoucherForm = z.infer<typeof createVoucherSchema>;
-type EditVoucherForm = z.infer<typeof editVoucherSchema>;
+type EditVoucherForm = CreateVoucherForm;
 
 interface Voucher {
   id: number;
@@ -336,26 +307,36 @@ export default function Daybook({ user }: { user?: any } = {}) {
   
   // Edit form with react-hook-form and zod
   const editForm = useForm<EditVoucherForm>({
-    resolver: zodResolver(editVoucherSchema),
+    resolver: zodResolver(createVoucherSchema),
     defaultValues: {
-      voucherDate: "",
       voucherType: "Journal",
+      voucherDate: format(new Date(), "yyyy-MM-dd"),
       description: "",
+      optional: false,
       entries: [],
     },
+  });
+
+  const { fields: editFields, append: editAppend, remove: editRemove } = useFieldArray({
+    control: editForm.control,
+    name: "entries",
   });
 
   // Populate form with entries when they're loaded (only once per voucher)
   useEffect(() => {
     if (voucherToEdit && voucherEntries.length > 0 && !entriesLoading && !editFormInitialized) {
       editForm.reset({
-        voucherDate: voucherToEdit.voucherDate,
         voucherType: voucherToEdit.voucherType as any,
+        voucherDate: voucherToEdit.voucherDate,
         description: voucherToEdit.description || "",
+        optional: voucherToEdit.optional,
         entries: voucherEntries.map(entry => ({
-          id: entry.id,
+          accountType: entry.accountType as "ledger" | "bank" | "supplier",
+          accountId: entry.accountId,
+          accountName: entry.accountName,
           debitAmount: entry.debitAmount || "0",
           creditAmount: entry.creditAmount || "0",
+          narration: entry.narration || "",
         })),
       });
       setEditFormInitialized(true);
@@ -487,28 +468,32 @@ export default function Daybook({ user }: { user?: any } = {}) {
   // Edit voucher mutation
   const editMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: EditVoucherForm }) => {
-      // Update voucher metadata
-      await apiRequest("PATCH", `/api/vouchers/${id}`, {
-        voucherDate: updates.voucherDate,
-        voucherType: updates.voucherType,
-        description: updates.description,
+      // Transform entries to match API format
+      const transformedEntries = updates.entries.map(entry => ({
+        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        debitAmount: entry.debitAmount,
+        creditAmount: entry.creditAmount,
+        narration: entry.narration || null,
+      }));
+
+      // Update entire voucher with entries
+      return await apiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
+        voucher: {
+          voucherType: updates.voucherType,
+          voucherDate: updates.voucherDate,
+          description: updates.description,
+          optional: updates.optional,
+        },
+        entries: transformedEntries,
       });
-
-      // Update each entry
-      for (const entry of updates.entries) {
-        await apiRequest("PATCH", `/api/voucher-entries/${entry.id}`, {
-          debitAmount: entry.debitAmount,
-          creditAmount: entry.creditAmount,
-        });
-      }
-
-      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       toast({
         title: "Success",
-        description: "Voucher and entries updated successfully",
+        description: "Voucher updated successfully",
       });
       setEditDialogOpen(false);
       setVoucherToEdit(null);
@@ -1275,7 +1260,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
         onOpenChange={(open) => {
           setEditDialogOpen(open);
           if (!open) {
-            // Reset initialization flag when dialog closes
             setEditFormInitialized(false);
           }
         }}
@@ -1284,10 +1268,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
           <DialogHeader>
             <DialogTitle>Edit Voucher</DialogTitle>
             <DialogDescription>
-              Update voucher metadata and entry amounts. Debits must equal credits.
+              Edit all voucher details. Debits must equal credits.
             </DialogDescription>
           </DialogHeader>
-          {voucherToEdit && (
+          {voucherToEdit && !entriesLoading && (
             <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit(handleSaveEdit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -1329,11 +1313,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Sales">Sales</SelectItem>
-                            <SelectItem value="Purchase">Purchase</SelectItem>
+                            <SelectItem value="Journal">Journal</SelectItem>
                             <SelectItem value="Payment">Payment</SelectItem>
                             <SelectItem value="Receipt">Receipt</SelectItem>
-                            <SelectItem value="Journal">Journal</SelectItem>
+                            <SelectItem value="Stock Transfer">Stock Transfer</SelectItem>
+                            <SelectItem value="Sales">Sales</SelectItem>
+                            <SelectItem value="Purchase">Purchase</SelectItem>
                             <SelectItem value="Contra">Contra</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1344,117 +1329,210 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
                   <FormField
                     control={editForm.control}
-                    name="description"
+                    name="optional"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
+                      <FormItem className="flex flex-row items-center justify-between rounded-md border p-3 space-y-0">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Optional</FormLabel>
+                          <div className="text-xs text-muted-foreground">
+                            Does not affect books
+                          </div>
+                        </div>
                         <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Optional"
-                            data-testid="input-edit-voucher-description"
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-edit-optional"
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                {/* Entries Section */}
-                <div className="border rounded-md p-4 space-y-2">
-                  <h3 className="font-semibold text-sm mb-3">Voucher Entries</h3>
-                  
-                  {entriesLoading ? (
-                    <div className="space-y-2">
-                      {[1, 2].map((i) => (
-                        <Skeleton key={i} className="h-16 w-full" />
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        {voucherEntries.map((entry, index) => (
-                          <div key={entry.id} className="grid grid-cols-12 gap-2 items-start border rounded p-3">
-                            <div className="col-span-6">
-                              <p className="text-sm font-medium">{entry.accountName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {entry.accountCode} • {entry.accountType}
-                              </p>
-                            </div>
-                            
-                            <div className="col-span-3">
-                              <FormField
-                                control={editForm.control}
-                                name={`entries.${index}.debitAmount`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs">Debit</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        className="font-mono text-sm"
-                                        data-testid={`input-debit-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            
-                            <div className="col-span-3">
-                              <FormField
-                                control={editForm.control}
-                                name={`entries.${index}.creditAmount`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs">Credit</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        className="font-mono text-sm"
-                                        data-testid={`input-credit-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </div>
-                        ))}
+                <FormField
+                  control={editForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Enter voucher description (optional)"
+                          rows={2}
+                          data-testid="textarea-edit-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Entry Rows */}
+                <div className="border rounded-md p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Voucher Entries</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => editAppend({ 
+                        accountType: "ledger", 
+                        accountId: 0, 
+                        accountName: "", 
+                        debitAmount: "0", 
+                        creditAmount: "0", 
+                        narration: "" 
+                      })}
+                      data-testid="button-edit-add-entry"
+                      className="gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Entry
+                    </Button>
+                  </div>
+
+                  {editFields.map((field, index) => (
+                    <div key={field.id} className="border rounded-md p-4 space-y-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Entry {index + 1}
+                        </span>
+                        {editFields.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editRemove(index)}
+                            data-testid={`button-edit-remove-entry-${index}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
-                      
-                      {/* Totals and Balance Check */}
-                      {editForm.watch("entries") && editForm.watch("entries").length > 0 && (
-                        <div className="mt-4 pt-3 border-t">
-                          <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-                            <div className="text-right">
-                              <span className="text-muted-foreground mr-2">Total Debits:</span>
-                              <span className="font-bold">
-                                ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0).toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <span className="text-muted-foreground mr-2">Total Credits:</span>
-                              <span className="font-bold">
-                                ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                          {editForm.formState.errors.entries && (
-                            <p className="text-sm text-destructive mt-2 text-center">
-                              {editForm.formState.errors.entries.message}
-                            </p>
+
+                      <FormField
+                        control={editForm.control}
+                        name={`entries.${index}.accountType`}
+                        render={({ field: typeField }) => (
+                          <FormItem>
+                            <FormLabel>Account</FormLabel>
+                            <FormControl>
+                              <AccountCombobox
+                                value={
+                                  editForm.watch(`entries.${index}.accountId`)
+                                    ? {
+                                        type: typeField.value,
+                                        id: editForm.watch(`entries.${index}.accountId`),
+                                        name: editForm.watch(`entries.${index}.accountName`),
+                                      }
+                                    : null
+                                }
+                                onChange={(type, id, name) => {
+                                  editForm.setValue(`entries.${index}.accountType`, type);
+                                  editForm.setValue(`entries.${index}.accountId`, id);
+                                  editForm.setValue(`entries.${index}.accountName`, name);
+                                }}
+                                ledgerAccounts={ledgerAccounts}
+                                bankAccounts={bankAccounts}
+                                suppliers={suppliers}
+                                rowIndex={index}
+                                testIdPrefix="button-edit-account"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={editForm.control}
+                          name={`entries.${index}.debitAmount`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Debit Amount</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className="font-mono"
+                                  data-testid={`input-edit-debit-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
+                        />
+
+                        <FormField
+                          control={editForm.control}
+                          name={`entries.${index}.creditAmount`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Credit Amount</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className="font-mono"
+                                  data-testid={`input-edit-credit-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={editForm.control}
+                        name={`entries.${index}.narration`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Narration (Optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="Enter narration"
+                                data-testid={`input-edit-narration-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+
+                  {/* Totals Display */}
+                  {editForm.watch("entries") && editForm.watch("entries").length > 0 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4 text-sm font-mono">
+                        <div className="text-right">
+                          <span className="text-muted-foreground mr-2">Total Debits:</span>
+                          <span className="font-bold">
+                            ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0).toFixed(2)}
+                          </span>
                         </div>
+                        <div className="text-right">
+                          <span className="text-muted-foreground mr-2">Total Credits:</span>
+                          <span className="font-bold">
+                            ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      {editForm.formState.errors.entries && (
+                        <p className="text-sm text-destructive mt-2 text-center">
+                          {editForm.formState.errors.entries.message}
+                        </p>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
 
@@ -1469,7 +1547,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={editMutation.isPending || entriesLoading}
+                    disabled={editMutation.isPending}
                     data-testid="button-save-edit"
                   >
                     {editMutation.isPending ? "Saving..." : "Save Changes"}
@@ -1477,6 +1555,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </div>
               </form>
             </Form>
+          )}
+          {entriesLoading && (
+            <div className="space-y-2">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
           )}
         </DialogContent>
       </Dialog>
