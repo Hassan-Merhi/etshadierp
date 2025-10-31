@@ -1112,12 +1112,25 @@ export default function Vouchers() {
   });
 
   const adjustmentEntries = stockAdjustmentForm.watch("entries") || [];
+  const adjustmentLocationId = stockAdjustmentForm.watch("locationId") || 0;
+  
   const consumptionTotal = adjustmentEntries
     .filter(entry => entry.type === "CONSUME")
     .reduce((sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")), 0);
   const productionTotal = adjustmentEntries
     .filter(entry => entry.type === "PRODUCE")
     .reduce((sum, entry) => sum + (parseFloat(entry.quantity || "0") * parseFloat(entry.rate || "0")), 0);
+
+  // Fetch location inventory for auto-filling rates in adjustments
+  const { data: locationInventory = [] } = useQuery<any[]>({
+    queryKey: ['/api/adjustment-location-inventory', adjustmentLocationId],
+    enabled: adjustmentLocationId > 0,
+    queryFn: async () => {
+      const response = await fetch(`/api/locations/${adjustmentLocationId}/inventory`);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      return response.json();
+    },
+  });
 
   // Stock Adjustment mutation
   const stockAdjustmentMutation = useMutation({
@@ -2786,6 +2799,12 @@ export default function Vouchers() {
                                         onChange={(id, name) => {
                                           stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, id);
                                           stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, name);
+                                          
+                                          // Auto-fill rate from location inventory
+                                          const inventoryItem = locationInventory.find((inv: any) => inv.stockItemId === id);
+                                          if (inventoryItem && inventoryItem.averageRate !== undefined && inventoryItem.averageRate !== null) {
+                                            stockAdjustmentForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
+                                          }
                                         }}
                                         stockItems={stockItems}
                                         rowIndex={index}
