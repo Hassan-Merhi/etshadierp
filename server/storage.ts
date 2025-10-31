@@ -185,6 +185,11 @@ export interface IStorage {
 
   // Stock Adjustments
   createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption" | "Mixed", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+
+  // Stock Query
+  getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
+  getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null>;
+  getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1439,6 +1444,75 @@ export class DbStorage implements IStorage {
       adjustment,
       items: adjustmentItems,
     };
+  }
+
+  // Stock Query Methods
+  async getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null> {
+    const result = await db
+      .select({
+        poNumber: schema.purchaseOrders.poNumber,
+        poDate: schema.purchaseOrders.createdAt,
+        supplierName: schema.suppliers.name,
+        quantity: schema.poLineItems.quantity,
+        rate: schema.poLineItems.rate,
+        amount: schema.poLineItems.lineTotal,
+      })
+      .from(schema.poLineItems)
+      .innerJoin(schema.purchaseOrders, eq(schema.poLineItems.poId, schema.purchaseOrders.id))
+      .innerJoin(schema.suppliers, eq(schema.purchaseOrders.supplierId, schema.suppliers.id))
+      .where(and(
+        eq(schema.poLineItems.stockItemId, stockItemId),
+        eq(schema.purchaseOrders.companyId, companyId)
+      ))
+      .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`)
+      .limit(1);
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null> {
+    const result = await db
+      .select({
+        voucherNumber: schema.vouchers.voucherNumber,
+        saleDate: schema.vouchers.voucherDate,
+        locationName: schema.locations.name,
+        quantity: schema.salesItems.quantity,
+        sellingPrice: schema.salesItems.sellingPrice,
+        totalSales: schema.salesItems.totalSales,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
+      .where(and(
+        eq(schema.salesItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ))
+      .orderBy(sql`${schema.vouchers.voucherDate} DESC`)
+      .limit(1);
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  async getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        locationId: schema.inventory.locationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+      })
+      .from(schema.inventory)
+      .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
+      .where(and(
+        eq(schema.inventory.stockItemId, stockItemId),
+        eq(schema.locations.companyId, companyId),
+        sql`${schema.inventory.quantity}::numeric > 0` // Only show locations with positive inventory
+      ))
+      .orderBy(schema.locations.name);
+
+    return results;
   }
 }
 

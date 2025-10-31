@@ -1461,6 +1461,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get stock item details (last purchase, last sale, inventory locations)
+  app.get("/api/stock-items/:id/details", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      // Get last purchase order, last sale, and current locations
+      const [lastPurchase, lastSale, inventoryLocations] = await Promise.all([
+        storage.getLastPurchaseOrderForItem(stockItemId, req.session.currentCompanyId),
+        storage.getLastSaleForItem(stockItemId, req.session.currentCompanyId),
+        storage.getInventoryLocationsByItem(stockItemId, req.session.currentCompanyId),
+      ]);
+
+      res.json({
+        lastPurchase,
+        lastSale,
+        inventoryLocations,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Update stock transfer item
   app.patch("/api/stock-transfer-items/:id", requireAuth, async (req, res) => {
     try {

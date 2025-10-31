@@ -1,377 +1,305 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Search, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import * as XLSX from "xlsx";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Search, Package, TrendingUp, MapPin } from "lucide-react";
+import { format } from "date-fns";
 
-interface StockQueryItem {
+interface StockItem {
   id: number;
   code: string;
   name: string;
   uom: string;
   stockGroupId: number | null;
-  stockGroupCode: string | null;
-  stockGroupName: string | null;
-  openingQty: string;
-  openingRate: string;
-  openingValue: string;
-  currentQty: string;
-  currentValue: string;
-  sellingPrice: string;
   active: boolean;
 }
 
-interface StockGroup {
-  id: number;
-  code: string;
-  name: string;
+interface StockItemDetails {
+  lastPurchase: {
+    poNumber: string;
+    poDate: string;
+    supplierName: string;
+    quantity: string;
+    rate: string;
+    amount: string;
+  } | null;
+  lastSale: {
+    voucherNumber: string;
+    saleDate: string;
+    locationName: string | null;
+    quantity: string;
+    sellingPrice: string;
+    totalSales: string;
+  } | null;
+  inventoryLocations: {
+    locationId: number;
+    locationName: string;
+    locationCode: string;
+    quantity: string;
+    averageRate: string;
+    totalValue: string;
+  }[];
 }
 
-type SortColumn = "code" | "name" | "stockGroup" | "currentQty" | "currentValue" | "sellingPrice";
-type SortDirection = "asc" | "desc" | null;
-
 export default function StockQuery() {
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStockGroup, setSelectedStockGroup] = useState<string>("all");
-  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
 
-  // Fetch stock items with aggregated data
-  const { data: stockItems = [], isLoading } = useQuery<StockQueryItem[]>({
-    queryKey: ["/api/stock-query"],
+  const { data: stockItems = [], isLoading: stockItemsLoading } = useQuery<StockItem[]>({
+    queryKey: ["/api/stock-items"],
   });
 
-  // Fetch stock groups for filter
-  const { data: stockGroups = [] } = useQuery<StockGroup[]>({
-    queryKey: ["/api/stock-groups"],
+  const { data: itemDetails, isLoading: detailsLoading } = useQuery<StockItemDetails>({
+    queryKey: ['stock-item-details', selectedItem?.id],
+    enabled: !!selectedItem,
   });
 
-  // Filter and sort data
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = stockItems.filter((item) => {
-      const matchesSearch =
-        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.name.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredItems = stockItems.filter(item =>
+    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      const matchesGroup =
-        selectedStockGroup === "all" ||
-        (selectedStockGroup === "null" && !item.stockGroupId) ||
-        item.stockGroupId?.toString() === selectedStockGroup;
-
-      return matchesSearch && matchesGroup;
-    });
-
-    // Sort data
-    if (sortColumn && sortDirection) {
-      filtered = [...filtered].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        switch (sortColumn) {
-          case "code":
-            aValue = a.code;
-            bValue = b.code;
-            break;
-          case "name":
-            aValue = a.name;
-            bValue = b.name;
-            break;
-          case "stockGroup":
-            aValue = a.stockGroupName || "";
-            bValue = b.stockGroupName || "";
-            break;
-          case "currentQty":
-            aValue = parseFloat(a.currentQty || "0");
-            bValue = parseFloat(b.currentQty || "0");
-            break;
-          case "currentValue":
-            aValue = parseFloat(a.currentValue || "0");
-            bValue = parseFloat(b.currentValue || "0");
-            break;
-          case "sellingPrice":
-            aValue = parseFloat(a.sellingPrice || "0");
-            bValue = parseFloat(b.sellingPrice || "0");
-            break;
-          default:
-            return 0;
-        }
-
-        if (typeof aValue === "string") {
-          return sortDirection === "asc"
-            ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
-        } else {
-          return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-        }
-      });
-    }
-
-    return filtered;
-  }, [stockItems, searchTerm, selectedStockGroup, sortColumn, sortDirection]);
-
-  const handleSort = (column: SortColumn) => {
-    if (sortColumn === column) {
-      // Cycle through: asc -> desc -> null
-      if (sortDirection === "asc") {
-        setSortDirection("desc");
-      } else if (sortDirection === "desc") {
-        setSortColumn(null);
-        setSortDirection(null);
-      }
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
+  const handleItemClick = (item: StockItem) => {
+    setSelectedItem(item);
   };
 
-  const getSortIcon = (column: SortColumn) => {
-    if (sortColumn !== column) {
-      return <ArrowUpDown className="h-4 w-4 ml-1 text-muted-foreground" />;
+  const handleCloseDialog = (open: boolean) => {
+    if (!open) {
+      setSelectedItem(null);
     }
-    if (sortDirection === "asc") {
-      return <ArrowUp className="h-4 w-4 ml-1" />;
-    }
-    return <ArrowDown className="h-4 w-4 ml-1" />;
-  };
-
-  const handleExportToExcel = () => {
-    const exportData = filteredAndSortedData.map((item) => ({
-      Code: item.code,
-      Name: item.name,
-      UOM: item.uom,
-      "Stock Group": item.stockGroupName || "Uncategorized",
-      "Opening Qty": item.openingQty,
-      "Opening Rate": item.openingRate,
-      "Opening Value": item.openingValue,
-      "Current Qty": item.currentQty,
-      "Current Value": item.currentValue,
-      "Selling Price": item.sellingPrice,
-      Status: item.active ? "Active" : "Inactive",
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Stock Query");
-
-    // Set column widths
-    const colWidths = [
-      { wch: 12 }, // Code
-      { wch: 30 }, // Name
-      { wch: 10 }, // UOM
-      { wch: 20 }, // Stock Group
-      { wch: 12 }, // Opening Qty
-      { wch: 12 }, // Opening Rate
-      { wch: 15 }, // Opening Value
-      { wch: 12 }, // Current Qty
-      { wch: 15 }, // Current Value
-      { wch: 12 }, // Selling Price
-      { wch: 10 }, // Status
-    ];
-    ws["!cols"] = colWidths;
-
-    XLSX.writeFile(wb, `stock_query_${new Date().toISOString().split("T")[0]}.xlsx`);
-
-    toast({
-      title: "Export Successful",
-      description: `Exported ${filteredAndSortedData.length} stock items to Excel`,
-    });
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Stock Query</h1>
-        <Button
-          onClick={handleExportToExcel}
-          disabled={filteredAndSortedData.length === 0}
-          data-testid="button-export-excel"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export to Excel
-        </Button>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Stock Query</h1>
+        <p className="text-muted-foreground">
+          Click on any item to view purchase history, sales history, and current inventory locations
+        </p>
       </div>
 
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Search Stock Items</CardTitle>
+          <CardDescription>Find items by code or name</CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by code or name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
-              data-testid="input-search"
+              data-testid="input-stock-search"
             />
           </div>
-
-          <Select value={selectedStockGroup} onValueChange={setSelectedStockGroup}>
-            <SelectTrigger data-testid="select-stock-group-filter">
-              <SelectValue placeholder="All Stock Groups" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Stock Groups</SelectItem>
-              <SelectItem value="null">Uncategorized</SelectItem>
-              {stockGroups.map((group) => (
-                <SelectItem key={group.id} value={group.id.toString()}>
-                  {group.code} - {group.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="text-sm text-muted-foreground flex items-center justify-end">
-            Showing {filteredAndSortedData.length} of {stockItems.length} items
-          </div>
-        </div>
+        </CardContent>
       </Card>
 
-      <Card className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("code")}
-                    data-testid="sort-code"
-                  >
-                    <span className="flex items-center">
-                      Code
-                      {getSortIcon("code")}
-                    </span>
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("name")}
-                    data-testid="sort-name"
-                  >
-                    <span className="flex items-center">
-                      Name
-                      {getSortIcon("name")}
-                    </span>
-                  </Button>
-                </TableHead>
-                <TableHead>UOM</TableHead>
-                <TableHead>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("stockGroup")}
-                    data-testid="sort-stock-group"
-                  >
-                    <span className="flex items-center">
-                      Stock Group
-                      {getSortIcon("stockGroup")}
-                    </span>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right">Opening Qty</TableHead>
-                <TableHead className="text-right">Opening Rate</TableHead>
-                <TableHead className="text-right">Opening Value</TableHead>
-                <TableHead className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("currentQty")}
-                    data-testid="sort-current-qty"
-                  >
-                    <span className="flex items-center">
-                      Current Qty
-                      {getSortIcon("currentQty")}
-                    </span>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("currentValue")}
-                    data-testid="sort-current-value"
-                  >
-                    <span className="flex items-center">
-                      Current Value
-                      {getSortIcon("currentValue")}
-                    </span>
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent"
-                    onClick={() => handleSort("sellingPrice")}
-                    data-testid="sort-selling-price"
-                  >
-                    <span className="flex items-center">
-                      Selling Price
-                      {getSortIcon("sellingPrice")}
-                    </span>
-                  </Button>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+      <Card>
+        <CardContent className="p-0">
+          {stockItemsLoading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading stock items...</div>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    Loading...
-                  </TableCell>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>UOM</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ) : filteredAndSortedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    No stock items found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAndSortedData.map((item) => (
-                  <TableRow key={item.id} data-testid={`row-stock-${item.id}`}>
-                    <TableCell className="font-mono">{item.code}</TableCell>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.uom}</TableCell>
-                    <TableCell>{item.stockGroupName || "Uncategorized"}</TableCell>
-                    <TableCell className="text-right">{parseFloat(item.openingQty || "0").toFixed(3)}</TableCell>
-                    <TableCell className="text-right">{parseFloat(item.openingRate || "0").toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{parseFloat(item.openingValue || "0").toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-medium">{parseFloat(item.currentQty || "0").toFixed(3)}</TableCell>
-                    <TableCell className="text-right font-medium">{parseFloat(item.currentValue || "0").toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-medium">{parseFloat(item.sellingPrice || "0").toFixed(2)}</TableCell>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No items found
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  filteredItems.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => handleItemClick(item)}
+                      data-testid={`row-stock-item-${item.id}`}
+                    >
+                      <TableCell className="font-medium">{item.code}</TableCell>
+                      <TableCell>
+                        <button
+                          className="text-primary hover:underline text-left"
+                          data-testid={`button-item-name-${item.id}`}
+                        >
+                          {item.name}
+                        </button>
+                      </TableCell>
+                      <TableCell>{item.uom}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.active ? "default" : "secondary"}>
+                          {item.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
+
+      <Dialog open={!!selectedItem} onOpenChange={handleCloseDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedItem?.name} ({selectedItem?.code})
+            </DialogTitle>
+          </DialogHeader>
+
+          {detailsLoading ? (
+            <div className="py-8 text-center text-muted-foreground">Loading details...</div>
+          ) : itemDetails ? (
+            <div className="space-y-6">
+              {/* Last Purchase */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Last Purchase Order
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {itemDetails.lastPurchase ? (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">PO Number</p>
+                        <p className="font-medium">{itemDetails.lastPurchase.poNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Date</p>
+                        <p className="font-medium">
+                          {format(new Date(itemDetails.lastPurchase.poDate), "MMM dd, yyyy")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Supplier</p>
+                        <p className="font-medium">{itemDetails.lastPurchase.supplierName}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Quantity</p>
+                        <p className="font-medium">{parseFloat(itemDetails.lastPurchase.quantity).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Rate</p>
+                        <p className="font-medium">${parseFloat(itemDetails.lastPurchase.rate).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Amount</p>
+                        <p className="font-medium">${parseFloat(itemDetails.lastPurchase.amount).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No purchase history</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Last Sale */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Last Sale
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {itemDetails.lastSale ? (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Voucher Number</p>
+                        <p className="font-medium">{itemDetails.lastSale.voucherNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Date</p>
+                        <p className="font-medium">
+                          {format(new Date(itemDetails.lastSale.saleDate), "MMM dd, yyyy")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Location</p>
+                        <p className="font-medium">{itemDetails.lastSale.locationName || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Quantity</p>
+                        <p className="font-medium">{parseFloat(itemDetails.lastSale.quantity).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Selling Price</p>
+                        <p className="font-medium">${parseFloat(itemDetails.lastSale.sellingPrice).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Total Sales</p>
+                        <p className="font-medium">${parseFloat(itemDetails.lastSale.totalSales).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No sales history</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Current Locations */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Current Inventory Locations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {itemDetails.inventoryLocations.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Location</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Avg Rate</TableHead>
+                          <TableHead className="text-right">Total Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.inventoryLocations.map((loc) => (
+                          <TableRow key={loc.locationId}>
+                            <TableCell>
+                              {loc.locationName} ({loc.locationCode})
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {parseFloat(loc.quantity).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${parseFloat(loc.averageRate).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${parseFloat(loc.totalValue).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No inventory at any location</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
