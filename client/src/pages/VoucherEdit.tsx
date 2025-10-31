@@ -528,8 +528,8 @@ export default function VoucherEdit() {
   const isJournal = voucherType === "Journal";
   const isPurchase = voucherType === "Purchase" && voucher?.purchaseOrder;
   const isSales = voucherType === "Sales" && voucher?.salesItems;
-  const isConsumption = (voucherType === "Consumption" || voucherType === "Mixed") && voucher?.adjustmentData;
-  const isStockTransfer = voucherType === "Stock Transfer" && voucher?.transferData;
+  const isConsumption = voucherType === "Consumption" || voucherType === "Mixed";
+  const isStockTransfer = voucherType === "Stock Transfer";
 
   // Payment/Receipt Form
   const paymentForm = useForm<VoucherFormData>({
