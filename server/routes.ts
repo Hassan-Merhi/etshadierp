@@ -3482,6 +3482,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             locationName: location?.name || "",
             items: itemsWithDetails,
           };
+        } else {
+          // No adjustment record exists - return empty structure so frontend can show form
+          adjustmentData = {
+            id: 0,
+            voucherId: id,
+            locationId: voucher.locationId || 1,
+            locationName: "",
+            adjustmentType: voucher.voucherType === "Consumption" ? "consumption" : "production",
+            notes: voucher.description || "",
+            items: [],
+            createdAt: new Date(),
+          };
         }
       }
       
