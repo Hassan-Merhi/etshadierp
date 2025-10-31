@@ -96,11 +96,20 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     stockItemId: item.stockItemId,
   }));
 
-  // Fetch bank accounts for cash account selector
+  // Fetch bank accounts for payment account selector
   const { data: bankAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/bank-accounts"],
     enabled: !!activeLocation, // Only fetch when location is selected
   });
+
+  // Fetch cash ledger accounts
+  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts"],
+    enabled: !!activeLocation,
+  });
+
+  // Filter cash ledger accounts
+  const cashLedgerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Cash");
 
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
@@ -109,7 +118,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     row: 0,
     col: 0,
   });
-  const [cashAccount, setCashAccount] = useState("");
+  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash">("bank");
+  const [paymentAccountId, setPaymentAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
@@ -123,12 +133,19 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Auto-select first bank account when loaded
+  // Auto-select first account when loaded based on account type
   useEffect(() => {
-    if (bankAccounts.length > 0 && !cashAccount) {
-      setCashAccount(String(bankAccounts[0].id));
+    if (paymentAccountType === "bank" && bankAccounts.length > 0 && !paymentAccountId) {
+      setPaymentAccountId(String(bankAccounts[0].id));
+    } else if (paymentAccountType === "cash" && cashLedgerAccounts.length > 0 && !paymentAccountId) {
+      setPaymentAccountId(String(cashLedgerAccounts[0].id));
     }
-  }, [bankAccounts, cashAccount]);
+  }, [paymentAccountType, bankAccounts, cashLedgerAccounts, paymentAccountId]);
+
+  // Reset account selection when switching account type
+  useEffect(() => {
+    setPaymentAccountId("");
+  }, [paymentAccountType]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -501,10 +518,10 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       return;
     }
 
-    if (!cashAccount) {
+    if (!paymentAccountId) {
       toast({
         title: "Error",
-        description: "Please select a cash account",
+        description: "Please select a payment account",
         variant: "destructive",
       });
       return;
@@ -523,7 +540,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     // Prepare sale data
     const saleData = {
       locationId: activeLocation.id,
-      cashAccountId: parseInt(cashAccount),
+      paymentAccountType,
+      paymentAccountId: parseInt(paymentAccountId),
       notes,
       items: validItems.map(row => ({
         stockItemId: row.stockItemId,
@@ -578,16 +596,33 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
 
         <div className="flex items-center gap-2">
           <Wallet className="h-4 w-4 text-muted-foreground" />
-          <Select value={cashAccount} onValueChange={setCashAccount}>
-            <SelectTrigger className="w-56" data-testid="select-cash-account">
-              <SelectValue placeholder="Select cash account" />
+          <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
+            <SelectTrigger className="w-40" data-testid="select-account-type">
+              <SelectValue placeholder="Account Type" />
             </SelectTrigger>
             <SelectContent>
-              {bankAccounts.map((acc: any) => (
-                <SelectItem key={acc.id} value={String(acc.id)}>
-                  {acc.name} ({acc.code})
-                </SelectItem>
-              ))}
+              <SelectItem value="bank">Bank Account</SelectItem>
+              <SelectItem value="cash">Cash Account</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+            <SelectTrigger className="w-56" data-testid="select-payment-account">
+              <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
+            </SelectTrigger>
+            <SelectContent>
+              {paymentAccountType === "bank" ? (
+                bankAccounts.map((acc: any) => (
+                  <SelectItem key={acc.id} value={String(acc.id)}>
+                    {acc.name} ({acc.code})
+                  </SelectItem>
+                ))
+              ) : (
+                cashLedgerAccounts.map((acc: any) => (
+                  <SelectItem key={acc.id} value={String(acc.id)}>
+                    {acc.name} ({acc.code})
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>

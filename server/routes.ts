@@ -970,10 +970,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { employeeId, amount, bankAccountId, date, notes } = req.body;
+      const { employeeId, amount, paymentAccountType, paymentAccountId, bankAccountId, date, notes } = req.body;
 
-      if (!employeeId || !amount || !bankAccountId || !date) {
-        return res.status(400).json({ message: "Employee, amount, bank account, and date are required" });
+      // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
+      const accountType = paymentAccountType || "bank";
+      const accountId = paymentAccountId || bankAccountId;
+
+      if (!employeeId || !amount || !accountId || !date) {
+        return res.status(400).json({ message: "Employee, amount, payment account, and date are required" });
       }
 
       const withdrawalAmount = parseFloat(amount);
@@ -1024,13 +1028,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Credit: Bank/Cash Account
-      await db.insert(voucherEntries).values({
+      const creditEntry: any = {
         voucherId: voucher.id,
-        bankAccountId,
         debitAmount: "0",
         creditAmount: withdrawalAmount.toFixed(2),
         narration: `Salary withdrawal - ${voucherNumber}`,
-      });
+      };
+
+      if (accountType === "cash") {
+        creditEntry.ledgerAccountId = accountId;
+      } else {
+        creditEntry.bankAccountId = accountId;
+      }
+
+      await db.insert(voucherEntries).values(creditEntry);
 
       // Update employee balance
       const newBalance = currentBalance - withdrawalAmount;
@@ -1142,14 +1153,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { payments, bankAccountId, date, notes } = req.body;
+      const { payments, paymentAccountType, paymentAccountId, bankAccountId, date, notes } = req.body;
+
+      // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
+      const accountType = paymentAccountType || "bank";
+      const accountId = paymentAccountId || bankAccountId;
 
       if (!payments || !Array.isArray(payments) || payments.length === 0) {
         return res.status(400).json({ message: "No payments provided" });
       }
 
-      if (!bankAccountId || !date) {
-        return res.status(400).json({ message: "Bank account and date are required" });
+      if (!accountId || !date) {
+        return res.status(400).json({ message: "Payment account and date are required" });
       }
 
       // Validate all payment amounts
@@ -1199,14 +1214,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
       });
 
-      // Create credit entry for bank account
-      await db.insert(voucherEntries).values({
+      // Create credit entry for bank/cash account
+      const creditEntry: any = {
         voucherId: voucher.id,
-        bankAccountId: parseInt(bankAccountId),
         debitAmount: "0",
         creditAmount: totalAmount.toFixed(2),
         narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
-      });
+      };
+
+      if (accountType === "cash") {
+        creditEntry.ledgerAccountId = parseInt(accountId);
+      } else {
+        creditEntry.bankAccountId = parseInt(accountId);
+      }
+
+      await db.insert(voucherEntries).values(creditEntry);
 
       res.json({
         voucher,
@@ -3784,14 +3806,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       
-      const { locationId, cashAccountId, items, notes } = req.body;
+      const { locationId, cashAccountId, paymentAccountType, paymentAccountId, items, notes } = req.body;
+
+      // Support both old (cashAccountId) and new (paymentAccountType/paymentAccountId) parameters
+      const accountType = paymentAccountType || "bank";
+      const accountId = paymentAccountId || cashAccountId;
 
       // Validate required fields
       if (!locationId) {
         return res.status(400).json({ message: "Location is required" });
       }
-      if (!cashAccountId) {
-        return res.status(400).json({ message: "Cash account is required" });
+      if (!accountId) {
+        return res.status(400).json({ message: "Payment account is required" });
       }
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -3895,13 +3921,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create voucher entries (double-entry bookkeeping)
         // Debit: Cash/Bank Account (Asset increases)
-        await tx.insert(voucherEntries).values({
+        const debitEntry: any = {
           voucherId: voucher.id,
-          bankAccountId: cashAccountId,
           debitAmount: grandTotal.toFixed(2),
           creditAmount: "0",
           narration: `POS Sale - ${voucherNumber}`,
-        });
+        };
+
+        if (accountType === "cash") {
+          debitEntry.ledgerAccountId = accountId;
+        } else {
+          debitEntry.bankAccountId = accountId;
+        }
+
+        await tx.insert(voucherEntries).values(debitEntry);
 
         // Credit: Sales Account (Revenue increases)
         await tx.insert(voucherEntries).values({

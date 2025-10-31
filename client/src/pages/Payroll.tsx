@@ -59,13 +59,15 @@ const depositSchema = z.object({
 
 const withdrawalSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
-  bankAccountId: z.string().min(1, "Bank account is required"),
+  paymentAccountType: z.enum(["bank", "cash"]),
+  paymentAccountId: z.string().min(1, "Payment account is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
 });
 
 const bulkPaymentSchema = z.object({
-  bankAccountId: z.string().min(1, "Bank account is required"),
+  paymentAccountType: z.enum(["bank", "cash"]),
+  paymentAccountId: z.string().min(1, "Payment account is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
 });
@@ -100,6 +102,13 @@ export default function Payroll() {
     enabled: !!selectedCompany,
   });
 
+  const { data: ledgerAccounts } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts"],
+    enabled: !!selectedCompany,
+  });
+
+  const cashAccounts = ledgerAccounts?.filter((acc) => acc.accountType === "Cash") || [];
+
   const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
   const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
 
@@ -133,7 +142,8 @@ export default function Payroll() {
     resolver: zodResolver(withdrawalSchema),
     defaultValues: {
       amount: "",
-      bankAccountId: "",
+      paymentAccountType: "bank",
+      paymentAccountId: "",
       date: new Date().toISOString().split("T")[0],
       notes: "",
     },
@@ -142,7 +152,8 @@ export default function Payroll() {
   const bulkPaymentForm = useForm<BulkPaymentFormData>({
     resolver: zodResolver(bulkPaymentSchema),
     defaultValues: {
-      bankAccountId: "",
+      paymentAccountType: "bank",
+      paymentAccountId: "",
       date: new Date().toISOString().split("T")[0],
       notes: "",
     },
@@ -606,18 +617,54 @@ export default function Payroll() {
 
               <FormField
                 control={withdrawalForm.control}
-                name="bankAccountId"
+                name="paymentAccountType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bank Account</FormLabel>
+                    <FormLabel>Payment From</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-withdrawal-bank">
-                          <SelectValue placeholder="Select bank account" />
+                        <SelectTrigger data-testid="select-withdrawal-account-type">
+                          <SelectValue placeholder="Select account type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {bankAccountsLoading ? (
+                        <SelectItem value="bank">Bank Account</SelectItem>
+                        <SelectItem value="cash">Cash Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={withdrawalForm.control}
+                name="paymentAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {withdrawalForm.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-withdrawal-account">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {withdrawalForm.watch("paymentAccountType") === "cash" ? (
+                          cashAccounts.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No cash accounts available
+                            </SelectItem>
+                          ) : (
+                            cashAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id.toString()}>
+                                {account.name}
+                              </SelectItem>
+                            ))
+                          )
+                        ) : bankAccountsLoading ? (
                           <SelectItem value="loading" disabled>
                             Loading...
                           </SelectItem>
@@ -718,18 +765,54 @@ export default function Payroll() {
             <form onSubmit={bulkPaymentForm.handleSubmit((data) => bulkPaymentMutation.mutate(data))} className="space-y-4">
               <FormField
                 control={bulkPaymentForm.control}
-                name="bankAccountId"
+                name="paymentAccountType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bank Account</FormLabel>
+                    <FormLabel>Payment From</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-bulk-bank">
-                          <SelectValue placeholder="Select bank account" />
+                        <SelectTrigger data-testid="select-bulk-account-type">
+                          <SelectValue placeholder="Select account type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {bankAccountsLoading ? (
+                        <SelectItem value="bank">Bank Account</SelectItem>
+                        <SelectItem value="cash">Cash Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bulkPaymentForm.control}
+                name="paymentAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {bulkPaymentForm.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-bulk-account">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {bulkPaymentForm.watch("paymentAccountType") === "cash" ? (
+                          cashAccounts.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No cash accounts available
+                            </SelectItem>
+                          ) : (
+                            cashAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id.toString()}>
+                                {account.name}
+                              </SelectItem>
+                            ))
+                          )
+                        ) : bankAccountsLoading ? (
                           <SelectItem value="loading" disabled>
                             Loading...
                           </SelectItem>
