@@ -36,7 +36,7 @@ interface SaleRow {
 }
 
 interface InventoryItem {
-  barcode: string;
+  code: string;
   name: string;
   stock: number;
   price: number;
@@ -51,7 +51,6 @@ interface APIInventoryItem {
   totalValue: string;
   stockItemCode: string;
   stockItemName: string;
-  stockItemBarcode: string | null;
   stockItemUom: string;
   stockGroupId: number | null;
   stockGroupName: string | null;
@@ -90,7 +89,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
 
   // Transform API inventory to POS format with stockItemId
   const inventory: (InventoryItem & { stockItemId: number })[] = apiInventory.map((item) => ({
-    barcode: item.stockItemBarcode || item.stockItemCode,
+    code: item.stockItemCode,
     name: item.stockItemName,
     stock: parseFloat(item.quantity),
     price: parseFloat(item.averageRate),
@@ -270,7 +269,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     if (!searchTerm) return inventory;
     return inventory.filter((item) =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.barcode.toLowerCase().includes(searchTerm.toLowerCase())
+      item.code.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
 
@@ -726,7 +725,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or barcode..."
+                placeholder="Search by name or code..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -742,7 +741,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             <div className="space-y-1">
               {filteredItems.map((item, idx) => (
                 <button
-                  key={item.barcode}
+                  key={item.code}
                   onClick={() => selectItem(item)}
                   className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
                     item.stock === 0 ? "opacity-60" : ""
@@ -753,7 +752,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium mb-1">{item.name}</div>
                       <div className="text-xs text-muted-foreground font-mono">
-                        {item.barcode}
+                        {item.code}
                       </div>
                     </div>
                     <div className="flex items-center">

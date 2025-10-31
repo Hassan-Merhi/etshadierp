@@ -26,7 +26,6 @@ interface StockQueryItem {
   id: number;
   code: string;
   name: string;
-  barcode: string | null;
   uom: string;
   stockGroupId: number | null;
   stockGroupCode: string | null;
@@ -71,8 +70,7 @@ export default function StockQuery() {
     let filtered = stockItems.filter((item) => {
       const matchesSearch =
         item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
+        item.name.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesGroup =
         selectedStockGroup === "all" ||
@@ -159,7 +157,6 @@ export default function StockQuery() {
     const exportData = filteredAndSortedData.map((item) => ({
       Code: item.code,
       Name: item.name,
-      Barcode: item.barcode || "",
       UOM: item.uom,
       "Stock Group": item.stockGroupName || "Uncategorized",
       "Opening Qty": item.openingQty,
@@ -179,7 +176,6 @@ export default function StockQuery() {
     const colWidths = [
       { wch: 12 }, // Code
       { wch: 30 }, // Name
-      { wch: 15 }, // Barcode
       { wch: 10 }, // UOM
       { wch: 20 }, // Stock Group
       { wch: 12 }, // Opening Qty
@@ -219,7 +215,7 @@ export default function StockQuery() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by code, name, or barcode..."
+              placeholder="Search by code or name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -281,7 +277,6 @@ export default function StockQuery() {
                     </span>
                   </Button>
                 </TableHead>
-                <TableHead>Barcode</TableHead>
                 <TableHead>UOM</TableHead>
                 <TableHead>
                   <Button
@@ -347,13 +342,13 @@ export default function StockQuery() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : filteredAndSortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     No stock items found
                   </TableCell>
                 </TableRow>
@@ -362,7 +357,6 @@ export default function StockQuery() {
                   <TableRow key={item.id} data-testid={`row-stock-${item.id}`}>
                     <TableCell className="font-mono">{item.code}</TableCell>
                     <TableCell>{item.name}</TableCell>
-                    <TableCell className="font-mono">{item.barcode || "-"}</TableCell>
                     <TableCell>{item.uom}</TableCell>
                     <TableCell>{item.stockGroupName || "Uncategorized"}</TableCell>
                     <TableCell className="text-right">{parseFloat(item.openingQty || "0").toFixed(3)}</TableCell>

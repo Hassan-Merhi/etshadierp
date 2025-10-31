@@ -215,7 +215,6 @@ export const stockItems = pgTable("stock_items", {
   companyId: integer("company_id").notNull(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
-  barcode: varchar("barcode", { length: 100 }),
   stockGroupId: integer("stock_group_id"),
   uom: text("uom").notNull(),
   openingQty: decimal("opening_qty", { precision: 15, scale: 3 }).default("0"),

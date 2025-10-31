@@ -19,7 +19,6 @@ interface InventoryItem {
   totalValue: string;
   stockItemCode: string;
   stockItemName: string;
-  stockItemBarcode: string | null;
   stockItemUom: string;
   stockGroupId: number | null;
   stockGroupName: string | null;
@@ -45,7 +44,7 @@ export default function Inventory() {
 
   const filteredInventory = inventory.filter((item) =>
     item.stockItemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.stockItemBarcode && item.stockItemBarcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    item.stockItemCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (item.locationName && item.locationName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -78,7 +77,7 @@ export default function Inventory() {
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search by name, barcode, or location..."
+            placeholder="Search by name, code, or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -99,7 +98,6 @@ export default function Inventory() {
                 <tr className="h-12">
                   <th className="text-left px-4 font-medium">Product Name</th>
                   <th className="text-left px-4 font-medium">Code</th>
-                  <th className="text-left px-4 font-medium">Barcode</th>
                   <th className="text-left px-4 font-medium">Group</th>
                   <th className="text-left px-4 font-medium">Location</th>
                   <th className="text-right px-4 font-medium">Stock</th>
@@ -112,7 +110,7 @@ export default function Inventory() {
               <tbody>
                 {filteredInventory.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No items found matching your search" : "No inventory items found"}
                     </td>
                   </tr>
@@ -139,9 +137,6 @@ export default function Inventory() {
                         </td>
                         <td className="px-4 font-mono text-muted-foreground">
                           {item.stockItemCode}
-                        </td>
-                        <td className="px-4 font-mono text-muted-foreground">
-                          {item.stockItemBarcode || "-"}
                         </td>
                         <td className="px-4 text-muted-foreground">
                           {item.stockGroupName || "Uncategorized"}

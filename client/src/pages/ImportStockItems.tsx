@@ -14,7 +14,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface ImportRow {
   code: string;
   name: string;
-  barcode?: string;
   unit?: string;
   stockGroupCode?: string;
 }
@@ -37,8 +36,8 @@ export default function ImportStockItems() {
 
   const downloadTemplate = () => {
     const template = [
-      { code: "ITEM001", name: "Cotton Bale Grade A", barcode: "123456789", unit: "Bale", stockGroupCode: "GRP001" },
-      { code: "ITEM002", name: "Cotton Bale Grade B", barcode: "987654321", unit: "Bale", stockGroupCode: "GRP001" },
+      { code: "ITEM001", name: "Cotton Bale Grade A", unit: "Bale", stockGroupCode: "GRP001" },
+      { code: "ITEM002", name: "Cotton Bale Grade B", unit: "Bale", stockGroupCode: "GRP001" },
     ];
 
     const ws = XLSX.utils.json_to_sheet(template);
@@ -92,7 +91,6 @@ export default function ImportStockItems() {
         rows.push({
           code: String(row.code || "").trim(),
           name: String(row.name || "").trim(),
-          barcode: row.barcode ? String(row.barcode).trim() : undefined,
           unit: row.unit ? String(row.unit).trim() : "Bale",
           stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
         });
@@ -163,10 +161,6 @@ export default function ImportStockItems() {
         };
 
         // Add optional fields only if they have values
-        if (row.barcode) {
-          item.barcode = row.barcode;
-        }
-
         if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) {
           item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
         }
@@ -307,7 +301,6 @@ export default function ImportStockItems() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 text-sm font-medium">Code</th>
                     <th className="text-left p-2 text-sm font-medium">Name</th>
-                    <th className="text-left p-2 text-sm font-medium">Barcode</th>
                     <th className="text-left p-2 text-sm font-medium">Unit</th>
                     <th className="text-left p-2 text-sm font-medium">Stock Group</th>
                   </tr>
@@ -317,9 +310,6 @@ export default function ImportStockItems() {
                     <tr key={index} className="border-b last:border-b-0">
                       <td className="p-2 text-sm">{item.code}</td>
                       <td className="p-2 text-sm">{item.name}</td>
-                      <td className="p-2 text-sm text-muted-foreground">
-                        {item.barcode || "-"}
-                      </td>
                       <td className="p-2 text-sm">{item.unit}</td>
                       <td className="p-2 text-sm text-muted-foreground">
                         {item.stockGroupCode || "-"}

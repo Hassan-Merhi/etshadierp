@@ -42,7 +42,6 @@ interface InventoryItem {
   totalValue: string;
   stockItemCode: string;
   stockItemName: string;
-  stockItemBarcode: string | null;
   stockItemUom: string;
   stockGroupId: number | null;
   stockGroupName: string | null;
@@ -725,7 +724,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
-                  <TableHead>Barcode</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead>UOM</TableHead>
@@ -746,9 +744,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     onClick={() => setSelectedRowIndex(index)}
                   >
                     <TableCell className="font-medium">{item.stockItemCode}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {item.stockItemBarcode || "-"}
-                    </TableCell>
                     <TableCell>{item.stockItemName}</TableCell>
                     <TableCell className="text-right font-mono">
                       {parseFloat(item.quantity).toFixed(3)}
@@ -813,7 +808,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Code</TableHead>
-                      <TableHead>Barcode</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Group</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
@@ -840,9 +834,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           data-testid={`row-all-items-${item.stockItemId}`}
                         >
                           <TableCell className="font-medium">{item.stockItemCode}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.stockItemBarcode || "-"}
-                          </TableCell>
                           <TableCell>{item.stockItemName}</TableCell>
                           <TableCell className="text-muted-foreground">
                             {item.stockGroupName || "Uncategorized"}
