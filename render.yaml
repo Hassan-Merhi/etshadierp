@@ -21,4 +21,4 @@ databases:
   - name: erp-database
     databaseName: erp_db
     user: erp_user
-    plan: starter
+    plan: basic
