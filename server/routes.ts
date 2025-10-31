@@ -4001,6 +4001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the main voucher
       const voucherUpdates: any = {
         totalAmount: totalAmount.toFixed(2),
+        locationId: parseInt(locationId),
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
       if (description !== undefined) voucherUpdates.description = description;
@@ -4134,6 +4135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update the main voucher
       const voucherUpdates: any = {
         totalAmount: totalAmount.toFixed(2),
+        locationId: parseInt(sourceLocationId), // Use source location as the primary location for the voucher
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
       if (description !== undefined) voucherUpdates.description = description;
