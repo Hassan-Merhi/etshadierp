@@ -3304,6 +3304,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a voucher with all entries (completely replace entries)
+  app.put("/api/vouchers/:id/with-entries", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      const { voucher, entries } = req.body;
+
+      if (!voucher || !entries || !Array.isArray(entries) || entries.length === 0) {
+        return res.status(400).json({ message: "Voucher and entries are required" });
+      }
+
+      // Get the existing voucher to check company and permissions
+      const existingVoucher = await storage.getVoucherById(id);
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Verify voucher belongs to current company
+      if (existingVoucher.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Voucher belongs to a different company" });
+      }
+
+      // Check edit permissions based on role
+      const userRole = req.session.currentRole;
+      if (!userRole) {
+        return res.status(403).json({ message: "User role not found" });
+      }
+
+      // Admin and Owner can edit all vouchers
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        // Manager can only edit today's vouchers
+        if (userRole === "Manager") {
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "Managers can only edit today's vouchers" });
+          }
+        } else {
+          // Other roles cannot edit
+          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+        }
+      }
+
+      // Validate that debits equal credits
+      const totalDebits = entries.reduce((sum: number, entry: any) => 
+        sum + parseFloat(entry.debitAmount || "0"), 0);
+      const totalCredits = entries.reduce((sum: number, entry: any) => 
+        sum + parseFloat(entry.creditAmount || "0"), 0);
+      
+      if (Math.abs(totalDebits - totalCredits) >= 0.01) {
+        return res.status(400).json({ message: "Total debits must equal total credits" });
+      }
+
+      const result = await db.transaction(async (tx) => {
+        // Update voucher metadata
+        const [updatedVoucher] = await tx.update(vouchers)
+          .set({
+            voucherType: voucher.voucherType,
+            voucherDate: voucher.voucherDate,
+            description: voucher.description || null,
+            optional: voucher.optional ?? false,
+            totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+          })
+          .where(eq(vouchers.id, id))
+          .returning();
+
+        // Delete all existing entries
+        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
+
+        // Create new entries
+        const createdEntries = [];
+        for (const entry of entries) {
+          const [createdEntry] = await tx.insert(voucherEntries).values({
+            voucherId: id,
+            ledgerAccountId: entry.ledgerAccountId || null,
+            bankAccountId: entry.bankAccountId || null,
+            fixedAssetId: entry.fixedAssetId || null,
+            supplierId: entry.supplierId || null,
+            debitAmount: entry.debitAmount || "0",
+            creditAmount: entry.creditAmount || "0",
+            narration: entry.narration || null,
+          }).returning();
+          createdEntries.push(createdEntry);
+        }
+
+        return { voucher: updatedVoucher, entries: createdEntries };
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get voucher entries for a specific voucher
   app.get("/api/vouchers/:id/entries", requireAuth, async (req, res) => {
     try {
