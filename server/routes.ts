@@ -37,6 +37,11 @@ import {
   stockTransferItems,
   purchaseOrders,
   poLineItems,
+  containers,
+  suppliers,
+  fixedAssets,
+  ledgerAccounts,
+  bankAccounts,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -5451,11 +5456,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fixedAssetAccounts = assets.map(asset => {
         const bal = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
-        const purchaseValue = parseFloat(asset.purchaseValue || "0");
+        const purchaseValue = parseFloat(asset.purchaseAmount || "0");
         return {
           id: asset.id,
-          code: asset.assetCode,
-          name: asset.assetName,
+          code: asset.code,
+          name: asset.name,
           balance: purchaseValue + bal.debits - bal.credits,
         };
       });
@@ -5476,7 +5481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           id: supplier.id,
           code: supplier.code,
-          name: supplier.name,
+          name: supplier.legalName,
           balance: bal.credits - bal.debits,
         };
       }).filter(s => s.balance !== 0);
@@ -5620,7 +5625,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : allStockItems;
 
       // Get all inventory records
-      let inventoryQuery = db
+      const inventoryConditions = [eq(locations.companyId, companyId)];
+
+      if (locationId) {
+        inventoryConditions.push(eq(inventory.locationId, parseInt(locationId as string)));
+      }
+
+      const inventoryRecords = await db
         .select({
           stockItemId: inventory.stockItemId,
           locationId: inventory.locationId,
@@ -5631,16 +5642,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
-        .where(eq(locations.companyId, companyId));
-
-      if (locationId) {
-        inventoryQuery = inventoryQuery.where(and(
-          eq(locations.companyId, companyId),
-          eq(inventory.locationId, parseInt(locationId as string))
-        ));
-      }
-
-      const inventoryRecords = await inventoryQuery.execute();
+        .where(and(...inventoryConditions))
+        .execute();
 
       // Build movement report
       const movementData = stockItemsToReport.map(item => {
@@ -5715,7 +5718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: containers.id,
           containerNumber: containers.containerNumber,
-          supplierName: suppliers.name,
+          supplierName: suppliers.legalName,
           status: containers.status,
           importDate: containers.importDate,
           itemsTotal: containers.itemsTotal,
