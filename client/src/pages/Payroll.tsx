@@ -107,6 +107,19 @@ export default function Payroll() {
     enabled: !!selectedCompany,
   });
 
+  const { data: workerPaymentSummary } = useQuery<{
+    workerPayments: Array<{
+      workerId: number;
+      workerCode: string;
+      workerName: string;
+      totalPaid: string;
+    }>;
+    grandTotal: string;
+  }>({
+    queryKey: ["/api/payroll/worker-payments-summary"],
+    enabled: !!selectedCompany,
+  });
+
   const cashAccounts = ledgerAccounts?.filter((acc) => acc.accountType === "Cash") || [];
 
   const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
@@ -234,6 +247,7 @@ export default function Payroll() {
         description: "Bulk payment processed successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/worker-payments-summary"] });
       setBulkPaymentDialogOpen(false);
       bulkPaymentForm.reset();
     },
@@ -406,6 +420,45 @@ export default function Payroll() {
         </TabsContent>
 
         <TabsContent value="workers">
+          {/* Worker Payment Summary */}
+          <Card className="p-6 mb-4">
+            <h3 className="text-lg font-semibold mb-4">Worker Payment Summary</h3>
+            {workerPaymentSummary ? (
+              <div className="space-y-4">
+                <div className="max-h-60 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Worker Name</TableHead>
+                        <TableHead className="text-right">Total Paid</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workerPaymentSummary.workerPayments.map((wp) => (
+                        <TableRow key={wp.workerId} data-testid={`worker-payment-${wp.workerId}`}>
+                          <TableCell className="font-mono">{wp.workerCode}</TableCell>
+                          <TableCell>{wp.workerName}</TableCell>
+                          <TableCell className="text-right font-mono" data-testid={`text-paid-${wp.workerId}`}>
+                            {parseFloat(wp.totalPaid).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <span className="text-lg font-semibold">Grand Total Paid:</span>
+                  <span className="text-lg font-semibold font-mono" data-testid="text-grand-total">
+                    {parseFloat(workerPaymentSummary.grandTotal).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <Skeleton className="h-40 w-full" />
+            )}
+          </Card>
+
           <Card className="p-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">

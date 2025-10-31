@@ -1240,6 +1240,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get worker payment summary (total paid to each worker)
+  app.get("/api/payroll/worker-payments-summary", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all employees of type Worker for current company
+      const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
+      const workers = allEmployees.filter((emp: any) => emp.employeeType === "Worker");
+
+      // Get all ledger accounts for current company
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+
+      // Calculate total paid per worker by checking their employee liability account
+      const workerPayments = await Promise.all(workers.map(async (worker: any) => {
+        // Find employee's liability account (code: EMP-{worker.code})
+        const employeeAccountCode = `EMP-${worker.code}`;
+        const employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+
+        let totalPaid = 0;
+        
+        if (employeeAccount) {
+          // Get all voucher entries that credit this employee account (withdrawals/payments)
+          const entries = await db
+            .select({
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(and(
+              eq(vouchers.companyId, req.session.currentCompanyId!),
+              eq(voucherEntries.ledgerAccountId, employeeAccount.id)
+            ));
+
+          // Sum all credits (payments to worker)
+          totalPaid = entries.reduce((sum: number, entry: any) => 
+            sum + parseFloat(entry.creditAmount || "0"), 0);
+        }
+
+        return {
+          workerId: worker.id,
+          workerCode: worker.code,
+          workerName: `${worker.firstName} ${worker.lastName}`,
+          totalPaid: totalPaid.toFixed(2),
+        };
+      }));
+
+      // Calculate grand total
+      const grandTotal = workerPayments.reduce((sum: number, wp: any) => 
+        sum + parseFloat(wp.totalPaid), 0);
+
+      res.json({
+        workerPayments,
+        grandTotal: grandTotal.toFixed(2),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Suppliers
   app.get("/api/suppliers", async (_req, res) => {
     try {
@@ -3275,9 +3336,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Total debits must equal total credits" });
       }
 
-      const result = await db.transaction(async (tx) => {
-        // Create voucher
-        const [createdVoucher] = await tx.insert(vouchers).values({
+      // Create voucher with error handling
+      let createdVoucher;
+      let createdEntries = [];
+      
+      try {
+        [createdVoucher] = await db.insert(vouchers).values({
           companyId: req.session.currentCompanyId!,
           locationId: voucher.locationId || null,
           voucherNumber: voucher.voucherNumber,
@@ -3289,9 +3353,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).returning();
 
         // Create voucher entries
-        const createdEntries = [];
         for (const entry of entries) {
-          const [createdEntry] = await tx.insert(voucherEntries).values({
+          const [createdEntry] = await db.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
             ledgerAccountId: entry.ledgerAccountId || null,
             bankAccountId: entry.bankAccountId || null,
@@ -3303,9 +3366,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }).returning();
           createdEntries.push(createdEntry);
         }
+      } catch (error: any) {
+        // Cleanup: Delete voucher and entries if anything failed
+        if (createdVoucher?.id) {
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, createdVoucher.id)).catch(() => {});
+          await db.delete(vouchers).where(eq(vouchers.id, createdVoucher.id)).catch(() => {});
+        }
+        throw error;
+      }
 
-        return { voucher: createdVoucher, entries: createdEntries };
-      });
+      const result = { voucher: createdVoucher, entries: createdEntries };
 
       res.json(result);
     } catch (error: any) {
@@ -3472,9 +3542,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Total debits must equal total credits" });
       }
 
-      const result = await db.transaction(async (tx) => {
+      // Update voucher with error handling
+      let updatedVoucher;
+      let createdEntries = [];
+      let oldEntries: any[] = [];
+      
+      try {
+        // Backup old entries before deleting
+        oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
+
         // Update voucher metadata
-        const [updatedVoucher] = await tx.update(vouchers)
+        [updatedVoucher] = await db.update(vouchers)
           .set({
             voucherType: voucher.voucherType,
             voucherDate: voucher.voucherDate,
@@ -3486,12 +3564,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Delete all existing entries
-        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
+        await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
         // Create new entries
-        const createdEntries = [];
         for (const entry of entries) {
-          const [createdEntry] = await tx.insert(voucherEntries).values({
+          const [createdEntry] = await db.insert(voucherEntries).values({
             voucherId: id,
             ledgerAccountId: entry.ledgerAccountId || null,
             bankAccountId: entry.bankAccountId || null,
@@ -3503,9 +3580,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }).returning();
           createdEntries.push(createdEntry);
         }
+      } catch (error: any) {
+        // Cleanup: Restore old entries if update failed after deletion
+        if (oldEntries.length > 0 && createdEntries.length === 0) {
+          for (const oldEntry of oldEntries) {
+            await db.insert(voucherEntries).values({
+              voucherId: oldEntry.voucherId,
+              ledgerAccountId: oldEntry.ledgerAccountId,
+              bankAccountId: oldEntry.bankAccountId,
+              fixedAssetId: oldEntry.fixedAssetId,
+              supplierId: oldEntry.supplierId,
+              debitAmount: oldEntry.debitAmount,
+              creditAmount: oldEntry.creditAmount,
+              narration: oldEntry.narration,
+            }).catch(() => {});
+          }
+        }
+        throw error;
+      }
 
-        return { voucher: updatedVoucher, entries: createdEntries };
-      });
+      const result = { voucher: updatedVoucher, entries: createdEntries };
 
       res.json(result);
     } catch (error: any) {
@@ -3859,56 +3953,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Location not found" });
       }
 
-      // STEP 1: Execute ALL operations in a transaction with row-level locking
+      // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
       const voucherDate = new Date().toISOString().split('T')[0];
 
-      const result = await db.transaction(async (tx) => {
-        // STEP 1a: Validate and lock inventory rows (SELECT ... FOR UPDATE)
-        const inventoryValidation: Array<{
-          item: any;
-          inventoryRecord: any;
-          currentQty: number;
-          saleQty: number;
-          newQty: number;
-          currentRate: number;
-        }> = [];
+      // STEP 1a: Validate inventory rows
+      const inventoryValidation: Array<{
+        item: any;
+        inventoryRecord: any;
+        currentQty: number;
+        saleQty: number;
+        newQty: number;
+        currentRate: number;
+      }> = [];
 
-        for (const item of items) {
-          // Lock the inventory row to prevent concurrent modifications
-          const [inventoryRecord] = await tx
-            .select()
-            .from(inventory)
-            .where(and(
-              eq(inventory.locationId, locationId),
-              eq(inventory.stockItemId, item.stockItemId)
-            ))
-            .for('update');
+      for (const item of items) {
+        const [inventoryRecord] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, locationId),
+            eq(inventory.stockItemId, item.stockItemId)
+          ));
 
-          if (!inventoryRecord) {
-            throw new Error(`Inventory not found for item ${item.stockItemId} at location ${locationId}`);
-          }
-
-          const currentQty = parseFloat(inventoryRecord.quantity);
-          const saleQty = parseFloat(item.quantity);
-
-          if (currentQty < saleQty) {
-            throw new Error(`Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`);
-          }
-
-          inventoryValidation.push({
-            item,
-            inventoryRecord,
-            currentQty,
-            saleQty,
-            newQty: currentQty - saleQty,
-            currentRate: parseFloat(inventoryRecord.averageRate),
-          });
+        if (!inventoryRecord) {
+          throw new Error(`Inventory not found for item ${item.stockItemId} at location ${locationId}`);
         }
 
-        // STEP 1b: Create accounting records (voucher and entries)
-        // Create Sales voucher
-        const [voucher] = await tx.insert(vouchers).values({
+        const currentQty = parseFloat(inventoryRecord.quantity);
+        const saleQty = parseFloat(item.quantity);
+
+        if (currentQty < saleQty) {
+          throw new Error(`Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`);
+        }
+
+        inventoryValidation.push({
+          item,
+          inventoryRecord,
+          currentQty,
+          saleQty,
+          newQty: currentQty - saleQty,
+          currentRate: parseFloat(inventoryRecord.averageRate),
+        });
+      }
+
+      // STEP 1b: Create accounting records (voucher and entries)
+      // Create Sales voucher
+      let voucher;
+      let saleItems = [];
+      const updatedInventoryIds: number[] = [];
+      
+      try {
+        [voucher] = await db.insert(vouchers).values({
           companyId: req.session.currentCompanyId!,
           locationId,
           voucherNumber,
@@ -3934,10 +4030,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           debitEntry.bankAccountId = accountId;
         }
 
-        await tx.insert(voucherEntries).values(debitEntry);
+        await db.insert(voucherEntries).values(debitEntry);
 
         // Credit: Sales Account (Revenue increases)
-        await tx.insert(voucherEntries).values({
+        await db.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: salesAccount.id,
           debitAmount: "0",
@@ -3946,15 +4042,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Update inventory for each item
-        const saleItems = [];
         for (const validatedItem of inventoryValidation) {
-          const { item, newQty, currentRate, inventoryRecord } = validatedItem;
+          const { item, newQty, currentRate, inventoryRecord, currentQty } = validatedItem;
 
           // Calculate new total value
           const newTotalValue = (newQty * currentRate).toFixed(2);
 
-          // Update inventory using transaction
-          await tx
+          // Update inventory
+          await db
             .update(inventory)
             .set({
               quantity: newQty.toString(),
@@ -3964,8 +4059,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
             .where(eq(inventory.id, inventoryRecord.id));
 
+          // Track updated inventory for potential rollback
+          updatedInventoryIds.push(inventoryRecord.id);
+
           // Get stock item details for response
-          const [stockItem] = await tx
+          const [stockItem] = await db
             .select()
             .from(stockItems)
             .where(eq(stockItems.id, item.stockItemId));
@@ -3978,7 +4076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const profit = totalSales - totalCost;
 
           // Insert sales item record for reporting
-          await tx.insert(salesItems).values({
+          await db.insert(salesItems).values({
             voucherId: voucher.id,
             stockItemId: item.stockItemId,
             quantity: qty.toString(),
@@ -3996,9 +4094,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             amount: totalSales.toFixed(2),
           });
         }
+      } catch (error: any) {
+        // Comprehensive cleanup: rollback all changes
+        if (voucher?.id) {
+          // Delete sales items
+          await db.delete(salesItems).where(eq(salesItems.voucherId, voucher.id)).catch(() => {});
+          // Delete voucher entries
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id)).catch(() => {});
+          // Delete voucher
+          await db.delete(vouchers).where(eq(vouchers.id, voucher.id)).catch(() => {});
+        }
+        
+        // Restore inventory quantities
+        for (let i = 0; i < updatedInventoryIds.length; i++) {
+          const validatedItem = inventoryValidation[i];
+          const originalQty = validatedItem.currentQty;
+          const originalTotalValue = (originalQty * validatedItem.currentRate).toFixed(2);
+          
+          await db
+            .update(inventory)
+            .set({
+              quantity: originalQty.toString(),
+              totalValue: originalTotalValue,
+              lastUpdated: new Date(),
+            })
+            .where(eq(inventory.id, updatedInventoryIds[i]))
+            .catch(() => {});
+        }
+        
+        throw error; // Re-throw to be caught by outer error handler
+      }
 
-        return { voucher, saleItems };
-      });
+      const result = { voucher, saleItems };
 
       // Return complete sale details
       res.json({
