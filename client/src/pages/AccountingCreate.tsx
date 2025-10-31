@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -347,7 +348,7 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       form.setValue("parentId", data.id);
       setIsParentDialogOpen(false);
-      parentForm.reset({ code: "", name: "", accountType: "" as any, active: true });
+      parentForm.reset({ name: "", accountType: "" as any, active: true });
     },
     onError: (error: any) => {
       toast({
@@ -369,20 +370,6 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="ACC001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
@@ -390,6 +377,9 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                   <FormControl>
                     <Input {...field} placeholder="Sales Revenue" data-testid="input-name" />
                   </FormControl>
+                  <FormDescription>
+                    Code will be auto-generated from the name
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -485,19 +475,6 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <FormField
                                 control={parentForm.control}
-                                name="code"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Code *</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} placeholder="ACC001" data-testid="input-parent-code" />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={parentForm.control}
                                 name="name"
                                 render={({ field }) => (
                                   <FormItem>
@@ -505,6 +482,9 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                                     <FormControl>
                                       <Input {...field} placeholder="Purchases" data-testid="input-parent-name" />
                                     </FormControl>
+                                    <FormDescription>
+                                      Code will be auto-generated
+                                    </FormDescription>
                                     <FormMessage />
                                   </FormItem>
                                 )}

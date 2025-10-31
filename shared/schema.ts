@@ -109,8 +109,8 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   createdAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
+  code: z.string().optional(),
+  name: z.string().min(1, "Name is required").refine(val => val.trim().length > 0, "Name cannot be only whitespace"),
   accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Profit"]),
   subType: z.string().optional(),
   openingBalance: z.string().optional(),

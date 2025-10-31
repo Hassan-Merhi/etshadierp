@@ -567,10 +567,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = insertLedgerAccountSchema.parse(req.body);
       
-      // Check for duplicate code
-      const existing = await storage.getLedgerAccountByCode(parsed.code);
-      if (existing) {
-        return res.status(400).json({ message: "Ledger account code already exists" });
+      // Auto-generate code from name if not provided
+      if (!parsed.code) {
+        // Generate code from name: take first 3 letters of each word, uppercase
+        const words = parsed.name.trim().split(/\s+/).filter(w => w.length > 0);
+        let baseCode = words.map(w => w.substring(0, 3)).join('').toUpperCase();
+        
+        // Fallback if baseCode is empty (shouldn't happen with validation, but be safe)
+        if (!baseCode || baseCode.length === 0) {
+          baseCode = "ACC";
+        }
+        
+        // Ensure uniqueness by adding suffix if needed
+        let code = baseCode;
+        let suffix = 1;
+        while (await storage.getLedgerAccountByCode(code)) {
+          code = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        parsed.code = code;
+      } else {
+        // Check for duplicate code if manually provided
+        const existing = await storage.getLedgerAccountByCode(parsed.code);
+        if (existing) {
+          return res.status(400).json({ message: "Ledger account code already exists" });
+        }
       }
 
       // Validate opening balance amount and side must both be present or both absent
@@ -1489,7 +1510,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: stockItems.id,
           code: stockItems.code,
           name: stockItems.name,
-          barcode: stockItems.barcode,
           uom: stockItems.uom,
           stockGroupId: stockItems.stockGroupId,
           stockGroupCode: stockGroups.code,
@@ -1700,7 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Try to find stock item (for preview purposes only - validation happens in validate step)
           if (row.Item_Barcode) {
-            stockItem = allStockItems.find(item => item.barcode === row.Item_Barcode);
+            stockItem = allStockItems.find(item => item.code === row.Item_Barcode);
             if (stockItem) {
               itemName = stockItem.name;
             }
@@ -1877,10 +1897,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seenBarcodes.add(item.barcode);
           }
 
-          // Try to find stock item by barcode first, then by name
+          // Try to find stock item by code first, then by name
           let stockItem = null;
           if (item.barcode) {
-            stockItem = allStockItems.find(si => si.barcode === item.barcode);
+            stockItem = allStockItems.find(si => si.code === item.barcode);
           }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find(si => si.name === item.itemName);
@@ -1888,7 +1908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (!stockItem) {
             if (item.barcode) {
-              errors.push(`Item not found: barcode ${item.barcode} (${item.itemName})`);
+              errors.push(`Item not found: code ${item.barcode} (${item.itemName})`);
             } else {
               errors.push(`Item not found by name: ${item.itemName}`);
             }
@@ -1947,10 +1967,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seenBarcodes.add(item.barcode);
           }
 
-          // Try to find stock item by barcode first, then by name
+          // Try to find stock item by code first, then by name
           let stockItem = null;
           if (item.barcode) {
-            stockItem = allStockItems.find(si => si.barcode === item.barcode);
+            stockItem = allStockItems.find(si => si.code === item.barcode);
           }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find(si => si.name === item.itemName);
@@ -1958,7 +1978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (!stockItem) {
             if (item.barcode) {
-              validationErrors.push(`Item not found: barcode ${item.barcode} (${item.itemName})`);
+              validationErrors.push(`Item not found: code ${item.barcode} (${item.itemName})`);
             } else {
               validationErrors.push(`Item not found by name: ${item.itemName}`);
             }
@@ -2079,13 +2099,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         for (const item of poItems) {
-          // Re-lookup stock item by barcode or name to get fresh ID (not stale preview data)
+          // Re-lookup stock item by code or name to get fresh ID (not stale preview data)
           let stockItemId = item.stockItemId;
           let stockItem = null;
 
-          // Try barcode first, then fall back to name
+          // Try code first, then fall back to name
           if (item.barcode) {
-            stockItem = freshStockItems.find(si => si.barcode === item.barcode);
+            stockItem = freshStockItems.find(si => si.code === item.barcode);
           }
           if (!stockItem && item.itemName) {
             stockItem = freshStockItems.find(si => si.name === item.itemName);
