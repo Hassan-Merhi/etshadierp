@@ -145,10 +145,12 @@ export default function ImportStockItems() {
 
     try {
       // Fetch stock groups to map codes to IDs
-      const stockGroupsRes = await apiRequest("GET", "/api/stock-groups");
-      const stockGroups = await stockGroupsRes.json();
+      const stockGroupsData: any[] = await fetch("/api/stock-groups", {
+        credentials: "include",
+      }).then(res => res.json());
+      
       const stockGroupMap = new Map(
-        stockGroups.map((sg: any) => [sg.code, sg.id])
+        stockGroupsData.map((sg: any) => [sg.code, sg.id])
       );
 
       const itemsToImport = previewData.map(row => {
