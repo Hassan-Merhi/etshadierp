@@ -152,9 +152,9 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   totalWithdrawals: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  code: z.string().optional(),
+  firstName: z.string().min(1, "First name is required").refine(val => val.trim().length > 0, "First name cannot be only whitespace"),
+  lastName: z.string().min(1, "Last name is required").refine(val => val.trim().length > 0, "Last name cannot be only whitespace"),
   email: z.string().email("Invalid email format"),
   joinDate: z.string().min(1, "Join date is required"),
   employeeType: z.enum(["Employee", "Worker"]),

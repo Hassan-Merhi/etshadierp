@@ -712,10 +712,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = insertEmployeeSchema.parse(req.body);
       
-      // Check for duplicate code
-      const existing = await storage.getEmployeeByCode(parsed.code);
-      if (existing) {
-        return res.status(400).json({ message: "Employee code already exists" });
+      // Auto-generate code from name if not provided
+      if (!parsed.code) {
+        // Generate code from name: first 3 letters of first name + first 3 letters of last name, uppercase
+        const firstPart = parsed.firstName.trim().substring(0, 3).toUpperCase();
+        const lastPart = parsed.lastName.trim().substring(0, 3).toUpperCase();
+        let baseCode = firstPart + lastPart;
+        
+        // Fallback if baseCode is somehow empty (shouldn't happen with validation)
+        if (!baseCode || baseCode.length === 0) {
+          baseCode = "EMP";
+        }
+        
+        // Ensure uniqueness by adding suffix if needed
+        let code = baseCode;
+        let suffix = 1;
+        while (await storage.getEmployeeByCode(code)) {
+          code = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        parsed.code = code;
+      } else {
+        // Check for duplicate code if manually provided
+        const existing = await storage.getEmployeeByCode(parsed.code);
+        if (existing) {
+          return res.status(400).json({ message: "Employee code already exists" });
+        }
       }
 
       const employee = await storage.createEmployee(parsed);

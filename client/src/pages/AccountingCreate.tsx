@@ -612,20 +612,6 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="EMP001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="firstName"
               render={({ field }) => (
                 <FormItem>
@@ -633,6 +619,9 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                   <FormControl>
                     <Input {...field} placeholder="John" data-testid="input-first-name" />
                   </FormControl>
+                  <FormDescription>
+                    Code will be auto-generated from name
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
