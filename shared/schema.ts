@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -233,12 +233,14 @@ export type Supplier = typeof suppliers.$inferSelect;
 export const stockGroups = pgTable("stock_groups", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
+  code: varchar("code", { length: 50 }).notNull(),
   name: text("name").notNull(),
   parentId: integer("parent_id"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("stock_groups_company_code_unique").on(t.companyId, t.code),
+}));
 
 export const insertStockGroupSchema = createInsertSchema(stockGroups).omit({
   id: true,
@@ -255,7 +257,7 @@ export type StockGroup = typeof stockGroups.$inferSelect;
 export const stockItems = pgTable("stock_items", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
+  code: varchar("code", { length: 50 }).notNull(),
   name: text("name").notNull(),
   stockGroupId: integer("stock_group_id"),
   uom: text("uom").notNull(),
@@ -266,7 +268,9 @@ export const stockItems = pgTable("stock_items", {
   sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("stock_items_company_code_unique").on(t.companyId, t.code),
+}));
 
 export const insertStockItemSchema = createInsertSchema(stockItems).omit({
   id: true,
