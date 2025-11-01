@@ -224,6 +224,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
   code: z.string().min(1, "Code is required"),
   legalName: z.string().min(1, "Legal name is required"),
   email: z.string().email("Invalid email format"),
+  openingBalance: z.string().optional(),
 });
 
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
