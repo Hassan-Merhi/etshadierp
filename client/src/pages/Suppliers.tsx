@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   Card,
   CardContent,
@@ -30,7 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download } from "lucide-react";
+import { Users, Container, DollarSign, Download, Edit } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -53,6 +54,7 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const { selectedCompany } = useCompany();
+  const [, navigate] = useLocation();
   
   // Fetch global supplier statistics (no company filter)
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
@@ -205,6 +207,7 @@ export default function Suppliers() {
                     <TableHead className="text-right">Containers</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -248,6 +251,16 @@ export default function Suppliers() {
                         <Badge variant={supplier.active ? "default" : "secondary"}>
                           {supplier.active ? "Active" : "Inactive"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
+                          data-testid={`button-edit-supplier-${supplier.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

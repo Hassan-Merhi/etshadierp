@@ -38,6 +38,7 @@ import ImportStockItems from "@/pages/ImportStockItems";
 import StockQuery from "@/pages/StockQuery";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
+import EditSupplier from "@/pages/EditSupplier";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -87,6 +88,7 @@ function Router({ user }: { user: any }) {
       <Route path="/import-stock-items" component={ImportStockItems} />
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/sales-report" component={SalesReport} />
+      <Route path="/suppliers/:id/edit" component={EditSupplier} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>
