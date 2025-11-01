@@ -137,6 +137,7 @@ export const employees = pgTable("employees", {
   department: text("department"),
   employeeType: text("employee_type").notNull().default("Employee"),
   monthlySalary: decimal("monthly_salary", { precision: 15, scale: 2 }).notNull().default("0"),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   currentBalance: decimal("current_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   totalDeposits: decimal("total_deposits", { precision: 15, scale: 2 }).notNull().default("0"),
   totalWithdrawals: decimal("total_withdrawals", { precision: 15, scale: 2 }).notNull().default("0"),
@@ -211,6 +212,7 @@ export const suppliers = pgTable("suppliers", {
   address: text("address"),
   taxId: text("tax_id"),
   paymentTerms: text("payment_terms"),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

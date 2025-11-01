@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -37,6 +37,7 @@ import Payroll from "@/pages/Payroll";
 import ImportStockItems from "@/pages/ImportStockItems";
 import StockQuery from "@/pages/StockQuery";
 import SalesReport from "@/pages/SalesReport";
+import POSDaybook from "@/pages/POSDaybook";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -56,6 +57,7 @@ function Router({ user }: { user: any }) {
       <Switch>
         <Route path="/">{() => <POS posUser={user} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
+        <Route path="/pos-daybook" component={POSDaybook} />
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -138,6 +140,7 @@ function AuthenticatedApp() {
   if (isPOS) {
     const isOnPOS = currentLocation === "/";
     const isOnInventory = currentLocation === "/location-inventory";
+    const isOnDaybook = currentLocation === "/pos-daybook";
     
     return (
       <div className="flex flex-col h-screen w-full">
@@ -163,6 +166,15 @@ function AuthenticatedApp() {
             >
               <ShoppingCart className="h-4 w-4 mr-2" />
               Point of Sale
+            </Button>
+            <Button
+              variant={isOnDaybook ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setLocation("/pos-daybook")}
+              data-testid="button-daybook-tab"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Daybook
             </Button>
             <Button
               variant={isOnInventory ? "default" : "ghost"}

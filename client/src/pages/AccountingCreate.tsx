@@ -721,6 +721,20 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
             <FormField
               control={form.control}
+              name="openingBalance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Opening Balance</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="active"
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
@@ -843,6 +857,20 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                   <FormLabel>Payment Terms</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="Net 30" data-testid="input-payment-terms" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="openingBalance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Opening Balance</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
