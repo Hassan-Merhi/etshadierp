@@ -97,7 +97,9 @@ export interface IStorage {
   // Suppliers
   getAllSuppliers(): Promise<Supplier[]>;
   getSupplierByCode(code: string): Promise<Supplier | undefined>;
+  getSupplierById(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier>;
 
   // Stock Groups
   getAllStockGroups(companyId: number): Promise<StockGroup[]>;
@@ -438,9 +440,23 @@ export class DbStorage implements IStorage {
     return supplier;
   }
 
+  async getSupplierById(id: number): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(schema.suppliers).where(eq(schema.suppliers.id, id));
+    return supplier;
+  }
+
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
     const [created] = await db.insert(schema.suppliers).values(supplier).returning();
     return created;
+  }
+
+  async updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier> {
+    const [updated] = await db
+      .update(schema.suppliers)
+      .set(updates)
+      .where(eq(schema.suppliers.id, id))
+      .returning();
+    return updated;
   }
 
   // Stock Groups
