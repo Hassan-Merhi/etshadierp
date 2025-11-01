@@ -1322,6 +1322,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const supplier = await storage.getSupplierById(supplierId);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+
+      res.json(supplier);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/suppliers", async (req, res) => {
     try {
       const parsed = insertSupplierSchema.parse(req.body);
@@ -1334,6 +1352,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const supplier = await storage.createSupplier(parsed);
       res.status(201).json(supplier);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (isNaN(supplierId)) {
+        return res.status(400).json({ message: "Invalid supplier ID" });
+      }
+
+      const existingSupplier = await storage.getSupplierById(supplierId);
+      if (!existingSupplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+
+      // If code is being changed, check for duplicates
+      if (req.body.code && req.body.code !== existingSupplier.code) {
+        const duplicate = await storage.getSupplierByCode(req.body.code);
+        if (duplicate) {
+          return res.status(400).json({ message: "Supplier code already exists" });
+        }
+      }
+
+      const parsed = insertSupplierSchema.partial().parse(req.body);
+      const updatedSupplier = await storage.updateSupplier(supplierId, parsed);
+      
+      res.json(updatedSupplier);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
