@@ -49,15 +49,15 @@ export default function EditSupplier() {
   useEffect(() => {
     if (supplier) {
       form.reset({
-        code: supplier.code,
-        legalName: supplier.legalName,
-        email: supplier.email || "",
-        phone: supplier.phone || "",
-        address: supplier.address || "",
-        taxId: supplier.taxId || "",
-        paymentTerms: supplier.paymentTerms || "",
-        openingBalance: supplier.openingBalance || "0.00",
-        active: supplier.active,
+        code: (supplier as any).code,
+        legalName: (supplier as any).legalName,
+        email: (supplier as any).email || "",
+        phone: (supplier as any).phone || "",
+        address: (supplier as any).address || "",
+        taxId: (supplier as any).taxId || "",
+        paymentTerms: (supplier as any).paymentTerms || "",
+        openingBalance: (supplier as any).openingBalance || "0.00",
+        active: (supplier as any).active,
       });
     }
   }, [supplier, form]);
