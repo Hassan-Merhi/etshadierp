@@ -78,8 +78,19 @@ export default function POSDaybook() {
     queryKey: ["/api/vouchers", { startDate, endDate }],
   });
 
-  // Filter to show only Sales vouchers
-  const salesVouchers = vouchers.filter((v) => v.voucherType === "Sales");
+  // Filter to show only Sales vouchers from the user's assigned location
+  const salesVouchers = vouchers.filter((v) => {
+    // Must be a Sales voucher
+    if (v.voucherType !== "Sales") return false;
+    
+    // If user has an assigned location (POS users), only show transactions from that location
+    if (currentUser?.assignedLocationId) {
+      return v.locationId === currentUser.assignedLocationId;
+    }
+    
+    // Non-POS users see all transactions
+    return true;
+  });
 
   // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
