@@ -186,6 +186,9 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Populate form when editing existing voucher
   useEffect(() => {
     if (editVoucher && editVoucher.salesItems && editVoucher.salesItems.length > 0) {
+      console.log('[POS Edit] Loading voucher for edit:', editVoucher);
+      console.log('[POS Edit] Sales items:', editVoucher.salesItems);
+      
       // Populate rows with sales items
       const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
         id: String(index + 1),
@@ -195,7 +198,18 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         rate: parseFloat(item.sellingPrice),
         amount: parseFloat(item.totalSales),
       }));
+      
+      // Add a blank row at the end for adding new items
+      newRows.push({
+        id: String(newRows.length + 1),
+        itemName: "",
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+      });
+      
       setRows(newRows);
+      console.log('[POS Edit] Set rows to:', newRows);
 
       // Populate notes
       if (editVoucher.description) {
@@ -292,6 +306,15 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading location...</p>
+      </div>
+    );
+  }
+
+  // Show loading state while fetching voucher for edit mode
+  if (editVoucherId && editVoucherLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading transaction...</p>
       </div>
     );
   }
