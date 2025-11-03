@@ -53,7 +53,7 @@ interface SalesItem {
 }
 
 interface VoucherWithItems extends Voucher {
-  salesItemsList?: SalesItem[];
+  salesItems?: SalesItem[];
 }
 
 export default function POSDaybook() {
@@ -256,7 +256,7 @@ export default function POSDaybook() {
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
-            ) : voucherDetails?.salesItemsList && voucherDetails.salesItemsList.length > 0 ? (
+            ) : voucherDetails?.salesItems && voucherDetails.salesItems.length > 0 ? (
               <div className="space-y-4">
                 {voucherDetails?.description && (
                   <div className="border-b pb-4">
@@ -279,7 +279,7 @@ export default function POSDaybook() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {voucherDetails.salesItemsList.map((item: any, idx: number) => (
+                      {voucherDetails.salesItems.map((item: any, idx: number) => (
                         <TableRow key={item.id || idx}>
                           <TableCell className="font-medium">
                             {item.stockItemName || `Item ${item.stockItemId}`}
@@ -309,19 +309,19 @@ export default function POSDaybook() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
-                      ${voucherDetails.salesItemsList.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0).toFixed(2)}
+                      ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Cost: </span>
                     <span className="font-mono font-semibold">
-                      ${voucherDetails.salesItemsList.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost), 0).toFixed(2)}
+                      ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost), 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Profit: </span>
                     <span className="font-mono font-semibold text-green-600 dark:text-green-500">
-                      ${voucherDetails.salesItemsList.reduce((sum: number, item: any) => sum + parseFloat(item.profit), 0).toFixed(2)}
+                      ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit), 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
