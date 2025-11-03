@@ -31,7 +31,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     assignedLocationId: userCompanyRole.assignedLocationId,
     posStation: userCompanyRole.posStation,
     cashAccountId: userCompanyRole.cashAccountId,
-    canSellNegativeStock: userCompanyRole.canSellNegativeStock,
+    // Admin always has negative stock permission
+    canSellNegativeStock: userCompanyRole.role === "Admin" ? true : userCompanyRole.canSellNegativeStock,
     canEditDaybook: userCompanyRole.canEditDaybook,
   };
 

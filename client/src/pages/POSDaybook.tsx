@@ -325,7 +325,7 @@ export default function POSDaybook() {
                       onClick={() => {
                         if (canEditDaybook) {
                           setSelectedVoucher(null);
-                          navigate(`/vouchers/${selectedVoucher?.id}/edit`);
+                          navigate(`/pos?edit=${selectedVoucher?.id}`);
                         }
                       }}
                       disabled={!canEditDaybook}

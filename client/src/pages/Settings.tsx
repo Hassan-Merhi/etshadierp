@@ -303,16 +303,41 @@ export default function Settings() {
   });
 
   const updatePermissionMutation = useMutation({
-    mutationFn: async ({ roleId, data }: { roleId: number; data: any }) => {
+    mutationFn: async ({ roleId, userId, companyId, data }: { roleId: number; userId: string; companyId: number; data: any }) => {
       const res = await apiRequest("PATCH", `/api/user-company-roles/${roleId}`, data);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      // Invalidate the user's company roles query
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${variables.userId}/company-roles`] });
+      
+      // Invalidate the aggregate permissions query so the permissions table updates
+      queryClient.invalidateQueries({ queryKey: ["/api/user-company-roles"] });
+      
+      // Check if we need to refresh current user's session
+      const currentUserRes = await fetch("/api/auth/me");
+      if (currentUserRes.ok) {
+        const currentUser = await currentUserRes.json();
+        // If we just updated the current user's permissions for the current company, refresh the session
+        if (currentUser.id === variables.userId) {
+          const currentCompanyRes = await fetch("/api/user/companies");
+          if (currentCompanyRes.ok) {
+            const userCompanies = await currentCompanyRes.json();
+            const currentCompany = userCompanies.find((uc: any) => uc.companyId === variables.companyId);
+            if (currentCompany) {
+              // Refresh session by re-selecting the company
+              await apiRequest("POST", "/api/auth/set-company", { companyId: variables.companyId });
+              // Invalidate current user query to refresh UI
+              queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+            }
+          }
+        }
+      }
+      
       toast({
         title: "Success",
         description: "Permission updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/user-company-roles"] });
     },
     onError: (error: any) => {
       toast({
@@ -396,9 +421,11 @@ export default function Settings() {
     setExpandedUserId(expandedUserId === userId ? null : userId);
   };
 
-  const handlePermissionToggle = (roleId: number, field: string, value: boolean) => {
+  const handlePermissionToggle = (roleId: number, userId: string, companyId: number, field: string, value: boolean) => {
     updatePermissionMutation.mutate({
       roleId,
+      userId,
+      companyId,
       data: { [field]: value },
     });
   };
@@ -868,11 +895,11 @@ export default function Settings() {
                             </TableCell>
                             <TableCell className="text-center">
                               <Switch
-                                checked={role.canSellNegativeStock}
+                                checked={role.role === "Admin" ? true : role.canSellNegativeStock}
                                 onCheckedChange={(checked) =>
-                                  handlePermissionToggle(role.id, "canSellNegativeStock", checked)
+                                  handlePermissionToggle(role.id, role.userId, role.companyId, "canSellNegativeStock", checked)
                                 }
-                                disabled={updatePermissionMutation.isPending}
+                                disabled={updatePermissionMutation.isPending || role.role === "Admin"}
                                 data-testid={`toggle-sell-negative-stock-${role.id}`}
                               />
                             </TableCell>
@@ -880,7 +907,7 @@ export default function Settings() {
                               <Switch
                                 checked={role.canEditDaybook}
                                 onCheckedChange={(checked) =>
-                                  handlePermissionToggle(role.id, "canEditDaybook", checked)
+                                  handlePermissionToggle(role.id, role.userId, role.companyId, "canEditDaybook", checked)
                                 }
                                 disabled={updatePermissionMutation.isPending}
                                 data-testid={`toggle-edit-daybook-${role.id}`}

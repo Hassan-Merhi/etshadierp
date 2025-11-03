@@ -3946,8 +3946,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(403).json({ message: "Managers can only edit today's vouchers" });
           }
         } else {
-          // Other roles cannot edit
-          return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+          // POS users can edit if they have canEditDaybook permission
+          const canEditDaybook = req.user?.canEditDaybook || false;
+          if (!canEditDaybook) {
+            return res.status(403).json({ message: "Insufficient permissions to edit vouchers" });
+          }
+          // POS users can only edit today's vouchers
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const voucherDate = new Date(existingVoucher.voucherDate);
+          voucherDate.setHours(0, 0, 0, 0);
+          
+          if (voucherDate.getTime() !== today.getTime()) {
+            return res.status(403).json({ message: "You can only edit today's vouchers" });
+          }
         }
       }
 

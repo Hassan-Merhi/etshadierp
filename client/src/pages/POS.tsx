@@ -72,6 +72,10 @@ interface Location {
 export default function POS({ posUser }: { posUser?: any } = {}) {
   const { selectedLocation } = useLocationContext();
   const [, navigate] = useLocation();
+  
+  // Check for edit mode from query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const editVoucherId = urlParams.get('edit');
 
   // For POS users, fetch their assigned location
   const { data: posLocation, error: locationError, isLoading: locationLoading } = useQuery<Location>({
@@ -123,6 +127,12 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
   const customerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Asset");
 
+  // Fetch voucher details if in edit mode
+  const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
+    queryKey: editVoucherId ? [`/api/vouchers/${editVoucherId}`] : [],
+    enabled: !!editVoucherId,
+  });
+
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -173,6 +183,30 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     setPaymentAccountId("");
   }, [paymentAccountType, posUser]);
 
+  // Populate form when editing existing voucher
+  useEffect(() => {
+    if (editVoucher && editVoucher.salesItems && editVoucher.salesItems.length > 0) {
+      // Populate rows with sales items
+      const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
+        id: String(index + 1),
+        itemName: item.stockItemName || "",
+        stockItemId: item.stockItemId,
+        quantity: parseFloat(item.quantity),
+        rate: parseFloat(item.sellingPrice),
+        amount: parseFloat(item.totalSales),
+      }));
+      setRows(newRows);
+
+      // Populate notes
+      if (editVoucher.description) {
+        setNotes(editVoucher.description);
+      }
+
+      // TODO: Populate payment account and credit sale info from voucher entries
+      // This would require analyzing the voucher entries to determine payment method
+    }
+  }, [editVoucher]);
+
   // Scroll highlighted item into view
   useEffect(() => {
     if (itemListRef.current && activeRow !== null) {
@@ -183,33 +217,58 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   }, [highlightedIndex, activeRow]);
 
-  // Save sale mutation
+  // Save sale mutation (handles both create and update)
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {
-      const res = await apiRequest("POST", "/api/pos/sales", saleData);
-      return await res.json();
+      if (editVoucherId) {
+        // Update existing voucher - use the sales voucher update endpoint
+        const updateData = {
+          locationId: saleData.locationId,
+          description: saleData.notes,
+          paymentAccountType: saleData.paymentAccountType,
+          paymentAccountId: saleData.paymentAccountId,
+          isCreditSale: saleData.isCreditSale,
+          items: saleData.items.map((item: any) => ({
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            sellingPrice: item.rate,
+          })),
+        };
+        const res = await apiRequest("PATCH", `/api/vouchers/${editVoucherId}/sales`, updateData);
+        return await res.json();
+      } else {
+        // Create new sale
+        const res = await apiRequest("POST", "/api/pos/sales", saleData);
+        return await res.json();
+      }
     },
     onSuccess: (data: any) => {
       setSavedSale(data);
       toast({
-        title: "Sale Saved",
-        description: `Sale ${data.voucher?.voucherNumber} has been saved successfully.`,
+        title: editVoucherId ? "Sale Updated" : "Sale Saved",
+        description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? 'updated' : 'saved'} successfully.`,
       });
       
-      // Clear the form
-      setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
-      setNotes("");
+      if (editVoucherId) {
+        // Navigate back to daybook after update
+        navigate("/pos-daybook");
+      } else {
+        // Clear the form for new sales
+        setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
+        setNotes("");
+        
+        // Auto-show print dialog
+        setShowPrintDialog(true);
+      }
       
       // Invalidate inventory query to refresh stock levels
       queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
-      
-      // Auto-show print dialog
-      setShowPrintDialog(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to save sale",
+        description: error.message || `Failed to ${editVoucherId ? 'update' : 'save'} sale`,
         variant: "destructive",
       });
     },
@@ -607,7 +666,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             className="gap-2"
             data-testid="button-complete-sale"
           >
-            {saveMutation.isPending ? "Saving..." : "Save & Print"}
+            {saveMutation.isPending ? (editVoucherId ? "Updating..." : "Saving...") : (editVoucherId ? "Update Sale" : "Save & Print")}
             {!saveMutation.isPending && <Check className="h-4 w-4" />}
           </Button>
         </div>

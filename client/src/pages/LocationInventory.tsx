@@ -837,59 +837,71 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 </CardContent>
               </Card>
             ) : (
-              <div className="border rounded-md">
-                <Table className="print-compact-table">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Group</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead>UOM</TableHead>
-                      {!posUser && (
-                        <>
-                          <TableHead className="text-right">Avg Rate</TableHead>
-                          <TableHead className="text-right">Total Value</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventory
-                      .sort((a, b) => {
-                        // Sort by group name, then by item name
-                        const groupCompare = (a.stockGroupName || "").localeCompare(b.stockGroupName || "");
-                        if (groupCompare !== 0) return groupCompare;
-                        return a.stockItemName.localeCompare(b.stockItemName);
-                      })
-                      .map((item) => (
-                        <TableRow
-                          key={item.inventoryId}
-                          data-testid={`row-all-items-${item.stockItemId}`}
-                        >
-                          <TableCell className="font-medium">{item.stockItemCode}</TableCell>
-                          <TableCell>{item.stockItemName}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.stockGroupName || "Uncategorized"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(item.quantity).toFixed(3)}
-                          </TableCell>
-                          <TableCell>{item.stockItemUom}</TableCell>
-                          {!posUser && (
-                            <>
-                              <TableCell className="text-right font-mono">
-                                ${parseFloat(item.averageRate).toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-medium">
-                                ${parseFloat(item.totalValue).toFixed(2)}
-                              </TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-6">
+                {(() => {
+                  // Group items by stock group
+                  const sortedInventory = [...inventory].sort((a, b) => {
+                    const groupCompare = (a.stockGroupName || "").localeCompare(b.stockGroupName || "");
+                    if (groupCompare !== 0) return groupCompare;
+                    return a.stockItemName.localeCompare(b.stockItemName);
+                  });
+
+                  const groupedInventory = sortedInventory.reduce((acc, item) => {
+                    const groupName = item.stockGroupName || "Uncategorized";
+                    if (!acc[groupName]) acc[groupName] = [];
+                    acc[groupName].push(item);
+                    return acc;
+                  }, {} as Record<string, typeof inventory>);
+
+                  return Object.entries(groupedInventory).map(([groupName, items]) => (
+                    <div key={groupName} className="print:break-inside-avoid">
+                      <h3 className="text-lg font-semibold mb-2 print:text-base">{groupName}</h3>
+                      <div className="border rounded-md">
+                        <Table className="print-compact-table">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Name</TableHead>
+                              <TableHead className="text-right">Quantity</TableHead>
+                              <TableHead>UOM</TableHead>
+                              {!posUser && (
+                                <>
+                                  <TableHead className="text-right">Avg Rate</TableHead>
+                                  <TableHead className="text-right">Total Value</TableHead>
+                                </>
+                              )}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {items.map((item) => (
+                              <TableRow
+                                key={item.inventoryId}
+                                data-testid={`row-all-items-${item.stockItemId}`}
+                              >
+                                <TableCell className="font-medium">{item.stockItemCode}</TableCell>
+                                <TableCell>{item.stockItemName}</TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {parseFloat(item.quantity).toFixed(3)}
+                                </TableCell>
+                                <TableCell>{item.stockItemUom}</TableCell>
+                                {!posUser && (
+                                  <>
+                                    <TableCell className="text-right font-mono">
+                                      ${parseFloat(item.averageRate).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono font-medium">
+                                      ${parseFloat(item.totalValue).toFixed(2)}
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             )}
 
