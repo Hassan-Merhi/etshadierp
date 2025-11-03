@@ -1324,6 +1324,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all suppliers with their container counts and balances (global, no company filter)
+  // MUST come before /api/suppliers/:id to avoid route matching issues
+  app.get("/api/suppliers/stats", requireAuth, async (req, res) => {
+    try {
+      const suppliers = await storage.getAllSuppliers();
+      
+      const suppliersWithStats = await Promise.all(
+        suppliers.map(async (supplier) => {
+          // Aggregate container count across ALL companies (no filter)
+          const containerCount = await storage.getContainerCountBySupplier(supplier.id);
+          
+          // Calculate balance from voucher entries across ALL companies
+          // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
+          // Balance = Credits - Debits (positive means we owe them)
+          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+          const balance = entries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            return sum + credit - debit;
+          }, 0);
+          
+          return {
+            ...supplier,
+            containerCount,
+            balance,
+          };
+        })
+      );
+
+      // Return all suppliers with their stats
+      res.json(suppliersWithStats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/suppliers/:id", async (req, res) => {
     try {
       const supplierId = parseInt(req.params.id);
@@ -3336,41 +3372,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(vouchers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Get all suppliers with their container counts and balances (global, no company filter)
-  app.get("/api/suppliers/stats", requireAuth, async (req, res) => {
-    try {
-      const suppliers = await storage.getAllSuppliers();
-      
-      const suppliersWithStats = await Promise.all(
-        suppliers.map(async (supplier) => {
-          // Aggregate container count across ALL companies (no filter)
-          const containerCount = await storage.getContainerCountBySupplier(supplier.id);
-          
-          // Calculate balance from voucher entries across ALL companies
-          // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
-          // Balance = Credits - Debits (positive means we owe them)
-          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
-          const balance = entries.reduce((sum, entry) => {
-            const credit = parseFloat(entry.creditAmount || "0");
-            const debit = parseFloat(entry.debitAmount || "0");
-            return sum + credit - debit;
-          }, 0);
-          
-          return {
-            ...supplier,
-            containerCount,
-            balance,
-          };
-        })
-      );
-
-      // Return all suppliers with their stats
-      res.json(suppliersWithStats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
