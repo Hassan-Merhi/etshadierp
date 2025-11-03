@@ -329,7 +329,7 @@ export class DbStorage implements IStorage {
   }
 
   async createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
-    const [created] = await db.insert(schema.ledgerAccounts).values(account).returning();
+    const [created] = await db.insert(schema.ledgerAccounts).values([account as any]).returning();
     return created;
   }
 
@@ -359,7 +359,7 @@ export class DbStorage implements IStorage {
   }
 
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
-    const [created] = await db.insert(schema.employees).values(employee).returning();
+    const [created] = await db.insert(schema.employees).values([employee as any]).returning();
     return created;
   }
 
@@ -1809,7 +1809,7 @@ export class DbStorage implements IStorage {
       .select({
         poNumber: schema.purchaseOrders.poNumber,
         poDate: schema.purchaseOrders.createdAt,
-        supplierName: schema.suppliers.name,
+        supplierName: schema.suppliers.legalName,
         quantity: schema.poLineItems.quantity,
         rate: schema.poLineItems.rate,
         amount: schema.poLineItems.lineTotal,
