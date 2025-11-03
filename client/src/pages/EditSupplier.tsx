@@ -74,7 +74,7 @@ export default function EditSupplier() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId] });
-      navigate("/accounting-create");
+      navigate("/suppliers");
     },
     onError: (error: any) => {
       toast({
@@ -104,7 +104,7 @@ export default function EditSupplier() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/accounting-create")}
+            onClick={() => navigate("/suppliers")}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -121,7 +121,7 @@ export default function EditSupplier() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/accounting-create")}
+          onClick={() => navigate("/suppliers")}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -318,7 +318,7 @@ export default function EditSupplier() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => navigate("/accounting-create")}
+                  onClick={() => navigate("/suppliers")}
                   data-testid="button-cancel"
                 >
                   Cancel
