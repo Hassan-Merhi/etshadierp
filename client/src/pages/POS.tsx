@@ -472,33 +472,29 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         if (!isItemNameField || filteredItems.length === 0) {
           e.preventDefault();
           
-          // If on rate field (last editable column), check if we should add a new row
+          // If on rate field, immediately create a new row
           const isRateField = columns[colIndex].key === "rate";
           if (isRateField) {
-            const currentRow = rows[rowIndex];
+            // Check if next row exists
             const nextRow = rows[rowIndex + 1];
             
-            // Only handle row creation/navigation if current row has data
-            if (currentRow.stockItemId) {
-              // If next row exists but is empty, move to next row's first field
-              if (nextRow && !nextRow.stockItemId) {
-                setSelectedCell({ row: rowIndex + 1, col: 0 });
-                focusCell(rowIndex + 1, 0);
-              }
-              // If no next row or next row also has data, add new row
-              else if (!nextRow || nextRow.stockItemId) {
-                setRows(prev => [...prev, {
-                  id: String(Date.now()),
-                  itemName: "",
-                  quantity: 0,
-                  rate: 0,
-                  amount: 0,
-                }]);
-                // Focus on item name field of new row after state updates
-                setTimeout(() => {
-                  focusCell(rows.length, 0);
-                }, 50);
-              }
+            if (!nextRow) {
+              // Add a new row
+              setRows(prev => [...prev, {
+                id: String(Date.now()),
+                itemName: "",
+                quantity: 0,
+                rate: 0,
+                amount: 0,
+              }]);
+              // Focus on item name field of new row after state updates
+              setTimeout(() => {
+                focusCell(rows.length, 0);
+              }, 50);
+            } else {
+              // Move to next row's first field
+              setSelectedCell({ row: rowIndex + 1, col: 0 });
+              focusCell(rowIndex + 1, 0);
             }
           } else if (rowIndex < maxRow) {
             setSelectedCell({ row: rowIndex + 1, col: colIndex });
