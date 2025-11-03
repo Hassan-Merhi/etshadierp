@@ -3369,12 +3369,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Filter to only show suppliers that have any activity (containers or balance)
-      const activeSuppliersInCompany = suppliersWithStats.filter(
-        s => s.containerCount > 0 || s.balance !== 0
-      );
-
-      res.json(activeSuppliersInCompany);
+      // Return all suppliers with their stats
+      res.json(suppliersWithStats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
