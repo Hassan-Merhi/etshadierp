@@ -94,7 +94,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     code: item.stockItemCode,
     name: item.stockItemName,
     stock: parseFloat(item.quantity),
-    price: parseFloat(item.averageRate),
+    price: parseFloat(item.lastSellingPrice || item.averageRate),
     stockItemId: item.stockItemId,
   }));
 
@@ -503,15 +503,21 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         }
         break;
       case "ArrowLeft":
-        if ((e.currentTarget as HTMLInputElement).selectionStart === 0 && colIndex > 0) {
-          e.preventDefault();
+        e.preventDefault();
+        if (colIndex > 0) {
           setSelectedCell({ row: rowIndex, col: colIndex - 1 });
           focusCell(rowIndex, colIndex - 1);
         }
         break;
       case "ArrowRight":
+        e.preventDefault();
+        if (colIndex < maxCol) {
+          setSelectedCell({ row: rowIndex, col: colIndex + 1 });
+          focusCell(rowIndex, colIndex + 1);
+        }
+        break;
       case "Tab":
-        if (!e.shiftKey && (e.currentTarget as HTMLInputElement).selectionStart === (e.currentTarget as HTMLInputElement).value.length && colIndex < maxCol) {
+        if (!e.shiftKey && colIndex < maxCol) {
           e.preventDefault();
           setSelectedCell({ row: rowIndex, col: colIndex + 1 });
           focusCell(rowIndex, colIndex + 1);

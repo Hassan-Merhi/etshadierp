@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -839,6 +839,7 @@ export class DbStorage implements IStorage {
 
   // Inventory - Location-based stock tracking
   async getLocationInventory(locationId: number): Promise<any[]> {
+    // First, get the basic inventory data
     const results = await db
       .select({
         inventoryId: schema.inventory.id,
@@ -860,7 +861,42 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .where(eq(schema.inventory.locationId, locationId));
     
-    return results;
+    // Get last selling prices for all stock items in this location
+    const stockItemIds = results.map(r => r.stockItemId);
+    
+    if (stockItemIds.length === 0) {
+      return results;
+    }
+    
+    // Query to get the most recent selling price for each stock item
+    const lastPrices = await db
+      .select({
+        stockItemId: schema.salesItems.stockItemId,
+        lastSellingPrice: schema.salesItems.sellingPrice,
+        voucherId: schema.salesItems.voucherId,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(
+        inArray(schema.salesItems.stockItemId, stockItemIds),
+        eq(schema.vouchers.locationId, locationId)
+      ))
+      .orderBy(desc(schema.vouchers.voucherDate))
+      .execute();
+    
+    // Create a map of stockItemId -> last selling price
+    const priceMap = new Map<number, string>();
+    for (const price of lastPrices) {
+      if (!priceMap.has(price.stockItemId)) {
+        priceMap.set(price.stockItemId, price.lastSellingPrice);
+      }
+    }
+    
+    // Add lastSellingPrice to results
+    return results.map(item => ({
+      ...item,
+      lastSellingPrice: priceMap.get(item.stockItemId) || item.averageRate,
+    }));
   }
 
   async getCompanyInventory(companyId: number): Promise<any[]> {
