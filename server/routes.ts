@@ -305,6 +305,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.currentLocationId = userRole.assignedLocationId;
       req.session.currentPOSStation = userRole.posStation;
       req.session.cashAccountId = userRole.cashAccountId;
+      req.session.canSellNegativeStock = userRole.canSellNegativeStock;
+      req.session.canEditDaybook = userRole.canEditDaybook;
       
       res.json({ message: "Company set successfully", companyId });
     } catch (error: any) {
