@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
-import { requireAuth, requireRole, canDelete, checkPOSLocation } from "./auth";
+import { requireAuth, requireRole, canDelete, checkPOSLocation, requireNonPOS } from "./auth";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -645,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/ledger-accounts", async (req, res) => {
+  app.post("/api/ledger-accounts", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const parsed = insertLedgerAccountSchema.parse(req.body);
       
@@ -711,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/ledger-accounts/:id", requireAuth, async (req, res) => {
+  app.put("/api/ledger-accounts/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -790,7 +790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/employees", async (req, res) => {
+  app.post("/api/employees", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const parsed = insertEmployeeSchema.parse(req.body);
       
@@ -916,7 +916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll - Employee Balance Deposit
-  app.post("/api/payroll/deposit-employee", requireAuth, async (req, res) => {
+  app.post("/api/payroll/deposit-employee", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1025,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll - Employee Withdrawal
-  app.post("/api/payroll/withdraw-employee", requireAuth, async (req, res) => {
+  app.post("/api/payroll/withdraw-employee", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1129,7 +1129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll - Worker Direct Payment
-  app.post("/api/payroll/pay-worker", requireAuth, async (req, res) => {
+  app.post("/api/payroll/pay-worker", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1208,7 +1208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payroll - Bulk Worker Payment
-  app.post("/api/payroll/bulk-pay-workers", requireAuth, async (req, res) => {
+  app.post("/api/payroll/bulk-pay-workers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1302,7 +1302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get worker payment summary (total paid to each worker)
-  app.get("/api/payroll/worker-payments-summary", requireAuth, async (req, res) => {
+  app.get("/api/payroll/worker-payments-summary", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1426,7 +1426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/suppliers", async (req, res) => {
+  app.post("/api/suppliers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const parsed = insertSupplierSchema.parse(req.body);
       
@@ -1443,7 +1443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/suppliers/:id", async (req, res) => {
+  app.patch("/api/suppliers/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) {
@@ -1485,7 +1485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-groups", requireAuth, async (req, res) => {
+  app.post("/api/stock-groups", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1525,7 +1525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/stock-items", requireAuth, async (req, res) => {
+  app.post("/api/stock-items", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1587,7 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk import stock items
-  app.post("/api/stock-items/import", requireAuth, async (req, res) => {
+  app.post("/api/stock-items/import", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1668,7 +1668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update stock item
-  app.patch("/api/stock-items/:id", requireAuth, async (req, res) => {
+  app.patch("/api/stock-items/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
@@ -1849,7 +1849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new code alias for a stock item
-  app.post("/api/stock-items/:id/code-aliases", requireAuth, async (req, res) => {
+  app.post("/api/stock-items/:id/code-aliases", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
@@ -2794,7 +2794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get containers
-  app.get("/api/containers", requireAuth, async (req, res) => {
+  app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -2807,7 +2807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get container details with POs, line items, and charges
-  app.get("/api/containers/:id", async (req, res) => {
+  app.get("/api/containers/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const containerId = parseInt(req.params.id);
       const container = await storage.getContainerById(containerId);
@@ -2840,7 +2840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Offload container to location
-  app.post("/api/containers/:id/offload", async (req, res) => {
+  app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const containerId = parseInt(req.params.id);
       
@@ -3557,7 +3557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new voucher
-  app.post("/api/vouchers", async (req, res) => {
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const voucher = await storage.createVoucher(req.body);
       res.json(voucher);
@@ -3567,7 +3567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a voucher with entries in one transaction
-  app.post("/api/vouchers/with-entries", requireAuth, async (req, res) => {
+  app.post("/api/vouchers/with-entries", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const { voucher, entries } = req.body;
       
@@ -3798,7 +3798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a voucher (Admin, Owner, or Manager for today's vouchers)
-  app.patch("/api/vouchers/:id", requireAuth, async (req, res) => {
+  app.patch("/api/vouchers/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -3854,7 +3854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Toggle optional status for a voucher
-  app.patch("/api/vouchers/:id/optional", requireAuth, async (req, res) => {
+  app.patch("/api/vouchers/:id/optional", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -4143,7 +4143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a purchase voucher with line items
-  app.patch("/api/vouchers/:id/purchase", requireAuth, async (req, res) => {
+  app.patch("/api/vouchers/:id/purchase", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -4289,7 +4289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update an adjustment voucher (Consumption or Mixed) with line items
-  app.patch("/api/vouchers/:id/adjustment", requireAuth, async (req, res) => {
+  app.patch("/api/vouchers/:id/adjustment", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -4500,7 +4500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update a stock transfer voucher with line items
-  app.patch("/api/vouchers/:id/transfer", requireAuth, async (req, res) => {
+  app.patch("/api/vouchers/:id/transfer", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -5454,7 +5454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock Transfers
-  app.post("/api/stock-transfers", async (req, res) => {
+  app.post("/api/stock-transfers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const { voucherId, destinationLocationId, notes, items } = req.body;
 
@@ -5522,7 +5522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock Adjustments
-  app.post("/api/stock-adjustments", async (req, res) => {
+  app.post("/api/stock-adjustments", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const { voucherId, locationId, adjustmentType, notes, items } = req.body;
 
@@ -5884,7 +5884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reports API Endpoints
   
   // Profit & Loss Report
-  app.get("/api/reports/profit-loss", requireAuth, async (req, res) => {
+  app.get("/api/reports/profit-loss", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
@@ -5981,7 +5981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Balance Sheet Report
-  app.get("/api/reports/balance-sheet", requireAuth, async (req, res) => {
+  app.get("/api/reports/balance-sheet", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {

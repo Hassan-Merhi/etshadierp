@@ -118,3 +118,19 @@ export function checkPOSLocation(req: Request, res: Response, next: NextFunction
 
   next();
 }
+
+// Block POS users from accessing sensitive routes
+export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
+  if (!req.user || !req.user.role) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const isPOS = req.user.role.startsWith("POS");
+  if (isPOS) {
+    return res.status(403).json({ 
+      message: "Access denied: This resource is not available for POS users" 
+    });
+  }
+
+  next();
+}

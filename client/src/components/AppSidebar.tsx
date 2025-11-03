@@ -167,6 +167,7 @@ export function AppSidebar({ user }: { user?: any }) {
       return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
     }
     
+    // For non-POS users:
     // Settings is Admin only
     if (item.url === "/settings") {
       return user?.role === "Admin";
@@ -174,9 +175,10 @@ export function AppSidebar({ user }: { user?: any }) {
     
     // POS Daybook is only for POS users (hide from others)
     if (item.url === "/pos-daybook") {
-      return false;
+      return isPOSUser; // This is redundant now but kept for clarity
     }
     
+    // All other items are visible to non-POS users
     return true;
   });
 
