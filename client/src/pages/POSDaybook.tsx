@@ -297,23 +297,11 @@ export default function POSDaybook() {
                   </Table>
                 </div>
 
-                <div className="border-t pt-4 flex justify-end gap-8">
+                <div className="border-t pt-4 flex justify-end">
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
                       ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Cost: </span>
-                    <span className="font-mono font-semibold">
-                      ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost), 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Profit: </span>
-                    <span className="font-mono font-semibold text-green-600 dark:text-green-500">
-                      ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit), 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
