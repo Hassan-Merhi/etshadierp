@@ -4123,8 +4123,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.insert(salesItems).values(salesItemsData);
 
       // STEP 5: Update voucher entries (accounting transactions)
-      // NOTE: This currently handles simple 2-entry vouchers (payment debit + sales credit).
-      // Future enhancement needed: preserve additional entries (taxes, COGS, etc.) for complex vouchers.
+      // NOTE: POS Sales vouchers in this system are ALWAYS 2-entry transactions:
+      //   1. Debit: Cash/Bank/Customer Account (payment account)
+      //   2. Credit: Sales Revenue Account
+      // This is confirmed by the POST /api/pos/sales endpoint (lines ~5420-5446) which creates exactly 2 entries.
+      // No taxes, COGS, or other entries exist for POS sales in the current implementation.
       // If payment info is not provided, derive it from existing entries
       let finalPaymentAccountId = paymentAccountId;
       let finalPaymentAccountType = paymentAccountType;
