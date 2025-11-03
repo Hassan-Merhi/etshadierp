@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
-import { requireAuth, requireRole, canDelete } from "./auth";
+import { requireAuth, requireRole, canDelete, checkPOSLocation } from "./auth";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -360,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single location by ID
-  app.get("/api/locations/:locationId", requireAuth, async (req, res) => {
+  app.get("/api/locations/:locationId", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -384,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Location Inventory - Get inventory for a specific location
-  app.get("/api/locations/:locationId/inventory", requireAuth, async (req, res) => {
+  app.get("/api/locations/:locationId/inventory", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -403,7 +403,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const inventory = await storage.getLocationInventory(locationId);
-      res.json(inventory);
+      
+      // Filter sensitive data for POS users (they should only see quantity)
+      const isPOS = req.user?.role?.startsWith("POS");
+      if (isPOS) {
+        const filteredInventory = inventory.map((item: any) => ({
+          ...item,
+          averageRate: null,
+          totalValue: null,
+        }));
+        res.json(filteredInventory);
+      } else {
+        res.json(inventory);
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -424,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk import inventory for a location
-  app.post("/api/locations/:locationId/import-inventory", requireAuth, async (req, res) => {
+  app.post("/api/locations/:locationId/import-inventory", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -4739,7 +4751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get detailed sales info for a specific location
-  app.get("/api/financial/sales/:locationId/details", requireAuth, async (req, res) => {
+  app.get("/api/financial/sales/:locationId/details", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });

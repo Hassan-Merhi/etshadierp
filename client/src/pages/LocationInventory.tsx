@@ -702,14 +702,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <span className="text-muted-foreground">Total Qty:</span>
                         <span className="font-medium">{group.totalQuantity.toFixed(3)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Avg Rate:</span>
-                        <span className="font-medium">${group.averageRate.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Value:</span>
-                        <span className="font-medium text-primary">${group.totalValue.toFixed(2)}</span>
-                      </div>
+                      {!posUser && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Avg Rate:</span>
+                            <span className="font-medium">${group.averageRate.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Value:</span>
+                            <span className="font-medium text-primary">${group.totalValue.toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -733,8 +737,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <TableHead>Name</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead>UOM</TableHead>
-                  <TableHead className="text-right">Avg Rate</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
+                  {!posUser && (
+                    <>
+                      <TableHead className="text-right">Avg Rate</TableHead>
+                      <TableHead className="text-right">Total Value</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -755,12 +763,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       {parseFloat(item.quantity).toFixed(3)}
                     </TableCell>
                     <TableCell>{item.stockItemUom}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${parseFloat(item.averageRate).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      ${parseFloat(item.totalValue).toFixed(2)}
-                    </TableCell>
+                    {!posUser && (
+                      <>
+                        <TableCell className="text-right font-mono">
+                          ${parseFloat(item.averageRate).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          ${parseFloat(item.totalValue).toFixed(2)}
+                        </TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
