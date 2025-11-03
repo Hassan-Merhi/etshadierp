@@ -78,6 +78,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [, navigate] = useRoute();
   const { toast } = useToast();
 
+  // Debug logging
+  console.log('[LocationInventory] posUser:', posUser);
+  console.log('[LocationInventory] !posUser (query enabled):', !posUser);
+
   // Import dialog state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -91,10 +95,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     contentRef: printRef,
   });
 
-  // Fetch all locations (only if not a POS user)
+  // Fetch all locations (only for non-POS users, POS users use specific query below)
   const { data: locations = [], isLoading: locationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
-    enabled: !posUser,
+    enabled: !posUser, // Disable for POS users to avoid redundant requests
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true, // Refetch when component mounts
   });
 
   // For POS users, automatically set their assigned location
