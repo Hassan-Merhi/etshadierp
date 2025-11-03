@@ -801,8 +801,24 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
           {/* Printable area */}
           <div ref={printRef}>
+            <style>{`
+              @media print {
+                .print-compact-table th,
+                .print-compact-table td {
+                  padding: 0.25rem 0.375rem !important;
+                  font-size: 0.875rem !important;
+                  line-height: 1.25rem !important;
+                }
+                .print-compact-table th {
+                  font-weight: 600 !important;
+                }
+                .print-header {
+                  margin-bottom: 1rem !important;
+                }
+              }
+            `}</style>
             {/* Print header (hidden on screen) */}
-            <div className="hidden print:block mb-6">
+            <div className="hidden print:block print-header mb-6">
               <h2 className="text-2xl font-bold">{selectedLocationLocal.name}</h2>
               <p className="text-sm text-muted-foreground">Full Inventory Report</p>
               <p className="text-sm text-muted-foreground">
@@ -822,7 +838,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </Card>
             ) : (
               <div className="border rounded-md">
-                <Table>
+                <Table className="print-compact-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Code</TableHead>
