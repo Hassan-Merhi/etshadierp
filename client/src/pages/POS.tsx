@@ -51,6 +51,7 @@ interface APIInventoryItem {
   quantity: string;
   averageRate: string;
   totalValue: string;
+  lastSellingPrice?: string;
   stockItemCode: string;
   stockItemName: string;
   stockItemUom: string;
