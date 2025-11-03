@@ -109,9 +109,16 @@ export interface IStorage {
   // Stock Items
   getAllStockItems(companyId: number): Promise<StockItem[]>;
   getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined>;
+  getStockItemByCodeOrAlias(code: string, companyId: number): Promise<StockItem | undefined>;
   getStockItemById(id: number): Promise<StockItem | undefined>;
   createStockItem(item: InsertStockItem): Promise<StockItem>;
   updateStockItem(id: number, updates: Partial<InsertStockItem>): Promise<StockItem>;
+  
+  // Stock Item Code Aliases
+  getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]>;
+  getStockItemCodeAliasById(id: number): Promise<schema.StockItemCodeAlias | undefined>;
+  createStockItemCodeAlias(alias: schema.InsertStockItemCodeAlias): Promise<schema.StockItemCodeAlias>;
+  deleteStockItemCodeAlias(id: number): Promise<void>;
 
   // Bank Accounts
   getAllBankAccounts(companyId: number): Promise<BankAccount[]>;
@@ -511,6 +518,76 @@ export class DbStorage implements IStorage {
       .where(eq(schema.stockItems.id, id))
       .returning();
     return updated;
+  }
+
+  async getStockItemByCodeOrAlias(code: string, companyId: number): Promise<StockItem | undefined> {
+    // First check if it matches a primary code (case-insensitive)
+    const [directMatch] = await db
+      .select()
+      .from(schema.stockItems)
+      .where(
+        and(
+          sql`LOWER(${schema.stockItems.code}) = LOWER(${code})`,
+          eq(schema.stockItems.companyId, companyId)
+        )
+      )
+      .limit(1);
+    
+    if (directMatch) {
+      return directMatch;
+    }
+
+    // If not found, check if it matches any alias (case-insensitive)
+    const [aliasMatch] = await db
+      .select({
+        stockItem: schema.stockItems,
+      })
+      .from(schema.stockItemCodeAliases)
+      .innerJoin(
+        schema.stockItems,
+        eq(schema.stockItemCodeAliases.stockItemId, schema.stockItems.id)
+      )
+      .where(
+        and(
+          sql`LOWER(${schema.stockItemCodeAliases.aliasCode}) = LOWER(${code})`,
+          eq(schema.stockItemCodeAliases.companyId, companyId),
+          eq(schema.stockItems.companyId, companyId)
+        )
+      )
+      .limit(1);
+
+    return aliasMatch?.stockItem;
+  }
+
+  // Stock Item Code Aliases
+  async getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]> {
+    return await db
+      .select()
+      .from(schema.stockItemCodeAliases)
+      .where(eq(schema.stockItemCodeAliases.stockItemId, stockItemId));
+  }
+
+  async getStockItemCodeAliasById(id: number): Promise<schema.StockItemCodeAlias | undefined> {
+    const [alias] = await db
+      .select()
+      .from(schema.stockItemCodeAliases)
+      .where(eq(schema.stockItemCodeAliases.id, id))
+      .limit(1);
+    return alias;
+  }
+
+  async createStockItemCodeAlias(alias: schema.InsertStockItemCodeAlias): Promise<schema.StockItemCodeAlias> {
+    const [created] = await db
+      .insert(schema.stockItemCodeAliases)
+      .values(alias)
+      .returning();
+    return created;
+  }
+
+  async deleteStockItemCodeAlias(id: number): Promise<void> {
+    await db
+      .delete(schema.stockItemCodeAliases)
+      .where(eq(schema.stockItemCodeAliases.id, id));
   }
 
   // Bank Accounts

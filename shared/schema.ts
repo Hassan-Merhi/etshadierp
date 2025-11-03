@@ -285,6 +285,30 @@ export const insertStockItemSchema = createInsertSchema(stockItems).omit({
 export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
 export type StockItem = typeof stockItems.$inferSelect;
 
+export const stockItemCodeAliases = pgTable("stock_item_code_aliases", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  aliasCode: varchar("alias_code", { length: 50 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyAlias: uniqueIndex("stock_item_code_aliases_company_alias_unique").on(t.companyId, t.aliasCode),
+}));
+
+export const insertStockItemCodeAliasSchema = createInsertSchema(stockItemCodeAliases).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  aliasCode: z.string().min(1, "Alias code is required"),
+  description: z.string().optional(),
+});
+
+export type InsertStockItemCodeAlias = z.infer<typeof insertStockItemCodeAliasSchema>;
+export type StockItemCodeAlias = typeof stockItemCodeAliases.$inferSelect;
+
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),

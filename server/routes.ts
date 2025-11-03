@@ -15,6 +15,7 @@ import {
   insertSupplierSchema,
   insertStockGroupSchema,
   insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
   insertBankAccountSchema,
   insertFixedAssetSchema,
   offloadRequestSchema,
@@ -466,9 +467,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const item of items) {
         try {
-          // Find stock item by Item_barcode (which maps to code field)
-          let stockItem = allStockItems.find(si => 
-            si.code.toLowerCase() === item.Item_barcode.toLowerCase()
+          // Find stock item by Item_barcode (which maps to code field OR code alias)
+          let stockItem = await storage.getStockItemByCodeOrAlias(
+            item.Item_barcode,
+            req.session.currentCompanyId
           );
 
           // If stock item doesn't exist, create it
@@ -1727,6 +1729,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastSale,
         inventoryLocations,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stock Item Code Aliases
+  // Get all code aliases for a stock item
+  app.get("/api/stock-items/:id/code-aliases", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      const aliases = await storage.getStockItemCodeAliases(stockItemId);
+      res.json(aliases);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new code alias for a stock item
+  app.post("/api/stock-items/:id/code-aliases", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      // Validate the alias (include companyId for security)
+      const validatedAlias = insertStockItemCodeAliasSchema.parse({
+        ...req.body,
+        stockItemId,
+        companyId: req.session.currentCompanyId,
+      });
+
+      const alias = await storage.createStockItemCodeAlias(validatedAlias);
+      res.status(201).json(alias);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete a code alias
+  app.delete("/api/stock-item-code-aliases/:id", requireAuth, async (req, res) => {
+    try {
+      const aliasId = parseInt(req.params.id);
+      if (isNaN(aliasId)) {
+        return res.status(400).json({ message: "Invalid alias ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get the alias first to verify ownership
+      const alias = await storage.getStockItemCodeAliasById(aliasId);
+      if (!alias) {
+        return res.status(404).json({ message: "Code alias not found" });
+      }
+
+      // Verify the alias belongs to the current company
+      if (alias.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Code alias belongs to a different company" });
+      }
+      
+      await storage.deleteStockItemCodeAlias(aliasId);
+      res.json({ message: "Code alias deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
