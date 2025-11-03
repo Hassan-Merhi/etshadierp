@@ -3342,7 +3342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all suppliers with their container counts and balances (global, no company filter)
-  app.get("/api/suppliers/with-stats", requireAuth, async (req, res) => {
+  app.get("/api/suppliers/stats", requireAuth, async (req, res) => {
     try {
       const suppliers = await storage.getAllSuppliers();
       
