@@ -739,6 +739,7 @@ export class DbStorage implements IStorage {
     if (remainingPOs.length === 0) {
       // Delete the container and all its charges if no POs remain
       await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+      await db.delete(schema.importLogs).where(eq(schema.importLogs.containerId, containerId));
       await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
     } else {
       // Update container totals
@@ -788,6 +789,9 @@ export class DbStorage implements IStorage {
 
     // Delete container charges
     await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, id));
+
+    // Delete import log entry to allow re-upload of the same file
+    await db.delete(schema.importLogs).where(eq(schema.importLogs.containerId, id));
 
     // Delete the container
     await db.delete(schema.containers).where(eq(schema.containers.id, id));
