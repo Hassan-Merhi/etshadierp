@@ -251,8 +251,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [filters, setFilters] = useState({
-    startDate: "",
-    endDate: "",
+    startDate: format(new Date(), "yyyy-MM-dd"),
+    endDate: format(new Date(), "yyyy-MM-dd"),
     voucherType: "all",
     searchQuery: "",
   });
