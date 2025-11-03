@@ -73,9 +73,10 @@ export default function POSDaybook() {
   // Only allow editing if explicitly permitted - defaults to false for safety
   const canEditDaybook = currentUser?.canEditDaybook === true;
 
-  // Fetch today's sales vouchers
+  // Fetch today's sales vouchers (only fetch after user is loaded)
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
     queryKey: ["/api/vouchers", { startDate, endDate }],
+    enabled: !isLoadingUser, // Only fetch vouchers after user data is loaded
   });
 
   // Filter to show only Sales vouchers from the user's assigned location
@@ -84,7 +85,7 @@ export default function POSDaybook() {
     if (v.voucherType !== "Sales") return false;
     
     // If user has an assigned location (POS users), only show transactions from that location
-    if (currentUser?.assignedLocationId) {
+    if (currentUser?.assignedLocationId !== undefined && currentUser?.assignedLocationId !== null) {
       return v.locationId === currentUser.assignedLocationId;
     }
     
@@ -178,7 +179,7 @@ export default function POSDaybook() {
           <CardTitle className="text-base">Sales Transactions</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoadingUser || isLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
