@@ -2132,9 +2132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let stockItem = null;
           let itemName = row.Item_Name;
 
-          // Try to find stock item (for preview purposes only - validation happens in validate step)
+          // Try to find stock item by code/alias or name (for preview purposes only - validation happens in validate step)
           if (row.Item_Barcode) {
-            stockItem = allStockItems.find(item => item.code === row.Item_Barcode);
+            stockItem = await storage.getStockItemByCodeOrAlias(row.Item_Barcode, req.session.currentCompanyId!);
             if (stockItem) {
               itemName = stockItem.name;
             }
