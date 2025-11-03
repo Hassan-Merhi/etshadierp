@@ -21,6 +21,7 @@ declare global {
         role?: string;
         assignedLocationId?: number | null;
         posStation?: number | null;
+        cashAccountId?: number | null;
       };
     }
   }

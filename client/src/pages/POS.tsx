@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -111,6 +113,15 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   // Filter cash ledger accounts
   const cashLedgerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Cash");
 
+  // Fetch assigned cash account for POS users
+  const { data: assignedCashAccount } = useQuery<any>({
+    queryKey: posUser?.cashAccountId ? [`/api/ledger-accounts/${posUser.cashAccountId}`] : [],
+    enabled: !!posUser?.cashAccountId,
+  });
+
+  // Fetch customer accounts (Asset-type ledger accounts for receivables)
+  const customerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Asset");
+
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -120,6 +131,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   });
   const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash">("bank");
   const [paymentAccountId, setPaymentAccountId] = useState("");
+  const [isCreditSale, setIsCreditSale] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [notes, setNotes] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
@@ -133,19 +146,31 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Auto-select first account when loaded based on account type
+  // Auto-set cash account for POS users with assigned cash account
   useEffect(() => {
+    if (posUser?.cashAccountId && assignedCashAccount && !paymentAccountId) {
+      setPaymentAccountType("cash");
+      setPaymentAccountId(String(posUser.cashAccountId));
+    }
+  }, [posUser, assignedCashAccount, paymentAccountId]);
+
+  // Auto-select first account when loaded based on account type (for non-POS users)
+  useEffect(() => {
+    // Skip auto-selection if POS user has assigned cash account
+    if (posUser?.cashAccountId) return;
+    
     if (paymentAccountType === "bank" && bankAccounts.length > 0 && !paymentAccountId) {
       setPaymentAccountId(String(bankAccounts[0].id));
     } else if (paymentAccountType === "cash" && cashLedgerAccounts.length > 0 && !paymentAccountId) {
       setPaymentAccountId(String(cashLedgerAccounts[0].id));
     }
-  }, [paymentAccountType, bankAccounts, cashLedgerAccounts, paymentAccountId]);
+  }, [paymentAccountType, bankAccounts, cashLedgerAccounts, paymentAccountId, posUser]);
 
-  // Reset account selection when switching account type
+  // Reset account selection when switching account type (disabled for POS users with assigned account)
   useEffect(() => {
+    if (posUser?.cashAccountId) return; // Don't reset for POS users
     setPaymentAccountId("");
-  }, [paymentAccountType]);
+  }, [paymentAccountType, posUser]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -518,10 +543,21 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       return;
     }
 
-    if (!paymentAccountId) {
+    // Validate payment account for cash sales
+    if (!isCreditSale && !paymentAccountId) {
       toast({
         title: "Error",
         description: "Please select a payment account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate customer for credit sales
+    if (isCreditSale && !selectedCustomerId) {
+      toast({
+        title: "Error",
+        description: "Please select a customer for credit sale",
         variant: "destructive",
       });
       return;
@@ -540,8 +576,9 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     // Prepare sale data
     const saleData = {
       locationId: activeLocation.id,
-      paymentAccountType,
-      paymentAccountId: parseInt(paymentAccountId),
+      paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
+      paymentAccountId: isCreditSale ? parseInt(selectedCustomerId) : parseInt(paymentAccountId),
+      isCreditSale,
       notes,
       items: validItems.map(row => ({
         stockItemId: row.stockItemId,
@@ -596,36 +633,79 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
 
         <div className="flex items-center gap-2">
           <Wallet className="h-4 w-4 text-muted-foreground" />
-          <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
-            <SelectTrigger className="w-40" data-testid="select-account-type">
-              <SelectValue placeholder="Account Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bank">Bank Account</SelectItem>
-              <SelectItem value="cash">Cash Account</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-            <SelectTrigger className="w-56" data-testid="select-payment-account">
-              <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentAccountType === "bank" ? (
-                bankAccounts.map((acc: any) => (
-                  <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name} ({acc.code})
-                  </SelectItem>
-                ))
-              ) : (
-                cashLedgerAccounts.map((acc: any) => (
-                  <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name} ({acc.code})
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+          {posUser?.cashAccountId && assignedCashAccount ? (
+            // Show read-only cash account for POS users
+            <div className="px-3 py-1.5 bg-muted/50 rounded-md border">
+              <span className="text-sm font-medium">{assignedCashAccount.name}</span>
+              <span className="text-xs text-muted-foreground ml-2">({assignedCashAccount.code})</span>
+            </div>
+          ) : (
+            // Show selectors for non-POS users
+            <>
+              <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
+                <SelectTrigger className="w-40" data-testid="select-account-type">
+                  <SelectValue placeholder="Account Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Bank Account</SelectItem>
+                  <SelectItem value="cash">Cash Account</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                <SelectTrigger className="w-56" data-testid="select-payment-account">
+                  <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentAccountType === "bank" ? (
+                    bankAccounts.map((acc: any) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name} ({acc.code})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    cashLedgerAccounts.map((acc: any) => (
+                      <SelectItem key={acc.id} value={String(acc.id)}>
+                        {acc.name} ({acc.code})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
+
+        {/* Credit Sale Toggle */}
+        <div className="flex items-center gap-2">
+          <Switch 
+            id="credit-sale" 
+            checked={isCreditSale}
+            onCheckedChange={setIsCreditSale}
+            data-testid="toggle-credit-sale"
+          />
+          <Label htmlFor="credit-sale" className="text-sm font-medium cursor-pointer">
+            Credit Sale
+          </Label>
+        </div>
+
+        {/* Customer Selector (shown when credit sale is enabled) */}
+        {isCreditSale && (
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+              <SelectTrigger className="w-56" data-testid="select-customer">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customerAccounts.map((acc: any) => (
+                  <SelectItem key={acc.id} value={String(acc.id)}>
+                    {acc.name} ({acc.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex-1 flex items-center gap-2">
           <Textarea
@@ -859,6 +939,14 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
                   <p>{savedSale?.saleDate}</p>
                 </div>
               </div>
+
+              {savedSale?.isCreditSale && savedSale?.customer && (
+                <div className="mb-6 p-3 bg-gray-100 border border-gray-300">
+                  <p className="font-semibold mb-1">Customer (Credit Sale):</p>
+                  <p className="text-base">{savedSale.customer.name}</p>
+                  <p className="text-sm text-gray-600">Account: {savedSale.customer.code}</p>
+                </div>
+              )}
 
               <table className="w-full mb-6 border-collapse">
                 <thead>

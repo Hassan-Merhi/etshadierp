@@ -30,6 +30,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     role: userCompanyRole.role,
     assignedLocationId: userCompanyRole.assignedLocationId,
     posStation: userCompanyRole.posStation,
+    cashAccountId: userCompanyRole.cashAccountId,
   };
 
   next();

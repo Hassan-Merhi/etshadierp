@@ -616,6 +616,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/ledger-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ message: "Invalid ledger account ID" });
+      }
+
+      const account = await storage.getLedgerAccountById(accountId);
+      if (!account) {
+        return res.status(404).json({ message: "Ledger account not found" });
+      }
+
+      // Verify account belongs to current company
+      if (account.companyId !== req.session.currentCompanyId) {
+        return res.status(404).json({ message: "Ledger account not found" });
+      }
+
+      res.json(account);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/ledger-accounts", async (req, res) => {
     try {
       const parsed = insertLedgerAccountSchema.parse(req.body);
@@ -4817,7 +4844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       
-      const { locationId, cashAccountId, paymentAccountType, paymentAccountId, items, notes } = req.body;
+      const { locationId, cashAccountId, paymentAccountType, paymentAccountId, items, notes, isCreditSale } = req.body;
 
       // Support both old (cashAccountId) and new (paymentAccountType/paymentAccountId) parameters
       const accountType = paymentAccountType || "bank";
@@ -4828,7 +4855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Location is required" });
       }
       if (!accountId) {
-        return res.status(400).json({ message: "Payment account is required" });
+        return res.status(400).json({ message: isCreditSale ? "Customer is required" : "Payment account is required" });
       }
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -4933,17 +4960,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).returning();
 
         // Create voucher entries (double-entry bookkeeping)
-        // Debit: Cash/Bank Account (Asset increases)
+        // Debit: Cash/Bank/Customer Account (Asset increases)
         const debitEntry: any = {
           voucherId: voucher.id,
           debitAmount: grandTotal.toFixed(2),
           creditAmount: "0",
-          narration: `POS Sale - ${voucherNumber}`,
+          narration: isCreditSale ? `Credit Sale - ${voucherNumber}` : `POS Sale - ${voucherNumber}`,
         };
 
-        if (accountType === "cash") {
+        if (isCreditSale || accountType === "cash" || accountType === "credit") {
+          // For credit sales and cash accounts, use ledgerAccountId
           debitEntry.ledgerAccountId = accountId;
         } else {
+          // For bank accounts, use bankAccountId
           debitEntry.bankAccountId = accountId;
         }
 
@@ -5044,6 +5073,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = { voucher, saleItems };
 
+      // Get customer details for credit sales
+      let customerAccount = null;
+      if (isCreditSale) {
+        customerAccount = await storage.getLedgerAccountById(accountId);
+      }
+
       // Return complete sale details
       res.json({
         voucher: result.voucher,
@@ -5052,6 +5087,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         grandTotal: grandTotal.toFixed(2),
         voucherNumber,
         saleDate: voucherDate,
+        isCreditSale,
+        customer: customerAccount ? {
+          id: customerAccount.id,
+          code: customerAccount.code,
+          name: customerAccount.name,
+        } : null,
       });
     } catch (error: any) {
       // Return appropriate status codes for different error types
