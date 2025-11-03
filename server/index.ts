@@ -22,6 +22,8 @@ declare global {
         assignedLocationId?: number | null;
         posStation?: number | null;
         cashAccountId?: number | null;
+        canSellNegativeStock?: boolean;
+        canEditDaybook?: boolean;
       };
     }
   }
@@ -41,6 +43,8 @@ declare module 'express-session' {
     currentLocationId?: number | null;
     currentPOSStation?: number | null;
     cashAccountId?: number | null;
+    canSellNegativeStock?: boolean;
+    canEditDaybook?: boolean;
   }
 }
 

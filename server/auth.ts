@@ -31,6 +31,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     assignedLocationId: userCompanyRole.assignedLocationId,
     posStation: userCompanyRole.posStation,
     cashAccountId: userCompanyRole.cashAccountId,
+    canSellNegativeStock: userCompanyRole.canSellNegativeStock,
+    canEditDaybook: userCompanyRole.canEditDaybook,
   };
 
   next();
