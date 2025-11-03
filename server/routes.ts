@@ -3904,7 +3904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid voucher ID" });
       }
 
-      const { voucherDate, description, items } = req.body;
+      const { voucherDate, description, locationId, items } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -3951,6 +3951,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Validate and authorize location if provided
+      let validatedLocationId: number | null = null;
+      if (locationId !== undefined && locationId !== null) {
+        const parsedLocationId = parseInt(locationId);
+        if (isNaN(parsedLocationId) || parsedLocationId <= 0) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
+        
+        // Verify location belongs to current company
+        const [targetLocation] = await db
+          .select()
+          .from(locations)
+          .where(eq(locations.id, parsedLocationId));
+        
+        if (!targetLocation) {
+          return res.status(404).json({ message: "Location not found" });
+        }
+        
+        if (targetLocation.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+        }
+        
+        validatedLocationId = parsedLocationId;
+      }
+
       // Fetch stock items to calculate cost prices
       const stockItemIds = items.map(item => item.stockItemId);
       const stockItemsData = await db
@@ -3990,12 +4015,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Delete existing sales items
+      // STEP 1: Reverse inventory for old sales items before deleting
+      const oldSalesItems = await db
+        .select()
+        .from(salesItems)
+        .where(eq(salesItems.voucherId, id));
+
+      if (existingVoucher.locationId) {
+        for (const oldItem of oldSalesItems) {
+          const quantity = parseFloat(oldItem.quantity);
+          const costPrice = parseFloat(oldItem.costPrice);
+
+          // Get current inventory
+          const [currentInventory] = await db
+            .select()
+            .from(inventory)
+            .where(and(
+              eq(inventory.locationId, existingVoucher.locationId),
+              eq(inventory.stockItemId, oldItem.stockItemId)
+            ));
+
+          if (currentInventory) {
+            // Add back the old quantity
+            const newQuantity = parseFloat(currentInventory.quantity) + quantity;
+            const currentTotalValue = parseFloat(currentInventory.totalValue);
+            const newTotalValue = currentTotalValue + (quantity * costPrice);
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await db
+              .update(inventory)
+              .set({
+                quantity: newQuantity.toFixed(3),
+                averageRate: newAverageRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+              })
+              .where(eq(inventory.id, currentInventory.id));
+          } else {
+            // Create new inventory record (shouldn't normally happen, but handle it)
+            await db.insert(inventory).values({
+              companyId: existingVoucher.companyId,
+              locationId: existingVoucher.locationId,
+              stockItemId: oldItem.stockItemId,
+              quantity: quantity.toFixed(3),
+              averageRate: costPrice.toFixed(2),
+              totalValue: (quantity * costPrice).toFixed(2),
+            });
+          }
+        }
+      }
+
+      // STEP 2: Delete existing sales items
       await db
         .delete(salesItems)
         .where(eq(salesItems.voucherId, id));
 
-      // Insert new sales items
+      // STEP 3: Deduct inventory for new sales items from the new location
+      // Use validated locationId if provided, otherwise use existing voucher location
+      const targetLocationId = validatedLocationId !== null ? validatedLocationId : existingVoucher.locationId;
+      
+      if (targetLocationId) {
+        for (const newItem of salesItemsData) {
+          const quantity = parseFloat(newItem.quantity);
+          const costPrice = parseFloat(newItem.costPrice);
+
+          // Get current inventory at the target location
+          const [currentInventory] = await db
+            .select()
+            .from(inventory)
+            .where(and(
+              eq(inventory.locationId, targetLocationId),
+              eq(inventory.stockItemId, newItem.stockItemId)
+            ));
+
+          if (currentInventory) {
+            // Deduct the new quantity
+            const newQuantity = Math.max(0, parseFloat(currentInventory.quantity) - quantity);
+            const currentTotalValue = parseFloat(currentInventory.totalValue);
+            const newTotalValue = Math.max(0, currentTotalValue - (quantity * costPrice));
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await db
+              .update(inventory)
+              .set({
+                quantity: newQuantity.toFixed(3),
+                averageRate: newAverageRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+              })
+              .where(eq(inventory.id, currentInventory.id));
+          }
+        }
+      }
+
+      // STEP 4: Insert new sales items
       await db.insert(salesItems).values(salesItemsData);
 
       // Update the voucher
@@ -4004,6 +4115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
       if (description !== undefined) voucherUpdates.description = description;
+      if (validatedLocationId !== null) voucherUpdates.locationId = validatedLocationId;
 
       const updated = await db
         .update(vouchers)
@@ -4260,12 +4372,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Delete existing adjustment items (if any)
+      // STEP 1: Reverse inventory for old adjustment items before deleting
+      const oldAdjustmentItems = await db
+        .select()
+        .from(stockAdjustmentItems)
+        .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+      const oldLocationId = adjustmentVoucher.locationId;
+
+      for (const oldItem of oldAdjustmentItems) {
+        // Reverse the adjustment (negate the quantity)
+        const quantity = parseFloat(oldItem.quantity);
+        const rate = parseFloat(oldItem.rate);
+        const reversedQuantity = -quantity; // Flip the sign to reverse
+
+        const [currentInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, oldLocationId),
+            eq(inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (currentInventory) {
+          const newQuantity = Math.max(0, parseFloat(currentInventory.quantity) + reversedQuantity);
+          const currentTotalValue = parseFloat(currentInventory.totalValue);
+          const newTotalValue = Math.max(0, currentTotalValue + (reversedQuantity * rate));
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, currentInventory.id));
+        }
+      }
+
+      // STEP 2: Delete existing adjustment items
       await db
         .delete(stockAdjustmentItems)
         .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
-      // Insert new adjustment items
+      // STEP 3: Apply inventory for new adjustment items
+      const newLocationId = parseInt(locationId);
+
+      for (const newItem of adjustmentItemsData) {
+        const quantity = parseFloat(newItem.quantity);
+        const rate = parseFloat(newItem.rate);
+
+        const [currentInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, newLocationId),
+            eq(inventory.stockItemId, newItem.stockItemId)
+          ));
+
+        if (currentInventory) {
+          const newQuantity = Math.max(0, parseFloat(currentInventory.quantity) + quantity);
+          const currentTotalValue = parseFloat(currentInventory.totalValue);
+          const newTotalValue = Math.max(0, currentTotalValue + (quantity * rate));
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, currentInventory.id));
+        } else {
+          await db.insert(inventory).values({
+            companyId: existingVoucher.companyId,
+            locationId: newLocationId,
+            stockItemId: newItem.stockItemId,
+            quantity: Math.max(0, quantity).toFixed(3),
+            averageRate: rate.toFixed(2),
+            totalValue: Math.max(0, quantity * rate).toFixed(2),
+          });
+        }
+      }
+
+      // STEP 4: Insert new adjustment items
       await db.insert(stockAdjustmentItems).values(adjustmentItemsData);
 
       // Update the adjustment voucher (location can be changed, but shouldn't affect old inventory)
@@ -4390,12 +4582,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // Delete existing transfer items (if any)
+      // STEP 1: Reverse inventory for old transfer items before deleting
+      const oldTransferItems = await db
+        .select()
+        .from(stockTransferItems)
+        .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+      const oldSourceLocationId = transferVoucher.sourceLocationId;
+      const oldDestinationLocationId = transferVoucher.destinationLocationId;
+
+      for (const oldItem of oldTransferItems) {
+        const quantity = parseFloat(oldItem.quantity);
+        const rate = parseFloat(oldItem.rate);
+
+        // Add back to source location
+        const [sourceInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, oldSourceLocationId),
+            eq(inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (sourceInventory) {
+          const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
+          const newTotalValue = parseFloat(sourceInventory.totalValue) + (quantity * rate);
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, sourceInventory.id));
+        } else {
+          await db.insert(inventory).values({
+            companyId: existingVoucher.companyId,
+            locationId: oldSourceLocationId,
+            stockItemId: oldItem.stockItemId,
+            quantity: quantity.toFixed(3),
+            averageRate: rate.toFixed(2),
+            totalValue: (quantity * rate).toFixed(2),
+          });
+        }
+
+        // Subtract from destination location
+        const [destInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, oldDestinationLocationId),
+            eq(inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (destInventory) {
+          const newQuantity = Math.max(0, parseFloat(destInventory.quantity) - quantity);
+          const newTotalValue = Math.max(0, parseFloat(destInventory.totalValue) - (quantity * rate));
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, destInventory.id));
+        }
+      }
+
+      // STEP 2: Delete existing transfer items
       await db
         .delete(stockTransferItems)
         .where(eq(stockTransferItems.transferId, transferVoucher.id));
 
-      // Insert new transfer items
+      // STEP 3: Apply inventory for new transfer items
+      const newSourceLocationId = parseInt(sourceLocationId);
+      const newDestinationLocationId = parseInt(destinationLocationId);
+
+      for (const newItem of transferItemsData) {
+        const quantity = parseFloat(newItem.quantity);
+        const rate = parseFloat(newItem.rate);
+
+        // Subtract from new source location
+        const [sourceInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, newSourceLocationId),
+            eq(inventory.stockItemId, newItem.stockItemId)
+          ));
+
+        if (sourceInventory) {
+          const newQuantity = Math.max(0, parseFloat(sourceInventory.quantity) - quantity);
+          const newTotalValue = Math.max(0, parseFloat(sourceInventory.totalValue) - (quantity * rate));
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, sourceInventory.id));
+        }
+
+        // Add to new destination location
+        const [destInventory] = await db
+          .select()
+          .from(inventory)
+          .where(and(
+            eq(inventory.locationId, newDestinationLocationId),
+            eq(inventory.stockItemId, newItem.stockItemId)
+          ));
+
+        if (destInventory) {
+          const newQuantity = parseFloat(destInventory.quantity) + quantity;
+          const newTotalValue = parseFloat(destInventory.totalValue) + (quantity * rate);
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(inventory.id, destInventory.id));
+        } else {
+          await db.insert(inventory).values({
+            companyId: existingVoucher.companyId,
+            locationId: newDestinationLocationId,
+            stockItemId: newItem.stockItemId,
+            quantity: quantity.toFixed(3),
+            averageRate: rate.toFixed(2),
+            totalValue: (quantity * rate).toFixed(2),
+          });
+        }
+      }
+
+      // STEP 4: Insert new transfer items
       await db.insert(stockTransferItems).values(transferItemsData);
 
       // Update the transfer voucher (locations can be changed, but shouldn't affect old inventory)

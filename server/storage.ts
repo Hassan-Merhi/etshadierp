@@ -1541,15 +1541,212 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoucher(id: number): Promise<void> {
-    // Find all purchase orders linked to this voucher
+    // First, get the voucher to check its type and location
+    const [voucher] = await db
+      .select()
+      .from(schema.vouchers)
+      .where(eq(schema.vouchers.id, id));
+
+    if (!voucher) {
+      throw new Error("Voucher not found");
+    }
+
+    // STEP 1: Reverse inventory movements based on voucher type
+    if (voucher.voucherType === "Sales" && voucher.locationId) {
+      // Restore items back to location inventory
+      const salesItemsList = await db
+        .select()
+        .from(schema.salesItems)
+        .where(eq(schema.salesItems.voucherId, id));
+
+      for (const saleItem of salesItemsList) {
+        const quantity = parseFloat(saleItem.quantity);
+        const costPrice = parseFloat(saleItem.costPrice);
+
+        // Get current inventory
+        const [currentInventory] = await db
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, voucher.locationId),
+            eq(schema.inventory.stockItemId, saleItem.stockItemId)
+          ));
+
+        if (currentInventory) {
+          // Add back the quantity
+          const newQuantity = parseFloat(currentInventory.quantity) + quantity;
+          const currentTotalValue = parseFloat(currentInventory.totalValue);
+          const newTotalValue = currentTotalValue + (quantity * costPrice);
+          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+          await db
+            .update(schema.inventory)
+            .set({
+              quantity: newQuantity.toFixed(3),
+              averageRate: newAverageRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+            })
+            .where(eq(schema.inventory.id, currentInventory.id));
+        } else {
+          // Create new inventory record (shouldn't normally happen, but handle it)
+          await db.insert(schema.inventory).values({
+            companyId: voucher.companyId,
+            locationId: voucher.locationId,
+            stockItemId: saleItem.stockItemId,
+            quantity: quantity.toFixed(3),
+            averageRate: costPrice.toFixed(2),
+            totalValue: (quantity * costPrice).toFixed(2),
+          });
+        }
+      }
+
+      // Delete sales items
+      await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
+    }
+
+    if (voucher.voucherType === "Stock Transfer") {
+      // Reverse the stock transfer
+      const [transferVoucher] = await db
+        .select()
+        .from(schema.stockTransferVouchers)
+        .where(eq(schema.stockTransferVouchers.voucherId, id));
+
+      if (transferVoucher) {
+        const transferItems = await db
+          .select()
+          .from(schema.stockTransferItems)
+          .where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+
+        for (const item of transferItems) {
+          const quantity = parseFloat(item.quantity);
+          const rate = parseFloat(item.rate);
+
+          // Note: Each transfer item now has its own sourceLocationId
+          // We need to get it from the item if stored, or from the transfer voucher as fallback
+          const sourceLocationId = transferVoucher.sourceLocationId;
+          const destinationLocationId = transferVoucher.destinationLocationId;
+
+          // Add back to source location
+          const [sourceInventory] = await db
+            .select()
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, sourceLocationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
+
+          if (sourceInventory) {
+            const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
+            const newTotalValue = parseFloat(sourceInventory.totalValue) + (quantity * rate);
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await db
+              .update(schema.inventory)
+              .set({
+                quantity: newQuantity.toFixed(3),
+                averageRate: newAverageRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+              })
+              .where(eq(schema.inventory.id, sourceInventory.id));
+          } else {
+            await db.insert(schema.inventory).values({
+              companyId: voucher.companyId,
+              locationId: sourceLocationId,
+              stockItemId: item.stockItemId,
+              quantity: quantity.toFixed(3),
+              averageRate: rate.toFixed(2),
+              totalValue: (quantity * rate).toFixed(2),
+            });
+          }
+
+          // Subtract from destination location
+          const [destInventory] = await db
+            .select()
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, destinationLocationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
+
+          if (destInventory) {
+            const newQuantity = Math.max(0, parseFloat(destInventory.quantity) - quantity);
+            const newTotalValue = Math.max(0, parseFloat(destInventory.totalValue) - (quantity * rate));
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await db
+              .update(schema.inventory)
+              .set({
+                quantity: newQuantity.toFixed(3),
+                averageRate: newAverageRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+              })
+              .where(eq(schema.inventory.id, destInventory.id));
+          }
+        }
+
+        // Delete transfer items and transfer voucher
+        await db.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+        await db.delete(schema.stockTransferVouchers).where(eq(schema.stockTransferVouchers.id, transferVoucher.id));
+      }
+    }
+
+    if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption") {
+      // Reverse stock adjustments (Production/Consumption)
+      const [adjustmentVoucher] = await db
+        .select()
+        .from(schema.stockAdjustmentVouchers)
+        .where(eq(schema.stockAdjustmentVouchers.voucherId, id));
+
+      if (adjustmentVoucher) {
+        const adjustmentItems = await db
+          .select()
+          .from(schema.stockAdjustmentItems)
+          .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+        for (const item of adjustmentItems) {
+          // Reverse the adjustment (negate the quantity)
+          const quantity = parseFloat(item.quantity);
+          const rate = parseFloat(item.rate);
+          const reversedQuantity = -quantity; // Flip the sign to reverse
+
+          const [currentInventory] = await db
+            .select()
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, adjustmentVoucher.locationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
+
+          if (currentInventory) {
+            const newQuantity = Math.max(0, parseFloat(currentInventory.quantity) + reversedQuantity);
+            const currentTotalValue = parseFloat(currentInventory.totalValue);
+            const newTotalValue = Math.max(0, currentTotalValue + (reversedQuantity * rate));
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await db
+              .update(schema.inventory)
+              .set({
+                quantity: newQuantity.toFixed(3),
+                averageRate: newAverageRate.toFixed(2),
+                totalValue: newTotalValue.toFixed(2),
+              })
+              .where(eq(schema.inventory.id, currentInventory.id));
+          }
+        }
+
+        // Delete adjustment items and adjustment voucher
+        await db.delete(schema.stockAdjustmentItems).where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+        await db.delete(schema.stockAdjustmentVouchers).where(eq(schema.stockAdjustmentVouchers.id, adjustmentVoucher.id));
+      }
+    }
+
+    // STEP 2: Handle Purchase Orders (existing logic)
     const linkedPOs = await db
       .select()
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.voucherId, id));
 
-    // If there are linked POs, we need to cascade delete and update containers
     if (linkedPOs.length > 0) {
-      // Group POs by container to calculate totals to subtract
       const containerUpdates = new Map<number, { itemsTotal: number }>();
       
       for (const po of linkedPOs) {
@@ -1559,14 +1756,11 @@ export class DbStorage implements IStorage {
           itemsTotal: existing.itemsTotal + itemsTotal,
         });
 
-        // Delete PO line items for this PO
         await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
       }
 
-      // Delete the POs
       await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
 
-      // Update container totals
       for (const [containerId, totals] of Array.from(containerUpdates.entries())) {
         const [container] = await db
           .select()
@@ -1579,7 +1773,6 @@ export class DbStorage implements IStorage {
           const newChargesTotal = parseFloat(container.chargesTotal || "0");
           const newGrandTotal = newItemsTotal + newChargesTotal;
 
-          // Check if container should be deleted (no remaining POs)
           const remainingPOs = await db
             .select()
             .from(schema.purchaseOrders)
@@ -1587,11 +1780,9 @@ export class DbStorage implements IStorage {
             .limit(1);
 
           if (remainingPOs.length === 0) {
-            // Delete the container and all its charges if no POs remain
             await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
             await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
           } else {
-            // Update container totals if there are still POs
             await db
               .update(schema.containers)
               .set({
@@ -1604,9 +1795,10 @@ export class DbStorage implements IStorage {
       }
     }
 
-    // Delete all voucher entries
+    // STEP 3: Delete voucher entries (this automatically restores account balances)
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
-    // Delete the voucher
+    
+    // STEP 4: Delete the voucher itself
     await db.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
   }
 
