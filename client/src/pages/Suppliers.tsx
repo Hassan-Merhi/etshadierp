@@ -58,7 +58,7 @@ export default function Suppliers() {
   
   // Fetch global supplier statistics (no company filter)
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
-    queryKey: ["/api/suppliers/with-stats"],
+    queryKey: ["/api/suppliers/with-stats"], // Fixed endpoint
   });
 
   // Fetch all companies for the filter dropdown

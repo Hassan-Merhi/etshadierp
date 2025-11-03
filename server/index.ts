@@ -1,9 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
+
+// Build version for cache busting and deployment tracking
+const BUILD_VERSION = process.env.BUILD_VERSION || 
+                      process.env.RENDER_GIT_COMMIT?.substring(0, 8) || 
+                      Date.now().toString();
 
 const app = express();
 
@@ -77,6 +84,12 @@ if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
 
 app.use(session(sessionConfig));
 
+// Add build version header to all responses for cache tracking
+app.use((_req, res, next) => {
+  res.setHeader('X-Build-Version', BUILD_VERSION);
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -108,6 +121,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Build info endpoint for frontend version checking (must be before registerRoutes)
+  app.get("/api/build-info", (_req, res) => {
+    res.json({ version: BUILD_VERSION });
+  });
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -124,7 +142,37 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Custom static file serving with proper cache headers
+    const distPath = path.resolve(import.meta.dirname, "public");
+
+    if (!fs.existsSync(distPath)) {
+      throw new Error(
+        `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      );
+    }
+
+    // Serve static assets with cache control
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          // Never cache index.html to prevent serving stale bundles
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        } else {
+          // Allow long-term caching for hashed assets
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
+
+    // Fallback to index.html with no-cache headers
+    app.use("*", (_req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.sendFile(path.resolve(distPath, "index.html"));
+    });
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
