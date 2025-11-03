@@ -3904,7 +3904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid voucher ID" });
       }
 
-      const { voucherDate, description, locationId, items } = req.body;
+      const { voucherDate, description, locationId, items, paymentAccountType, paymentAccountId, isCreditSale } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -4121,6 +4121,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // STEP 4: Insert new sales items
       await db.insert(salesItems).values(salesItemsData);
+
+      // STEP 5: Update voucher entries (accounting transactions)
+      // NOTE: This currently handles simple 2-entry vouchers (payment debit + sales credit).
+      // Future enhancement needed: preserve additional entries (taxes, COGS, etc.) for complex vouchers.
+      // If payment info is not provided, derive it from existing entries
+      let finalPaymentAccountId = paymentAccountId;
+      let finalPaymentAccountType = paymentAccountType;
+      let finalIsCreditSale = isCreditSale;
+
+      if (!finalPaymentAccountId || !finalPaymentAccountType) {
+        // Fetch existing voucher entries to derive payment account
+        const existingEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, id));
+
+        // Find the debit entry that represents the payment account
+        // Priority: bank account > cash ledger > other ledger (customer/receivable)
+        const debitEntries = existingEntries.filter(entry => parseFloat(entry.debitAmount || "0") > 0);
+        
+        // Check for bank account first
+        let existingDebitEntry = debitEntries.find(entry => entry.bankAccountId !== null);
+        if (existingDebitEntry) {
+          finalPaymentAccountId = String(existingDebitEntry.bankAccountId);
+          finalPaymentAccountType = "bank";
+          finalIsCreditSale = false;
+        } else {
+          // Check for ledger accounts - need to fetch ledger details to identify type
+          for (const entry of debitEntries) {
+            if (entry.ledgerAccountId) {
+              const [ledgerAccount] = await db
+                .select()
+                .from(ledgerAccounts)
+                .where(eq(ledgerAccounts.id, entry.ledgerAccountId))
+                .limit(1);
+              
+              if (ledgerAccount) {
+                if (ledgerAccount.accountType === "Cash") {
+                  // Found cash account
+                  finalPaymentAccountId = String(entry.ledgerAccountId);
+                  finalPaymentAccountType = "cash";
+                  finalIsCreditSale = false;
+                  existingDebitEntry = entry;
+                  break;
+                } else if (ledgerAccount.accountType === "Asset" || entry.narration?.includes('Credit Sale')) {
+                  // Found customer receivable account (credit sale)
+                  finalPaymentAccountId = String(entry.ledgerAccountId);
+                  finalPaymentAccountType = "credit";
+                  finalIsCreditSale = true;
+                  existingDebitEntry = entry;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Only proceed if we have payment account information
+      if (finalPaymentAccountId && finalPaymentAccountType) {
+        // Delete old voucher entries
+        await db
+          .delete(voucherEntries)
+          .where(eq(voucherEntries.voucherId, id));
+
+        const accountId = parseInt(finalPaymentAccountId);
+        const accountType = finalPaymentAccountType;
+
+        // Debit: Cash/Bank/Customer Account (Asset increases)
+        const debitEntry: any = {
+          voucherId: id,
+          debitAmount: totalSalesAmount.toFixed(2),
+          creditAmount: "0",
+          narration: finalIsCreditSale ? `Credit Sale - ${existingVoucher.voucherNumber}` : `POS Sale - ${existingVoucher.voucherNumber}`,
+        };
+
+        if (finalIsCreditSale || accountType === "cash" || accountType === "credit") {
+          // For credit sales and cash accounts, use ledgerAccountId
+          debitEntry.ledgerAccountId = accountId;
+        } else {
+          // For bank accounts, use bankAccountId
+          debitEntry.bankAccountId = accountId;
+        }
+
+        await db.insert(voucherEntries).values(debitEntry);
+
+        // Credit: Sales Account (Revenue increases)
+        // Get the SALES ledger account for this company
+        const [salesAccount] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(and(
+            eq(ledgerAccounts.companyId, existingVoucher.companyId),
+            eq(ledgerAccounts.accountType, "SALES")
+          ))
+          .limit(1);
+
+        if (!salesAccount) {
+          throw new Error("Sales revenue account not found for this company");
+        }
+
+        await db.insert(voucherEntries).values({
+          voucherId: id,
+          ledgerAccountId: salesAccount.id,
+          debitAmount: "0",
+          creditAmount: totalSalesAmount.toFixed(2),
+          narration: `POS Sale - ${existingVoucher.voucherNumber}`,
+        });
+      } else {
+        throw new Error("Unable to determine payment account for voucher update");
+      }
 
       // Update the voucher
       const voucherUpdates: any = {

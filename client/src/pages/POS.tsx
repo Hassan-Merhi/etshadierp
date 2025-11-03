@@ -140,7 +140,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     row: 0,
     col: 0,
   });
-  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash">("bank");
+  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("bank");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -216,10 +216,63 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         setNotes(editVoucher.description);
       }
 
-      // TODO: Populate payment account and credit sale info from voucher entries
-      // This would require analyzing the voucher entries to determine payment method
+      // Populate payment account and credit sale info from voucher entries
+      if (editVoucher.entries && editVoucher.entries.length > 0) {
+        console.log('[POS Edit] Voucher entries:', editVoucher.entries);
+        
+        // Find the debit entry (the payment account)
+        const debitEntry = editVoucher.entries.find((entry: any) => 
+          parseFloat(entry.debitAmount || "0") > 0
+        );
+        
+        if (debitEntry) {
+          console.log('[POS Edit] Debit entry found:', debitEntry);
+          
+          // Bank account - has bankAccountId
+          if (debitEntry.bankAccountId) {
+            setPaymentAccountType("bank");
+            setPaymentAccountId(String(debitEntry.bankAccountId));
+            setIsCreditSale(false);
+            console.log('[POS Edit] Set bank account:', debitEntry.bankAccountId);
+          } 
+          // Ledger account - need to determine if cash or credit
+          else if (debitEntry.ledgerAccountId) {
+            // Find the ledger account in our loaded accounts
+            const ledgerAccount = allLedgerAccounts.find((acc: any) => acc.id === debitEntry.ledgerAccountId);
+            
+            if (ledgerAccount) {
+              // Cash account
+              if (ledgerAccount.accountType === "Cash") {
+                setPaymentAccountType("cash");
+                setPaymentAccountId(String(debitEntry.ledgerAccountId));
+                setIsCreditSale(false);
+                console.log('[POS Edit] Set cash account:', debitEntry.ledgerAccountId);
+              } 
+              // Customer/Receivable account (Asset type for customers, or could be other types)
+              else {
+                setPaymentAccountType("credit");
+                setPaymentAccountId(String(debitEntry.ledgerAccountId));
+                setIsCreditSale(true);
+                console.log('[POS Edit] Set credit sale with customer account:', debitEntry.ledgerAccountId, 'accountType:', ledgerAccount.accountType);
+              }
+            } else {
+              // Fallback: use narration to detect if it's credit sale
+              const isCreditSaleEntry = debitEntry.narration?.includes('Credit Sale');
+              if (isCreditSaleEntry) {
+                setPaymentAccountType("credit");
+                setIsCreditSale(true);
+              } else {
+                setPaymentAccountType("cash");
+                setIsCreditSale(false);
+              }
+              setPaymentAccountId(String(debitEntry.ledgerAccountId));
+              console.log('[POS Edit] Ledger account not found in list, using narration fallback');
+            }
+          }
+        }
+      }
     }
-  }, [editVoucher]);
+  }, [editVoucher, allLedgerAccounts]);
 
   // Scroll highlighted item into view
   useEffect(() => {
