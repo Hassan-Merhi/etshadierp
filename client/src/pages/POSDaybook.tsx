@@ -273,9 +273,7 @@ export default function POSDaybook() {
                         <TableHead>Item</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Cost</TableHead>
                         <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Profit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -290,14 +288,8 @@ export default function POSDaybook() {
                           <TableCell className="text-right font-mono">
                             ${parseFloat(item.sellingPrice).toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground">
-                            ${parseFloat(item.costPrice).toFixed(2)}
-                          </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
                             ${parseFloat(item.totalSales).toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-green-600 dark:text-green-500">
-                            ${parseFloat(item.profit).toFixed(2)}
                           </TableCell>
                         </TableRow>
                       ))}
