@@ -627,49 +627,52 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-muted-foreground" />
-          {posUser?.cashAccountId && assignedCashAccount ? (
-            // Show read-only cash account for POS users
-            <div className="px-3 py-1.5 bg-muted/50 rounded-md border">
-              <span className="text-sm font-medium">{assignedCashAccount.name}</span>
-              <span className="text-xs text-muted-foreground ml-2">({assignedCashAccount.code})</span>
-            </div>
-          ) : (
-            // Show selectors for non-POS users
-            <>
-              <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
-                <SelectTrigger className="w-40" data-testid="select-account-type">
-                  <SelectValue placeholder="Account Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bank">Bank Account</SelectItem>
-                  <SelectItem value="cash">Cash Account</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                <SelectTrigger className="w-56" data-testid="select-payment-account">
-                  <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentAccountType === "bank" ? (
-                    bankAccounts.map((acc: any) => (
-                      <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.name} ({acc.code})
-                      </SelectItem>
-                    ))
-                  ) : (
-                    cashLedgerAccounts.map((acc: any) => (
-                      <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.name} ({acc.code})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </>
-          )}
-        </div>
+        {/* Hide cash account selector when credit sale is ON */}
+        {!isCreditSale && (
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+            {posUser?.cashAccountId && assignedCashAccount ? (
+              // Show read-only cash account for POS users
+              <div className="px-3 py-1.5 bg-muted/50 rounded-md border">
+                <span className="text-sm font-medium">{assignedCashAccount.name}</span>
+                <span className="text-xs text-muted-foreground ml-2">({assignedCashAccount.code})</span>
+              </div>
+            ) : (
+              // Show selectors for non-POS users
+              <>
+                <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
+                  <SelectTrigger className="w-40" data-testid="select-account-type">
+                    <SelectValue placeholder="Account Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank">Bank Account</SelectItem>
+                    <SelectItem value="cash">Cash Account</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                  <SelectTrigger className="w-56" data-testid="select-payment-account">
+                    <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentAccountType === "bank" ? (
+                      bankAccounts.map((acc: any) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name} ({acc.code})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      cashLedgerAccounts.map((acc: any) => (
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name} ({acc.code})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Credit Sale Toggle */}
         <div className="flex items-center gap-2">

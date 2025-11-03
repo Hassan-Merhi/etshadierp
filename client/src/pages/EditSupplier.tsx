@@ -49,18 +49,18 @@ export default function EditSupplier() {
   useEffect(() => {
     if (supplier) {
       form.reset({
-        code: (supplier as any).code,
-        legalName: (supplier as any).legalName,
-        email: (supplier as any).email || "",
-        phone: (supplier as any).phone || "",
-        address: (supplier as any).address || "",
-        taxId: (supplier as any).taxId || "",
-        paymentTerms: (supplier as any).paymentTerms || "",
-        openingBalance: (supplier as any).openingBalance || "0.00",
-        active: (supplier as any).active,
+        code: String((supplier as any).code || ""),
+        legalName: String((supplier as any).legalName || ""),
+        email: String((supplier as any).email || ""),
+        phone: String((supplier as any).phone || ""),
+        address: String((supplier as any).address || ""),
+        taxId: String((supplier as any).taxId || ""),
+        paymentTerms: String((supplier as any).paymentTerms || ""),
+        openingBalance: String((supplier as any).openingBalance || "0.00"),
+        active: Boolean((supplier as any).active),
       });
     }
-  }, [supplier, form]);
+  }, [supplier]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
