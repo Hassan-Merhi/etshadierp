@@ -136,6 +136,7 @@ export interface IStorage {
   getContainerByNumber(containerNumber: string): Promise<Container | undefined>;
   createContainer(container: InsertContainer): Promise<Container>;
   updateContainer(id: number, updates: Partial<InsertContainer>): Promise<Container>;
+  deleteContainer(id: number): Promise<void>;
 
   // Purchase Orders
   getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]>;
@@ -761,6 +762,35 @@ export class DbStorage implements IStorage {
           .where(eq(schema.containers.id, containerId));
       }
     }
+  }
+
+  async deleteContainer(id: number): Promise<void> {
+    // Get all purchase orders in this container
+    const pos = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.containerId, id));
+
+    // Delete each PO (which cascades to line items and vouchers)
+    for (const po of pos) {
+      // Delete PO line items
+      await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
+
+      // Delete the voucher if it exists
+      if (po.voucherId) {
+        await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
+        await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
+      }
+
+      // Delete the PO
+      await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, po.id));
+    }
+
+    // Delete container charges
+    await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, id));
+
+    // Delete the container
+    await db.delete(schema.containers).where(eq(schema.containers.id, id));
   }
 
   // PO Line Items
