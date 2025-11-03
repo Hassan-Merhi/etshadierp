@@ -295,7 +295,10 @@ export class DbStorage implements IStorage {
 
   // Locations
   async getAllLocations(companyId: number): Promise<Location[]> {
-    return await db.select().from(schema.locations).where(eq(schema.locations.companyId, companyId));
+    console.log('[storage.getAllLocations] Querying locations for companyId:', companyId);
+    const locations = await db.select().from(schema.locations).where(eq(schema.locations.companyId, companyId));
+    console.log('[storage.getAllLocations] Query returned:', locations.length, 'locations');
+    return locations;
   }
 
   async getLocationById(id: number): Promise<Location | undefined> {

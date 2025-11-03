@@ -317,13 +317,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : req.session.currentCompanyId;
       
+      console.log('[/api/locations] Request from user:', req.user?.username);
+      console.log('[/api/locations] Company ID from query:', req.query.companyId);
+      console.log('[/api/locations] Company ID from session:', req.session.currentCompanyId);
+      console.log('[/api/locations] Final companyId to query:', companyId);
+      
       if (!companyId) {
         return res.status(400).json({ message: "No company selected or specified" });
       }
       
       const locations = await storage.getAllLocations(companyId);
+      console.log('[/api/locations] Found locations:', locations.length, 'for company', companyId);
       res.json(locations);
     } catch (error: any) {
+      console.error('[/api/locations] Error:', error);
       res.status(500).json({ message: error.message });
     }
   });
