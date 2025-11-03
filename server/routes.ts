@@ -2916,6 +2916,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a container (Admin only)
+  app.delete("/api/containers/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+
+      const existingContainer = await storage.getContainerById(id);
+      if (!existingContainer) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      // Verify container belongs to current company
+      if (existingContainer.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Container belongs to a different company" });
+      }
+
+      await storage.deleteContainer(id);
+      res.json({ message: "Container deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Backfill voucher entries for existing POs
   app.post("/api/po-import/backfill", requireAuth, async (req, res) => {
     try {

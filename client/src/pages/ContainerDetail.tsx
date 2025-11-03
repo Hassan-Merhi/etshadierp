@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ export default function ContainerDetail() {
   const containerId = params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -55,9 +56,37 @@ export default function ContainerDetail() {
     },
   });
 
+  // Delete Container mutation
+  const deleteContainerMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/containers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      toast({
+        title: "Container Deleted",
+        description: "The container and all associated data have been removed",
+      });
+      setLocation("/containers");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete container",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeletePO = (poId: number, poNumber: string) => {
     if (confirm(`Are you sure you want to delete PO ${poNumber}? This will also delete all line items, the voucher, and remove the container if this is the last PO.`)) {
       deletePOMutation.mutate(poId);
+    }
+  };
+
+  const handleDeleteContainer = () => {
+    if (confirm(`Are you sure you want to delete container ${containerData?.container.containerNumber}? This will delete all purchase orders, line items, charges, vouchers, and the container itself. This action cannot be undone.`)) {
+      deleteContainerMutation.mutate(parseInt(containerId!));
     }
   };
 
@@ -129,6 +158,16 @@ export default function ContainerDetail() {
             Offload Container
           </Button>
         )}
+        <Button
+          variant="destructive"
+          onClick={handleDeleteContainer}
+          disabled={deleteContainerMutation.isPending}
+          className="gap-2"
+          data-testid="button-delete-container"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete Container
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
