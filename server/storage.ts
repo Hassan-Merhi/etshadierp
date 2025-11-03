@@ -1441,9 +1441,72 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoucher(id: number): Promise<void> {
-    // First delete all voucher entries
+    // Find all purchase orders linked to this voucher
+    const linkedPOs = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.voucherId, id));
+
+    // If there are linked POs, we need to cascade delete and update containers
+    if (linkedPOs.length > 0) {
+      // Group POs by container to calculate totals to subtract
+      const containerUpdates = new Map<number, { itemsTotal: number }>();
+      
+      for (const po of linkedPOs) {
+        const itemsTotal = parseFloat(po.itemsTotal || "0");
+        const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0 };
+        containerUpdates.set(po.containerId, {
+          itemsTotal: existing.itemsTotal + itemsTotal,
+        });
+
+        // Delete PO line items for this PO
+        await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
+      }
+
+      // Delete the POs
+      await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
+
+      // Update container totals
+      for (const [containerId, totals] of Array.from(containerUpdates.entries())) {
+        const [container] = await db
+          .select()
+          .from(schema.containers)
+          .where(eq(schema.containers.id, containerId))
+          .limit(1);
+
+        if (container) {
+          const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - totals.itemsTotal);
+          const newChargesTotal = parseFloat(container.chargesTotal || "0");
+          const newGrandTotal = newItemsTotal + newChargesTotal;
+
+          // Check if container should be deleted (no items left and no charges)
+          const remainingPOs = await db
+            .select()
+            .from(schema.purchaseOrders)
+            .where(eq(schema.purchaseOrders.containerId, containerId))
+            .limit(1);
+
+          if (remainingPOs.length === 0 && newChargesTotal === 0) {
+            // Delete the container if it has no POs and no charges
+            await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+            await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
+          } else {
+            // Update container totals
+            await db
+              .update(schema.containers)
+              .set({
+                itemsTotal: newItemsTotal.toString(),
+                grandTotal: newGrandTotal.toString(),
+              })
+              .where(eq(schema.containers.id, containerId));
+          }
+        }
+      }
+    }
+
+    // Delete all voucher entries
     await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
-    // Then delete the voucher
+    // Delete the voucher
     await db.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
   }
 

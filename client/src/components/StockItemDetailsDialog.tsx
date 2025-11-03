@@ -19,8 +19,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Edit, Save, X, Package } from "lucide-react";
+import { Edit, Save, X, Package, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { Card } from "@/components/ui/card";
 
 interface StockItemDetailsDialogProps {
   open: boolean;
@@ -59,6 +60,15 @@ interface Transaction {
   notes: string | null;
 }
 
+interface CodeAlias {
+  id: number;
+  stockItemId: number;
+  companyId: number;
+  aliasCode: string;
+  description: string | null;
+  createdAt: string;
+}
+
 export function StockItemDetailsDialog({
   open,
   onOpenChange,
@@ -78,6 +88,10 @@ export function StockItemDetailsDialog({
   const [editedStockItemId, setEditedStockItemId] = useState<number | null>(null);
   const [editedQuantity, setEditedQuantity] = useState("");
   const [editedRate, setEditedRate] = useState("");
+
+  // Code aliases state
+  const [newAliasCode, setNewAliasCode] = useState("");
+  const [newAliasDescription, setNewAliasDescription] = useState("");
 
   // Fetch stock item details
   const { data: stockItem, isLoading: loadingItem } = useQuery<StockItem>({
@@ -100,6 +114,12 @@ export function StockItemDetailsDialog({
   // Fetch transactions
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<Transaction[]>({
     queryKey: [`/api/stock-items/${stockItemId}/transactions`],
+    enabled: open,
+  });
+
+  // Fetch code aliases
+  const { data: codeAliases = [], isLoading: loadingAliases } = useQuery<CodeAlias[]>({
+    queryKey: [`/api/stock-items/${stockItemId}/code-aliases`],
     enabled: open,
   });
 
@@ -150,6 +170,51 @@ export function StockItemDetailsDialog({
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create code alias mutation
+  const createAliasMutation = useMutation({
+    mutationFn: async (aliasData: { aliasCode: string; description?: string }) => {
+      const response = await apiRequest("POST", `/api/stock-items/${stockItemId}/code-aliases`, aliasData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/code-aliases`] });
+      setNewAliasCode("");
+      setNewAliasDescription("");
+      toast({
+        title: "Alias Created",
+        description: "Code alias created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create code alias",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete code alias mutation
+  const deleteAliasMutation = useMutation({
+    mutationFn: async (aliasId: number) => {
+      await apiRequest("DELETE", `/api/stock-item-code-aliases/${aliasId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/code-aliases`] });
+      toast({
+        title: "Alias Deleted",
+        description: "Code alias deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete code alias",
         variant: "destructive",
       });
     },
@@ -265,6 +330,28 @@ export function StockItemDetailsDialog({
     setEditedRate("");
   };
 
+  const handleAddAlias = () => {
+    if (!newAliasCode || newAliasCode.trim() === "") {
+      toast({
+        title: "Validation Error",
+        description: "Alias code is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createAliasMutation.mutate({
+      aliasCode: newAliasCode.trim(),
+      description: newAliasDescription.trim() || undefined,
+    });
+  };
+
+  const handleDeleteAlias = (aliasId: number) => {
+    if (confirm("Are you sure you want to delete this code alias?")) {
+      deleteAliasMutation.mutate(aliasId);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -276,9 +363,12 @@ export function StockItemDetailsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details" data-testid="tab-details">
               Item Details
+            </TabsTrigger>
+            <TabsTrigger value="aliases" data-testid="tab-aliases">
+              Code Aliases
             </TabsTrigger>
             <TabsTrigger value="transactions" data-testid="tab-transactions">
               Voucher History
@@ -438,6 +528,87 @@ export function StockItemDetailsDialog({
                 </div>
               </div>
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="aliases" className="space-y-4 mt-4">
+            <div className="space-y-4">
+              <Card className="p-4">
+                <h3 className="font-medium mb-3">Add New Alias</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="aliasCode">Alias Code *</Label>
+                    <Input
+                      id="aliasCode"
+                      value={newAliasCode}
+                      onChange={(e) => setNewAliasCode(e.target.value)}
+                      placeholder="ALT-CODE-001"
+                      data-testid="input-alias-code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="aliasDescription">Description (Optional)</Label>
+                    <Input
+                      id="aliasDescription"
+                      value={newAliasDescription}
+                      onChange={(e) => setNewAliasDescription(e.target.value)}
+                      placeholder="Old supplier code"
+                      data-testid="input-alias-description"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button
+                    onClick={handleAddAlias}
+                    disabled={createAliasMutation.isPending}
+                    data-testid="button-add-alias"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Alias
+                  </Button>
+                </div>
+              </Card>
+
+              <div>
+                <h3 className="font-medium mb-3">Existing Aliases</h3>
+                {loadingAliases ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading aliases...</p>
+                  </div>
+                ) : codeAliases.length === 0 ? (
+                  <div className="flex items-center justify-center py-8 border rounded-lg">
+                    <p className="text-muted-foreground">No code aliases found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {codeAliases.map((alias) => (
+                      <Card key={alias.id} className="p-4" data-testid={`alias-${alias.id}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-mono font-medium" data-testid={`alias-code-${alias.id}`}>
+                              {alias.aliasCode}
+                            </p>
+                            {alias.description && (
+                              <p className="text-sm text-muted-foreground mt-1" data-testid={`alias-description-${alias.id}`}>
+                                {alias.description}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            onClick={() => handleDeleteAlias(alias.id)}
+                            variant="outline"
+                            size="sm"
+                            disabled={deleteAliasMutation.isPending}
+                            data-testid={`button-delete-alias-${alias.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="transactions" className="mt-4">

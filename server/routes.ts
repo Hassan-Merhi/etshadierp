@@ -3988,6 +3988,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Associated purchase order not found" });
       }
 
+      // Store old total for container update calculation
+      const oldPOTotal = parseFloat(po.itemsTotal || "0");
+
       // Calculate totals and prepare items data
       let totalAmount = 0;
       const poItemsData = items.map((item: any) => {
@@ -4020,6 +4023,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(purchaseOrders)
         .set({ itemsTotal: totalAmount.toFixed(2) })
         .where(eq(purchaseOrders.id, po.id));
+
+      // Update the container totals to reflect the PO change
+      const [container] = await db
+        .select()
+        .from(containers)
+        .where(eq(containers.id, po.containerId))
+        .limit(1);
+
+      if (container) {
+        const containerItemsTotal = parseFloat(container.itemsTotal || "0");
+        const containerChargesTotal = parseFloat(container.chargesTotal || "0");
+        
+        // Calculate the difference and update container
+        const difference = totalAmount - oldPOTotal;
+        const newContainerItemsTotal = containerItemsTotal + difference;
+        const newContainerGrandTotal = newContainerItemsTotal + containerChargesTotal;
+
+        await db
+          .update(containers)
+          .set({
+            itemsTotal: newContainerItemsTotal.toFixed(2),
+            grandTotal: newContainerGrandTotal.toFixed(2),
+          })
+          .where(eq(containers.id, po.containerId));
+      }
 
       // Update the voucher
       const voucherUpdates: any = {
