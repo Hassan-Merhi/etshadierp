@@ -3341,7 +3341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all suppliers with balances and container counts (global across all companies)
+  // Get all suppliers with their container counts and balances (global, no company filter)
   app.get("/api/suppliers/with-stats", requireAuth, async (req, res) => {
     try {
       const suppliers = await storage.getAllSuppliers();
@@ -3369,8 +3369,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // Return all suppliers with their stats
-      res.json(suppliersWithStats);
+      // Filter to only show suppliers that have any activity (containers or balance)
+      const activeSuppliersInCompany = suppliersWithStats.filter(
+        s => s.containerCount > 0 || s.balance !== 0
+      );
+
+      res.json(activeSuppliersInCompany);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
