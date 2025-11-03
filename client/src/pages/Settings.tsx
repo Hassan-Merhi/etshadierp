@@ -37,10 +37,12 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield } from "lucide-react";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 
 const userFormSchema = insertUserSchema;
@@ -86,6 +88,23 @@ export default function Settings() {
   const { data: userCompanyRoles = [] } = useQuery<any[]>({
     queryKey: [`/api/users/${expandedUserId}/company-roles`],
     enabled: !!expandedUserId,
+  });
+
+  // Query for all user company roles (for the permissions tab)
+  const { data: allUserCompanyRoles = [], isLoading: isLoadingPermissions } = useQuery<any[]>({
+    queryKey: ["/api/user-company-roles"],
+    queryFn: async () => {
+      const roles: any[] = [];
+      for (const user of users) {
+        const res = await fetch(`/api/users/${user.id}/company-roles`);
+        if (res.ok) {
+          const userRoles = await res.json();
+          roles.push(...userRoles.map((role: any) => ({ ...role, username: user.username })));
+        }
+      }
+      return roles;
+    },
+    enabled: users.length > 0,
   });
 
   const companyForm = useForm<CompanyFormData>({
@@ -283,6 +302,27 @@ export default function Settings() {
     },
   });
 
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ roleId, data }: { roleId: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/user-company-roles/${roleId}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Permission updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-company-roles"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update permission",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditCompany = (company: any) => {
     setEditingCompany(company);
     companyForm.reset({
@@ -356,12 +396,36 @@ export default function Settings() {
     setExpandedUserId(expandedUserId === userId ? null : userId);
   };
 
+  const handlePermissionToggle = (roleId: number, field: string, value: boolean) => {
+    updatePermissionMutation.mutate({
+      roleId,
+      data: { [field]: value },
+    });
+  };
+
   const isPOSRole = selectedRole?.startsWith("POS");
 
   return (
-    <div className="space-y-8">
-      {/* Companies Management Section */}
-      <div className="space-y-4">
+    <div className="p-6">
+      <Tabs defaultValue="companies" className="space-y-6">
+        <TabsList data-testid="tabs-settings">
+          <TabsTrigger value="companies" data-testid="tab-companies">
+            <Building2 className="h-4 w-4 mr-2" />
+            Companies
+          </TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="h-4 w-4 mr-2" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="permissions" data-testid="tab-permissions">
+            <Shield className="h-4 w-4 mr-2" />
+            User Permissions
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Companies Tab */}
+        <TabsContent value="companies" className="space-y-4">
+          <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
@@ -506,9 +570,11 @@ export default function Settings() {
           )}
         </Card>
       </div>
+        </TabsContent>
 
-      {/* User Management Section */}
-      <div className="space-y-4">
+        {/* Users Tab */}
+        <TabsContent value="users" className="space-y-4">
+          <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -753,6 +819,84 @@ export default function Settings() {
           )}
         </Card>
       </div>
+        </TabsContent>
+
+        {/* User Permissions Tab */}
+        <TabsContent value="permissions" className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">User Permissions</h2>
+              </div>
+            </div>
+
+            <Card className="p-6">
+              {isLoadingPermissions ? (
+                <p className="text-center text-muted-foreground">Loading permissions...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-center">Can Sell Negative Stock</TableHead>
+                      <TableHead className="text-center">Can Edit Daybook</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUserCompanyRoles.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          No user permissions found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      allUserCompanyRoles.map((role: any) => {
+                        const company = companies.find((c: any) => c.id === role.companyId);
+                        return (
+                          <TableRow key={role.id} data-testid={`permission-row-${role.id}`}>
+                            <TableCell className="font-medium" data-testid={`text-permission-username-${role.id}`}>
+                              {role.username}
+                            </TableCell>
+                            <TableCell data-testid={`text-permission-company-${role.id}`}>
+                              {company?.name || "Unknown Company"}
+                            </TableCell>
+                            <TableCell data-testid={`text-permission-role-${role.id}`}>
+                              <Badge variant="outline">{role.role}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={role.canSellNegativeStock}
+                                onCheckedChange={(checked) =>
+                                  handlePermissionToggle(role.id, "canSellNegativeStock", checked)
+                                }
+                                disabled={updatePermissionMutation.isPending}
+                                data-testid={`toggle-sell-negative-stock-${role.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={role.canEditDaybook}
+                                onCheckedChange={(checked) =>
+                                  handlePermissionToggle(role.id, "canEditDaybook", checked)
+                                }
+                                disabled={updatePermissionMutation.isPending}
+                                data-testid={`toggle-edit-daybook-${role.id}`}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Role Assignment Dialog */}
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>

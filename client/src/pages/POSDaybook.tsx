@@ -17,9 +17,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, DollarSign, Package, Eye } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, Lock } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 
 interface Voucher {
@@ -58,6 +64,14 @@ export default function POSDaybook() {
   const today = new Date();
   const startDate = format(startOfDay(today), "yyyy-MM-dd");
   const endDate = format(endOfDay(today), "yyyy-MM-dd");
+
+  // Fetch user permissions
+  const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // Only allow editing if explicitly permitted - defaults to false for safety
+  const canEditDaybook = currentUser?.canEditDaybook === true;
 
   // Fetch today's sales vouchers
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
@@ -323,15 +337,33 @@ export default function POSDaybook() {
             <Button variant="outline" onClick={() => setSelectedVoucher(null)} data-testid="button-close">
               Close
             </Button>
-            <Button
-              onClick={() => {
-                setSelectedVoucher(null);
-                navigate(`/vouchers/${selectedVoucher?.id}/edit`);
-              }}
-              data-testid="button-edit-transaction"
-            >
-              Edit Transaction
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <Button
+                      onClick={() => {
+                        if (canEditDaybook) {
+                          setSelectedVoucher(null);
+                          navigate(`/vouchers/${selectedVoucher?.id}/edit`);
+                        }
+                      }}
+                      disabled={!canEditDaybook}
+                      className={!canEditDaybook ? "opacity-50 cursor-not-allowed" : ""}
+                      data-testid="button-edit-transaction"
+                    >
+                      {!canEditDaybook && <Lock className="h-4 w-4 mr-2" />}
+                      Edit Transaction
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                {!canEditDaybook && (
+                  <TooltipContent>
+                    <p>You don't have permission to edit daybook transactions</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </DialogContent>
       </Dialog>

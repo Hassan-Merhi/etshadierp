@@ -4929,7 +4929,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentQty = parseFloat(inventoryRecord.quantity);
         const saleQty = parseFloat(item.quantity);
 
-        if (currentQty < saleQty) {
+        // Check if user can sell negative stock
+        const canSellNegativeStock = req.user?.canSellNegativeStock || false;
+        
+        if (currentQty < saleQty && !canSellNegativeStock) {
           throw new Error(`Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`);
         }
 
