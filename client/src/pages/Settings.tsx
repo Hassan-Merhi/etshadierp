@@ -314,12 +314,16 @@ export default function Settings() {
       // Invalidate the aggregate permissions query so the permissions table updates
       queryClient.invalidateQueries({ queryKey: ["/api/user-company-roles"] });
       
+      let isCurrentUser = false;
+      
       // Check if we need to refresh current user's session
       const currentUserRes = await fetch("/api/auth/me");
       if (currentUserRes.ok) {
         const currentUser = await currentUserRes.json();
+        isCurrentUser = currentUser.id === variables.userId;
+        
         // If we just updated the current user's permissions for the current company, refresh the session
-        if (currentUser.id === variables.userId) {
+        if (isCurrentUser) {
           const currentCompanyRes = await fetch("/api/user/companies");
           if (currentCompanyRes.ok) {
             const userCompanies = await currentCompanyRes.json();
@@ -336,7 +340,9 @@ export default function Settings() {
       
       toast({
         title: "Success",
-        description: "Permission updated successfully",
+        description: isCurrentUser 
+          ? "Permission updated successfully"
+          : "Permission updated successfully. The user will need to log out and log back in for this change to take effect.",
       });
     },
     onError: (error: any) => {
