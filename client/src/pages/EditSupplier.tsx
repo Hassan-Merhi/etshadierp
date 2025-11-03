@@ -27,7 +27,7 @@ export default function EditSupplier() {
   const supplierId = params.id ? parseInt(params.id) : null;
 
   const { data: supplier, isLoading } = useQuery({
-    queryKey: ["/api/suppliers", supplierId],
+    queryKey: [`/api/suppliers/${supplierId}`],
     enabled: !!supplierId,
   });
 
@@ -73,7 +73,7 @@ export default function EditSupplier() {
         description: `Supplier "${data.legalName}" updated successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers", supplierId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/suppliers/${supplierId}`] });
       navigate("/suppliers");
     },
     onError: (error: any) => {

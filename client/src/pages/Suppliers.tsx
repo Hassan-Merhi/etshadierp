@@ -77,8 +77,8 @@ export default function Suppliers() {
   });
 
   const activeSuppliers = suppliers.filter((s) => s.active);
-  const totalContainers = suppliers.reduce((sum, s) => sum + s.containerCount, 0);
-  const totalBalance = suppliers.reduce((sum, s) => sum + s.balance, 0);
+  const totalContainers = suppliers.reduce((sum, s) => sum + Number(s.containerCount || 0), 0);
+  const totalBalance = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0);
   
   const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
