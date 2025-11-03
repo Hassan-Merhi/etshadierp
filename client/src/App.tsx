@@ -18,6 +18,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import POS from "@/pages/POS";
 import Inventory from "@/pages/Inventory";
+import StockItems from "@/pages/StockItems";
 import Containers from "@/pages/Containers";
 import Financial from "@/pages/Financial";
 import Accounts from "@/pages/Accounts";
@@ -70,6 +71,7 @@ function Router({ user }: { user: any }) {
       <Route path="/" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
       <Route path="/inventory" component={Inventory} />
+      <Route path="/stock-items" component={StockItems} />
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />

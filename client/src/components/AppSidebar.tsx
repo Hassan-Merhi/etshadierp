@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   Search,
   PieChart,
+  Tags,
 } from "lucide-react";
 import {
   Sidebar,
@@ -51,6 +52,11 @@ const menuItems = [
     title: "Inventory",
     url: "/inventory",
     icon: Package,
+  },
+  {
+    title: "Stock Items",
+    url: "/stock-items",
+    icon: Tags,
   },
   {
     title: "Location Inventory",
