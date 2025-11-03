@@ -49,6 +49,11 @@ const menuItems = [
     icon: ShoppingCart,
   },
   {
+    title: "POS Daybook",
+    url: "/pos-daybook",
+    icon: Book,
+  },
+  {
     title: "Inventory",
     url: "/inventory",
     icon: Package,
@@ -155,10 +160,23 @@ export function AppSidebar({ user }: { user?: any }) {
 
   // Filter menu items based on user role
   const visibleMenuItems = menuItems.filter((item) => {
+    const isPOSUser = user?.role?.startsWith("POS");
+    
+    // POS users only see: POS, POS Daybook, and Location Inventory
+    if (isPOSUser) {
+      return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
+    }
+    
     // Settings is Admin only
     if (item.url === "/settings") {
       return user?.role === "Admin";
     }
+    
+    // POS Daybook is only for POS users (hide from others)
+    if (item.url === "/pos-daybook") {
+      return false;
+    }
+    
     return true;
   });
 
