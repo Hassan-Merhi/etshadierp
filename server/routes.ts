@@ -2891,6 +2891,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a purchase order (Admin only)
+  app.delete("/api/purchase-orders/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid purchase order ID" });
+      }
+
+      const existingPO = await storage.getPurchaseOrderById(id);
+      if (!existingPO) {
+        return res.status(404).json({ message: "Purchase order not found" });
+      }
+
+      // Verify purchase order belongs to current company
+      if (existingPO.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Purchase order belongs to a different company" });
+      }
+
+      await storage.deletePurchaseOrder(id);
+      res.json({ message: "Purchase order deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Backfill voucher entries for existing POs
   app.post("/api/po-import/backfill", requireAuth, async (req, res) => {
     try {

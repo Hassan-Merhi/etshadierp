@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, FileText, Truck } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Supplier } from "@shared/schema";
 
 interface ContainerDetailData {
@@ -20,6 +22,7 @@ export default function ContainerDetail() {
   const params = useParams();
   const containerId = params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
+  const { toast } = useToast();
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -29,6 +32,34 @@ export default function ContainerDetail() {
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+
+  // Delete PO mutation
+  const deletePOMutation = useMutation({
+    mutationFn: async (poId: number) => {
+      await apiRequest("DELETE", `/api/purchase-orders/${poId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      toast({
+        title: "Purchase Order Deleted",
+        description: "The purchase order and associated data have been removed",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete purchase order",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeletePO = (poId: number, poNumber: string) => {
+    if (confirm(`Are you sure you want to delete PO ${poNumber}? This will also delete all line items, the voucher, and remove the container if this is the last PO.`)) {
+      deletePOMutation.mutate(poId);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -162,11 +193,22 @@ export default function ContainerDetail() {
                     <h3 className="text-lg font-semibold" data-testid={`text-po-${po.poNumber}`}>
                       PO: {po.poNumber}
                     </h3>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Currency: </span>
-                      <span className="font-medium">{po.currency}</span>
-                      <span className="text-muted-foreground ml-4">Total: </span>
-                      <span className="font-semibold">${parseFloat(po.itemsTotal).toFixed(2)}</span>
+                    <div className="flex items-center gap-4">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Currency: </span>
+                        <span className="font-medium">{po.currency}</span>
+                        <span className="text-muted-foreground ml-4">Total: </span>
+                        <span className="font-semibold">${parseFloat(po.itemsTotal).toFixed(2)}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeletePO(po.id, po.poNumber)}
+                        disabled={deletePOMutation.isPending}
+                        data-testid={`button-delete-po-${po.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
 

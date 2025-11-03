@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Package, Eye } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Package, Eye, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
+  const [searchTerm, setSearchTerm] = useState("");
+  
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers"],
   });
@@ -16,8 +20,13 @@ export default function Containers() {
     queryKey: ["/api/suppliers"],
   });
 
-  // Filter out offloaded containers
-  const containers = allContainers.filter((c) => c.status !== "OFFLOADED");
+  // Filter out offloaded containers and apply search
+  const containers = allContainers
+    .filter((c) => c.status !== "OFFLOADED")
+    .filter((c) => 
+      searchTerm === "" || 
+      c.containerNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const getSupplierName = (supplierId: number) => {
     const supplier = suppliers.find((s) => s.id === supplierId);
@@ -53,6 +62,19 @@ export default function Containers() {
           </Button>
         </Link>
       </div>
+
+      {allContainers.filter((c) => c.status !== "OFFLOADED").length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by container number..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-container"
+          />
+        </div>
+      )}
 
       {containers.length === 0 ? (
         <Card>

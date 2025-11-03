@@ -144,6 +144,7 @@ export interface IStorage {
   getPurchaseOrdersBySupplier(supplierId: number, companyId: number): Promise<any[]>;
   createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
   updatePurchaseOrder(id: number, updates: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder>;
+  deletePurchaseOrder(id: number): Promise<void>;
 
   // PO Line Items
   getLineItemsByPO(poId: number): Promise<POLineItem[]>;
@@ -698,6 +699,68 @@ export class DbStorage implements IStorage {
       .where(eq(schema.purchaseOrders.id, id))
       .returning();
     return updated;
+  }
+
+  async deletePurchaseOrder(id: number): Promise<void> {
+    // Get the PO first to get container info
+    const [po] = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.id, id))
+      .limit(1);
+
+    if (!po) {
+      throw new Error("Purchase order not found");
+    }
+
+    const containerId = po.containerId;
+    const poTotal = parseFloat(po.itemsTotal || "0");
+
+    // Delete PO line items
+    await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, id));
+
+    // Delete the PO
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, id));
+
+    // Delete the voucher if it exists
+    if (po.voucherId) {
+      await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
+      await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
+    }
+
+    // Check if there are any remaining POs for this container
+    const remainingPOs = await db
+      .select()
+      .from(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.containerId, containerId))
+      .limit(1);
+
+    if (remainingPOs.length === 0) {
+      // Delete the container and all its charges if no POs remain
+      await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+      await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
+    } else {
+      // Update container totals
+      const [container] = await db
+        .select()
+        .from(schema.containers)
+        .where(eq(schema.containers.id, containerId))
+        .limit(1);
+
+      if (container) {
+        const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - poTotal);
+        const chargesTotal = parseFloat(container.chargesTotal || "0");
+        const newGrandTotal = newItemsTotal + chargesTotal;
+
+        await db
+          .update(schema.containers)
+          .set({
+            itemsTotal: newItemsTotal.toString(),
+            grandTotal: newGrandTotal.toString(),
+          })
+          .where(eq(schema.containers.id, containerId));
+      }
+    }
   }
 
   // PO Line Items
@@ -1479,19 +1542,19 @@ export class DbStorage implements IStorage {
           const newChargesTotal = parseFloat(container.chargesTotal || "0");
           const newGrandTotal = newItemsTotal + newChargesTotal;
 
-          // Check if container should be deleted (no items left and no charges)
+          // Check if container should be deleted (no remaining POs)
           const remainingPOs = await db
             .select()
             .from(schema.purchaseOrders)
             .where(eq(schema.purchaseOrders.containerId, containerId))
             .limit(1);
 
-          if (remainingPOs.length === 0 && newChargesTotal === 0) {
-            // Delete the container if it has no POs and no charges
+          if (remainingPOs.length === 0) {
+            // Delete the container and all its charges if no POs remain
             await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
             await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
           } else {
-            // Update container totals
+            // Update container totals if there are still POs
             await db
               .update(schema.containers)
               .set({
