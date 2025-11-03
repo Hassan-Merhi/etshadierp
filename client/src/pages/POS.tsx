@@ -928,58 +928,65 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
           
           {/* Hidden Print Template */}
           <div className="hidden">
-            <div ref={printRef} className="p-8 bg-white text-black">
-              <div className="text-center mb-6">
-                <h1 className="text-3xl font-bold mb-2">SALES INVOICE</h1>
+            <div ref={printRef} className="p-6 bg-white text-black">
+              <div className="text-center mb-4">
+                <h1 className="text-2xl font-bold mb-1">SALES INVOICE</h1>
                 <p className="text-sm text-gray-600">Invoice #{savedSale?.voucher?.voucherNumber}</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+              <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
                 <div>
-                  <p className="font-semibold mb-1">Location:</p>
+                  <p className="font-semibold mb-0.5">Location:</p>
                   <p>{savedSale?.location?.name}</p>
                   <p>{savedSale?.location?.city}, {savedSale?.location?.state}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold mb-1">Date:</p>
+                  <p className="font-semibold mb-0.5">Date:</p>
                   <p>{savedSale?.saleDate}</p>
                 </div>
               </div>
 
               {savedSale?.isCreditSale && savedSale?.customer && (
-                <div className="mb-6 p-3 bg-gray-100 border border-gray-300">
-                  <p className="font-semibold mb-1">Customer (Credit Sale):</p>
+                <div className="mb-4 p-2 bg-gray-100 border border-gray-300">
+                  <p className="font-semibold mb-0.5">Customer (Credit Sale):</p>
                   <p className="text-base">{savedSale.customer.name}</p>
                   <p className="text-sm text-gray-600">Account: {savedSale.customer.code}</p>
                 </div>
               )}
 
-              <table className="w-full mb-6 border-collapse">
+              <table className="w-full mb-4 border-collapse" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '42%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '18%' }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b-2 border-black">
-                    <th className="text-left py-2">#</th>
-                    <th className="text-left py-2">Item</th>
-                    <th className="text-right py-2">Qty</th>
-                    <th className="text-right py-2">Rate</th>
-                    <th className="text-right py-2">Amount</th>
+                    <th className="text-left py-1 px-1">#</th>
+                    <th className="text-left py-1 px-1">Item</th>
+                    <th className="text-right py-1 px-1">Qty</th>
+                    <th className="text-right py-1 px-1">Rate</th>
+                    <th className="text-right py-1 px-1">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {savedSale?.items.map((item: any, idx: number) => (
                     <tr key={idx} className="border-b">
-                      <td className="py-2">{idx + 1}</td>
-                      <td className="py-2">{item.stockItemName}</td>
-                      <td className="text-right py-2">{item.quantity}</td>
-                      <td className="text-right py-2">${parseFloat(item.rate).toFixed(2)}</td>
-                      <td className="text-right py-2">${item.amount}</td>
+                      <td className="py-1 px-1">{idx + 1}</td>
+                      <td className="py-1 px-1">{item.stockItemName}</td>
+                      <td className="text-right py-1 px-1">{item.quantity}</td>
+                      <td className="text-right py-1 px-1">${parseFloat(item.rate).toFixed(2)}</td>
+                      <td className="text-right py-1 px-1">${item.amount}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
 
-              <div className="flex justify-end mb-6">
-                <div className="w-64">
-                  <div className="flex justify-between py-2 text-lg font-bold border-t-2 border-black">
+              <div className="flex justify-end mb-4">
+                <div className="w-48">
+                  <div className="flex justify-between py-1 text-lg font-bold border-t-2 border-black">
                     <span>TOTAL:</span>
                     <span>${savedSale?.grandTotal}</span>
                   </div>
@@ -987,13 +994,13 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
               </div>
 
               {savedSale?.voucher?.description && (
-                <div className="mb-6">
-                  <p className="font-semibold mb-1">Notes:</p>
+                <div className="mb-4">
+                  <p className="font-semibold mb-0.5">Notes:</p>
                   <p className="text-sm">{savedSale.voucher.description}</p>
                 </div>
               )}
 
-              <div className="text-center text-sm text-gray-600 mt-8 pt-4 border-t">
+              <div className="text-center text-sm text-gray-600 mt-4 pt-3 border-t">
                 <p>Thank you for your business!</p>
               </div>
             </div>
