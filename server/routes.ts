@@ -2311,10 +2311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seenBarcodes.add(item.barcode);
           }
 
-          // Try to find stock item by code first, then by name
+          // Try to find stock item by code/alias first, then by name
           let stockItem = null;
           if (item.barcode) {
-            stockItem = allStockItems.find(si => si.code === item.barcode);
+            stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find(si => si.name === item.itemName);
@@ -2381,10 +2381,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seenBarcodes.add(item.barcode);
           }
 
-          // Try to find stock item by code first, then by name
+          // Try to find stock item by code/alias first, then by name
           let stockItem = null;
           if (item.barcode) {
-            stockItem = allStockItems.find(si => si.code === item.barcode);
+            stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find(si => si.name === item.itemName);
@@ -2514,13 +2514,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         for (const item of poItems) {
-          // Re-lookup stock item by code or name to get fresh ID (not stale preview data)
+          // Re-lookup stock item by code/alias or name to get fresh ID (not stale preview data)
           let stockItemId = item.stockItemId;
           let stockItem = null;
 
-          // Try code first, then fall back to name
+          // Try code/alias first, then fall back to name
           if (item.barcode) {
-            stockItem = freshStockItems.find(si => si.code === item.barcode);
+            stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           }
           if (!stockItem && item.itemName) {
             stockItem = freshStockItems.find(si => si.name === item.itemName);
