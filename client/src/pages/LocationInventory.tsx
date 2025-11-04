@@ -634,6 +634,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </Dialog>
 
               <Button
+                onClick={() => {
+                  setViewAllItems(true);
+                  // Give the view time to render before printing
+                  setTimeout(() => handlePrint(), 100);
+                }}
+                data-testid="button-print-inventory-quick"
+                variant="outline"
+                className="gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Print Inventory
+              </Button>
+              <Button
                 onClick={() => setViewAllItems(true)}
                 data-testid="button-view-all-items"
                 variant="outline"
