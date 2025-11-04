@@ -21,6 +21,7 @@ import {
   Search,
   PieChart,
   Tags,
+  Ship,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,6 +73,11 @@ const menuItems = [
     title: "Containers",
     url: "/containers",
     icon: Container,
+  },
+  {
+    title: "Stock OTW",
+    url: "/stock-otw",
+    icon: Ship,
   },
   {
     title: "PO Import",

@@ -40,6 +40,7 @@ import StockQuery from "@/pages/StockQuery";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import EditSupplier from "@/pages/EditSupplier";
+import StockOTW from "@/pages/StockOTW";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -75,6 +76,7 @@ function Router({ user }: { user: any }) {
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
+      <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/financial" component={Financial} />
       <Route path="/accounts" component={Accounts} />
