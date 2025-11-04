@@ -50,7 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -2062,20 +2062,69 @@ export default function VoucherEdit() {
     const sourceLocation = locations.find(l => l.id === transfer.sourceLocationId);
     const destinationLocation = locations.find(l => l.id === transfer.destinationLocationId);
     
+    // Excel export function for Stock Transfer
+    const exportToExcel = () => {
+      const XLSX = require('xlsx');
+      
+      const transferItems = transferForm.watch("items");
+      const totalBales = transferItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+      
+      const exportData = transferItems.map(item => ({
+        'Source Location': sourceLocation?.name || 'Unknown',
+        'Bale Name': item.stockItemName || 'Unknown',
+        'Quantity': parseFloat(item.quantity) || 0,
+        'Rate': parseFloat(item.rate) || 0,
+        'Amount': (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0),
+        'Destination Location': destinationLocation?.name || 'Unknown',
+      }));
+      
+      // Add total row
+      exportData.push({
+        'Source Location': '',
+        'Bale Name': 'TOTAL',
+        'Quantity': totalBales,
+        'Rate': '',
+        'Amount': transferGrandTotal,
+        'Destination Location': '',
+      });
+      
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Transfer');
+      
+      const filename = `Stock_Transfer_${voucher.voucherNumber}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      
+      toast({
+        title: "Export Successful",
+        description: `Stock transfer exported to ${filename}`,
+      });
+    };
+    
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              Edit Stock Transfer
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Voucher #{voucher.voucherNumber}
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={handleCancel} data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold" data-testid="text-page-title">
+                Edit Stock Transfer
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Voucher #{voucher.voucherNumber}
+              </p>
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            onClick={exportToExcel}
+            data-testid="button-export-excel"
+          >
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Export to Excel
+          </Button>
         </div>
 
         <Card>

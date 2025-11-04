@@ -1,16 +1,24 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Supplier } from "@shared/schema";
+import { useCompany } from "@/contexts/CompanyContext";
+import type { Supplier, Customer, ContainerSale } from "@shared/schema";
 
 interface ContainerDetailData {
   container: any;
@@ -18,12 +26,21 @@ interface ContainerDetailData {
   charges: any[];
 }
 
+const saleFormSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  salePrice: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Sale price must be positive"),
+  commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
+  saleDate: z.string().min(1, "Sale date is required"),
+});
+
 export default function ContainerDetail() {
   const params = useParams();
   const containerId = params.id;
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
+  const [showSellDialog, setShowSellDialog] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { selectedCompany, companyId } = useCompany();
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -32,6 +49,28 @@ export default function ContainerDetail() {
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers", companyId],
+    enabled: !!companyId,
+  });
+
+  const { data: containerSales = [] } = useQuery<ContainerSale[]>({
+    queryKey: ["/api/container-sales", companyId],
+    enabled: !!companyId,
+  });
+
+  const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
+
+  const form = useForm<z.infer<typeof saleFormSchema>>({
+    resolver: zodResolver(saleFormSchema),
+    defaultValues: {
+      customerId: "",
+      salePrice: "",
+      commission: "",
+      saleDate: new Date().toISOString().split('T')[0],
+    },
   });
 
   // Delete PO mutation
@@ -78,6 +117,41 @@ export default function ContainerDetail() {
     },
   });
 
+  // Sell Container mutation
+  const sellContainerMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof saleFormSchema>) => {
+      const salePrice = parseFloat(data.salePrice);
+      const commission = parseFloat(data.commission);
+      const totalAmount = salePrice + commission;
+
+      await apiRequest("POST", "/api/container-sales", {
+        containerId: parseInt(containerId!),
+        customerId: parseInt(data.customerId),
+        saleDate: data.saleDate,
+        containerCost: data.salePrice,
+        commission: data.commission,
+        totalAmount: totalAmount.toString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/container-sales", companyId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      toast({
+        title: "Container Sold",
+        description: "Container sale has been recorded successfully",
+      });
+      setShowSellDialog(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sale Failed",
+        description: error.message || "Failed to record container sale",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeletePO = (poId: number, poNumber: string) => {
     if (confirm(`Are you sure you want to delete PO ${poNumber}? This will also delete all line items, the voucher, and remove the container if this is the last PO.`)) {
       deletePOMutation.mutate(poId);
@@ -89,6 +163,12 @@ export default function ContainerDetail() {
       deleteContainerMutation.mutate(parseInt(containerId!));
     }
   };
+
+  const handleSellSubmit = (data: z.infer<typeof saleFormSchema>) => {
+    sellContainerMutation.mutate(data);
+  };
+
+  const saleCustomer = customers.find((c) => c.id === containerSale?.customerId);
 
   if (isLoading) {
     return (
@@ -148,6 +228,16 @@ export default function ContainerDetail() {
         <Badge variant={container.status === "OTW" ? "default" : "secondary"} data-testid="badge-status">
           {container.status}
         </Badge>
+        {!containerSale && (
+          <Button
+            onClick={() => setShowSellDialog(true)}
+            className="gap-2"
+            data-testid="button-sell-container"
+          >
+            <HandCoins className="w-4 h-4" />
+            Sell Container
+          </Button>
+        )}
         {container.status !== "OFFLOADED" && (
           <Button
             onClick={() => setShowOffloadDialog(true)}
@@ -169,6 +259,61 @@ export default function ContainerDetail() {
           Delete Container
         </Button>
       </div>
+
+      {containerSale && (
+        <Card className="border-green-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HandCoins className="h-5 w-5 text-green-600" />
+              Container Sold
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Sold to</p>
+                <p className="font-semibold" data-testid="text-sale-customer">
+                  {saleCustomer?.legalName || "Unknown Customer"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Sale Date</p>
+                <p className="font-semibold" data-testid="text-sale-date">
+                  {new Date(containerSale.saleDate).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Sale Price</p>
+                <p className="font-semibold" data-testid="text-sale-price">
+                  ${parseFloat(containerSale.containerCost).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm text-muted-foreground">Commission</p>
+                <p className="font-semibold" data-testid="text-sale-commission">
+                  ${parseFloat(containerSale.commission).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="pt-2 border-t">
+              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-xl font-bold" data-testid="text-sale-total">
+                ${parseFloat(containerSale.totalAmount).toFixed(2)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -347,6 +492,117 @@ export default function ContainerDetail() {
         containerNumber={container.containerNumber}
         totalBales={totalBales}
       />
+
+      <Dialog open={showSellDialog} onOpenChange={setShowSellDialog}>
+        <DialogContent data-testid="dialog-sell-container">
+          <DialogHeader>
+            <DialogTitle>Sell Container</DialogTitle>
+            <DialogDescription>
+              Record the sale of container {container.containerNumber} to a customer.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSellSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="customerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-customer">
+                          <SelectValue placeholder="Select a customer" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id.toString()}>
+                            {customer.legalName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="saleDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-sale-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="salePrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sale Price</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-sale-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="commission"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commission</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-commission"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowSellDialog(false)}
+                  data-testid="button-cancel-sale"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={sellContainerMutation.isPending}
+                  data-testid="button-submit-sale"
+                >
+                  {sellContainerMutation.isPending ? "Processing..." : "Record Sale"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -22,6 +22,8 @@ import {
   PieChart,
   Tags,
   Ship,
+  HandCoins,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   Sidebar,
@@ -75,6 +77,11 @@ const menuItems = [
     icon: Container,
   },
   {
+    title: "Sold Containers",
+    url: "/sold-containers",
+    icon: HandCoins,
+  },
+  {
     title: "Stock OTW",
     url: "/stock-otw",
     icon: Ship,
@@ -98,6 +105,16 @@ const menuItems = [
     title: "Suppliers",
     url: "/suppliers",
     icon: Users,
+  },
+  {
+    title: "Customers",
+    url: "/customers",
+    icon: Users,
+  },
+  {
+    title: "Inter-Company Transfers",
+    url: "/inter-company-transfers",
+    icon: ArrowLeftRight,
   },
   {
     title: "Vouchers",

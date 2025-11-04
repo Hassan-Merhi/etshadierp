@@ -41,6 +41,9 @@ import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import EditSupplier from "@/pages/EditSupplier";
 import StockOTW from "@/pages/StockOTW";
+import Customers from "@/pages/Customers";
+import SoldContainers from "@/pages/SoldContainers";
+import InterCompanyTransfers from "@/pages/InterCompanyTransfers";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -76,11 +79,14 @@ function Router({ user }: { user: any }) {
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
+      <Route path="/sold-containers" component={SoldContainers} />
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/financial" component={Financial} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />
+      <Route path="/customers" component={Customers} />
+      <Route path="/inter-company-transfers" component={InterCompanyTransfers} />
       <Route path="/vouchers" component={Vouchers} />
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
