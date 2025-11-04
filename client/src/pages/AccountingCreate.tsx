@@ -406,6 +406,14 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                       <SelectItem value="Expense">Expense</SelectItem>
                       <SelectItem value="Bank">Bank</SelectItem>
                       <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                      <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                      <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                      <SelectItem value="Loans">Loans</SelectItem>
+                      <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                      <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                      <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                      <SelectItem value="Profit">Profit</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -510,6 +518,14 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                                         <SelectItem value="Expense">Expense</SelectItem>
                                         <SelectItem value="Bank">Bank</SelectItem>
                                         <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                        <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                        <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                        <SelectItem value="Loans">Loans</SelectItem>
+                                        <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                        <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                        <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                                        <SelectItem value="Profit">Profit</SelectItem>
                                       </SelectContent>
                                     </Select>
                                     <FormMessage />
