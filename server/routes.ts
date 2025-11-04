@@ -783,6 +783,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/ledger-accounts/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ message: "Invalid account ID" });
+      }
+
+      // Verify account exists and belongs to current company
+      const existingAccount = await storage.getLedgerAccountById(accountId);
+      if (!existingAccount) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      if (existingAccount.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Account belongs to a different company" });
+      }
+
+      // Check if account is used in any voucher entries
+      const entries = await storage.getVoucherEntriesByLedger(accountId);
+      if (entries && entries.length > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete ledger account: It has been used in transactions. Please remove all related transactions first." 
+        });
+      }
+
+      // Check if account is a parent to other accounts
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      const hasChildren = allAccounts.some(acc => acc.parentId === accountId);
+      if (hasChildren) {
+        return res.status(400).json({ 
+          message: "Cannot delete ledger account: It is a parent account. Please remove or reassign child accounts first." 
+        });
+      }
+
+      await storage.deleteLedgerAccount(accountId);
+      res.json({ message: "Ledger account deleted successfully" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Employees
   app.get("/api/employees", requireAuth, async (req, res) => {
     try {

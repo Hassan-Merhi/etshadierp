@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown } from "lucide-react";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -350,6 +350,37 @@ export default function Accounts() {
       });
     },
   });
+
+  const deleteLedgerMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      return await apiRequest("DELETE", `/api/ledger-accounts/${accountId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Ledger account deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setAccountToEdit(null);
+      editForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteAccount = () => {
+    if (!accountToEdit) return;
+    
+    if (window.confirm(`Are you sure you want to delete "${accountToEdit.name}"? This action cannot be undone.`)) {
+      deleteLedgerMutation.mutate(accountToEdit.id);
+    }
+  };
 
   const onEditSubmit = (data: UpdateLedgerAccount) => {
     updateLedgerMutation.mutate(data);
@@ -994,6 +1025,7 @@ export default function Accounts() {
                                   <SelectItem value="Loans">Loans</SelectItem>
                                   <SelectItem value="Duty Agent">Duty Agent</SelectItem>
                                   <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                  <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
                                   <SelectItem value="Profit">Profit</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -1042,26 +1074,38 @@ export default function Accounts() {
                             )}
                           />
                         </div>
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-2 justify-between">
                           <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setAccountToEdit(null);
-                              editForm.reset();
-                            }}
-                            data-testid="button-cancel-edit"
+                            variant="destructive"
+                            onClick={handleDeleteAccount}
+                            disabled={deleteLedgerMutation.isPending}
+                            data-testid="button-delete-account"
                           >
-                            Cancel
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {deleteLedgerMutation.isPending ? "Deleting..." : "Delete"}
                           </Button>
-                          <Button
-                            type="submit"
-                            disabled={updateLedgerMutation.isPending}
-                            data-testid="button-save-edit"
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            {updateLedgerMutation.isPending ? "Saving..." : "Save Changes"}
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setAccountToEdit(null);
+                                editForm.reset();
+                              }}
+                              data-testid="button-cancel-edit"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={updateLedgerMutation.isPending}
+                              data-testid="button-save-edit"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              {updateLedgerMutation.isPending ? "Saving..." : "Save Changes"}
+                            </Button>
+                          </div>
                         </div>
                       </form>
                     </Form>
