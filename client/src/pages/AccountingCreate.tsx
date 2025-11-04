@@ -643,20 +643,6 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
             <FormField
               control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email *</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="email" placeholder="john@example.com" data-testid="input-email" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="phone"
               render={({ field }) => (
                 <FormItem>
@@ -674,7 +660,7 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
               name="joinDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Join Date *</FormLabel>
+                  <FormLabel>Starting Date *</FormLabel>
                   <FormControl>
                     <Input {...field} type="date" data-testid="input-join-date" />
                   </FormControl>

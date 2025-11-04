@@ -133,7 +133,7 @@ export const employees = pgTable("employees", {
   code: varchar("code", { length: 50 }).notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").notNull(),
+  email: text("email"),
   phone: text("phone"),
   joinDate: date("join_date").notNull(),
   department: text("department"),
@@ -158,7 +158,7 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   code: z.string().optional(),
   firstName: z.string().min(1, "First name is required").refine(val => val.trim().length > 0, "First name cannot be only whitespace"),
   lastName: z.string().min(1, "Last name is required").refine(val => val.trim().length > 0, "Last name cannot be only whitespace"),
-  email: z.string().email("Invalid email format"),
+  email: z.string().email("Invalid email format").optional().or(z.literal("")),
   joinDate: z.string().min(1, "Join date is required"),
   employeeType: z.enum(["Employee", "Worker"]),
 });
