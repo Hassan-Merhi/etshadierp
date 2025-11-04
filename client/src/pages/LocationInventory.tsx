@@ -828,6 +828,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 .print-header {
                   margin-bottom: 1rem !important;
                 }
+                .print-compact-table th:first-child,
+                .print-compact-table td:first-child {
+                  display: none !important;
+                }
               }
             `}</style>
             {/* Print header (hidden on screen) */}
