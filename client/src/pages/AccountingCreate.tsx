@@ -662,7 +662,7 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Starting Date *</FormLabel>
                   <FormControl>
-                    <Input {...field} type="date" data-testid="input-join-date" />
+                    <Input {...field} type="text" placeholder="YYYY-MM-DD" data-testid="input-join-date" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -159,7 +159,15 @@ export const insertEmployeeSchema = createInsertSchema(employees).omit({
   firstName: z.string().min(1, "First name is required").refine(val => val.trim().length > 0, "First name cannot be only whitespace"),
   lastName: z.string().min(1, "Last name is required").refine(val => val.trim().length > 0, "Last name cannot be only whitespace"),
   email: z.string().email("Invalid email format").optional().or(z.literal("")),
-  joinDate: z.string().min(1, "Join date is required"),
+  joinDate: z.string().min(1, "Starting date is required").refine(
+    (val) => {
+      const regex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!regex.test(val)) return false;
+      const date = new Date(val);
+      return !isNaN(date.getTime()) && val === date.toISOString().split('T')[0];
+    },
+    "Date must be a valid date in YYYY-MM-DD format"
+  ),
   employeeType: z.enum(["Employee", "Worker"]),
 });
 
