@@ -76,8 +76,10 @@ export interface IStorage {
   getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
   getLedgerAccountById(id: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined>;
+  getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined>;
   createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
   updateLedgerAccount(account: schema.UpdateLedgerAccount): Promise<LedgerAccount>;
+  deleteLedgerAccount(id: number): Promise<void>;
 
   // Employees
   getAllEmployees(companyId: number): Promise<Employee[]>;
@@ -329,9 +331,20 @@ export class DbStorage implements IStorage {
     return account;
   }
 
+  async getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined> {
+    const [account] = await db.select().from(schema.ledgerAccounts).where(
+      and(eq(schema.ledgerAccounts.name, name), eq(schema.ledgerAccounts.companyId, companyId))
+    );
+    return account;
+  }
+
   async createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
     const [created] = await db.insert(schema.ledgerAccounts).values([account as any]).returning();
     return created;
+  }
+
+  async deleteLedgerAccount(id: number): Promise<void> {
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, id));
   }
 
   async getLedgerAccountById(id: number): Promise<LedgerAccount | undefined> {

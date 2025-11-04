@@ -649,6 +649,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = insertLedgerAccountSchema.parse(req.body);
       
+      // Check for duplicate name within the same company
+      const existingByName = await storage.getLedgerAccountByName(parsed.name, parsed.companyId);
+      if (existingByName) {
+        return res.status(400).json({ message: "Duplicate ledger: A ledger account with this name already exists" });
+      }
+      
       // Auto-generate code from name if not provided
       if (!parsed.code) {
         // Generate code from name: take first 3 letters of each word, uppercase
