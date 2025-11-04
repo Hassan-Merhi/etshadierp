@@ -1,4 +1,4 @@
-import { eq, and, sql, inArray, desc } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -214,6 +214,37 @@ export interface IStorage {
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
+
+  // Customers
+  getAllCustomers(companyId: number): Promise<schema.Customer[]>;
+  getCustomerById(id: number): Promise<schema.Customer | undefined>;
+  getCustomerByCode(code: string, companyId: number): Promise<schema.Customer | undefined>;
+  createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer>;
+  updateCustomer(id: number, updates: Partial<schema.InsertCustomer>): Promise<schema.Customer>;
+
+  // Container Sales
+  getAllContainerSales(companyId: number): Promise<schema.ContainerSale[]>;
+  getContainerSaleById(id: number): Promise<schema.ContainerSale | undefined>;
+  getContainerSalesByCustomer(customerId: number): Promise<schema.ContainerSale[]>;
+  getContainerSalesByContainer(containerId: number): Promise<schema.ContainerSale | undefined>;
+  createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale>;
+
+  // Inter-Company Transfers
+  getAllInterCompanyTransfers(companyId?: number): Promise<schema.InterCompanyTransfer[]>;
+  getInterCompanyTransferById(id: number): Promise<schema.InterCompanyTransfer | undefined>;
+  createInterCompanyTransfer(transfer: schema.InsertInterCompanyTransfer): Promise<schema.InterCompanyTransfer>;
+
+  // Salary Advances
+  getAllSalaryAdvances(companyId: number): Promise<schema.SalaryAdvance[]>;
+  getSalaryAdvanceById(id: number): Promise<schema.SalaryAdvance | undefined>;
+  getSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]>;
+  getUnpaidSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]>;
+  createSalaryAdvance(advance: schema.InsertSalaryAdvance): Promise<schema.SalaryAdvance>;
+  updateSalaryAdvance(id: number, updates: Partial<schema.InsertSalaryAdvance>): Promise<schema.SalaryAdvance>;
+
+  // Salary Advance Deductions
+  getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
+  createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction>;
 }
 
 export class DbStorage implements IStorage {
@@ -2113,6 +2144,139 @@ export class DbStorage implements IStorage {
       .orderBy(schema.locations.name);
 
     return results;
+  }
+
+  // Customer Methods
+  async getAllCustomers(companyId: number): Promise<schema.Customer[]> {
+    return await db.select().from(schema.customers)
+      .where(eq(schema.customers.companyId, companyId))
+      .orderBy(schema.customers.legalName);
+  }
+
+  async getCustomerById(id: number): Promise<schema.Customer | undefined> {
+    const [customer] = await db.select().from(schema.customers).where(eq(schema.customers.id, id));
+    return customer;
+  }
+
+  async getCustomerByCode(code: string, companyId: number): Promise<schema.Customer | undefined> {
+    const [customer] = await db.select().from(schema.customers)
+      .where(and(eq(schema.customers.code, code), eq(schema.customers.companyId, companyId)));
+    return customer;
+  }
+
+  async createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer> {
+    const [newCustomer] = await db.insert(schema.customers).values(customer).returning();
+    return newCustomer;
+  }
+
+  async updateCustomer(id: number, updates: Partial<schema.InsertCustomer>): Promise<schema.Customer> {
+    const [customer] = await db.update(schema.customers).set(updates).where(eq(schema.customers.id, id)).returning();
+    return customer;
+  }
+
+  // Container Sales Methods
+  async getAllContainerSales(companyId: number): Promise<schema.ContainerSale[]> {
+    return await db.select().from(schema.containerSales)
+      .where(eq(schema.containerSales.companyId, companyId))
+      .orderBy(sql`${schema.containerSales.saleDate} DESC`);
+  }
+
+  async getContainerSaleById(id: number): Promise<schema.ContainerSale | undefined> {
+    const [sale] = await db.select().from(schema.containerSales).where(eq(schema.containerSales.id, id));
+    return sale;
+  }
+
+  async getContainerSalesByCustomer(customerId: number): Promise<schema.ContainerSale[]> {
+    return await db.select().from(schema.containerSales)
+      .where(eq(schema.containerSales.customerId, customerId))
+      .orderBy(sql`${schema.containerSales.saleDate} DESC`);
+  }
+
+  async getContainerSalesByContainer(containerId: number): Promise<schema.ContainerSale | undefined> {
+    const [sale] = await db.select().from(schema.containerSales)
+      .where(eq(schema.containerSales.containerId, containerId));
+    return sale;
+  }
+
+  async createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale> {
+    const [newSale] = await db.insert(schema.containerSales).values(sale).returning();
+    return newSale;
+  }
+
+  // Inter-Company Transfer Methods
+  async getAllInterCompanyTransfers(companyId?: number): Promise<schema.InterCompanyTransfer[]> {
+    if (companyId) {
+      return await db.select().from(schema.interCompanyTransfers)
+        .where(or(
+          eq(schema.interCompanyTransfers.fromCompanyId, companyId),
+          eq(schema.interCompanyTransfers.toCompanyId, companyId)
+        ))
+        .orderBy(sql`${schema.interCompanyTransfers.transferDate} DESC`);
+    }
+    return await db.select().from(schema.interCompanyTransfers)
+      .orderBy(sql`${schema.interCompanyTransfers.transferDate} DESC`);
+  }
+
+  async getInterCompanyTransferById(id: number): Promise<schema.InterCompanyTransfer | undefined> {
+    const [transfer] = await db.select().from(schema.interCompanyTransfers)
+      .where(eq(schema.interCompanyTransfers.id, id));
+    return transfer;
+  }
+
+  async createInterCompanyTransfer(transfer: schema.InsertInterCompanyTransfer): Promise<schema.InterCompanyTransfer> {
+    const [newTransfer] = await db.insert(schema.interCompanyTransfers).values(transfer).returning();
+    return newTransfer;
+  }
+
+  // Salary Advance Methods
+  async getAllSalaryAdvances(companyId: number): Promise<schema.SalaryAdvance[]> {
+    return await db.select().from(schema.salaryAdvances)
+      .where(eq(schema.salaryAdvances.companyId, companyId))
+      .orderBy(sql`${schema.salaryAdvances.advanceDate} DESC`);
+  }
+
+  async getSalaryAdvanceById(id: number): Promise<schema.SalaryAdvance | undefined> {
+    const [advance] = await db.select().from(schema.salaryAdvances)
+      .where(eq(schema.salaryAdvances.id, id));
+    return advance;
+  }
+
+  async getSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]> {
+    return await db.select().from(schema.salaryAdvances)
+      .where(eq(schema.salaryAdvances.employeeId, employeeId))
+      .orderBy(sql`${schema.salaryAdvances.advanceDate} DESC`);
+  }
+
+  async getUnpaidSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]> {
+    return await db.select().from(schema.salaryAdvances)
+      .where(and(
+        eq(schema.salaryAdvances.employeeId, employeeId),
+        eq(schema.salaryAdvances.fullyPaid, false)
+      ))
+      .orderBy(sql`${schema.salaryAdvances.advanceDate}`);
+  }
+
+  async createSalaryAdvance(advance: schema.InsertSalaryAdvance): Promise<schema.SalaryAdvance> {
+    const [newAdvance] = await db.insert(schema.salaryAdvances).values(advance).returning();
+    return newAdvance;
+  }
+
+  async updateSalaryAdvance(id: number, updates: Partial<schema.InsertSalaryAdvance>): Promise<schema.SalaryAdvance> {
+    const [advance] = await db.update(schema.salaryAdvances).set(updates)
+      .where(eq(schema.salaryAdvances.id, id)).returning();
+    return advance;
+  }
+
+  // Salary Advance Deduction Methods
+  async getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]> {
+    return await db.select().from(schema.salaryAdvanceDeductions)
+      .where(eq(schema.salaryAdvanceDeductions.salaryAdvanceId, salaryAdvanceId))
+      .orderBy(schema.salaryAdvanceDeductions.payrollMonth);
+  }
+
+  async createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction> {
+    const [newDeduction] = await db.insert(schema.salaryAdvanceDeductions).values(deduction).returning();
+    return newDeduction;
   }
 }
 
