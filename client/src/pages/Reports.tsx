@@ -208,20 +208,20 @@ export default function Reports() {
   const salesParams = new URLSearchParams();
   if (startDate) salesParams.set("startDate", startDate);
   if (endDate) salesParams.set("endDate", endDate);
-  if (locationId) salesParams.set("locationId", locationId);
-  if (stockGroupId) salesParams.set("stockGroupId", stockGroupId);
+  if (locationId && locationId !== "all") salesParams.set("locationId", locationId);
+  if (stockGroupId && stockGroupId !== "all") salesParams.set("stockGroupId", stockGroupId);
 
   const stockMovementParams = new URLSearchParams();
   if (startDate) stockMovementParams.set("startDate", startDate);
   if (endDate) stockMovementParams.set("endDate", endDate);
-  if (locationId) stockMovementParams.set("locationId", locationId);
-  if (stockGroupId) stockMovementParams.set("stockGroupId", stockGroupId);
+  if (locationId && locationId !== "all") stockMovementParams.set("locationId", locationId);
+  if (stockGroupId && stockGroupId !== "all") stockMovementParams.set("stockGroupId", stockGroupId);
 
   const containerParams = new URLSearchParams();
   if (startDate) containerParams.set("startDate", startDate);
   if (endDate) containerParams.set("endDate", endDate);
-  if (supplierId) containerParams.set("supplierId", supplierId);
-  if (containerStatus) containerParams.set("status", containerStatus);
+  if (supplierId && supplierId !== "all") containerParams.set("supplierId", supplierId);
+  if (containerStatus && containerStatus !== "all") containerParams.set("status", containerStatus);
 
   const ratiosParams = new URLSearchParams();
   if (startDate) ratiosParams.set("startDate", startDate);
@@ -528,7 +528,7 @@ export default function Reports() {
                       <SelectValue placeholder="All Locations" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Locations</SelectItem>
+                      <SelectItem value="all">All Locations</SelectItem>
                       {locations.map((loc: any) => (
                         <SelectItem key={loc.id} value={loc.id.toString()}>
                           {loc.name}
@@ -548,7 +548,7 @@ export default function Reports() {
                       <SelectValue placeholder="All Groups" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Groups</SelectItem>
+                      <SelectItem value="all">All Groups</SelectItem>
                       {stockGroups.map((group: any) => (
                         <SelectItem key={group.id} value={group.id.toString()}>
                           {group.name}
@@ -568,7 +568,7 @@ export default function Reports() {
                       <SelectValue placeholder="All Suppliers" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Suppliers</SelectItem>
+                      <SelectItem value="all">All Suppliers</SelectItem>
                       {suppliers.map((supplier: any) => (
                         <SelectItem key={supplier.id} value={supplier.id.toString()}>
                           {supplier.name}
@@ -588,7 +588,7 @@ export default function Reports() {
                       <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="OTW">On The Way</SelectItem>
                       <SelectItem value="Arrived">Arrived</SelectItem>
                       <SelectItem value="Offloaded">Offloaded</SelectItem>
