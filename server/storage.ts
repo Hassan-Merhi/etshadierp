@@ -174,7 +174,8 @@ export interface IStorage {
     duties: string, 
     dutiesAccountId: number | null | undefined,
     officeCharges: string,
-    officeChargesAccountId: number | null | undefined, 
+    officeChargesAccountId: number | null | undefined,
+    officeChargesCashAccountId: number | null | undefined,
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
@@ -979,7 +980,8 @@ export class DbStorage implements IStorage {
     duties: string, 
     dutiesAccountId: number | null | undefined,
     officeCharges: string,
-    officeChargesAccountId: number | null | undefined, 
+    officeChargesAccountId: number | null | undefined,
+    officeChargesCashAccountId: number | null | undefined,
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
@@ -1125,7 +1127,7 @@ export class DbStorage implements IStorage {
     }
 
     // Office charges voucher entry
-    if (officeChargesAccountId && parseFloat(officeCharges) > 0) {
+    if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1136,19 +1138,19 @@ export class DbStorage implements IStorage {
         totalAmount: officeCharges,
       }).returning();
 
-      // Debit: Import Charges (Expense increases)
+      // Debit: Office Charges Account (Expense increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: importChargesLedgerId,
+        ledgerAccountId: officeChargesAccountId,
         debitAmount: officeCharges,
         creditAmount: "0",
         narration: `Office charges for container ${container.containerNumber}`,
       });
 
-      // Credit: Office charges account (Liability increases)
+      // Credit: Cash Account (Cash decreases - money set aside)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: officeChargesAccountId,
+        ledgerAccountId: officeChargesCashAccountId,
         debitAmount: "0",
         creditAmount: officeCharges,
         narration: `Office charges for container ${container.containerNumber}`,

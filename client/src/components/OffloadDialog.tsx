@@ -53,6 +53,7 @@ export function OffloadDialog({
   const [dutiesAccountId, setDutiesAccountId] = useState("");
   const [officeCharges, setOfficeCharges] = useState("0");
   const [officeChargesAccountId, setOfficeChargesAccountId] = useState("");
+  const [officeChargesCashAccountId, setOfficeChargesCashAccountId] = useState("");
   const [transferCharges, setTransferCharges] = useState("0");
   const [transportFees, setTransportFees] = useState("0");
   const [transportAccountId, setTransportAccountId] = useState("");
@@ -64,6 +65,7 @@ export function OffloadDialog({
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
+    enabled: open,
   });
 
   const totalCharges =
@@ -112,7 +114,12 @@ export function OffloadDialog({
 
       // Validate office charges account if office charges are set
       if (parseFloat(officeCharges) > 0 && !officeChargesAccountId) {
-        throw new Error("Please select an account for office charges");
+        throw new Error("Please select an office charges account");
+      }
+
+      // Validate office charges cash account if office charges are set
+      if (parseFloat(officeCharges) > 0 && !officeChargesCashAccountId) {
+        throw new Error("Please select a cash account for office charges");
       }
 
       // Validate transport account if transport fees are set
@@ -141,6 +148,7 @@ export function OffloadDialog({
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
           officeCharges: officeCharges,
           officeChargesAccountId: officeChargesAccountId ? parseInt(officeChargesAccountId) : null,
+          officeChargesCashAccountId: officeChargesCashAccountId ? parseInt(officeChargesCashAccountId) : null,
           transferCharges: transferCharges,
           transportFees: transportFees,
           transportAccountId: transportAccountId ? parseInt(transportAccountId) : null,
@@ -225,7 +233,7 @@ export function OffloadDialog({
           {/* Office Charges Section */}
           <div className="space-y-2">
             <Label>Office Charges</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Input
                 type="number"
                 step="0.01"
@@ -241,10 +249,26 @@ export function OffloadDialog({
                 disabled={parseFloat(officeCharges) === 0}
               >
                 <SelectTrigger data-testid="select-office-charges-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder="Office account" />
                 </SelectTrigger>
                 <SelectContent>
                   {ledgerAccounts.map((account: any) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} ({account.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={officeChargesCashAccountId}
+                onValueChange={setOfficeChargesCashAccountId}
+                disabled={parseFloat(officeCharges) === 0}
+              >
+                <SelectTrigger data-testid="select-office-charges-cash-account">
+                  <SelectValue placeholder="Cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ledgerAccounts.filter((account: any) => account.accountType === "Cash" || account.accountType === "Bank").map((account: any) => (
                     <SelectItem key={account.id} value={account.id.toString()}>
                       {account.name} ({account.code})
                     </SelectItem>

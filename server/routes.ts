@@ -1386,11 +1386,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Calculate balance from voucher entries across ALL companies
           // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
           // Balance = Credits - Debits (positive means we owe them)
+          // Only count entries where one side is non-zero to prevent double-counting
           const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
-            return sum + credit - debit;
+            
+            // Only count if this is a pure credit or pure debit entry
+            // This prevents double-counting if both sides of a transaction have supplierId
+            if (credit > 0 && debit === 0) {
+              return sum + credit; // Increase payable
+            } else if (debit > 0 && credit === 0) {
+              return sum - debit; // Decrease payable
+            }
+            return sum;
           }, 0);
           
           return {
@@ -2858,7 +2867,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         duties, 
         dutiesAccountId,
         officeCharges,
-        officeChargesAccountId, 
+        officeChargesAccountId,
+        officeChargesCashAccountId,
         transferCharges, 
         transportFees,
         transportAccountId,
@@ -2883,6 +2893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dutiesAccountId,
         officeCharges,
         officeChargesAccountId,
+        officeChargesCashAccountId,
         transferCharges,
         transportFees,
         transportAccountId,

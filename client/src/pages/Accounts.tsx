@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit } from "lucide-react";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -78,6 +78,7 @@ export default function Accounts() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(null);
   const [editSearchTerm, setEditSearchTerm] = useState("");
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
@@ -189,14 +190,68 @@ export default function Accounts() {
     { value: "12", label: "December" },
   ];
 
-  const filteredAccounts = accounts.filter((account) => {
+  // Build account hierarchy
+  const buildAccountHierarchy = () => {
+    const accountMap = new Map<string, Account & { children: Account[] }>();
+    const rootAccounts: (Account & { children: Account[] })[] = [];
+    
+    // First pass: create map of all accounts
+    accounts.forEach(account => {
+      accountMap.set(account.id, { ...account, children: [] });
+    });
+    
+    // Second pass: build hierarchy
+    accounts.forEach(account => {
+      const mappedAccount = accountMap.get(account.id);
+      if (!mappedAccount) return;
+      
+      // Find parent in ledgerAccounts if it has one
+      const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
+      if (ledgerAccount?.parentId) {
+        // Find parent in account map
+        const parentAccount = Array.from(accountMap.values()).find(
+          a => a.accountId === ledgerAccount.parentId
+        );
+        if (parentAccount) {
+          parentAccount.children.push(mappedAccount);
+        } else {
+          rootAccounts.push(mappedAccount);
+        }
+      } else {
+        rootAccounts.push(mappedAccount);
+      }
+    });
+    
+    return rootAccounts;
+  };
+
+  const accountHierarchy = buildAccountHierarchy();
+
+  const filteredAccounts = accountHierarchy.filter((account) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      account.name.toLowerCase().includes(searchLower) ||
-      account.code.toLowerCase().includes(searchLower) ||
-      account.type.toLowerCase().includes(searchLower)
-    );
+    const matchesSearch = (acc: Account): boolean => {
+      return (
+        acc.name.toLowerCase().includes(searchLower) ||
+        acc.code.toLowerCase().includes(searchLower) ||
+        acc.type.toLowerCase().includes(searchLower)
+      );
+    };
+    
+    // Show account if it matches or any of its children match
+    const accountMatches = matchesSearch(account);
+    const childMatches = account.children.some(matchesSearch);
+    return accountMatches || childMatches;
   });
+
+  const toggleParent = (accountId: string) => {
+    const newExpanded = new Set(expandedParents);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedParents(newExpanded);
+  };
 
   const calculateRunningBalance = () => {
     let runningBalance = selectedAccount?.balance || 0;
@@ -507,27 +562,70 @@ export default function Accounts() {
                     </div>
                   ) : (
                     filteredAccounts.map((account) => (
-                      <button
-                        key={account.id}
-                        onClick={() => handleAccountChange(account.id)}
-                        disabled={accountsLoading || !selectedCompany}
-                        className={`w-full p-3 text-left hover-elevate border-b last:border-b-0 ${
-                          selectedAccount?.id === account.id
-                            ? "bg-accent"
-                            : ""
-                        }`}
-                        data-testid={`button-select-account-${account.id}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {account.type}
-                          </Badge>
-                          <span className="font-mono text-xs text-muted-foreground">
-                            {account.code}
-                          </span>
-                          <span className="text-sm">{account.name}</span>
+                      <div key={account.id}>
+                        <div className="flex items-center border-b last:border-b-0">
+                          {account.children.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleParent(account.id);
+                              }}
+                              className="p-2 hover-elevate"
+                              data-testid={`button-toggle-${account.id}`}
+                            >
+                              {expandedParents.has(account.id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleAccountChange(account.id)}
+                            disabled={accountsLoading || !selectedCompany}
+                            className={`flex-1 p-3 text-left hover-elevate ${
+                              selectedAccount?.id === account.id
+                                ? "bg-accent"
+                                : ""
+                            } ${account.children.length === 0 ? 'ml-8' : ''}`}
+                            data-testid={`button-select-account-${account.id}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {account.type}
+                              </Badge>
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {account.code}
+                              </span>
+                              <span className="text-sm">{account.name}</span>
+                            </div>
+                          </button>
                         </div>
-                      </button>
+                        {expandedParents.has(account.id) && account.children.map((child) => (
+                          <div key={child.id} className="border-b last:border-b-0">
+                            <button
+                              onClick={() => handleAccountChange(child.id)}
+                              disabled={accountsLoading || !selectedCompany}
+                              className={`w-full p-3 pl-16 text-left hover-elevate ${
+                                selectedAccount?.id === child.id
+                                  ? "bg-accent"
+                                  : ""
+                              }`}
+                              data-testid={`button-select-account-${child.id}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {child.type}
+                                </Badge>
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {child.code}
+                                </span>
+                                <span className="text-sm">{child.name}</span>
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     ))
                   )}
                 </div>

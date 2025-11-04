@@ -113,10 +113,11 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   companyId: z.number().min(1, "Company is required"),
   code: z.string().optional(),
   name: z.string().min(1, "Name is required").refine(val => val.trim().length > 0, "Name cannot be only whitespace"),
-  accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Profit"]),
+  accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Accounts Payable", "Profit"]),
   subType: z.string().optional(),
   openingBalance: z.string().optional(),
   openingBalanceSide: z.enum(["Dr", "Cr"]).optional(),
+  parentId: z.number().optional(),
 });
 
 export const updateLedgerAccountSchema = insertLedgerAccountSchema.partial().extend({
@@ -562,6 +563,7 @@ export const offloadRequestSchema = insertContainerOffloadSchema.omit({
 }).extend({
   dutiesAccountId: z.number().nullable().optional(),
   officeChargesAccountId: z.number().nullable().optional(),
+  officeChargesCashAccountId: z.number().nullable().optional(),
   transportAccountId: z.number().nullable().optional(),
   additionalCharges: z.array(z.object({
     description: z.string().min(1, "Description is required"),

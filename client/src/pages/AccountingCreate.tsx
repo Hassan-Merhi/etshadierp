@@ -93,6 +93,7 @@ function EntityFormWrapper({
         description: `${config.label} "${data.name || data.legalName || data.code}" created successfully`,
       });
       queryClient.invalidateQueries({ queryKey: [config.endpoint] });
+      queryClient.invalidateQueries({ queryKey: [config.endpoint, selectedCompany?.id] });
       form.reset({});
     },
     onError: (error: any) => {
