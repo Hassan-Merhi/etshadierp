@@ -758,3 +758,147 @@ export const insertSalesItemSchema = createInsertSchema(salesItems).omit({
 
 export type InsertSalesItem = z.infer<typeof insertSalesItemSchema>;
 export type SalesItem = typeof salesItems.$inferSelect;
+
+// Customers - similar to suppliers but for container sales
+export const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  ledgerAccountId: integer("ledger_account_id"),
+  code: varchar("code", { length: 50 }).notNull(),
+  legalName: text("legal_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  address: text("address"),
+  taxId: text("tax_id"),
+  paymentTerms: text("payment_terms"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("customers_company_code_unique").on(t.companyId, t.code),
+}));
+
+export const insertCustomerSchema = createInsertSchema(customers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  code: z.string().min(1, "Code is required"),
+  legalName: z.string().min(1, "Legal name is required"),
+  email: z.string().email("Invalid email format"),
+  ledgerAccountId: z.number().optional(),
+});
+
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
+
+// Container Sales - tracks when containers are sold to customers
+export const containerSales = pgTable("container_sales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  saleDate: date("sale_date").notNull(),
+  containerCost: decimal("container_cost", { precision: 15, scale: 2 }).notNull(),
+  commission: decimal("commission", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  voucherId: integer("voucher_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContainerSaleSchema = createInsertSchema(containerSales).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  containerId: z.number().min(1, "Container is required"),
+  customerId: z.number().min(1, "Customer is required"),
+  saleDate: z.string().min(1, "Sale date is required"),
+  containerCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Container cost must be non-negative"),
+  commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
+  totalAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total amount must be positive"),
+});
+
+export type InsertContainerSale = z.infer<typeof insertContainerSaleSchema>;
+export type ContainerSale = typeof containerSales.$inferSelect;
+
+// Inter-Company Transfers - move money between companies owned by same person
+export const interCompanyTransfers = pgTable("inter_company_transfers", {
+  id: serial("id").primaryKey(),
+  transferType: text("transfer_type").notNull(),
+  fromCompanyId: integer("from_company_id").notNull(),
+  toCompanyId: integer("to_company_id").notNull(),
+  transferDate: date("transfer_date").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  fromLedgerAccountId: integer("from_ledger_account_id").notNull(),
+  toLedgerAccountId: integer("to_ledger_account_id").notNull(),
+  fromVoucherId: integer("from_voucher_id"),
+  toVoucherId: integer("to_voucher_id"),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertInterCompanyTransferSchema = createInsertSchema(interCompanyTransfers).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  transferType: z.enum(["Cash", "Loan"]),
+  fromCompanyId: z.number().min(1, "From company is required"),
+  toCompanyId: z.number().min(1, "To company is required"),
+  transferDate: z.string().min(1, "Transfer date is required"),
+  amount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
+  fromLedgerAccountId: z.number().min(1, "From account is required"),
+  toLedgerAccountId: z.number().min(1, "To account is required"),
+});
+
+export type InsertInterCompanyTransfer = z.infer<typeof insertInterCompanyTransferSchema>;
+export type InterCompanyTransfer = typeof interCompanyTransfers.$inferSelect;
+
+// Salary Advances - track advances given to employees
+export const salaryAdvances = pgTable("salary_advances", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  advanceDate: date("advance_date").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  remainingBalance: decimal("remaining_balance", { precision: 15, scale: 2 }).notNull(),
+  voucherId: integer("voucher_id"),
+  notes: text("notes"),
+  fullyPaid: boolean("fully_paid").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSalaryAdvanceSchema = createInsertSchema(salaryAdvances).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  employeeId: z.number().min(1, "Employee is required"),
+  advanceDate: z.string().min(1, "Advance date is required"),
+  amount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
+  remainingBalance: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Remaining balance must be non-negative"),
+});
+
+export type InsertSalaryAdvance = z.infer<typeof insertSalaryAdvanceSchema>;
+export type SalaryAdvance = typeof salaryAdvances.$inferSelect;
+
+// Salary Advance Deductions - track deductions from employee salary
+export const salaryAdvanceDeductions = pgTable("salary_advance_deductions", {
+  id: serial("id").primaryKey(),
+  salaryAdvanceId: integer("salary_advance_id").notNull(),
+  payrollMonth: text("payroll_month").notNull(),
+  deductionAmount: decimal("deduction_amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSalaryAdvanceDeductionSchema = createInsertSchema(salaryAdvanceDeductions).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  salaryAdvanceId: z.number().min(1, "Salary advance is required"),
+  payrollMonth: z.string().min(1, "Payroll month is required"),
+  deductionAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Deduction amount must be positive"),
+});
+
+export type InsertSalaryAdvanceDeduction = z.infer<typeof insertSalaryAdvanceDeductionSchema>;
+export type SalaryAdvanceDeduction = typeof salaryAdvanceDeductions.$inferSelect;

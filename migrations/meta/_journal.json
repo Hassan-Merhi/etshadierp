@@ -15,6 +15,13 @@
       "when": 1762249325365,
       "tag": "0001_parallel_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762274055857,
+      "tag": "0002_married_loa",
+      "breakpoints": true
     }
   ]
 }
