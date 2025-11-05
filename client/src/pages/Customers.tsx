@@ -25,55 +25,48 @@ import {
 import { insertCustomerSchema, type Customer } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 
 const formSchema = insertCustomerSchema.extend({
-  code: z.string().min(1, "Code is required"),
   legalName: z.string().min(1, "Legal name is required"),
-  email: z.string().min(1, "Email is required").email("Invalid email"),
 });
 
 export default function Customers() {
   const { toast } = useToast();
-  const { companyId } = useCompany();
+  const { selectedCompany } = useCompany();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers", companyId],
-    enabled: !!companyId,
+    queryKey: ["/api/customers", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      companyId: companyId!,
-      code: "",
+      companyId: selectedCompany?.id || 0,
       legalName: "",
-      email: "",
       phone: "",
-      address: "",
-      taxId: "",
-      paymentTerms: "",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
     },
   });
 
   // Reset form when company changes
   useEffect(() => {
-    if (companyId) {
+    if (selectedCompany?.id) {
       form.reset({
-        companyId: companyId,
-        code: "",
+        companyId: selectedCompany.id,
         legalName: "",
-        email: "",
         phone: "",
-        address: "",
-        taxId: "",
-        paymentTerms: "",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
       });
     }
-  }, [companyId, form]);
+  }, [selectedCompany?.id, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
@@ -84,18 +77,15 @@ export default function Customers() {
         title: "Success",
         description: "Customer created successfully with ledger account",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers", companyId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateOpen(false);
       form.reset({
-        companyId: companyId!,
-        code: "",
+        companyId: selectedCompany?.id || 0,
         legalName: "",
-        email: "",
         phone: "",
-        address: "",
-        taxId: "",
-        paymentTerms: "",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
       });
     },
     onError: (error: Error) => {
@@ -114,7 +104,6 @@ export default function Customers() {
   const filteredCustomers = customers.filter((customer) =>
     customer.legalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     customer.phone?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -140,78 +129,37 @@ export default function Customers() {
               New Customer
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create New Customer</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Customer Code *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="CUST001" data-testid="input-customer-code" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="legalName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Legal Name *</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="ABC Company Ltd." data-testid="input-legal-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email *</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="email" placeholder="contact@example.com" data-testid="input-email" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid="input-phone" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="legalName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Legal Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="ABC Company Ltd." data-testid="input-legal-name" />
+                      </FormControl>
+                      <FormDescription>
+                        Customer code will be auto-generated
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
-                  name="address"
+                  name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Address</FormLabel>
+                      <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ""} placeholder="123 Main St, City, Country" data-testid="input-address" />
+                        <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid="input-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -221,26 +169,35 @@ export default function Customers() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="taxId"
+                    name="openingBalance"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tax ID / VAT Number</FormLabel>
+                        <FormLabel>Opening Balance</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="TAX123456" data-testid="input-tax-id" />
+                          <Input {...field} value={field.value || "0"} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
-                    name="paymentTerms"
+                    name="openingBalanceSide"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Payment Terms</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} placeholder="Net 30" data-testid="input-payment-terms" />
-                        </FormControl>
+                        <FormLabel>Balance Side</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || "Dr"}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-balance-side">
+                              <SelectValue placeholder="Select side" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -274,7 +231,7 @@ export default function Customers() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search customers by name, code, email, or phone..."
+            placeholder="Search customers by name, code, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -289,35 +246,33 @@ export default function Customers() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Legal Name</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead>Tax ID</TableHead>
-              <TableHead>Payment Terms</TableHead>
+              <TableHead className="text-right">Opening Balance</TableHead>
+              <TableHead>Balance Side</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   {searchQuery ? "No customers found matching your search" : "No customers yet"}
                 </TableCell>
               </TableRow>
             ) : (
               filteredCustomers.map((customer) => (
                 <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                  <TableCell className="font-medium">{customer.code}</TableCell>
+                  <TableCell className="font-medium font-mono">{customer.code}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                       {customer.legalName}
                     </div>
                   </TableCell>
-                  <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.phone || "-"}</TableCell>
-                  <TableCell className="max-w-xs truncate">{customer.address || "-"}</TableCell>
-                  <TableCell>{customer.taxId || "-"}</TableCell>
-                  <TableCell>{customer.paymentTerms || "-"}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    ${parseFloat(customer.openingBalance || "0").toFixed(2)}
+                  </TableCell>
+                  <TableCell>{customer.openingBalanceSide || "Dr"}</TableCell>
                 </TableRow>
               ))
             )}

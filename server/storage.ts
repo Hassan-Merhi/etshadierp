@@ -847,7 +847,25 @@ export class DbStorage implements IStorage {
 
   // PO Line Items
   async getLineItemsByPO(poId: number): Promise<POLineItem[]> {
-    return await db.select().from(schema.poLineItems).where(eq(schema.poLineItems.poId, poId));
+    const items = await db
+      .select({
+        id: schema.poLineItems.id,
+        poId: schema.poLineItems.poId,
+        stockItemId: schema.poLineItems.stockItemId,
+        stockItemCode: schema.stockItems.code,
+        stockItemName: schema.poLineItems.itemName,
+        itemName: schema.poLineItems.itemName,
+        quantity: schema.poLineItems.quantity,
+        rate: schema.poLineItems.rate,
+        lineTotal: schema.poLineItems.lineTotal,
+        createdAt: schema.poLineItems.createdAt,
+        totalCost: schema.poLineItems.lineTotal,
+      })
+      .from(schema.poLineItems)
+      .leftJoin(schema.stockItems, eq(schema.poLineItems.stockItemId, schema.stockItems.id))
+      .where(eq(schema.poLineItems.poId, poId));
+    
+    return items as any;
   }
 
   async createPOLineItem(lineItem: InsertPOLineItem): Promise<POLineItem> {

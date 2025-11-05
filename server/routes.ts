@@ -1591,16 +1591,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const parsed = insertCustomerSchema.parse(dataWithCompany);
       
-      // Check for duplicate code within the current company
-      const existing = await storage.getCustomerByCode(parsed.code, req.session.currentCompanyId);
-      if (existing) {
-        return res.status(400).json({ message: "Customer code already exists in this company" });
+      // Auto-generate customer code
+      let code = "CUST001";
+      let suffix = 1;
+      const allCustomers = await storage.getAllCustomers(req.session.currentCompanyId);
+      
+      // Find the highest existing customer number
+      const existingCodes = allCustomers
+        .map(c => c.code)
+        .filter(c => c.startsWith("CUST"))
+        .map(c => parseInt(c.replace("CUST", "")))
+        .filter(n => !isNaN(n));
+      
+      if (existingCodes.length > 0) {
+        const maxNumber = Math.max(...existingCodes);
+        suffix = maxNumber + 1;
+      }
+      
+      code = `CUST${suffix.toString().padStart(3, "0")}`;
+      
+      // Ensure uniqueness
+      while (await storage.getCustomerByCode(code, req.session.currentCompanyId)) {
+        suffix++;
+        code = `CUST${suffix.toString().padStart(3, "0")}`;
       }
 
-      // Create customer first
-      const customer = await storage.createCustomer(parsed);
+      // Create customer with auto-generated code
+      const customer = await storage.createCustomer({ ...parsed, code });
 
-      // Auto-create ledger account for customer
+      // Auto-create ledger account for customer with opening balance
       const customerAccountCode = `CUST-${customer.code}`;
       let customerAccount = await storage.getLedgerAccountByCode(customerAccountCode);
       
@@ -1611,7 +1630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: `${customer.legalName} - Customer Account`,
           accountType: "Asset",
           subType: "Accounts Receivable",
-          openingBalance: "0",
+          openingBalance: parsed.openingBalance || "0",
+          openingBalanceSide: parsed.openingBalanceSide || "Dr",
           active: true,
         });
 

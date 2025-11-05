@@ -766,11 +766,9 @@ export const customers = pgTable("customers", {
   ledgerAccountId: integer("ledger_account_id"),
   code: varchar("code", { length: 50 }).notNull(),
   legalName: text("legal_name").notNull(),
-  email: text("email").notNull(),
   phone: text("phone"),
-  address: text("address"),
-  taxId: text("tax_id"),
-  paymentTerms: text("payment_terms"),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
+  openingBalanceSide: varchar("opening_balance_side", { length: 2 }).default("Dr"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
@@ -780,11 +778,12 @@ export const customers = pgTable("customers", {
 export const insertCustomerSchema = createInsertSchema(customers).omit({
   id: true,
   createdAt: true,
+  code: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
   legalName: z.string().min(1, "Legal name is required"),
-  email: z.string().email("Invalid email format"),
+  openingBalance: z.string().optional(),
+  openingBalanceSide: z.enum(["Dr", "Cr"]).optional(),
   ledgerAccountId: z.number().optional(),
 });
 
