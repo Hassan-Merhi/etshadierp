@@ -48,13 +48,13 @@ const formSchema = insertInterCompanyTransferSchema.extend({
 
 export default function InterCompanyTransfers() {
   const { toast } = useToast();
-  const { companyId } = useCompany();
+  const { selectedCompany } = useCompany();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: transfers = [], isLoading } = useQuery<InterCompanyTransfer[]>({
-    queryKey: ["/api/inter-company-transfers", companyId],
-    enabled: !!companyId,
+    queryKey: ["/api/inter-company-transfers", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: companies = [] } = useQuery<Company[]>({
@@ -64,7 +64,7 @@ export default function InterCompanyTransfers() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fromCompanyId: companyId!,
+      fromCompanyId: selectedCompany?.id || 0,
       toCompanyId: 0,
       transferType: "Cash",
       amount: "",
@@ -77,9 +77,9 @@ export default function InterCompanyTransfers() {
 
   // Reset form when company changes
   useEffect(() => {
-    if (companyId) {
+    if (selectedCompany?.id) {
       form.reset({
-        fromCompanyId: companyId,
+        fromCompanyId: selectedCompany.id,
         toCompanyId: 0,
         transferType: "Cash",
         amount: "",
@@ -89,7 +89,7 @@ export default function InterCompanyTransfers() {
         toVoucherId: undefined,
       });
     }
-  }, [companyId, form]);
+  }, [selectedCompany?.id, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
@@ -100,12 +100,12 @@ export default function InterCompanyTransfers() {
         title: "Success",
         description: "Inter-company transfer created with vouchers in both companies",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/inter-company-transfers", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inter-company-transfers", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       setIsCreateOpen(false);
       form.reset({
-        fromCompanyId: companyId!,
+        fromCompanyId: selectedCompany?.id || 0,
         toCompanyId: 0,
         transferType: "Cash",
         amount: "",
@@ -152,7 +152,7 @@ export default function InterCompanyTransfers() {
     );
   }
 
-  const otherCompanies = companies.filter(c => c.id !== companyId);
+  const otherCompanies = companies.filter(c => c.id !== selectedCompany?.id);
 
   return (
     <div className="flex flex-col h-full p-6">

@@ -455,13 +455,14 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                 <FormItem>
                   <FormLabel>Parent Account</FormLabel>
                   <div className="flex gap-2">
-                    <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
+                    <Select onValueChange={(v) => field.onChange(v === "none" ? undefined : parseInt(v))} value={field.value?.toString() || "none"}>
                       <FormControl>
                         <SelectTrigger data-testid="select-parent">
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
                         {ledgerAccounts.map((acc: any) => (
                           <SelectItem key={acc.id} value={acc.id.toString()}>
                             {acc.name} ({acc.code})
