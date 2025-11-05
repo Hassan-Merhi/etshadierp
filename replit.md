@@ -38,7 +38,11 @@ The frontend uses React with TypeScript and Vite. It implements the shadcn/ui de
 ### Feature Specifications
 
 - **Multi-Tenancy**: Full support for multiple companies with isolated data (locations, inventory, financials) and shared global suppliers. Users can have different roles across companies.
-- **Inventory Management**: Stock items use a single `code` field for item codes and barcode scanning. Stock items can be assigned to stock groups during creation or import.
+- **Inventory Management**: 
+    - Stock items use a single `code` field for item codes and barcode scanning. Stock items can be assigned to stock groups during creation or import.
+    - **Stock Transfers**: Multi-source location transfers wrapped in database transactions for atomic operations. Each item can be transferred from a different source location to a single destination, with automatic weighted average rate calculation.
+    - **Stock Adjustments**: Production and consumption adjustments wrapped in transactions. Production adds inventory with weighted average costing; consumption reduces inventory maintaining current average rate.
+    - All stock operations use Drizzle ORM transactions to ensure atomicity - either all inventory updates succeed or everything rolls back.
 - **Financial Accounting**:
     - Automatic voucher creation for purchase orders (Debit: PURCHASES, Credit: Supplier).
     - Automatic voucher creation for container offload charges (duties, office, transport, additional) to specific ledger accounts (Debit: IMPORT_CHARGES, Credit: Payable accounts).
