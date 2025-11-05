@@ -69,7 +69,7 @@ const getDefaultValues = (entityType: EntityType) => {
     case "ledger":
       return { name: "", openingBalance: "0", active: true };
     case "employee":
-      return { firstName: "", lastName: "", designation: "", openingBalance: "0", active: true };
+      return { firstName: "", lastName: "", phone: "", joinDate: "", department: "", openingBalance: "0", active: true };
     case "supplier":
       return { legalName: "", phone: "", active: true };
     case "stockGroup":
