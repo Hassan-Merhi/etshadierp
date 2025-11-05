@@ -6325,6 +6325,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log('[Stock Transfer] Creating transfer:', { voucherId, destinationLocationId, itemCount: items.length });
+      
       const transfer = await storage.createStockTransfer(
         voucherId,
         destinationLocationId,
@@ -6332,8 +6334,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items
       );
 
+      console.log('[Stock Transfer] Transfer created successfully:', { transferId: transfer.transfer.id, itemsCount: transfer.items.length });
       res.status(201).json(transfer);
     } catch (error: any) {
+      console.error('[Stock Transfer] Error creating transfer:', error.message, error.stack);
       res.status(500).json({ message: error.message });
     }
   });
@@ -6386,6 +6390,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log('[Stock Adjustment] Creating adjustment:', { voucherId, locationId, adjustmentType, itemCount: items.length });
+      
       const adjustment = await storage.createStockAdjustment(
         voucherId,
         locationId,
@@ -6394,8 +6400,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items
       );
 
+      console.log('[Stock Adjustment] Adjustment created successfully:', { adjustmentId: adjustment.adjustment.id, itemsCount: adjustment.items.length });
       res.status(201).json(adjustment);
     } catch (error: any) {
+      console.error('[Stock Adjustment] Error creating adjustment:', error.message, error.stack);
       res.status(500).json({ message: error.message });
     }
   });
