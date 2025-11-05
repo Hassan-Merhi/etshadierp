@@ -1226,6 +1226,7 @@ export default function Vouchers() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
       stockTransferForm.reset({
         voucherDate: new Date(),
         destinationLocationId: 0,
@@ -1375,10 +1376,19 @@ export default function Vouchers() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-adjustments"] });
       stockAdjustmentForm.reset({
         voucherDate: new Date(),
         locationId: 0,
-        entries: [],
+        entries: [
+          {
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            adjustmentType: "Production",
+            notes: "",
+          },
+        ],
         notes: "",
       });
     },
