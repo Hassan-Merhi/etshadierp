@@ -71,6 +71,7 @@ export interface IStorage {
   getLocationById(id: number): Promise<Location | undefined>;
   getLocationByCode(code: string, companyId: number): Promise<Location | undefined>;
   createLocation(location: InsertLocation): Promise<Location>;
+  deleteLocation(id: number): Promise<void>;
 
   // Ledger Accounts
   getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
@@ -350,6 +351,10 @@ export class DbStorage implements IStorage {
   async createLocation(location: InsertLocation): Promise<Location> {
     const [created] = await db.insert(schema.locations).values(location).returning();
     return created;
+  }
+
+  async deleteLocation(id: number): Promise<void> {
+    await db.delete(schema.locations).where(eq(schema.locations.id, id));
   }
 
   // Ledger Accounts

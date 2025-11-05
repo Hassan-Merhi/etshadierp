@@ -4,7 +4,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useReactToPrint } from "react-to-print";
@@ -16,6 +16,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +99,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
+
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Print handler
   const handlePrint = useReactToPrint({
@@ -355,6 +369,35 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setImportPreview([]);
     setImportErrors([]);
     setImportComplete(false);
+  };
+
+  const handleDeleteLocation = async () => {
+    if (!selectedLocationLocal) return;
+
+    setIsDeleting(true);
+    try {
+      await apiRequest("DELETE", `/api/locations/${selectedLocationLocal.id}`);
+
+      // Invalidate locations cache to refresh the list
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+
+      toast({
+        title: "Location Deleted",
+        description: `${selectedLocationLocal.name} has been deleted successfully`,
+      });
+
+      // Navigate back to location list
+      setSelectedLocationLocal(null);
+      setDeleteDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete location",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -656,17 +699,51 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 View All Stock Items
               </Button>
               {!posUser && (
-                <Button
-                  onClick={() => handleUseLocation(selectedLocationLocal)}
-                  data-testid="button-use-location"
-                  className="gap-2"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  Use Location for POS
-                </Button>
+                <>
+                  <Button
+                    onClick={() => handleUseLocation(selectedLocationLocal)}
+                    data-testid="button-use-location"
+                    className="gap-2"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    Use Location for POS
+                  </Button>
+                  <Button
+                    onClick={() => setDeleteDialogOpen(true)}
+                    data-testid="button-delete-location"
+                    variant="destructive"
+                    className="gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Location
+                  </Button>
+                </>
               )}
             </div>
           </div>
+
+          {/* Delete Confirmation Dialog */}
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Location</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{selectedLocationLocal?.name}"? This action cannot be undone and will remove all associated inventory data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteLocation}
+                  disabled={isDeleting}
+                  data-testid="button-confirm-delete"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           {inventoryLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map(i => (

@@ -395,6 +395,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete location
+  app.delete("/api/locations/:locationId", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      // Verify location belongs to current company
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Location belongs to a different company" });
+      }
+
+      await storage.deleteLocation(locationId);
+      res.json({ message: "Location deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Location Inventory - Get inventory for a specific location
   app.get("/api/locations/:locationId/inventory", requireAuth, checkPOSLocation, async (req, res) => {
     try {
