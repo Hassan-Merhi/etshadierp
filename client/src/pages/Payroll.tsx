@@ -485,7 +485,6 @@ export default function Payroll() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead data-testid="header-code">Code</TableHead>
                         <TableHead data-testid="header-name">Name</TableHead>
                         <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
                         <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
@@ -496,11 +495,16 @@ export default function Payroll() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employeeStaff.map((employee) => (
+                      {employeeStaff.map((employee) => {
+                        const openingBal = parseFloat(employee.openingBalance || "0");
+                        const deposits = parseFloat(employee.totalDeposits || "0");
+                        const withdrawals = parseFloat(employee.totalWithdrawals || "0");
+                        const balance = employee.openingBalanceSide === "Dr" 
+                          ? openingBal + deposits - withdrawals
+                          : -openingBal + deposits - withdrawals;
+                        
+                        return (
                         <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
-                          <TableCell data-testid={`cell-code-${employee.id}`}>
-                            {employee.code}
-                          </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
                             {employee.firstName} {employee.lastName}
                           </TableCell>
@@ -508,7 +512,7 @@ export default function Payroll() {
                             {parseFloat(employee.monthlySalary).toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono">
-                            {parseFloat(employee.currentBalance).toFixed(2)}
+                            {balance.toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
                             {parseFloat(employee.totalDeposits).toFixed(2)}
@@ -536,7 +540,7 @@ export default function Payroll() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleWithdrawal(employee)}
-                                disabled={parseFloat(employee.currentBalance) <= 0}
+                                disabled={balance <= 0}
                                 data-testid={`button-withdraw-${employee.id}`}
                               >
                                 <TrendingDown className="h-4 w-4 mr-1" />
@@ -545,7 +549,8 @@ export default function Payroll() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
