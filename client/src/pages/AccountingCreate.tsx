@@ -61,6 +61,26 @@ const entityConfig = {
   stockItem: { label: "Stock Item", endpoint: "/api/stock-items", schema: insertStockItemSchema.omit({ companyId: true }) },
 };
 
+// Get default values for each entity type
+const getDefaultValues = (entityType: EntityType) => {
+  switch (entityType) {
+    case "location":
+      return { name: "", code: "", active: true };
+    case "ledger":
+      return { name: "", openingBalance: "0", active: true };
+    case "employee":
+      return { firstName: "", lastName: "", designation: "", openingBalance: "0", active: true };
+    case "supplier":
+      return { legalName: "", phone: "", active: true };
+    case "stockGroup":
+      return { name: "", active: true };
+    case "stockItem":
+      return { name: "", uom: "PCS", openingQty: "0", openingRate: "0", openingValue: "0", sellingPrice: "0", reorderLevel: "0", active: true };
+    default:
+      return {};
+  }
+};
+
 // Wrapper component to properly recreate form when entity changes
 function EntityFormWrapper({ 
   entityType, 
@@ -72,9 +92,11 @@ function EntityFormWrapper({
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   
+  const defaultValues = getDefaultValues(entityType);
+  
   const form = useForm({
     resolver: zodResolver(config.schema),
-    defaultValues: {},
+    defaultValues: defaultValues,
   });
 
   const createMutation = useMutation({
@@ -94,7 +116,7 @@ function EntityFormWrapper({
       });
       queryClient.invalidateQueries({ queryKey: [config.endpoint] });
       queryClient.invalidateQueries({ queryKey: [config.endpoint, selectedCompany?.id] });
-      form.reset({});
+      form.reset(getDefaultValues(entityType));
     },
     onError: (error: any) => {
       toast({
@@ -110,7 +132,7 @@ function EntityFormWrapper({
   };
 
   const handleCancel = () => {
-    form.reset({});
+    form.reset(getDefaultValues(entityType));
   };
 
   // Render appropriate form based on entity type

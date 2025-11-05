@@ -829,7 +829,7 @@ export default function Vouchers() {
 
       return voucher;
     },
-    onSuccess: (voucher, formData) => {
+    onSuccess: () => {
       toast({
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher created successfully`,
@@ -837,9 +837,9 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       form.reset({
-        paymentAccountType: formData.paymentAccountType,
-        paymentAccountId: formData.paymentAccountId,
-        paymentAccountName: formData.paymentAccountName,
+        paymentAccountType: "ledger",
+        paymentAccountId: 0,
+        paymentAccountName: "",
         voucherDate: new Date(),
         entries: [
           {
