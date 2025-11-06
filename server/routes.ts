@@ -4331,13 +4331,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
         ...suppliers.map((supplier) => {
           const movements = supplierBalances.get(supplier.id) || { debits: 0, credits: 0 };
-          // Suppliers don't have opening balance, and are typically credit balance (payables)
-          const { balance, balanceSide } = calculateBalance(
-            "0",
-            "Cr",
-            movements.debits,
-            movements.credits
-          );
+          
+          // Calculate balance using signed opening balance (same logic as /api/suppliers/stats)
+          // Positive opening balance = we owe them, Negative = they owe us/prepaid
+          // Credits increase payable, Debits decrease payable
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          const calculatedBalance = openingBalance + movements.credits - movements.debits;
+          
+          // Determine side based on final balance
+          const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
+          const absoluteBalance = Math.abs(calculatedBalance);
           
           return {
             id: `supplier-${supplier.id}`,
@@ -4345,7 +4348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: "Supplier",
             code: supplier.code,
             name: supplier.legalName,
-            balance,
+            balance: absoluteBalance,
             balanceSide,
             active: supplier.active,
           };
