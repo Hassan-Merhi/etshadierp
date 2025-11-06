@@ -193,8 +193,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   });
 
-  // Sort locations chronologically (by id)
-  const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
+  // Sort locations alphabetically (A-Z) by name
+  const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
 
   // Filter locations by search term
   const filteredLocations = sortedLocations.filter((location) =>
