@@ -553,7 +553,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const handleEdit = (voucher: Voucher) => {
     // Navigate to appropriate editing interface based on voucher type
-    const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase", "Consumption", "Mixed", "Stock Transfer"];
+    const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase", "Consumption", "Production", "Mixed", "Stock Transfer"];
     if (editableTypes.includes(voucher.voucherType)) {
       setLocation(`/vouchers/${voucher.id}/edit`);
     } else {

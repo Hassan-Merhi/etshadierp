@@ -4789,9 +4789,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // If this is a Consumption or Mixed voucher, fetch adjustment details
+      // If this is a Consumption, Mixed, or Production voucher, fetch adjustment details
       let adjustmentData = null;
-      if (voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") {
+      if (voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed" || voucher.voucherType === "Production") {
         const adjustment = await db
           .select()
           .from(stockAdjustmentVouchers)
@@ -4825,12 +4825,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         } else {
           // No adjustment record exists - return empty structure so frontend can show form
+          let adjustmentType = "production";
+          if (voucher.voucherType === "Consumption") adjustmentType = "consumption";
+          else if (voucher.voucherType === "Mixed") adjustmentType = "mixed";
+          
           adjustmentData = {
             id: 0,
             voucherId: id,
             locationId: voucher.locationId || 1,
             locationName: "",
-            adjustmentType: voucher.voucherType === "Consumption" ? "consumption" : "production",
+            adjustmentType: adjustmentType,
             notes: voucher.description || "",
             items: [],
             createdAt: new Date(),
@@ -5508,7 +5512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update an adjustment voucher (Consumption or Mixed) with line items
+  // Update an adjustment voucher (Consumption, Production, or Mixed) with line items
   app.patch("/api/vouchers/:id/adjustment", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -5532,9 +5536,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Voucher not found" });
       }
 
-      // Verify this is a Consumption or Mixed voucher
-      if (existingVoucher.voucherType !== "Consumption" && existingVoucher.voucherType !== "Mixed") {
-        return res.status(400).json({ message: "This endpoint only updates Consumption or Mixed vouchers" });
+      // Verify this is a Consumption, Production, or Mixed voucher
+      if (existingVoucher.voucherType !== "Consumption" && existingVoucher.voucherType !== "Production" && existingVoucher.voucherType !== "Mixed") {
+        return res.status(400).json({ message: "This endpoint only updates Consumption, Production, or Mixed vouchers" });
       }
 
       // Verify voucher belongs to current company
@@ -5574,7 +5578,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If no adjustment voucher exists, create one
       if (!adjustmentVoucher) {
-        const adjustmentType = existingVoucher.voucherType === "Consumption" ? "consumption" : "production";
+        let adjustmentType = "production";
+        if (existingVoucher.voucherType === "Consumption") adjustmentType = "consumption";
+        else if (existingVoucher.voucherType === "Mixed") adjustmentType = "mixed";
+        
         const [newAdjustment] = await db
           .insert(stockAdjustmentVouchers)
           .values({

@@ -528,7 +528,7 @@ export default function VoucherEdit() {
   const isJournal = voucherType === "Journal";
   const isPurchase = voucherType === "Purchase";
   const isSales = voucherType === "Sales";
-  const isConsumption = voucherType === "Consumption" || voucherType === "Mixed";
+  const isConsumption = voucherType === "Consumption" || voucherType === "Production" || voucherType === "Mixed";
   const isStockTransfer = voucherType === "Stock Transfer";
 
   // Payment/Receipt Form
