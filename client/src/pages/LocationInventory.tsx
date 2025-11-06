@@ -5,6 +5,7 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search } from "lucide-react";
+import { LocationCreateDialog } from "@/components/LocationCreateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useReactToPrint } from "react-to-print";
@@ -107,6 +108,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Create location dialog state
+  const [createLocationDialogOpen, setCreateLocationDialogOpen] = useState(false);
+
   // Print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -191,10 +195,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Filter locations by search term
   const filteredLocations = sortedLocations.filter((location) =>
-    location.name.toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
-    location.code.toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
-    (location.city ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
-    (location.state ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase())
+    location.name.toLowerCase().includes(locationSearchTerm.toLowerCase())
   );
 
   // Sort stock groups chronologically (by id, nulls last)
@@ -515,13 +516,29 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Location List View */}
       {!selectedLocationLocal && (
         <div>
-          <h1 className="text-3xl font-bold mb-6">Location Inventory</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">Location Inventory</h1>
+            <Button
+              variant="default"
+              onClick={() => setCreateLocationDialogOpen(true)}
+              data-testid="button-create-location"
+              className="gap-2"
+            >
+              <MapPin className="w-4 h-4" />
+              Create Location
+            </Button>
+          </div>
+
+          <LocationCreateDialog
+            open={createLocationDialogOpen}
+            onOpenChange={setCreateLocationDialogOpen}
+          />
           
           <Card className="p-4">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search locations by name, code, city, or state..."
+                placeholder="Search locations by name..."
                 value={locationSearchTerm}
                 onChange={(e) => setLocationSearchTerm(e.target.value)}
                 className="pl-10"
@@ -544,17 +561,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-12">
-                      <th className="text-left px-3 font-medium">Code</th>
                       <th className="text-left px-3 font-medium">Name</th>
-                      <th className="text-left px-3 font-medium">City</th>
-                      <th className="text-left px-3 font-medium">State</th>
-                      <th className="text-left px-3 font-medium">Country</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLocations.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <td colSpan={1} className="text-center py-8 text-muted-foreground">
                           No locations found matching your search
                         </td>
                       </tr>
@@ -566,23 +579,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           onClick={() => handleLocationClick(location)}
                           data-testid={`row-location-${location.id}`}
                         >
-                          <td className="px-3 font-mono" data-testid={`code-${location.id}`}>
-                            {location.code}
-                          </td>
                           <td className="px-3 font-medium" data-testid={`name-${location.id}`}>
                             <div className="flex items-center gap-2">
                               <MapPin className="h-4 w-4 text-muted-foreground" />
                               {location.name}
                             </div>
-                          </td>
-                          <td className="px-3" data-testid={`city-${location.id}`}>
-                            {location.city || "-"}
-                          </td>
-                          <td className="px-3" data-testid={`state-${location.id}`}>
-                            {location.state || "-"}
-                          </td>
-                          <td className="px-3" data-testid={`country-${location.id}`}>
-                            {location.country || "-"}
                           </td>
                         </tr>
                       ))
@@ -822,7 +823,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search stock groups by name or code..."
+                placeholder="Search stock groups by name..."
                 value={groupSearchTerm}
                 onChange={(e) => setGroupSearchTerm(e.target.value)}
                 className="pl-10"
@@ -845,7 +846,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-12">
-                      <th className="text-left px-3 font-medium">Code</th>
                       <th className="text-left px-3 font-medium">Name</th>
                       <th className="text-right px-3 font-medium">Items</th>
                       <th className="text-right px-3 font-medium">Total Qty</th>
@@ -860,7 +860,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tbody>
                     {filteredStockGroups.length === 0 ? (
                       <tr>
-                        <td colSpan={posUser ? 4 : 6} className="text-center py-8 text-muted-foreground">
+                        <td colSpan={posUser ? 3 : 5} className="text-center py-8 text-muted-foreground">
                           No stock groups found matching your search
                         </td>
                       </tr>
@@ -872,9 +872,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           onClick={() => setSelectedGroup(group)}
                           data-testid={`row-group-${group.groupId || 'uncategorized'}`}
                         >
-                          <td className="px-3 font-mono" data-testid={`code-${group.groupId}`}>
-                            {group.groupCode || "-"}
-                          </td>
                           <td className="px-3 font-medium" data-testid={`name-${group.groupId}`}>
                             <div className="flex items-center gap-2">
                               <Layers className="h-4 w-4 text-muted-foreground" />
@@ -885,7 +882,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             {group.itemCount}
                           </td>
                           <td className="px-3 text-right font-mono" data-testid={`qty-${group.groupId}`}>
-                            {group.totalQuantity.toFixed(3)}
+                            {Math.floor(group.totalQuantity)}
                           </td>
                           {!posUser && (
                             <>
@@ -924,7 +921,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search items by name or code..."
+                placeholder="Search items by name..."
                 value={itemSearchTerm}
                 onChange={(e) => setItemSearchTerm(e.target.value)}
                 className="pl-10"
@@ -936,7 +933,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr className="h-12">
-                    <th className="text-left px-3 font-medium">Code</th>
                     <th className="text-left px-3 font-medium">Name</th>
                     <th className="text-right px-3 font-medium">Quantity</th>
                     <th className="text-left px-3 font-medium">UOM</th>
@@ -951,7 +947,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <tbody>
                   {filteredStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan={posUser ? 4 : 6} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={posUser ? 3 : 5} className="text-center py-8 text-muted-foreground">
                         {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
                       </td>
                     </tr>
@@ -965,10 +961,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         }`}
                         onClick={() => setSelectedRowIndex(index)}
                       >
-                        <td className="px-3 font-mono">{item.stockItemCode}</td>
                         <td className="px-3 font-medium">{item.stockItemName}</td>
                         <td className="px-3 text-right font-mono">
-                          {parseFloat(item.quantity).toFixed(3)}
+                          {Math.floor(parseFloat(item.quantity))}
                         </td>
                         <td className="px-3">{item.stockItemUom}</td>
                         {!posUser && (
@@ -1030,10 +1025,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 .print-header {
                   margin-bottom: 1rem !important;
                 }
-                .print-compact-table th:first-child,
-                .print-compact-table td:first-child {
-                  display: none !important;
-                }
               }
             `}</style>
             {/* Print header (hidden on screen) */}
@@ -1079,7 +1070,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <Table className="print-compact-table">
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Code</TableHead>
                               <TableHead>Name</TableHead>
                               <TableHead className="text-right">Quantity</TableHead>
                               <TableHead>UOM</TableHead>
@@ -1097,10 +1087,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 key={item.inventoryId}
                                 data-testid={`row-all-items-${item.stockItemId}`}
                               >
-                                <TableCell className="font-medium">{item.stockItemCode}</TableCell>
-                                <TableCell>{item.stockItemName}</TableCell>
+                                <TableCell className="font-medium">{item.stockItemName}</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {parseFloat(item.quantity).toFixed(3)}
+                                  {Math.floor(parseFloat(item.quantity))}
                                 </TableCell>
                                 <TableCell>{item.stockItemUom}</TableCell>
                                 {!posUser && (
