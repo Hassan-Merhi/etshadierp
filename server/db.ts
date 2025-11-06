@@ -9,7 +9,7 @@ let connectionString: string;
 if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
   // Use Replit's database in development
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
-  connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
+  connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}?sslmode=require`;
   console.log('Using Replit database for development');
 } else if (process.env.DATABASE_URL) {
   // Use DATABASE_URL for production (Render)
