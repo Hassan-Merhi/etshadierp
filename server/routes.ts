@@ -3201,13 +3201,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
       }
 
-      // Get last purchase order, last sale, and current locations
-      const [lastPurchase, lastSale, inventoryLocations] = await Promise.all([
-        storage.getLastPurchaseOrderForItem(
+      // Get all purchases, all sales, and current locations
+      const [purchases, sales, inventoryLocations] = await Promise.all([
+        storage.getAllPurchasesForItem(
           stockItemId,
           req.session.currentCompanyId,
         ),
-        storage.getLastSaleForItem(stockItemId, req.session.currentCompanyId),
+        storage.getAllSalesForItem(stockItemId, req.session.currentCompanyId),
         storage.getInventoryLocationsByItem(
           stockItemId,
           req.session.currentCompanyId,
@@ -3215,8 +3215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       res.json({
-        lastPurchase,
-        lastSale,
+        purchases,
+        sales,
         inventoryLocations,
       });
     } catch (error: any) {

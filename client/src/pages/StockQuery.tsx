@@ -17,23 +17,28 @@ interface StockItem {
   active: boolean;
 }
 
+interface Purchase {
+  poNumber: string;
+  poDate: string;
+  supplierName: string;
+  containerNumber: string | null;
+  quantity: string;
+  rate: string;
+  amount: string;
+}
+
+interface Sale {
+  voucherNumber: string;
+  saleDate: string;
+  locationName: string | null;
+  quantity: string;
+  sellingPrice: string;
+  totalSales: string;
+}
+
 interface StockItemDetails {
-  lastPurchase: {
-    poNumber: string;
-    poDate: string;
-    supplierName: string;
-    quantity: string;
-    rate: string;
-    amount: string;
-  } | null;
-  lastSale: {
-    voucherNumber: string;
-    saleDate: string;
-    locationName: string | null;
-    quantity: string;
-    sellingPrice: string;
-    totalSales: string;
-  } | null;
+  purchases: Purchase[];
+  sales: Sale[];
   inventoryLocations: {
     locationId: number;
     locationName: string;
@@ -44,6 +49,13 @@ interface StockItemDetails {
   }[];
 }
 
+const formatSmartNumber = (value: string | number) => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
+  // Remove .00 from whole numbers, preserve all decimals for fractional numbers
+  return num % 1 === 0 ? num.toString() : value.toString();
+};
+
 export default function StockQuery() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
@@ -53,7 +65,7 @@ export default function StockQuery() {
   });
 
   const { data: itemDetails, isLoading: detailsLoading } = useQuery<StockItemDetails>({
-    queryKey: ['stock-item-details', selectedItem?.id],
+    queryKey: [`/api/stock-items/${selectedItem?.id}/details`],
     enabled: !!selectedItem,
   });
 
@@ -108,16 +120,14 @@ export default function StockQuery() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>UOM</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">
                       No items found
                     </TableCell>
                   </TableRow>
@@ -129,7 +139,6 @@ export default function StockQuery() {
                       onClick={() => handleItemClick(item)}
                       data-testid={`row-stock-item-${item.id}`}
                     >
-                      <TableCell className="font-medium">{item.code}</TableCell>
                       <TableCell>
                         <button
                           className="text-primary hover:underline text-left"
@@ -138,7 +147,6 @@ export default function StockQuery() {
                           {item.name}
                         </button>
                       </TableCell>
-                      <TableCell>{item.uom}</TableCell>
                       <TableCell>
                         <Badge variant={item.active ? "default" : "secondary"}>
                           {item.active ? "Active" : "Inactive"}
@@ -165,88 +173,72 @@ export default function StockQuery() {
             <div className="py-8 text-center text-muted-foreground">Loading details...</div>
           ) : itemDetails ? (
             <div className="space-y-6">
-              {/* Last Purchase */}
+              {/* Purchases */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Package className="h-4 w-4" />
-                    Last Purchase Order
+                    Purchases
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {itemDetails.lastPurchase ? (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">PO Number</p>
-                        <p className="font-medium">{itemDetails.lastPurchase.poNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Date</p>
-                        <p className="font-medium">
-                          {format(new Date(itemDetails.lastPurchase.poDate), "MMM dd, yyyy")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Supplier</p>
-                        <p className="font-medium">{itemDetails.lastPurchase.supplierName}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Quantity</p>
-                        <p className="font-medium">{parseFloat(itemDetails.lastPurchase.quantity).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Rate</p>
-                        <p className="font-medium">${parseFloat(itemDetails.lastPurchase.rate).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Amount</p>
-                        <p className="font-medium">${parseFloat(itemDetails.lastPurchase.amount).toFixed(2)}</p>
-                      </div>
-                    </div>
+                  {itemDetails.purchases.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Container #</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.purchases.map((purchase, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{purchase.containerNumber || "N/A"}</TableCell>
+                            <TableCell className="text-right font-mono">{formatSmartNumber(purchase.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono">${parseFloat(purchase.rate).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   ) : (
                     <p className="text-sm text-muted-foreground">No purchase history</p>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Last Sale */}
+              {/* Sales */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
-                    Last Sale
+                    Sales
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {itemDetails.lastSale ? (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Voucher Number</p>
-                        <p className="font-medium">{itemDetails.lastSale.voucherNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Date</p>
-                        <p className="font-medium">
-                          {format(new Date(itemDetails.lastSale.saleDate), "MMM dd, yyyy")}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Location</p>
-                        <p className="font-medium">{itemDetails.lastSale.locationName || "N/A"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Quantity</p>
-                        <p className="font-medium">{parseFloat(itemDetails.lastSale.quantity).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Selling Price</p>
-                        <p className="font-medium">${parseFloat(itemDetails.lastSale.sellingPrice).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total Sales</p>
-                        <p className="font-medium">${parseFloat(itemDetails.lastSale.totalSales).toFixed(2)}</p>
-                      </div>
-                    </div>
+                  {itemDetails.sales.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Selling Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itemDetails.sales.map((sale, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>{format(new Date(sale.saleDate), "MMM dd, yyyy")}</TableCell>
+                            <TableCell>{sale.locationName || "N/A"}</TableCell>
+                            <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-mono">${parseFloat(sale.totalSales).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   ) : (
                     <p className="text-sm text-muted-foreground">No sales history</p>
                   )}
@@ -278,13 +270,13 @@ export default function StockQuery() {
                             <TableCell>
                               {loc.locationName} ({loc.locationCode})
                             </TableCell>
-                            <TableCell className="text-right">
-                              {parseFloat(loc.quantity).toLocaleString()}
+                            <TableCell className="text-right font-mono">
+                              {formatSmartNumber(loc.quantity)}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right font-mono">
                               ${parseFloat(loc.averageRate).toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right font-mono">
                               ${parseFloat(loc.totalValue).toFixed(2)}
                             </TableCell>
                           </TableRow>

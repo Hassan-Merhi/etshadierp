@@ -215,6 +215,8 @@ export interface IStorage {
   // Stock Query
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null>;
+  getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]>;
+  getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]>;
   getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
 
   // Customers
@@ -2203,6 +2205,52 @@ export class DbStorage implements IStorage {
       .limit(1);
 
     return result.length > 0 ? result[0] : null;
+  }
+
+  async getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        poNumber: schema.purchaseOrders.poNumber,
+        poDate: schema.purchaseOrders.createdAt,
+        supplierName: schema.suppliers.legalName,
+        containerNumber: schema.containers.containerNumber,
+        quantity: schema.poLineItems.quantity,
+        rate: schema.poLineItems.rate,
+        amount: schema.poLineItems.lineTotal,
+      })
+      .from(schema.poLineItems)
+      .innerJoin(schema.purchaseOrders, eq(schema.poLineItems.poId, schema.purchaseOrders.id))
+      .innerJoin(schema.suppliers, eq(schema.purchaseOrders.supplierId, schema.suppliers.id))
+      .leftJoin(schema.containers, eq(schema.purchaseOrders.containerId, schema.containers.id))
+      .where(and(
+        eq(schema.poLineItems.stockItemId, stockItemId),
+        eq(schema.purchaseOrders.companyId, companyId)
+      ))
+      .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`);
+
+    return results;
+  }
+
+  async getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        voucherNumber: schema.vouchers.voucherNumber,
+        saleDate: schema.vouchers.voucherDate,
+        locationName: schema.locations.name,
+        quantity: schema.salesItems.quantity,
+        sellingPrice: schema.salesItems.sellingPrice,
+        totalSales: schema.salesItems.totalSales,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
+      .where(and(
+        eq(schema.salesItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ))
+      .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
+
+    return results;
   }
 
   async getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]> {
