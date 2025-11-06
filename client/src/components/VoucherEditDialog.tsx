@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Voucher } from "@shared/schema";
 
 // Types
 interface VoucherEditDialogProps {
@@ -126,7 +127,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   });
 
   // Fetch voucher data
-  const { data: voucherData, isLoading } = useQuery({
+  const { data: voucherData, isLoading } = useQuery<Voucher & { entries?: VoucherEntry[] }>({
     queryKey: ["/api/vouchers", voucherId],
     enabled: open && !!voucherId,
   });
