@@ -1470,9 +1470,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Calculate balance from voucher entries across ALL companies
           // For suppliers: Credit = increase in payable (we owe them), Debit = decrease (we paid)
-          // Balance = Credits - Debits (positive means we owe them)
-          // Only count entries where one side is non-zero to prevent double-counting
+          // Balance = Opening Balance + Credits - Debits
+          // Opening balance: Positive = we owe them, Negative = they owe us/we prepaid
           const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -1485,7 +1487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return sum - debit; // Decrease payable
             }
             return sum;
-          }, 0);
+          }, openingBalance);
           
           return {
             ...supplier,
