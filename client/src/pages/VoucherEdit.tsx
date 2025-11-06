@@ -2089,7 +2089,7 @@ export default function VoucherEdit() {
         'Source Location': '',
         'Bale Name': 'TOTAL',
         'Quantity': totalBales,
-        'Rate': '',
+        'Rate': 0,
         'Amount': transferGrandTotal,
         'Destination Location': '',
       });
