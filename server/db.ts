@@ -7,9 +7,9 @@ import * as schema from "@shared/schema";
 let connectionString: string;
 
 if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
-  // Use Replit's database in development
+  // Use Replit's database in development (no SSL)
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
-  connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}?sslmode=require`;
+  connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
   console.log('Using Replit database for development');
 } else if (process.env.DATABASE_URL) {
   // Use DATABASE_URL for production (Render)
