@@ -49,24 +49,6 @@ interface ProfitLossData {
   endDate: string | null;
 }
 
-interface BalanceSheetData {
-  assets: {
-    ledgers: AccountItem[];
-    banks: AccountItem[];
-    fixedAssets: AccountItem[];
-    total: number;
-  };
-  liabilities: {
-    ledgers: AccountItem[];
-    suppliers: AccountItem[];
-    total: number;
-  };
-  equity: {
-    accounts: AccountItem[];
-    total: number;
-  };
-  asOfDate: string | null;
-}
 
 interface SalesItem {
   id: number;
@@ -229,7 +211,6 @@ export default function Reports() {
   // Shared filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [asOfDate, setAsOfDate] = useState("");
   const [locationId, setLocationId] = useState("");
   const [stockGroupId, setStockGroupId] = useState("");
   const [supplierId, setSupplierId] = useState("");
@@ -245,8 +226,6 @@ export default function Reports() {
   if (startDate) profitLossParams.set("startDate", startDate);
   if (endDate) profitLossParams.set("endDate", endDate);
 
-  const balanceSheetParams = new URLSearchParams();
-  if (asOfDate) balanceSheetParams.set("asOfDate", asOfDate);
 
   const salesParams = new URLSearchParams();
   if (startDate) salesParams.set("startDate", startDate);
@@ -272,7 +251,6 @@ export default function Reports() {
 
   // Fetch reports
   const profitLossUrl = `/api/reports/profit-loss${profitLossParams.toString() ? `?${profitLossParams.toString()}` : ''}`;
-  const balanceSheetUrl = `/api/reports/balance-sheet${balanceSheetParams.toString() ? `?${balanceSheetParams.toString()}` : ''}`;
   const salesUrl = `/api/reports/sales${salesParams.toString() ? `?${salesParams.toString()}` : ''}`;
   const stockMovementUrl = `/api/reports/stock-movement${stockMovementParams.toString() ? `?${stockMovementParams.toString()}` : ''}`;
   const containerUrl = `/api/reports/containers${containerParams.toString() ? `?${containerParams.toString()}` : ''}`;
@@ -281,11 +259,6 @@ export default function Reports() {
   const { data: profitLossData, refetch: refetchProfitLoss, isLoading: loadingPL } = useQuery<ProfitLossData>({
     queryKey: [profitLossUrl],
     enabled: activeTab === "profit-loss",
-  });
-
-  const { data: balanceSheetData, refetch: refetchBalanceSheet, isLoading: loadingBS } = useQuery<BalanceSheetData>({
-    queryKey: [balanceSheetUrl],
-    enabled: activeTab === "balance-sheet",
   });
 
   const { data: salesData, refetch: refetchSales, isLoading: loadingSales } = useQuery<SalesData>({
@@ -312,9 +285,6 @@ export default function Reports() {
     switch (activeTab) {
       case "profit-loss":
         refetchProfitLoss();
-        break;
-      case "balance-sheet":
-        refetchBalanceSheet();
         break;
       case "sales":
         refetchSales();
@@ -357,36 +327,6 @@ export default function Reports() {
           ["Total Expenses", "", profitLossData.totalExpenses],
           [],
           ["NET PROFIT", "", profitLossData.netProfit],
-        ];
-        break;
-
-      case "balance-sheet":
-        if (!balanceSheetData) return;
-        fileName = "Balance_Sheet";
-        worksheetData = [
-          ["Balance Sheet"],
-          [`As of: ${asOfDate || "Current"}`],
-          [],
-          ["ASSETS"],
-          ["Account Name", "Amount"],
-          ...balanceSheetData.assets.ledgers.map((item: any) => [item.name, item.balance]),
-          ...balanceSheetData.assets.banks.map((item: any) => [item.name, item.balance]),
-          ...balanceSheetData.assets.fixedAssets.map((item: any) => [item.name, item.balance]),
-          [],
-          ["Total Assets", balanceSheetData.assets.total],
-          [],
-          ["LIABILITIES"],
-          ["Account Name", "Amount"],
-          ...balanceSheetData.liabilities.ledgers.map((item: any) => [item.name, item.balance]),
-          ...balanceSheetData.liabilities.suppliers.map((item: any) => [item.name, item.balance]),
-          [],
-          ["Total Liabilities", balanceSheetData.liabilities.total],
-          [],
-          ["EQUITY"],
-          ["Account Name", "Amount"],
-          ...balanceSheetData.equity.accounts.map((item: any) => [item.name, item.balance]),
-          [],
-          ["Total Equity", balanceSheetData.equity.total],
         ];
         break;
 
@@ -517,9 +457,8 @@ export default function Reports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-6 w-full" data-testid="tabs-reports">
+        <TabsList className="grid grid-cols-5 w-full" data-testid="tabs-reports">
           <TabsTrigger value="profit-loss" data-testid="tab-profit-loss">P&L</TabsTrigger>
-          <TabsTrigger value="balance-sheet" data-testid="tab-balance-sheet">Balance</TabsTrigger>
           <TabsTrigger value="sales" data-testid="tab-sales">Sales</TabsTrigger>
           <TabsTrigger value="stock-movement" data-testid="tab-stock">Stock</TabsTrigger>
           <TabsTrigger value="containers" data-testid="tab-containers">Containers</TabsTrigger>
@@ -534,44 +473,26 @@ export default function Reports() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* Date Range Filters */}
-              {activeTab !== "balance-sheet" && (
-                <>
-                  <div>
-                    <Label htmlFor="start-date">Start Date</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      data-testid="input-start-date"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="end-date">End Date</Label>
-                    <Input
-                      id="end-date"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      data-testid="input-end-date"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* As Of Date Filter for Balance Sheet */}
-              {activeTab === "balance-sheet" && (
-                <div>
-                  <Label htmlFor="as-of-date">As of Date</Label>
-                  <Input
-                    id="as-of-date"
-                    type="date"
-                    value={asOfDate}
-                    onChange={(e) => setAsOfDate(e.target.value)}
-                    data-testid="input-as-of-date"
-                  />
-                </div>
-              )}
+              <div>
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  data-testid="input-start-date"
+                />
+              </div>
+              <div>
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  data-testid="input-end-date"
+                />
+              </div>
 
               {/* Location Filter */}
               {(activeTab === "sales" || activeTab === "stock-movement") && (
@@ -723,117 +644,6 @@ export default function Reports() {
                       <span className={`text-lg font-bold font-mono ${profitLossData.netProfit >= 0 ? "text-chart-2" : "text-destructive"}`} data-testid="text-net-profit">
                         ${profitLossData.netProfit.toFixed(2)}
                       </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">No data available. Click Generate to load report.</div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="balance-sheet">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Balance Sheet
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingBS ? (
-                <div className="text-center py-8 text-muted-foreground">Loading...</div>
-              ) : balanceSheetData ? (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-medium mb-3">Assets</h3>
-                    <div className="space-y-2">
-                      {balanceSheetData.assets.ledgers.length > 0 && (
-                        <div className="ml-2 space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">Ledger Accounts</div>
-                          {balanceSheetData.assets.ledgers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-ledger-${item.id}`}>
-                              <span>{item.name}</span>
-                              <span className="font-mono">${formatAmount(item.balance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {balanceSheetData.assets.banks.length > 0 && (
-                        <div className="ml-2 space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">Bank Accounts</div>
-                          {balanceSheetData.assets.banks.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-bank-${item.id}`}>
-                              <span>{item.name}</span>
-                              <span className="font-mono">${formatAmount(item.balance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {balanceSheetData.assets.fixedAssets.length > 0 && (
-                        <div className="ml-2 space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">Fixed Assets</div>
-                          {balanceSheetData.assets.fixedAssets.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-fixed-${item.id}`}>
-                              <span>{item.name}</span>
-                              <span className="font-mono">${formatAmount(item.balance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex justify-between py-2 font-semibold border-t">
-                        <span>Total Assets</span>
-                        <span className="font-mono" data-testid="text-total-assets">${formatAmount(balanceSheetData.assets.total)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-medium mb-3">Liabilities</h3>
-                    <div className="space-y-2">
-                      {balanceSheetData.liabilities.ledgers.length > 0 && (
-                        <div className="ml-2 space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">Ledger Accounts</div>
-                          {balanceSheetData.liabilities.ledgers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`liability-ledger-${item.id}`}>
-                              <span>{item.name}</span>
-                              <span className="font-mono">${formatAmount(item.balance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {balanceSheetData.liabilities.suppliers.length > 0 && (
-                        <div className="ml-2 space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">Suppliers</div>
-                          {balanceSheetData.liabilities.suppliers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`liability-supplier-${item.id}`}>
-                              <span>{item.name}</span>
-                              <span className="font-mono">${formatAmount(item.balance)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="flex justify-between py-2 font-semibold border-t">
-                        <span>Total Liabilities</span>
-                        <span className="font-mono" data-testid="text-total-liabilities">${formatAmount(balanceSheetData.liabilities.total)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-medium mb-3">Equity</h3>
-                    <div className="space-y-2">
-                      {balanceSheetData.equity.accounts.map((item: any) => (
-                        <div key={item.id} className="flex justify-between py-1 text-sm ml-2" data-testid={`equity-account-${item.id}`}>
-                          <span>{item.name}</span>
-                          <span className="font-mono">${formatAmount(item.balance)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between py-2 font-semibold border-t">
-                        <span>Total Equity</span>
-                        <span className="font-mono" data-testid="text-total-equity">${formatAmount(balanceSheetData.equity.total)}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
