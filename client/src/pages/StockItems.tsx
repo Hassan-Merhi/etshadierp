@@ -8,6 +8,7 @@ import { Search, Plus, Package, Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
+import { StockItemCreateDialog } from "@/components/StockItemCreateDialog";
 
 interface StockItem {
   id: number;
@@ -34,6 +35,7 @@ export default function StockItems() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editStockItemId, setEditStockItemId] = useState<number | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -76,7 +78,11 @@ export default function StockItems() {
             Manage all stock items in your company
           </p>
         </div>
-        <Button className="gap-2" data-testid="button-add-item">
+        <Button 
+          className="gap-2" 
+          onClick={() => setCreateDialogOpen(true)}
+          data-testid="button-add-item"
+        >
           <Plus className="h-4 w-4" />
           Add Item
         </Button>
@@ -184,6 +190,11 @@ export default function StockItems() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         stockItemId={editStockItemId}
+      />
+
+      <StockItemCreateDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
       />
     </div>
   );

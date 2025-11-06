@@ -57,14 +57,9 @@ const menuItems = [
     icon: Book,
   },
   {
-    title: "Inventory",
-    url: "/inventory",
-    icon: Package,
-  },
-  {
     title: "Stock Items",
     url: "/stock-items",
-    icon: Tags,
+    icon: Package,
   },
   {
     title: "Location Inventory",
