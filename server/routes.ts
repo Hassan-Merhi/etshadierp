@@ -1644,7 +1644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create customer with auto-generated code
-      const customer = await storage.createCustomer({ ...parsed, code });
+      const customer = await storage.createCustomer({ ...parsed, code } as any);
 
       // Auto-create ledger account for customer with opening balance
       const customerAccountCode = `CUST-${customer.code}`;
