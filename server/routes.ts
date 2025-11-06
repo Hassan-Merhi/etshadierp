@@ -8907,11 +8907,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockItemCode: stockItems.code,
           stockItemName: stockItems.name,
           quantity: salesItems.quantity,
-          sellingPrice: salesItems.sellingPrice,
+          actualSellingPrice: salesItems.sellingPrice, // Price item was actually sold at
+          configuredSellingPrice: stockItems.sellingPrice, // Configured price in stock items
           costPrice: salesItems.costPrice,
           totalSales: salesItems.totalSales,
           totalCost: salesItems.totalCost,
-          profit: salesItems.profit,
+          costProfit: salesItems.profit, // Actual selling price - cost price
           createdAt: salesItems.createdAt,
         })
         .from(salesItems)
@@ -8921,7 +8922,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(...conditions))
         .orderBy(vouchers.voucherDate);
 
-      res.json(salesData);
+      // Calculate configured profit for each item (actual selling price - configured selling price) * quantity
+      const enhancedSalesData = salesData.map(item => ({
+        ...item,
+        configuredProfit: (parseFloat(item.actualSellingPrice || "0") - parseFloat(item.configuredSellingPrice || "0")) * parseFloat(item.quantity || "0"),
+        totalConfiguredCost: parseFloat(item.configuredSellingPrice || "0") * parseFloat(item.quantity || "0"),
+      }));
+
+      res.json(enhancedSalesData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
