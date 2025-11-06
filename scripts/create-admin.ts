@@ -23,7 +23,7 @@ async function createAdmin() {
     // 2. Create admin user
     console.log('Step 2: Creating admin user...');
     const username = 'admin';
-    const password = 'admin123'; // Change this after first login!
+    const password = 'admin'; // Change this after first login!
     
     const [user] = await db.insert(users).values({
       username,
