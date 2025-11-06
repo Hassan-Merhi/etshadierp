@@ -6775,8 +6775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!adjustmentType) {
         return res.status(400).json({ message: "Adjustment type is required" });
       }
-      if (adjustmentType !== "Production" && adjustmentType !== "Consumption") {
-        return res.status(400).json({ message: "Adjustment type must be either 'Production' or 'Consumption'" });
+      if (adjustmentType !== "Production" && adjustmentType !== "Consumption" && adjustmentType !== "Mixed") {
+        return res.status(400).json({ message: "Adjustment type must be either 'Production', 'Consumption', or 'Mixed'" });
       }
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "Items are required" });
