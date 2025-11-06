@@ -14,7 +14,6 @@ import {
   Users,
   Receipt,
   Book,
-  Scale,
   TrendingUp,
   UserCheck,
   FileSpreadsheet,
@@ -130,11 +129,6 @@ const menuItems = [
     title: "Reports",
     url: "/reports",
     icon: FileText,
-  },
-  {
-    title: "Balance Sheet",
-    url: "/balance-sheet",
-    icon: Scale,
   },
   {
     title: "Profit & Loss",

@@ -31,7 +31,6 @@ import POSImport from "@/pages/POSImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
 import Settings from "@/pages/Settings";
-import BalanceSheet from "@/pages/BalanceSheet";
 import ProfitLoss from "@/pages/ProfitLoss";
 import VoucherEdit from "@/pages/VoucherEdit";
 import Payroll from "@/pages/Payroll";
@@ -91,7 +90,6 @@ function Router({ user }: { user: any }) {
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
       <Route path="/reports" component={Reports} />
-      <Route path="/balance-sheet" component={BalanceSheet} />
       <Route path="/profit-loss" component={ProfitLoss} />
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
