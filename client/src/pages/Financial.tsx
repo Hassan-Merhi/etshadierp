@@ -5,10 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
 import { DollarSign, TrendingDown, Wallet, Package, FileText, ChevronRight, ChevronDown } from "lucide-react";
+import { format } from "date-fns";
 
 interface Account {
   id: string;
@@ -39,9 +41,22 @@ interface SalesDetail {
   totalTransactions: number;
 }
 
+interface POSTransaction {
+  id: number;
+  voucherNumber: string;
+  voucherDate: string;
+  createdAt: string;
+  description: string | null;
+  totalAmount: number;
+  totalQuantity: number;
+  itemCount: number;
+  items: any[];
+}
+
 export default function Financial() {
   const { selectedCompany } = useCompany();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
 
@@ -84,16 +99,37 @@ export default function Financial() {
     enabled: !!selectedCompany,
   });
 
-  // Get details for selected location
-  const { data: salesDetails } = useQuery<SalesDetail>({
-    queryKey: ["/api/financial/sales", selectedLocationForDetails, "details", dateRange],
+  // Get date range for details dialog
+  const getDetailsDateRange = () => {
+    const today = new Date();
+    let startDate = "";
+    let endDate = today.toISOString().split("T")[0];
+
+    if (detailsPeriod === "today") {
+      startDate = endDate;
+    } else if (detailsPeriod === "month") {
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate = firstDayOfMonth.toISOString().split("T")[0];
+    } else if (detailsPeriod === "year") {
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+      startDate = firstDayOfYear.toISOString().split("T")[0];
+    }
+
+    return detailsPeriod === "all" ? {} : { startDate, endDate };
+  };
+
+  const detailsDateRange = getDetailsDateRange();
+
+  // Get transactions for selected location
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<POSTransaction[]>({
+    queryKey: ["/api/financial/sales", selectedLocationForDetails, "transactions", detailsDateRange],
     queryFn: async () => {
-      const params = new URLSearchParams(dateRange as Record<string, string>);
+      const params = new URLSearchParams(detailsDateRange as Record<string, string>);
       const response = await fetch(
-        `/api/financial/sales/${selectedLocationForDetails}/details?${params}`,
+        `/api/financial/sales/${selectedLocationForDetails}/transactions?${params}`,
         { credentials: "include" }
       );
-      if (!response.ok) throw new Error("Failed to fetch sales details");
+      if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
     enabled: !!selectedLocationForDetails,
@@ -581,37 +617,113 @@ export default function Financial() {
       </Tabs>
 
       {/* Sales Detail Dialog */}
-      <Dialog open={!!selectedLocationForDetails} onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}>
-        <DialogContent data-testid="dialog-sales-details">
+      <Dialog open={!!selectedLocationForDetails} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedLocationForDetails(null);
+          setDetailsPeriod("all");
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh]" data-testid="dialog-sales-details">
           <DialogHeader>
-            <DialogTitle>Sales Details</DialogTitle>
-          </DialogHeader>
-          {salesDetails && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 border rounded-md">
-                  <p className="text-sm text-muted-foreground mb-1">Total Transactions</p>
-                  <p className="text-2xl font-bold font-mono">
-                    {salesDetails.totalTransactions}
-                  </p>
-                </div>
-                <div className="p-4 border rounded-md">
-                  <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                  <p className="text-2xl font-bold font-mono">
-                    ${salesDetails.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-              <div className="p-4 border rounded-md">
-                <p className="text-sm text-muted-foreground mb-1">Average Per Transaction</p>
-                <p className="text-xl font-bold font-mono">
-                  ${salesDetails.totalTransactions > 0 
-                    ? (salesDetails.totalAmount / salesDetails.totalTransactions).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                    : "0.00"}
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Transaction Details</DialogTitle>
+              <Select value={detailsPeriod} onValueChange={setDetailsPeriod}>
+                <SelectTrigger className="w-40" data-testid="select-details-period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Summary Section */}
+            {transactionsLoading ? (
+              <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="p-4" data-testid="card-total-transactions">
+                  <p className="text-sm text-muted-foreground mb-1">Total Transactions</p>
+                  <p className="text-2xl font-bold font-mono" data-testid="text-total-transactions">
+                    {transactions.length}
+                  </p>
+                </Card>
+                <Card className="p-4" data-testid="card-total-quantity">
+                  <p className="text-sm text-muted-foreground mb-1">Total Quantity Sold</p>
+                  <p className="text-2xl font-bold font-mono" data-testid="text-total-quantity">
+                    {transactions.reduce((sum, t) => sum + t.totalQuantity, 0)}
+                  </p>
+                </Card>
+                <Card className="p-4" data-testid="card-total-amount">
+                  <p className="text-sm text-muted-foreground mb-1">Total Amount Sold</p>
+                  <p className="text-2xl font-bold font-mono" data-testid="text-total-amount">
+                    ${transactions.reduce((sum, t) => sum + t.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </Card>
+              </div>
+            )}
+
+            {/* Transactions Table */}
+            {transactionsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : transactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-transactions">
+                No transactions found for the selected period
+              </p>
+            ) : (
+              <ScrollArea className="max-h-[400px]" data-testid="scroll-transactions">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Voucher Number</TableHead>
+                      <TableHead className="text-right">Items</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((transaction) => (
+                      <TableRow 
+                        key={transaction.id} 
+                        data-testid={`row-transaction-${transaction.id}`}
+                        className="hover-elevate"
+                      >
+                        <TableCell data-testid={`text-date-${transaction.id}`}>
+                          {format(new Date(transaction.voucherDate), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="font-medium" data-testid={`text-voucher-${transaction.id}`}>
+                          {transaction.voucherNumber}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-items-${transaction.id}`}>
+                          {transaction.itemCount}
+                        </TableCell>
+                        <TableCell className="text-right font-mono" data-testid={`text-quantity-${transaction.id}`}>
+                          {transaction.totalQuantity}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium" data-testid={`text-amount-${transaction.id}`}>
+                          ${transaction.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -7826,6 +7826,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get individual POS transactions for a specific location
+  app.get(
+    "/api/financial/sales/:locationId/transactions",
+    requireAuth,
+    checkPOSLocation,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const locationId = parseInt(req.params.locationId);
+        if (isNaN(locationId)) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
+
+        const { startDate, endDate } = req.query;
+
+        // Build query conditions
+        const conditions = [
+          eq(vouchers.companyId, req.session.currentCompanyId),
+          eq(vouchers.voucherType, "Sales"),
+          eq(vouchers.locationId, locationId),
+        ];
+
+        if (startDate) {
+          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        }
+
+        if (endDate) {
+          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        }
+
+        // Get all sales vouchers for this location with details
+        const salesVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(and(...conditions))
+          .orderBy(sql`${vouchers.voucherDate} DESC, ${vouchers.createdAt} DESC`);
+
+        // For each voucher, get the sales items
+        const transactions = await Promise.all(
+          salesVouchers.map(async (voucher) => {
+            const items = await db
+              .select({
+                id: salesItems.id,
+                stockItemId: salesItems.stockItemId,
+                stockItemName: stockItems.name,
+                quantity: salesItems.quantity,
+                sellingPrice: salesItems.sellingPrice,
+                totalSales: salesItems.totalSales,
+              })
+              .from(salesItems)
+              .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+              .where(eq(salesItems.voucherId, voucher.id));
+
+            const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+            const totalAmt = parseFloat(voucher.totalAmount || "0");
+
+            return {
+              id: voucher.id,
+              voucherNumber: voucher.voucherNumber,
+              voucherDate: voucher.voucherDate,
+              createdAt: voucher.createdAt,
+              description: voucher.description,
+              totalAmount: totalAmt,
+              totalQuantity: totalQty,
+              itemCount: items.length,
+              items,
+            };
+          })
+        );
+
+        res.json(transactions);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // POS Sales
   app.post("/api/pos/sales", requireAuth, async (req, res) => {
     try {
