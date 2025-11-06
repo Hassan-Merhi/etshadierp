@@ -130,13 +130,30 @@ export default function StockOTW() {
       const group = grouped.get(name)!;
       group.totalQuantity += isNaN(qty) ? 0 : qty;
       group.totalCost += isNaN(cost) ? 0 : cost;
-      group.containerCount += 1;
-      group.containers.push({
-        containerNumber: item.containerNumber,
-        quantity: isNaN(qty) ? 0 : qty,
-        cost: isNaN(cost) ? 0 : cost,
-        supplierName: item.supplierName,
-      });
+      
+      // Check if this container already exists in the group
+      const existingContainer = group.containers.find(
+        c => c.containerNumber === item.containerNumber
+      );
+      
+      if (existingContainer) {
+        // Add to existing container
+        existingContainer.quantity += isNaN(qty) ? 0 : qty;
+        existingContainer.cost += isNaN(cost) ? 0 : cost;
+      } else {
+        // Add new container
+        group.containers.push({
+          containerNumber: item.containerNumber,
+          quantity: isNaN(qty) ? 0 : qty,
+          cost: isNaN(cost) ? 0 : cost,
+          supplierName: item.supplierName,
+        });
+      }
+    });
+    
+    // Calculate container count and unique suppliers for each group
+    grouped.forEach((group) => {
+      group.containerCount = group.containers.length;
     });
     
     return Array.from(grouped.values());
@@ -321,6 +338,9 @@ export default function StockOTW() {
                           </TableCell>
                           <TableCell className="font-medium">
                             {item.stockItemName}
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
                             {Math.round(item.totalQuantity).toLocaleString()}
@@ -329,9 +349,14 @@ export default function StockOTW() {
                             ${item.totalCost.toFixed(2)}
                           </TableCell>
                           <TableCell className="text-sm">
-                            <Badge variant="secondary" data-testid={`badge-container-count-${index}`}>
-                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''}
-                            </Badge>
+                            {(() => {
+                              const uniqueSuppliers = Array.from(new Set(item.containers.map(c => c.supplierName)));
+                              if (uniqueSuppliers.length === 1) {
+                                return uniqueSuppliers[0];
+                              } else {
+                                return `${uniqueSuppliers[0]} +${uniqueSuppliers.length - 1}`;
+                              }
+                            })()}
                           </TableCell>
                         </TableRow>
                         {isExpanded && item.containers.map((container, containerIndex) => (
