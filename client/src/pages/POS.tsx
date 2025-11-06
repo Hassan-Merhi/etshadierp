@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
-import { useLocation, Redirect } from "wouter";
+import { useLocation, Redirect, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -892,6 +892,14 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Point of Sale</h1>
         <div className="flex gap-2">
+          {!posUser && (
+            <Link href="/pos-import">
+              <Button variant="outline" className="gap-2" data-testid="button-import-sales">
+                <Upload className="h-4 w-4" />
+                Import Sales
+              </Button>
+            </Link>
+          )}
           <Button 
             variant="outline"
             onClick={() => setShowDraftDialog(true)}
