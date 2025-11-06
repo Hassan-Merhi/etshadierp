@@ -92,6 +92,11 @@ const menuItems = [
     icon: Upload,
   },
   {
+    title: "POS Import",
+    url: "/pos-import",
+    icon: ShoppingCart,
+  },
+  {
     title: "Financial",
     url: "/financial",
     icon: DollarSign,

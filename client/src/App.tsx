@@ -28,6 +28,7 @@ import Daybook from "@/pages/Daybook";
 import Reports from "@/pages/Reports";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
+import POSImport from "@/pages/POSImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
 import Settings from "@/pages/Settings";
@@ -82,6 +83,7 @@ function Router({ user }: { user: any }) {
       <Route path="/sold-containers" component={SoldContainers} />
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
+      <Route path="/pos-import" component={POSImport} />
       <Route path="/financial" component={Financial} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />

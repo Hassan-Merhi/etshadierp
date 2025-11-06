@@ -3496,6 +3496,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POS Import - Parse and Preview Excel
+  app.post("/api/pos-import/parse", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (rawData.length === 0) {
+        return res.status(400).json({ message: "Excel file is empty" });
+      }
+
+      // Parse rows
+      const rows = rawData as any[];
+      const items: any[] = [];
+      let totalValue = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 2;
+
+        // Expected columns: Barcode, Quantity, Rate
+        const barcode = row.Barcode || row.barcode || row.Code || row.code;
+        const quantity = parseFloat(row.Quantity || row.quantity || row.Qty || row.qty || "0");
+        const rate = parseFloat(row.Rate || row.rate || row.Price || row.price || "0");
+
+        if (!barcode) {
+          continue; // Skip rows without barcode
+        }
+
+        if (quantity <= 0 || rate <= 0) {
+          continue; // Skip invalid quantities/rates
+        }
+
+        const itemValue = quantity * rate;
+        totalValue += itemValue;
+
+        items.push({
+          rowNum,
+          barcode: barcode.toString().trim(),
+          quantity,
+          rate,
+          value: itemValue,
+        });
+      }
+
+      res.json({
+        items,
+        totalValue,
+        fileName: req.file.originalname,
+      });
+    } catch (error: any) {
+      console.error("POS Import parse error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POS Import - Validate data before import
+  app.post("/api/pos-import/validate", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const { locationId, items } = req.body;
+
+      if (!locationId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const errors: string[] = [];
+      const validatedItems: any[] = [];
+
+      // Validate location exists
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        errors.push("Selected location not found");
+        return res.json({ errors, validatedItems });
+      }
+
+      // Get all stock items for validation
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
+
+      // Validate each item
+      for (const item of items) {
+        const validatedItem: any = { ...item };
+
+        // Find stock item by barcode (code or alias)
+        let stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+
+        if (!stockItem) {
+          validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
+          errors.push(`Row ${item.rowNum}: Barcode '${item.barcode}' not found`);
+        } else {
+          validatedItem.stockItemId = stockItem.id;
+          validatedItem.stockItemName = stockItem.name;
+          validatedItem.stockItemUom = stockItem.uom;
+          
+          // Check if location has this item in inventory
+          const inventoryItem = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, locationId)
+              )
+            )
+            .limit(1);
+
+          if (inventoryItem.length === 0 || parseFloat(inventoryItem[0].quantity) < item.quantity) {
+            const available = inventoryItem.length > 0 ? parseFloat(inventoryItem[0].quantity) : 0;
+            validatedItem.error = `Insufficient inventory. Available: ${available}, Requested: ${item.quantity}`;
+            errors.push(`Row ${item.rowNum}: Insufficient inventory for '${stockItem.name}'. Available: ${available}, Requested: ${item.quantity}`);
+          }
+
+          // Get cost price for profit calculation
+          if (inventoryItem.length > 0) {
+            validatedItem.costPrice = parseFloat(inventoryItem[0].averageRate || "0");
+          }
+        }
+
+        validatedItems.push(validatedItem);
+      }
+
+      res.json({
+        errors,
+        validatedItems,
+      });
+    } catch (error: any) {
+      console.error("POS Import validation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POS Import - Import sales transactions
+  app.post("/api/pos-import/import", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const { locationId, saleDate, items } = req.body;
+
+      if (!locationId || !saleDate || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate location
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(400).json({ message: "Location not found" });
+      }
+
+      let totalSales = 0;
+      let totalCost = 0;
+
+      await db.transaction(async (tx) => {
+        // Create sales voucher
+        const voucherNumber = `SALES-${Date.now()}`;
+        
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId!,
+            locationId,
+            voucherNumber,
+            voucherType: "Sales",
+            voucherDate: saleDate,
+            description: `POS Import - ${items.length} items`,
+            totalAmount: "0", // Will be updated with actual total
+            optional: false,
+          })
+          .returning();
+
+        // Create sales items and update inventory
+        for (const item of items) {
+          // Get stock item
+          const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+          if (!stockItem) {
+            throw new Error(`Stock item not found for barcode: ${item.barcode}`);
+          }
+
+          // Get current inventory
+          const [inventoryRecord] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, locationId)
+              )
+            )
+            .limit(1);
+
+          if (!inventoryRecord) {
+            throw new Error(`No inventory found for ${stockItem.name} at location ${location.name}`);
+          }
+
+          const availableQty = parseFloat(inventoryRecord.quantity);
+          if (availableQty < item.quantity) {
+            throw new Error(`Insufficient inventory for ${stockItem.name}. Available: ${availableQty}, Requested: ${item.quantity}`);
+          }
+
+          const costPrice = parseFloat(inventoryRecord.averageRate || "0");
+          const itemSales = item.quantity * item.rate;
+          const itemCost = item.quantity * costPrice;
+          const profit = itemSales - itemCost;
+
+          totalSales += itemSales;
+          totalCost += itemCost;
+
+          // Create sales item record
+          await tx.insert(salesItems).values({
+            voucherId: voucher.id,
+            stockItemId: stockItem.id,
+            quantity: item.quantity.toString(),
+            sellingPrice: item.rate.toString(),
+            costPrice: costPrice.toString(),
+            totalSales: itemSales.toString(),
+            totalCost: itemCost.toString(),
+            profit: profit.toString(),
+          });
+
+          // Update inventory - reduce quantity
+          await tx
+            .update(inventory)
+            .set({
+              quantity: (availableQty - item.quantity).toString(),
+            })
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, locationId)
+              )
+            );
+        }
+
+        // Update voucher with total amount
+        await tx
+          .update(vouchers)
+          .set({
+            totalAmount: totalSales.toString(),
+          })
+          .where(eq(vouchers.id, voucher.id));
+      });
+
+      res.json({
+        success: true,
+        itemsCount: items.length,
+        totalSales: totalSales.toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("POS Import error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download sample POS import template
+  app.get("/api/pos-import/template", (_req, res) => {
+    try {
+      const sampleData = [
+        {
+          Barcode: "BC001",
+          Quantity: 5,
+          Rate: 25.00,
+        },
+        {
+          Barcode: "BC002",
+          Quantity: 3,
+          Rate: 35.50,
+        },
+        {
+          Barcode: "BC003",
+          Quantity: 10,
+          Rate: 15.75,
+        },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(sampleData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "POS Import");
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader("Content-Disposition", "attachment; filename=POS_Import_Template.xlsx");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Template generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get containers
   app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {
