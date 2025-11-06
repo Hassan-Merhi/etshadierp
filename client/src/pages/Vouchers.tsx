@@ -1196,7 +1196,7 @@ export default function Vouchers() {
       // Create voucher
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
         companyId: selectedCompany?.id,
-        voucherType: "Stock Transfer",
+        voucherType: "StockTransfer",
         voucherNumber: `TRANSFER-${Date.now()}`,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
         description: `Stock transfer from ${sourceNames} to ${destName}`,
