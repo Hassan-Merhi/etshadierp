@@ -148,10 +148,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   }, [posUser, posLocation, selectedLocationLocal]);
 
   // Fetch inventory for selected location
-  const { data: inventory = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
+  const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: selectedLocationLocal ? [`/api/locations/${selectedLocationLocal.id}/inventory`] : [],
     enabled: !!selectedLocationLocal,
   });
+
+  // Filter out items with 0 quantity
+  const inventory = inventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
   // Group inventory by stock group
   const stockGroups: StockGroupSummary[] = inventory.reduce((groups, item) => {
