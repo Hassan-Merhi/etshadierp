@@ -759,6 +759,60 @@ export const insertSalesItemSchema = createInsertSchema(salesItems).omit({
 export type InsertSalesItem = z.infer<typeof insertSalesItemSchema>;
 export type SalesItem = typeof salesItems.$inferSelect;
 
+// Draft POS Sales - stores unsaved POS transactions for later completion
+export const draftPosSales = pgTable("draft_pos_sales", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  locationId: integer("location_id").notNull(),
+  paymentAccountType: text("payment_account_type"), // "bank", "cash", or "credit"
+  paymentAccountId: integer("payment_account_id"),
+  isCreditSale: boolean("is_credit_sale").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDraftPosSaleSchema = createInsertSchema(draftPosSales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  userId: z.string().min(1, "User is required"),
+  locationId: z.number().min(1, "Location is required"),
+  paymentAccountType: z.enum(["bank", "cash", "credit"]).optional(),
+  paymentAccountId: z.number().optional(),
+  isCreditSale: z.boolean().optional(),
+  notes: z.string().optional(),
+});
+
+export type InsertDraftPosSale = z.infer<typeof insertDraftPosSaleSchema>;
+export type DraftPosSale = typeof draftPosSales.$inferSelect;
+
+// Draft POS Sale Items - line items for draft sales
+export const draftPosSaleItems = pgTable("draft_pos_sale_items", {
+  id: serial("id").primaryKey(),
+  draftId: integer("draft_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDraftPosSaleItemSchema = createInsertSchema(draftPosSaleItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  draftId: z.number().min(1, "Draft is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+  amount: z.string(),
+});
+
+export type InsertDraftPosSaleItem = z.infer<typeof insertDraftPosSaleItemSchema>;
+export type DraftPosSaleItem = typeof draftPosSaleItems.$inferSelect;
+
 // Customers - similar to suppliers but for container sales
 export const customers = pgTable("customers", {
   id: serial("id").primaryKey(),

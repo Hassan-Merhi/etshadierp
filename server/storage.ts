@@ -247,6 +247,13 @@ export interface IStorage {
   // Salary Advance Deductions
   getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]>;
   createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction>;
+
+  // Draft POS Sales
+  getAllDraftPosSales(userId: string, locationId?: number): Promise<schema.DraftPosSale[]>;
+  getDraftPosSaleById(id: number): Promise<any | undefined>;
+  createDraftPosSale(draft: schema.InsertDraftPosSale, items: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>): Promise<schema.DraftPosSale>;
+  updateDraftPosSale(id: number, draft: Partial<schema.InsertDraftPosSale>, items?: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>): Promise<schema.DraftPosSale>;
+  deleteDraftPosSale(id: number): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -2351,6 +2358,101 @@ export class DbStorage implements IStorage {
   async createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction> {
     const [newDeduction] = await db.insert(schema.salaryAdvanceDeductions).values(deduction).returning();
     return newDeduction;
+  }
+
+  // Draft POS Sales Methods
+  async getAllDraftPosSales(userId: string, locationId?: number): Promise<schema.DraftPosSale[]> {
+    if (locationId) {
+      return await db.select().from(schema.draftPosSales)
+        .where(and(
+          eq(schema.draftPosSales.userId, userId),
+          eq(schema.draftPosSales.locationId, locationId)
+        ))
+        .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
+    }
+    return await db.select().from(schema.draftPosSales)
+      .where(eq(schema.draftPosSales.userId, userId))
+      .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
+  }
+
+  async getDraftPosSaleById(id: number): Promise<any | undefined> {
+    const [draft] = await db.select().from(schema.draftPosSales)
+      .where(eq(schema.draftPosSales.id, id));
+    
+    if (!draft) return undefined;
+
+    const items = await db.select({
+      id: schema.draftPosSaleItems.id,
+      stockItemId: schema.draftPosSaleItems.stockItemId,
+      stockItemName: schema.stockItems.name,
+      stockItemCode: schema.stockItems.code,
+      quantity: schema.draftPosSaleItems.quantity,
+      rate: schema.draftPosSaleItems.rate,
+      amount: schema.draftPosSaleItems.amount,
+    })
+      .from(schema.draftPosSaleItems)
+      .leftJoin(schema.stockItems, eq(schema.draftPosSaleItems.stockItemId, schema.stockItems.id))
+      .where(eq(schema.draftPosSaleItems.draftId, id));
+
+    return { ...draft, items };
+  }
+
+  async createDraftPosSale(
+    draft: schema.InsertDraftPosSale, 
+    items: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>
+  ): Promise<schema.DraftPosSale> {
+    const [newDraft] = await db.insert(schema.draftPosSales).values(draft).returning();
+    
+    if (items && items.length > 0) {
+      const draftItems = items.map(item => ({
+        draftId: newDraft.id,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: item.amount,
+      }));
+      await db.insert(schema.draftPosSaleItems).values(draftItems);
+    }
+    
+    return newDraft;
+  }
+
+  async updateDraftPosSale(
+    id: number, 
+    draft: Partial<schema.InsertDraftPosSale>, 
+    items?: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>
+  ): Promise<schema.DraftPosSale> {
+    const updateData = { ...draft, updatedAt: sql`now()` };
+    const [updatedDraft] = await db.update(schema.draftPosSales)
+      .set(updateData)
+      .where(eq(schema.draftPosSales.id, id))
+      .returning();
+    
+    if (items) {
+      // Delete existing items and insert new ones
+      await db.delete(schema.draftPosSaleItems)
+        .where(eq(schema.draftPosSaleItems.draftId, id));
+      
+      if (items.length > 0) {
+        const draftItems = items.map(item => ({
+          draftId: id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount,
+        }));
+        await db.insert(schema.draftPosSaleItems).values(draftItems);
+      }
+    }
+    
+    return updatedDraft;
+  }
+
+  async deleteDraftPosSale(id: number): Promise<void> {
+    await db.delete(schema.draftPosSaleItems)
+      .where(eq(schema.draftPosSaleItems.draftId, id));
+    await db.delete(schema.draftPosSales)
+      .where(eq(schema.draftPosSales.id, id));
   }
 }
 

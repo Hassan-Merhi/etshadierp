@@ -70,7 +70,7 @@ interface Location {
 }
 
 export default function POS({ posUser }: { posUser?: any } = {}) {
-  const { selectedLocation } = useLocationContext();
+  const { selectedLocation, setSelectedLocation } = useLocationContext();
   const [_location, navigate] = useLocation();
   
   // Check for edit mode from query parameter
@@ -82,6 +82,12 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
     enabled: !!posUser?.assignedLocationId,
     retry: false,
+  });
+
+  // Fetch all locations for the dropdown (non-POS users only)
+  const { data: allLocations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+    enabled: !posUser, // Only fetch for non-POS users
   });
 
   // Use either the selected location (for Admin/Owner/Manager) or POS user's assigned location
@@ -124,6 +130,12 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     enabled: !!posUser?.cashAccountId,
   });
 
+  // Fetch drafts for current user and location
+  const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
+    queryKey: activeLocation ? [`/api/pos/drafts`, { locationId: activeLocation.id }] : [],
+    enabled: !!activeLocation,
+  });
+
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
   const customerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Asset");
 
@@ -152,6 +164,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const [zeroStockItem, setZeroStockItem] = useState("");
   const [savedSale, setSavedSale] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -284,6 +298,26 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   }, [highlightedIndex, activeRow]);
 
+  // Warn user about unsaved changes when leaving the page
+  useEffect(() => {
+    const hasUnsavedChanges = rows.some(row => row.itemName && row.quantity > 0);
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Modern browsers require this
+      }
+    };
+
+    if (hasUnsavedChanges) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [rows]);
+
   // Save sale mutation (handles both create and update)
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {
@@ -347,6 +381,127 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     contentRef: printRef,
     documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
     onAfterPrint: () => setShowPrintDialog(false),
+  });
+
+  // Save draft mutation
+  const saveDraftMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeLocation) throw new Error("No location selected");
+      
+      const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+      if (validItems.length === 0) throw new Error("No items to save");
+
+      const draftData = {
+        locationId: activeLocation.id,
+        paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
+        paymentAccountId: isCreditSale ? (selectedCustomerId ? parseInt(selectedCustomerId) : null) : (paymentAccountId ? parseInt(paymentAccountId) : null),
+        isCreditSale,
+        notes,
+        items: validItems.map(row => ({
+          stockItemId: row.stockItemId,
+          quantity: row.quantity.toString(),
+          rate: row.rate.toString(),
+          amount: row.amount.toString(),
+        })),
+      };
+
+      if (currentDraftId) {
+        const res = await apiRequest("PATCH", `/api/pos/drafts/${currentDraftId}`, draftData);
+        return await res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/pos/drafts", draftData);
+        return await res.json();
+      }
+    },
+    onSuccess: (data) => {
+      setCurrentDraftId(data.id);
+      toast({
+        title: "Draft Saved",
+        description: "Your transaction has been saved as a draft",
+      });
+      refetchDrafts();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save draft",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Load draft handler
+  const handleLoadDraft = async (draftId: number) => {
+    try {
+      const res = await fetch(`/api/pos/drafts/${draftId}`);
+      if (!res.ok) throw new Error("Failed to load draft");
+      
+      const draft = await res.json();
+      
+      // Populate form with draft data
+      if (draft.paymentAccountType) setPaymentAccountType(draft.paymentAccountType);
+      if (draft.paymentAccountId) setPaymentAccountId(String(draft.paymentAccountId));
+      setIsCreditSale(draft.isCreditSale || false);
+      if (draft.isCreditSale && draft.paymentAccountId) {
+        setSelectedCustomerId(String(draft.paymentAccountId));
+      }
+      setNotes(draft.notes || "");
+
+      // Populate rows with draft items
+      const draftRows = draft.items.map((item: any, index: number) => ({
+        id: String(index + 1),
+        itemName: item.stockItemName,
+        stockItemId: item.stockItemId,
+        quantity: parseFloat(item.quantity),
+        rate: parseFloat(item.rate),
+        amount: parseFloat(item.amount),
+      }));
+
+      // Add blank row at end
+      draftRows.push({
+        id: String(draftRows.length + 1),
+        itemName: "",
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+      });
+
+      setRows(draftRows);
+      setCurrentDraftId(draftId);
+      setShowDraftDialog(false);
+
+      toast({
+        title: "Draft Loaded",
+        description: "Transaction has been loaded from draft",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load draft",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Delete draft mutation
+  const deleteDraftMutation = useMutation({
+    mutationFn: async (draftId: number) => {
+      await apiRequest("DELETE", `/api/pos/drafts/${draftId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Draft Deleted",
+        description: "Draft has been deleted successfully",
+      });
+      refetchDrafts();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete draft",
+        variant: "destructive",
+      });
+    },
   });
 
   // Conditional renders after all hooks are called
@@ -738,6 +893,22 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         <h1 className="text-2xl font-semibold">Point of Sale</h1>
         <div className="flex gap-2">
           <Button 
+            variant="outline"
+            onClick={() => setShowDraftDialog(true)}
+            disabled={drafts.length === 0}
+            data-testid="button-load-draft"
+          >
+            Load Draft {drafts.length > 0 && `(${drafts.length})`}
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => saveDraftMutation.mutate()}
+            disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
+            data-testid="button-save-draft"
+          >
+            {saveDraftMutation.isPending ? "Saving..." : currentDraftId ? "Update Draft" : "Save as Draft"}
+          </Button>
+          <Button 
             onClick={handleSaveSale}
             disabled={saveMutation.isPending}
             className="gap-2"
@@ -757,16 +928,26 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
               <span className="font-medium">{activeLocation?.name}</span>
             </div>
           ) : (
-            <Button
-              variant="outline"
-              onClick={() => navigate("/location-inventory")}
-              className="gap-2"
-              data-testid="button-change-location"
+            <Select 
+              value={activeLocation?.id.toString() || ""} 
+              onValueChange={(value) => {
+                const location = allLocations.find(loc => loc.id.toString() === value);
+                if (location) {
+                  setSelectedLocation(location);
+                }
+              }}
             >
-              <span className="font-medium">{activeLocation?.name}</span>
-              <span className="text-muted-foreground">•</span>
-              <span className="text-xs text-muted-foreground">Change</span>
-            </Button>
+              <SelectTrigger className="w-64" data-testid="select-location">
+                <SelectValue placeholder="Select location" />
+              </SelectTrigger>
+              <SelectContent>
+                {allLocations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
 
@@ -976,7 +1157,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
         </Card>
 
         {/* Right Panel - Item Search */}
-        <Card className="w-96 flex flex-col">
+        <Card className="w-96 flex flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
             <h3 className="text-sm font-semibold mb-3">Search Items</h3>
             <div className="relative">
@@ -1149,6 +1330,64 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
               <Printer className="h-4 w-4" />
               Print Invoice
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Draft Dialog */}
+      <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Load Draft</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a draft to continue working on it. Loading a draft will replace your current work.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="max-h-96 overflow-y-auto">
+            {drafts.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No drafts available</p>
+            ) : (
+              <div className="space-y-2">
+                {drafts.map((draft: any) => (
+                  <div key={draft.id} className="flex items-center justify-between p-4 border rounded-md hover-elevate">
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        Draft #{draft.id} - {new Date(draft.updatedAt).toLocaleString()}
+                      </p>
+                      {draft.notes && (
+                        <p className="text-sm text-muted-foreground mt-1">{draft.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleLoadDraft(draft.id)}
+                        data-testid={`button-load-draft-${draft.id}`}
+                      >
+                        Load
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteDraftMutation.mutate(draft.id)}
+                        disabled={deleteDraftMutation.isPending}
+                        data-testid={`button-delete-draft-${draft.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setShowDraftDialog(false)} data-testid="button-cancel-draft">
+              Cancel
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
