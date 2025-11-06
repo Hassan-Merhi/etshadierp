@@ -5337,6 +5337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
             balanceSide,
             active: account.active,
+            parentId: account.parentId,
           };
         }),
         ...banks.map((account) => {
@@ -5360,6 +5361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
             balanceSide,
             active: account.active,
+            parentId: null,
           };
         }),
         ...assets.map((asset) => {
@@ -5383,6 +5385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
             balanceSide,
             active: asset.active,
+            parentId: null,
           };
         }),
         ...suppliers.map((supplier) => {
@@ -5411,6 +5414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance: absoluteBalance,
             balanceSide,
             active: supplier.active,
+            parentId: null,
           };
         }),
       ];
