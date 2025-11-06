@@ -1,6 +1,6 @@
 import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
-import { DollarSign, Package, TrendingUp, AlertTriangle } from "lucide-react";
+import { DollarSign, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import {
@@ -27,17 +27,6 @@ type MonthlyData = {
   profit: number;
 };
 
-type StockSummary = {
-  totalStockItems: number;
-  lowStockCount: number;
-  criticalCount: number;
-  lowStockItems: Array<{
-    name: string;
-    stock: number;
-    location: string;
-  }>;
-};
-
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   
@@ -58,17 +47,6 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/stats/monthly-data", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch monthly data");
-      return await response.json();
-    },
-    enabled: !!selectedCompany,
-  });
-
-  // Fetch stock summary data
-  const { data: stockSummary, isLoading: stockSummaryLoading } = useQuery<StockSummary>({
-    queryKey: ["/api/stats/stock-summary", selectedCompany?.id],
-    queryFn: async () => {
-      const response = await fetch("/api/stats/stock-summary", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch stock summary");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -102,7 +80,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <KPICard
           title="Total Income"
           value={isLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
@@ -118,22 +96,6 @@ export default function Dashboard() {
           changeType={(profitData?.netProfit ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
           data-testid="kpi-net-profit"
-        />
-        <KPICard
-          title="Stock Items"
-          value={stockSummaryLoading ? "Loading..." : stockSummary?.totalStockItems.toString() || "0"}
-          change="Total unique stock items"
-          changeType="neutral"
-          icon={Package}
-          data-testid="kpi-stock-items"
-        />
-        <KPICard
-          title="Low Stock Alerts"
-          value={stockSummaryLoading ? "Loading..." : stockSummary?.lowStockCount.toString() || "0"}
-          change={stockSummaryLoading ? "" : `${stockSummary?.criticalCount || 0} critical items`}
-          changeType="negative"
-          icon={AlertTriangle}
-          data-testid="kpi-low-stock"
         />
       </div>
 
@@ -195,42 +157,6 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4">Low Stock Alerts</h3>
-        {stockSummaryLoading ? (
-          <div className="flex items-center justify-center h-[200px]">
-            <p className="text-muted-foreground">Loading stock data...</p>
-          </div>
-        ) : !stockSummary?.lowStockItems || stockSummary.lowStockItems.length === 0 ? (
-          <div className="flex items-center justify-center h-[200px]">
-            <p className="text-muted-foreground">No low stock items</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {stockSummary.lowStockItems.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 rounded-md border"
-                data-testid={`alert-stock-${index}`}
-              >
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                  <div>
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.location}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-sm font-mono font-medium text-destructive">
-                  {item.stock.toFixed(2)} units
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
     </div>
   );
 }
