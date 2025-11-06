@@ -107,9 +107,6 @@ export default function StockItems() {
                 <tr className="h-12">
                   <th className="text-left px-4 font-medium">Code</th>
                   <th className="text-left px-4 font-medium">Name</th>
-                  <th className="text-left px-4 font-medium">Barcode</th>
-                  <th className="text-left px-4 font-medium">Stock Group</th>
-                  <th className="text-left px-4 font-medium">UOM</th>
                   <th className="text-right px-4 font-medium">Selling Price</th>
                   <th className="text-left px-4 font-medium">Status</th>
                   <th className="text-center px-4 font-medium">Actions</th>
@@ -118,7 +115,7 @@ export default function StockItems() {
               <tbody>
                 {filteredStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
@@ -141,15 +138,6 @@ export default function StockItems() {
                             <Package className="h-4 w-4 text-muted-foreground" />
                             {item.name}
                           </div>
-                        </td>
-                        <td className="px-4 font-mono text-sm text-muted-foreground" data-testid={`barcode-${item.id}`}>
-                          {item.barcode || "-"}
-                        </td>
-                        <td className="px-4 text-muted-foreground" data-testid={`group-${item.id}`}>
-                          {getStockGroupName(item.stockGroupId)}
-                        </td>
-                        <td className="px-4" data-testid={`uom-${item.id}`}>
-                          {item.uom}
                         </td>
                         <td className="px-4 text-right font-mono" data-testid={`price-${item.id}`}>
                           ${sellingPrice.toFixed(2)}
