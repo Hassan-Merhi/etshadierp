@@ -578,7 +578,7 @@ export default function Vouchers() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const [, setLocation] = useLocation();
+  const [_location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
 
   // Fetch data

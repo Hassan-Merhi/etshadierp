@@ -25,7 +25,7 @@ interface ValidationError {
 }
 
 export default function ImportStockItems() {
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);

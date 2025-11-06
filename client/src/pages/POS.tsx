@@ -71,7 +71,7 @@ interface Location {
 
 export default function POS({ posUser }: { posUser?: any } = {}) {
   const { selectedLocation } = useLocationContext();
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   
   // Check for edit mode from query parameter
   const urlParams = new URLSearchParams(window.location.search);

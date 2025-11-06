@@ -546,7 +546,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     createMutation.mutate(data);
   };
 
-  const [, setLocation] = useLocation();
+  const [_location, setLocation] = useLocation();
 
   const handleEdit = (voucher: Voucher) => {
     // Navigate to appropriate editing interface based on voucher type

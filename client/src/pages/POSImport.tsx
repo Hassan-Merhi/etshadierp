@@ -17,7 +17,7 @@ interface Location {
 }
 
 export default function POSImport() {
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);

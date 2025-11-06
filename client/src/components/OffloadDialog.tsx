@@ -46,7 +46,7 @@ export function OffloadDialog({
   containerNumber,
   totalBales,
 }: OffloadDialogProps) {
-  const [, setLocation] = useLocation();
+  const [_location, setLocation] = useLocation();
   const { toast } = useToast();
   const [locationId, setLocationId] = useState<number | null>(null);
   const [duties, setDuties] = useState("0");

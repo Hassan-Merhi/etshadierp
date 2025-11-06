@@ -85,7 +85,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
-  const [, navigate] = useRoute();
+  const [_route, navigate] = useRoute();
   const { toast } = useToast();
 
   // Debug logging

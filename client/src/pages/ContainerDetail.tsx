@@ -39,7 +39,7 @@ export default function ContainerDetail() {
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
   const [showSellDialog, setShowSellDialog] = useState(false);
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [_location, setLocation] = useLocation();
   const { selectedCompany, companyId } = useCompany();
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({

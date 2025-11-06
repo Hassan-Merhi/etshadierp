@@ -49,7 +49,7 @@ import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
   const isPOS = user?.role?.startsWith("POS");
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   
   // POS users only see POS and Location Inventory
   if (isPOS) {

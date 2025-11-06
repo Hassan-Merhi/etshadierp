@@ -13,7 +13,7 @@ import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download } from "lucide-
 import type { Supplier } from "@shared/schema";
 
 export default function POImport() {
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);

@@ -22,7 +22,7 @@ import { insertSupplierSchema } from "@shared/schema";
 
 export default function EditSupplier() {
   const params = useParams();
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const supplierId = params.id ? parseInt(params.id) : null;
 

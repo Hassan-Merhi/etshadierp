@@ -490,7 +490,7 @@ function AccountCombobox({
 
 export default function VoucherEdit() {
   const { id } = useParams<{ id: string }>();
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [formInitialized, setFormInitialized] = useState(false);

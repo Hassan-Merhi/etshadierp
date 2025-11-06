@@ -54,7 +54,7 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const { selectedCompany } = useCompany();
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
   
   // Fetch global supplier statistics (no company filter)
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({

@@ -58,7 +58,7 @@ interface VoucherWithItems extends Voucher {
 
 export default function POSDaybook() {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
-  const [, navigate] = useLocation();
+  const [_location, navigate] = useLocation();
 
   // Get today's date range
   const today = new Date();
