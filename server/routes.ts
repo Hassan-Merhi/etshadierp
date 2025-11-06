@@ -3255,6 +3255,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get or create "Import Charges" ledger account for container charges
+      let importChargesAccount = await storage.getLedgerAccountByCode("IMPORT_CHARGES");
+      if (!importChargesAccount) {
+        importChargesAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "IMPORT_CHARGES",
+          name: "Import Charges",
+          accountType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
       // Create POs and line items
       for (const [poNumber, items] of Object.entries(poGroups)) {
         const poItems = items as any[];
@@ -3334,42 +3348,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create container charges
+      // Create container charges and their voucher entries
       const charges = containerPreview.charges;
-      if (charges.freight > 0) {
-        await storage.createContainerCharge({
-          containerId: container.id,
-          chargeType: "Freight",
-          amount: charges.freight.toString(),
-        });
-      }
-      if (charges.surcharge > 0) {
-        await storage.createContainerCharge({
-          containerId: container.id,
-          chargeType: "Surcharge",
-          amount: charges.surcharge.toString(),
-        });
-      }
-      if (charges.fumigation > 0) {
-        await storage.createContainerCharge({
-          containerId: container.id,
-          chargeType: "Fumigation",
-          amount: charges.fumigation.toString(),
-        });
-      }
-      if (charges.discount > 0) {
-        await storage.createContainerCharge({
-          containerId: container.id,
-          chargeType: "Discount",
-          amount: (-charges.discount).toString(),
-        });
-      }
-      if (charges.documentCharges > 0) {
-        await storage.createContainerCharge({
-          containerId: container.id,
-          chargeType: "Document Charges",
-          amount: charges.documentCharges.toString(),
-        });
+      const chargeTypes = [
+        { type: "Freight", amount: charges.freight, isNegative: false },
+        { type: "Surcharge", amount: charges.surcharge, isNegative: false },
+        { type: "Fumigation", amount: charges.fumigation, isNegative: false },
+        { type: "Discount", amount: charges.discount, isNegative: true },
+        { type: "Document Charges", amount: charges.documentCharges, isNegative: false },
+      ];
+
+      for (const charge of chargeTypes) {
+        if (charge.amount > 0) {
+          const actualAmount = charge.isNegative ? -charge.amount : charge.amount;
+          
+          // Create container charge record
+          await storage.createContainerCharge({
+            containerId: container.id,
+            chargeType: charge.type,
+            amount: actualAmount.toString(),
+          });
+
+          // Create voucher for this charge to update supplier balance
+          const chargeVoucher = await storage.createVoucher({
+            companyId: req.session.currentCompanyId!,
+            voucherNumber: `CHARGE-${containerNumber}-${charge.type.toUpperCase().replace(/\s+/g, '_')}-${Date.now()}`,
+            voucherType: "Purchase",
+            voucherDate: importDate,
+            description: `${charge.type} - Container ${containerNumber}`,
+            totalAmount: Math.abs(actualAmount).toString(),
+            optional: false,
+          });
+
+          if (!charge.isNegative) {
+            // For normal charges (freight, fumigation, etc.): Debit Import Charges, Credit Supplier
+            await storage.createVoucherEntry({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: importChargesAccount.id,
+              debitAmount: actualAmount.toString(),
+              creditAmount: "0",
+              narration: `${charge.type} - Container ${containerNumber}`,
+            });
+
+            await storage.createVoucherEntry({
+              voucherId: chargeVoucher.id,
+              supplierId: supplierId,
+              debitAmount: "0",
+              creditAmount: actualAmount.toString(),
+              narration: `${charge.type} - Container ${containerNumber}`,
+            });
+          } else {
+            // For discount: Credit Import Charges, Debit Supplier (reduces payable)
+            await storage.createVoucherEntry({
+              voucherId: chargeVoucher.id,
+              ledgerAccountId: importChargesAccount.id,
+              debitAmount: "0",
+              creditAmount: Math.abs(actualAmount).toString(),
+              narration: `${charge.type} - Container ${containerNumber}`,
+            });
+
+            await storage.createVoucherEntry({
+              voucherId: chargeVoucher.id,
+              supplierId: supplierId,
+              debitAmount: Math.abs(actualAmount).toString(),
+              creditAmount: "0",
+              narration: `${charge.type} - Container ${containerNumber}`,
+            });
+          }
+        }
       }
 
       // Create import log
