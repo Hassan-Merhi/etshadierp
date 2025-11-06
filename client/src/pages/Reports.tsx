@@ -915,10 +915,10 @@ export default function Reports() {
                                 }}
                                 data-testid={`sales-group-row-${idx}`}
                               >
-                                <td className="py-2">{row.date}</td>
-                                <td className="py-2">{row.locationName}</td>
-                                <td className="py-2 text-right font-mono">${formatSmartNumber(row.totalSales)}</td>
-                                <td className="py-2 text-right font-mono">${formatSmartNumber(row.totalProfit)}</td>
+                                <td className="py-2" data-testid={`text-date-${idx}`}>{row.date}</td>
+                                <td className="py-2" data-testid={`text-location-${idx}`}>{row.locationName}</td>
+                                <td className="py-2 text-right font-mono" data-testid={`text-sales-${idx}`}>${formatSmartNumber(row.totalSales)}</td>
+                                <td className="py-2 text-right font-mono" data-testid={`text-profit-${idx}`}>${formatSmartNumber(row.totalProfit)}</td>
                               </tr>
                             ));
                           })()}
@@ -963,9 +963,9 @@ export default function Reports() {
                                   onClick={() => navigate(`/vouchers/${voucher.voucherId}`)}
                                   data-testid={`voucher-row-${idx}`}
                                 >
-                                  <td className="py-2 font-mono text-xs">{voucher.voucherNumber}</td>
-                                  <td className="py-2 text-right font-mono">{formatSmartNumber(voucher.itemsCount)}</td>
-                                  <td className="py-2 text-right font-mono">${formatSmartNumber(voucher.totalAmount)}</td>
+                                  <td className="py-2 font-mono text-xs" data-testid={`text-voucher-number-${idx}`}>{voucher.voucherNumber}</td>
+                                  <td className="py-2 text-right font-mono" data-testid={`text-voucher-items-${idx}`}>{formatSmartNumber(voucher.itemsCount)}</td>
+                                  <td className="py-2 text-right font-mono" data-testid={`text-voucher-amount-${idx}`}>${formatSmartNumber(voucher.totalAmount)}</td>
                                 </tr>
                               ))}
                             </tbody>
