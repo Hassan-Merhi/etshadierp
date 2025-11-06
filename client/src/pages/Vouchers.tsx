@@ -1382,11 +1382,11 @@ export default function Vouchers() {
         locationId: 0,
         entries: [
           {
+            type: "PRODUCE",
             stockItemId: 0,
             stockItemName: "",
             quantity: "",
-            adjustmentType: "Production",
-            notes: "",
+            rate: "",
           },
         ],
         notes: "",
