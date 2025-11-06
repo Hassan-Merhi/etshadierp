@@ -99,11 +99,7 @@ export function StockItemEditDialog({
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<StockItem>) => {
-      return await apiRequest(`/api/stock-items/${stockItemId}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PATCH", `/api/stock-items/${stockItemId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
@@ -126,9 +122,7 @@ export function StockItemEditDialog({
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/stock-items/${stockItemId}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/stock-items/${stockItemId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
