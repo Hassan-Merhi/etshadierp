@@ -4,9 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Package } from "lucide-react";
+import { Search, Plus, Package, Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
+import { StockItemEditDialog } from "@/components/StockItemEditDialog";
 
 interface StockItem {
   id: number;
@@ -31,6 +32,8 @@ export default function StockItems() {
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editStockItemId, setEditStockItemId] = useState<number | null>(null);
 
   const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -44,6 +47,12 @@ export default function StockItems() {
     setSelectedStockItemId(stockItemId);
     setSelectedStockItemName(stockItemName);
     setDetailsDialogOpen(true);
+  };
+
+  const handleEditClick = (stockItemId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click from firing
+    setEditStockItemId(stockItemId);
+    setEditDialogOpen(true);
   };
 
   const filteredStockItems = stockItems.filter((item) =>
@@ -103,12 +112,13 @@ export default function StockItems() {
                   <th className="text-left px-4 font-medium">UOM</th>
                   <th className="text-right px-4 font-medium">Selling Price</th>
                   <th className="text-left px-4 font-medium">Status</th>
+                  <th className="text-center px-4 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
@@ -149,6 +159,18 @@ export default function StockItems() {
                             {item.active ? "Active" : "Inactive"}
                           </Badge>
                         </td>
+                        <td className="px-4 text-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => handleEditClick(item.id, e)}
+                            data-testid={`button-edit-${item.id}`}
+                            className="gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit
+                          </Button>
+                        </td>
                       </tr>
                     );
                   })
@@ -173,6 +195,12 @@ export default function StockItems() {
           stockItemName={selectedStockItemName}
         />
       )}
+
+      <StockItemEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        stockItemId={editStockItemId}
+      />
     </div>
   );
 }
