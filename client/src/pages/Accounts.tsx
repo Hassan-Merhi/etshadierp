@@ -24,11 +24,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertLedgerAccountSchema, updateLedgerAccountSchema } from "@shared/schema";
-import type { InsertLedgerAccount, UpdateLedgerAccount, LedgerAccount } from "@shared/schema";
+import { insertLedgerAccountSchema, updateLedgerAccountSchema, insertBankAccountSchema } from "@shared/schema";
+import type { InsertLedgerAccount, UpdateLedgerAccount, LedgerAccount, BankAccount } from "@shared/schema";
 import { z } from "zod";
 import {
   Form,
@@ -79,6 +80,8 @@ export default function Accounts() {
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(null);
   const [editSearchTerm, setEditSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
+  const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
@@ -93,6 +96,19 @@ export default function Accounts() {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch ledger accounts");
+      return await response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<BankAccount[]>({
+    queryKey: ["/api/bank-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany) return [];
+      const response = await fetch(`/api/bank-accounts?companyId=${selectedCompany.id}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch bank accounts");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -280,6 +296,20 @@ export default function Accounts() {
     },
   });
 
+  const bankForm = useForm<Omit<z.infer<typeof insertBankAccountSchema>, "companyId">>({
+    resolver: zodResolver(insertBankAccountSchema.omit({ companyId: true })),
+    defaultValues: {
+      code: "",
+      name: "",
+      bankName: "",
+      accountNumber: "",
+      routingCode: "",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
+      active: true,
+    },
+  });
+
   const createLedgerMutation = useMutation({
     mutationFn: async (data: Omit<InsertLedgerAccount, "companyId">) => {
       if (!selectedCompany?.id) {
@@ -374,6 +404,84 @@ export default function Accounts() {
     },
   });
 
+  const createBankMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected");
+      }
+      return await apiRequest("POST", "/api/bank-accounts", {
+        ...data,
+        companyId: selectedCompany.id,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bank account created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setIsBankDialogOpen(false);
+      bankForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create bank account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateBankMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!bankToEdit) {
+        throw new Error("No bank account selected");
+      }
+      return await apiRequest("PUT", `/api/bank-accounts/${bankToEdit.id}`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bank account updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setBankToEdit(null);
+      bankForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update bank account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteBankMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      return await apiRequest("DELETE", `/api/bank-accounts/${accountId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bank account deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      setBankToEdit(null);
+      bankForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete bank account",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDeleteAccount = () => {
     if (!accountToEdit) return;
     
@@ -408,6 +516,36 @@ export default function Accounts() {
     );
   });
 
+  const onBankSubmit = (data: any) => {
+    if (bankToEdit) {
+      updateBankMutation.mutate(data);
+    } else {
+      createBankMutation.mutate(data);
+    }
+  };
+
+  const handleSelectBankForEdit = (bank: BankAccount) => {
+    setBankToEdit(bank);
+    bankForm.reset({
+      code: bank.code,
+      name: bank.name,
+      bankName: bank.bankName,
+      accountNumber: bank.accountNumber,
+      routingCode: bank.routingCode || "",
+      openingBalance: bank.openingBalance || "0",
+      openingBalanceSide: bank.openingBalanceSide as "Dr" | "Cr" || "Dr",
+      active: bank.active,
+    });
+  };
+
+  const handleDeleteBankAccount = () => {
+    if (!bankToEdit) return;
+    
+    if (window.confirm(`Are you sure you want to delete "${bankToEdit.name}"? This action cannot be undone.`)) {
+      deleteBankMutation.mutate(bankToEdit.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -417,16 +555,17 @@ export default function Accounts() {
             View all accounts, balances, and transaction history
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              data-testid="button-create-ledger"
-              disabled={!selectedCompany}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Ledger Account
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                data-testid="button-create-ledger"
+                disabled={!selectedCompany}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Ledger Account
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create Ledger Account</DialogTitle>
@@ -551,6 +690,217 @@ export default function Accounts() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isBankDialogOpen || !!bankToEdit} onOpenChange={(open) => {
+          setIsBankDialogOpen(open);
+          if (!open) {
+            setBankToEdit(null);
+            bankForm.reset();
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button 
+              data-testid="button-create-bank"
+              disabled={!selectedCompany}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Bank Account
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{bankToEdit ? "Edit Bank Account" : "Create Bank Account"}</DialogTitle>
+              <DialogDescription>
+                {bankToEdit ? "Update bank account details" : "Add a new bank account"}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...bankForm}>
+              <form onSubmit={bankForm.handleSubmit(onBankSubmit)} className="space-y-4">
+                <FormField
+                  control={bankForm.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="BANK001" {...field} data-testid="input-bank-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bankForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Main Account" {...field} data-testid="input-bank-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bankForm.control}
+                  name="bankName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ABC Bank" {...field} data-testid="input-bank-bankname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bankForm.control}
+                  name="accountNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="1234567890" {...field} data-testid="input-bank-accountnumber" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bankForm.control}
+                  name="routingCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Routing Code (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ABCD0123456" {...field} value={field.value || ""} data-testid="input-bank-routingcode" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={bankForm.control}
+                    name="openingBalance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Opening Balance</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            value={field.value || "0"}
+                            data-testid="input-bank-opening-balance"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={bankForm.control}
+                    name="openingBalanceSide"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Balance Side</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-bank-balance-side">
+                              <SelectValue placeholder="Dr/Cr" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={bankForm.control}
+                  name="active"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active</FormLabel>
+                      </div>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-bank-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  {bankToEdit ? (
+                    <div className="flex w-full gap-2 justify-between">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleDeleteBankAccount}
+                        disabled={deleteBankMutation.isPending}
+                        data-testid="button-delete-bank"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {deleteBankMutation.isPending ? "Deleting..." : "Delete"}
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setBankToEdit(null);
+                            bankForm.reset();
+                          }}
+                          data-testid="button-cancel-bank"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={updateBankMutation.isPending}
+                          data-testid="button-submit-bank"
+                        >
+                          {updateBankMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsBankDialogOpen(false)}
+                        data-testid="button-cancel-bank"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createBankMutation.isPending}
+                        data-testid="button-submit-bank"
+                      >
+                        {createBankMutation.isPending ? "Creating..." : "Create Account"}
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="view" className="space-y-6">
@@ -909,38 +1259,53 @@ export default function Accounts() {
                       </div>
                     ) : (
                       filteredAccountsForEdit.map((account) => {
-                        // Only allow editing of ledger accounts for now
                         const isLedger = account.type === "Ledger";
-                        const isSelected = accountToEdit?.id === account.accountId && isLedger;
+                        const isBank = account.type === "Bank";
+                        const isEditable = isLedger || isBank;
+                        const isLedgerSelected = accountToEdit?.id === account.accountId && isLedger;
+                        const isBankSelected = bankToEdit?.id === account.accountId && isBank;
+                        const isSelected = isLedgerSelected || isBankSelected;
                         
                         return (
                           <button
                             key={account.id}
                             type="button"
-                            disabled={ledgerAccountsLoading || !selectedCompany}
+                            disabled={ledgerAccountsLoading || bankAccountsLoading || !selectedCompany}
                             onClick={() => {
                               if (isLedger) {
-                                // Fetch the actual ledger account to edit
                                 const ledgerAccount = ledgerAccounts.find(la => la.id === account.accountId);
                                 if (ledgerAccount) {
+                                  setBankToEdit(null);
                                   handleSelectAccountForEdit(ledgerAccount);
                                 } else {
                                   toast({
                                     title: "Error",
-                                    description: `Ledger account not found. Account ID: ${account.accountId}. Available accounts: ${ledgerAccounts.length}`,
+                                    description: `Ledger account not found.`,
+                                    variant: "destructive",
+                                  });
+                                }
+                              } else if (isBank) {
+                                const bankAccount = bankAccounts.find(ba => ba.id === account.accountId);
+                                if (bankAccount) {
+                                  setAccountToEdit(null);
+                                  handleSelectBankForEdit(bankAccount);
+                                } else {
+                                  toast({
+                                    title: "Error",
+                                    description: `Bank account not found.`,
                                     variant: "destructive",
                                   });
                                 }
                               } else {
                                 toast({
                                   title: "Not Editable",
-                                  description: "Only ledger accounts can be edited at this time",
+                                  description: "Only ledger and bank accounts can be edited",
                                 });
                               }
                             }}
                             className={`w-full p-3 text-left border-b last:border-b-0 ${
                               isSelected ? "bg-accent" : "hover-elevate"
-                            } ${!isLedger ? "opacity-60" : ""}`}
+                            } ${!isEditable ? "opacity-60" : ""}`}
                             data-testid={`button-select-account-edit-${account.id}`}
                           >
                             <div className="flex items-center gap-2">
@@ -951,7 +1316,7 @@ export default function Accounts() {
                                 {account.code}
                               </span>
                               <span className="text-sm">{account.name}</span>
-                              {!isLedger && (
+                              {!isEditable && (
                                 <span className="ml-auto text-xs text-muted-foreground italic">
                                   (View only)
                                 </span>
@@ -1104,6 +1469,160 @@ export default function Accounts() {
                             >
                               <Edit className="w-4 h-4 mr-2" />
                               {updateLedgerMutation.isPending ? "Saving..." : "Save Changes"}
+                            </Button>
+                          </div>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              )}
+
+              {bankToEdit && (
+                <Card className="bg-muted/50">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Edit Bank Account Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...bankForm}>
+                      <form onSubmit={bankForm.handleSubmit(onBankSubmit)} className="space-y-4">
+                        <FormField
+                          control={bankForm.control}
+                          name="code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Code</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-bank-code" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={bankForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-bank-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={bankForm.control}
+                          name="bankName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Bank Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-bank-bankname" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={bankForm.control}
+                          name="accountNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Number</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-edit-bank-accountnumber" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={bankForm.control}
+                          name="routingCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Routing Code (Optional)</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value || ""} data-testid="input-edit-bank-routingcode" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={bankForm.control}
+                            name="openingBalance"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Opening Balance</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    {...field}
+                                    value={field.value || "0"}
+                                    data-testid="input-edit-bank-balance"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={bankForm.control}
+                            name="openingBalanceSide"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Balance Side</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-edit-bank-balance-side">
+                                      <SelectValue placeholder="Dr/Cr" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="flex gap-2 justify-between">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleDeleteBankAccount}
+                            disabled={deleteBankMutation.isPending}
+                            data-testid="button-delete-bank-account"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {deleteBankMutation.isPending ? "Deleting..." : "Delete"}
+                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setBankToEdit(null);
+                                bankForm.reset();
+                              }}
+                              data-testid="button-cancel-bank-edit"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={updateBankMutation.isPending}
+                              data-testid="button-save-bank-edit"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              {updateBankMutation.isPending ? "Saving..." : "Save Changes"}
                             </Button>
                           </div>
                         </div>

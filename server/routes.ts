@@ -2824,6 +2824,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/bank-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const parsed = insertBankAccountSchema.partial().parse(req.body);
+      
+      // Validate opening balance amount and side must both be present or both absent
+      const hasBalance = parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
+      const hasSide = parsed.openingBalanceSide !== undefined && parsed.openingBalanceSide !== null;
+      
+      if (hasBalance && !hasSide) {
+        return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
+      }
+      
+      if (!hasBalance && hasSide) {
+        return res.status(400).json({ message: "Dr/Cr side requires opening balance amount" });
+      }
+
+      const account = await storage.updateBankAccount(id, parsed);
+      if (!account) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/bank-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteBankAccount(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Fixed Assets
   app.get("/api/fixed-assets", requireAuth, async (req, res) => {
     try {
