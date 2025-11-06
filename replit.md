@@ -6,6 +6,20 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
 
 **Deployment**: Configured for Render cloud hosting at $14/month (Web Service: $7 + PostgreSQL: $7) with automatic deployments from GitHub.
 
+## Recent Changes (November 2025)
+
+### UI/UX Improvements
+- **Import Buttons Relocated**: Moved import functionality buttons from Dashboard sidebar to their respective pages for better context:
+  - Import Stock Items button added to Stock Items page
+  - Import PO button on Containers page
+  - Import Sales button added to Point of Sale page (visible to non-POS users only)
+- **Navigation Cleanup**: Removed standalone import pages and Analytics page from sidebar navigation to reduce clutter
+- **Stock Query Enhancements**: 
+  - Display all purchases and sales in table format (not just last transaction)
+  - Include container numbers in purchase history
+  - Removed Code and UOM columns from stock items list
+  - Smart number formatting removes .00 from whole numbers while preserving full decimal precision
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
