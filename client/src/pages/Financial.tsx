@@ -196,6 +196,17 @@ export default function Financial() {
     (acc) => acc.subType === "Indirect Expense"
   );
 
+  const liabilityAccounts = accounts.filter(
+    (acc) => 
+      (acc.type === "Ledger" && (
+        acc.accountType === "Liability" ||
+        acc.accountType === "Accounts Payable" ||
+        acc.accountType === "Loans" ||
+        acc.accountType === "Duty Agent" ||
+        acc.accountType === "Transporter Agent"
+      ))
+  );
+
   // Calculate totals
   const calculateTotal = (accountList: Account[]) => {
     return accountList.reduce((sum, acc) => sum + (acc.balance || 0), 0);
@@ -314,17 +325,20 @@ export default function Financial() {
       <div>
         <h1 className="text-2xl font-semibold">Financial Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Overview of expenses, assets, cash, and sales
+          Overview of expenses, assets, liabilities, cash, and sales
         </p>
       </div>
 
       <Tabs defaultValue="expenses">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="expenses" data-testid="tab-expenses">
             Expenses
           </TabsTrigger>
           <TabsTrigger value="assets" data-testid="tab-assets">
             Assets
+          </TabsTrigger>
+          <TabsTrigger value="liabilities" data-testid="tab-liabilities">
+            Liabilities
           </TabsTrigger>
           <TabsTrigger value="indirect-expenses" data-testid="tab-indirect-expenses">
             Indirect Exp.
@@ -416,6 +430,47 @@ export default function Financial() {
                 </TableHeader>
                 <TableBody>
                   {renderHierarchicalAccounts(assetAccounts)}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Liabilities Tab */}
+        <TabsContent value="liabilities" className="space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <FileText className="h-5 w-5 text-red-500" />
+                All Liability Accounts
+              </h3>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold font-mono">
+                  ${calculateTotal(liabilityAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+            {accountsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : liabilityAccounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No liability accounts found
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {renderHierarchicalAccounts(liabilityAccounts)}
                 </TableBody>
               </Table>
             )}
