@@ -440,6 +440,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Voucher created successfully",
@@ -491,6 +492,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Voucher updated successfully",
@@ -515,6 +517,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Voucher deleted successfully",

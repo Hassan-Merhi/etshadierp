@@ -226,6 +226,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
         description: "Voucher updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {

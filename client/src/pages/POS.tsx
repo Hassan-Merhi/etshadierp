@@ -331,6 +331,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       // Invalidate inventory query to refresh stock levels
       queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
       toast({

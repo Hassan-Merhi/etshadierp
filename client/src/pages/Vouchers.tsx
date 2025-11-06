@@ -835,7 +835,7 @@ export default function Vouchers() {
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher created successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       form.reset({
         paymentAccountType: "ledger",
         paymentAccountId: 0,
@@ -994,7 +994,7 @@ export default function Vouchers() {
         description: "Journal voucher created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       journalForm.reset({
         voucherDate: new Date(),
         entries: [

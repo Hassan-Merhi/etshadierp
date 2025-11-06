@@ -100,6 +100,7 @@ export default function POSImport() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       navigate("/vouchers");
     },
     onError: (error: any) => {

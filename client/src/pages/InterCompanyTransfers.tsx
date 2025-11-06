@@ -103,6 +103,7 @@ export default function InterCompanyTransfers() {
       queryClient.invalidateQueries({ queryKey: ["/api/inter-company-transfers", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       setIsCreateOpen(false);
       form.reset({
         fromCompanyId: selectedCompany?.id || 0,

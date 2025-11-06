@@ -802,6 +802,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Voucher updated successfully",
@@ -825,6 +826,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Optional status updated successfully",
@@ -857,6 +859,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Sales voucher updated successfully",
@@ -891,6 +894,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Purchase voucher updated successfully",
@@ -925,6 +929,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Adjustment voucher updated successfully",
@@ -960,6 +965,7 @@ export default function VoucherEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       toast({
         title: "Success",
         description: "Stock transfer voucher updated successfully",
