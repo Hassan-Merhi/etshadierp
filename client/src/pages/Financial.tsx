@@ -5,11 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, Package, FileText } from "lucide-react";
+import { DollarSign, TrendingDown, Wallet, Package, FileText, ChevronRight, ChevronDown } from "lucide-react";
 
 interface Account {
   id: string;
@@ -22,6 +21,7 @@ interface Account {
   balance: number;
   balanceSide: string | null;
   active: boolean;
+  parentId?: number;
 }
 
 interface LocationSales {
@@ -43,20 +43,11 @@ export default function Financial() {
   const { selectedCompany } = useCompany();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
 
   // Get all accounts
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
-    enabled: !!selectedCompany,
-  });
-
-  // Get net profit
-  const { data: profitData, isLoading: profitLoading } = useQuery<{
-    totalIncome: number;
-    totalExpenses: number;
-    netProfit: number;
-  }>({
-    queryKey: ["/api/stats/net-profit", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -108,6 +99,40 @@ export default function Financial() {
     enabled: !!selectedLocationForDetails,
   });
 
+  // Toggle account expansion
+  const toggleAccount = (accountId: number) => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedAccounts(newExpanded);
+  };
+
+  // Group accounts by parent
+  const groupAccountsByParent = (accountList: Account[]) => {
+    const parentAccounts = accountList.filter(acc => !acc.parentId);
+    const childAccounts = accountList.filter(acc => acc.parentId);
+    
+    const accountMap = new Map<number, Account[]>();
+    childAccounts.forEach(child => {
+      const parentId = child.parentId!;
+      if (!accountMap.has(parentId)) {
+        accountMap.set(parentId, []);
+      }
+      accountMap.get(parentId)!.push(child);
+    });
+
+    return { parentAccounts, accountMap };
+  };
+
+  // Calculate total for children
+  const calculateChildrenTotal = (parentAccountId: number, accountMap: Map<number, Account[]>) => {
+    const children = accountMap.get(parentAccountId) || [];
+    return children.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  };
+
   // Filter accounts
   const cashAccounts = accounts.filter(
     (acc) => acc.type === "Bank" && (
@@ -140,23 +165,125 @@ export default function Financial() {
     return accountList.reduce((sum, acc) => sum + (acc.balance || 0), 0);
   };
 
-  const profitPercent = profitData
-    ? profitData.totalIncome > 0
-      ? Math.min(100, Math.max(0, (profitData.netProfit / profitData.totalIncome) * 100))
-      : 0
-    : 0;
+  // Render hierarchical accounts
+  const renderHierarchicalAccounts = (accountList: Account[]) => {
+    const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
+
+    return (
+      <>
+        {parentAccounts.map((parent) => {
+          const children = accountMap.get(parent.accountId) || [];
+          const hasChildren = children.length > 0;
+          const isExpanded = expandedAccounts.has(parent.accountId);
+          const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
+
+          return (
+            <>
+              <TableRow 
+                key={parent.id} 
+                data-testid={`row-account-${parent.id}`}
+                className={hasChildren ? "hover-elevate cursor-pointer font-medium" : ""}
+                onClick={() => hasChildren && toggleAccount(parent.accountId)}
+              >
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {hasChildren && (
+                      isExpanded ? 
+                        <ChevronDown className="h-4 w-4" data-testid={`icon-expanded-${parent.id}`} /> : 
+                        <ChevronRight className="h-4 w-4" data-testid={`icon-collapsed-${parent.id}`} />
+                    )}
+                    <span>{parent.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">
+                  ${(hasChildren ? childrenTotal : parent.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TableCell>
+              </TableRow>
+              {hasChildren && isExpanded && children.map((child) => (
+                <TableRow key={child.id} data-testid={`row-account-${child.id}`}>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    {child.name}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    ${child.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </>
+          );
+        })}
+      </>
+    );
+  };
+
+  // Render hierarchical accounts for Cash tab (with Side column)
+  const renderHierarchicalCashAccounts = (accountList: Account[]) => {
+    const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
+
+    return (
+      <>
+        {parentAccounts.map((parent) => {
+          const children = accountMap.get(parent.accountId) || [];
+          const hasChildren = children.length > 0;
+          const isExpanded = expandedAccounts.has(parent.accountId);
+          const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
+
+          return (
+            <>
+              <TableRow 
+                key={parent.id} 
+                data-testid={`row-account-${parent.id}`}
+                className={hasChildren ? "hover-elevate cursor-pointer font-medium" : ""}
+                onClick={() => hasChildren && toggleAccount(parent.accountId)}
+              >
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {hasChildren && (
+                      isExpanded ? 
+                        <ChevronDown className="h-4 w-4" data-testid={`icon-expanded-${parent.id}`} /> : 
+                        <ChevronRight className="h-4 w-4" data-testid={`icon-collapsed-${parent.id}`} />
+                    )}
+                    <span>{parent.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">
+                  ${(hasChildren ? childrenTotal : parent.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">
+                  {parent.balanceSide || "Dr"}
+                </TableCell>
+              </TableRow>
+              {hasChildren && isExpanded && children.map((child) => (
+                <TableRow key={child.id} data-testid={`row-account-${child.id}`}>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    {child.name}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    ${child.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {child.balanceSide || "Dr"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </>
+          );
+        })}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Financial Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Overview of expenses, assets, profit, cash, and sales
+          Overview of expenses, assets, cash, and sales
         </p>
       </div>
 
       <Tabs defaultValue="expenses">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="expenses" data-testid="tab-expenses">
             Expenses
           </TabsTrigger>
@@ -168,9 +295,6 @@ export default function Financial() {
           </TabsTrigger>
           <TabsTrigger value="direct-expenses" data-testid="tab-direct-expenses">
             Direct Exp.
-          </TabsTrigger>
-          <TabsTrigger value="profit" data-testid="tab-profit">
-            Profit
           </TabsTrigger>
           <TabsTrigger value="cash" data-testid="tab-cash">
             Cash
@@ -209,25 +333,12 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Account Name</TableHead>
-                    <TableHead>Type</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {expenseAccounts.map((acc) => (
-                    <TableRow key={acc.id} data-testid={`row-account-${acc.id}`}>
-                      <TableCell className="font-mono text-sm">{acc.code}</TableCell>
-                      <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {acc.subType || "General"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderHierarchicalAccounts(expenseAccounts)}
                 </TableBody>
               </Table>
             )}
@@ -263,25 +374,12 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Account Name</TableHead>
-                    <TableHead>Type</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assetAccounts.map((acc) => (
-                    <TableRow key={acc.id} data-testid={`row-account-${acc.id}`}>
-                      <TableCell className="font-mono text-sm">{acc.code}</TableCell>
-                      <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {acc.type}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderHierarchicalAccounts(assetAccounts)}
                 </TableBody>
               </Table>
             )}
@@ -317,21 +415,12 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Account Name</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {indirectExpenseAccounts.map((acc) => (
-                    <TableRow key={acc.id} data-testid={`row-account-${acc.id}`}>
-                      <TableCell className="font-mono text-sm">{acc.code}</TableCell>
-                      <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderHierarchicalAccounts(indirectExpenseAccounts)}
                 </TableBody>
               </Table>
             )}
@@ -367,71 +456,14 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Account Name</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {directExpenseAccounts.map((acc) => (
-                    <TableRow key={acc.id} data-testid={`row-account-${acc.id}`}>
-                      <TableCell className="font-mono text-sm">{acc.code}</TableCell>
-                      <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderHierarchicalAccounts(directExpenseAccounts)}
                 </TableBody>
               </Table>
-            )}
-          </Card>
-        </TabsContent>
-
-        {/* Profit Tab */}
-        <TabsContent value="profit" className="space-y-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-6 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-              Profit Analysis
-            </h3>
-            {profitLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Net Profit</p>
-                  <p className={`text-4xl font-bold font-mono ${(profitData?.netProfit || 0) >= 0 ? "text-green-500" : "text-destructive"}`}>
-                    ${(profitData?.netProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Profit Margin</span>
-                      <span className="text-sm font-medium">{profitPercent.toFixed(1)}%</span>
-                    </div>
-                    <Progress value={profitPercent} className="h-3" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Total Income</p>
-                    <p className="text-2xl font-bold font-mono text-green-500">
-                      ${(profitData?.totalIncome || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Total Expenses</p>
-                    <p className="text-2xl font-bold font-mono text-destructive">
-                      ${(profitData?.totalExpenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </div>
             )}
           </Card>
         </TabsContent>
@@ -465,25 +497,13 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Account Name</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead className="text-right">Side</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cashAccounts.map((acc) => (
-                    <TableRow key={acc.id} data-testid={`row-account-${acc.id}`}>
-                      <TableCell className="font-mono text-sm">{acc.code}</TableCell>
-                      <TableCell className="font-medium">{acc.name}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {acc.balanceSide || "Dr"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {renderHierarchicalCashAccounts(cashAccounts)}
                 </TableBody>
               </Table>
             )}
@@ -521,7 +541,6 @@ export default function Financial() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Location Code</TableHead>
                     <TableHead>Location Name</TableHead>
                     <TableHead className="text-right">Transactions</TableHead>
                     <TableHead className="text-right">Total Sales</TableHead>
@@ -535,7 +554,6 @@ export default function Financial() {
                       data-testid={`row-sales-${sale.locationId}`}
                       className="hover-elevate"
                     >
-                      <TableCell className="font-mono text-sm">{sale.locationCode}</TableCell>
                       <TableCell className="font-medium">{sale.locationName}</TableCell>
                       <TableCell className="text-right font-mono">
                         {sale.totalTransactions}
