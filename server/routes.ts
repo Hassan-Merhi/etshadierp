@@ -2446,6 +2446,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete stock item
+  app.delete("/api/stock-items/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Stock item belongs to a different company" });
+      }
+
+      // Check if item has any inventory
+      const inventoryLocations = await storage.getInventoryLocationsByItem(stockItemId, req.session.currentCompanyId);
+      const hasInventory = inventoryLocations.some(loc => parseFloat(loc.quantity) > 0);
+      
+      if (hasInventory) {
+        return res.status(400).json({ message: "Cannot delete stock item with existing inventory. Please transfer or adjust inventory to zero first." });
+      }
+
+      await storage.deleteStockItem(stockItemId);
+      res.json({ message: "Stock item deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get stock item transactions (transfers and adjustments)
   app.get("/api/stock-items/:id/transactions", requireAuth, async (req, res) => {
     try {

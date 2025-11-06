@@ -116,6 +116,7 @@ export interface IStorage {
   getStockItemById(id: number): Promise<StockItem | undefined>;
   createStockItem(item: InsertStockItem): Promise<StockItem>;
   updateStockItem(id: number, updates: Partial<InsertStockItem>): Promise<StockItem>;
+  deleteStockItem(id: number): Promise<void>;
   
   // Stock Item Code Aliases
   getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]>;
@@ -573,6 +574,12 @@ export class DbStorage implements IStorage {
       .where(eq(schema.stockItems.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteStockItem(id: number): Promise<void> {
+    await db
+      .delete(schema.stockItems)
+      .where(eq(schema.stockItems.id, id));
   }
 
   async getStockItemByCodeOrAlias(code: string, companyId: number): Promise<StockItem | undefined> {
