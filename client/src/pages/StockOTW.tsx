@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Package, Search, Ship, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Container, Supplier } from "@shared/schema";
 
@@ -25,8 +26,22 @@ interface StockItem {
   importDate: string;
 }
 
+interface GroupedStockItem {
+  stockItemName: string;
+  totalQuantity: number;
+  totalCost: number;
+  containerCount: number;
+  containers: {
+    containerNumber: string;
+    quantity: number;
+    cost: number;
+    supplierName: string;
+  }[];
+}
+
 export default function StockOTW() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const { 
     data: containers = [], 
@@ -93,27 +108,69 @@ export default function StockOTW() {
     return items;
   }, [containerDetailsQueries, otwContainers, suppliers]);
 
+  // Group items by stock item name
+  const groupedItems: GroupedStockItem[] = useMemo(() => {
+    const grouped = new Map<string, GroupedStockItem>();
+    
+    stockItems.forEach((item) => {
+      const name = item.stockItemName;
+      const qty = parseFloat(item.quantity || "0");
+      const cost = parseFloat(item.totalCost || "0");
+      
+      if (!grouped.has(name)) {
+        grouped.set(name, {
+          stockItemName: name,
+          totalQuantity: 0,
+          totalCost: 0,
+          containerCount: 0,
+          containers: [],
+        });
+      }
+      
+      const group = grouped.get(name)!;
+      group.totalQuantity += isNaN(qty) ? 0 : qty;
+      group.totalCost += isNaN(cost) ? 0 : cost;
+      group.containerCount += 1;
+      group.containers.push({
+        containerNumber: item.containerNumber,
+        quantity: isNaN(qty) ? 0 : qty,
+        cost: isNaN(cost) ? 0 : cost,
+        supplierName: item.supplierName,
+      });
+    });
+    
+    return Array.from(grouped.values());
+  }, [stockItems]);
+
   // Apply search filter
-  const filteredItems = stockItems.filter((item) => {
+  const filteredItems = groupedItems.filter((item) => {
     if (searchTerm === "") return true;
     const search = searchTerm.toLowerCase();
     return (
-      item.stockItemCode.toLowerCase().includes(search) ||
       item.stockItemName.toLowerCase().includes(search) ||
-      item.containerNumber.toLowerCase().includes(search) ||
-      item.supplierName.toLowerCase().includes(search)
+      item.containers.some(c => 
+        c.containerNumber.toLowerCase().includes(search) ||
+        c.supplierName.toLowerCase().includes(search)
+      )
     );
   });
 
+  const toggleItemExpanded = (itemName: string) => {
+    setExpandedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName);
+      } else {
+        newSet.add(itemName);
+      }
+      return newSet;
+    });
+  };
+
   // Calculate totals with NaN protection
-  const totalQuantity = filteredItems.reduce((sum, item) => {
-    const qty = parseFloat(item.quantity || "0");
-    return sum + (isNaN(qty) ? 0 : qty);
-  }, 0);
-  const totalValue = filteredItems.reduce((sum, item) => {
-    const val = parseFloat(item.totalCost || "0");
-    return sum + (isNaN(val) ? 0 : val);
-  }, 0);
+  const totalQuantity = filteredItems.reduce((sum, item) => sum + item.totalQuantity, 0);
+  const totalValue = filteredItems.reduce((sum, item) => sum + item.totalCost, 0);
+  const uniqueItemCount = filteredItems.length;
 
   if (isLoading) {
     return (
@@ -171,10 +228,10 @@ export default function StockOTW() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono" data-testid="text-total-items">
-              {filteredItems.length}
+              {uniqueItemCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              Stock items
+              Unique stock items
             </p>
           </CardContent>
         </Card>
@@ -186,7 +243,7 @@ export default function StockOTW() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono" data-testid="text-total-quantity">
-              {totalQuantity.toFixed(3)}
+              {Math.round(totalQuantity).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
               Total bales/units
@@ -223,46 +280,82 @@ export default function StockOTW() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Stock Items ({filteredItems.length})</CardTitle>
+            <CardTitle>Stock Items ({uniqueItemCount})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Item Code</TableHead>
+                    <TableHead className="w-12"></TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Total Cost</TableHead>
-                    <TableHead>Container</TableHead>
                     <TableHead>Supplier</TableHead>
-                    <TableHead>Import Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredItems.map((item, index) => {
-                    const qty = parseFloat(item.quantity || "0");
-                    const cost = parseFloat(item.totalCost || "0");
+                    const isExpanded = expandedItems.has(item.stockItemName);
                     return (
-                      <TableRow key={index} data-testid={`row-item-${index}`}>
-                        <TableCell className="font-medium font-mono">
-                          {item.stockItemCode}
-                        </TableCell>
-                        <TableCell>{item.stockItemName}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {isNaN(qty) ? "0.000" : qty.toFixed(3)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${isNaN(cost) ? "0.00" : cost.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {item.containerNumber}
-                        </TableCell>
-                        <TableCell className="text-sm">{item.supplierName}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {new Date(item.importDate).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow 
+                          key={item.stockItemName} 
+                          data-testid={`row-item-${index}`}
+                          className="hover-elevate cursor-pointer"
+                          onClick={() => toggleItemExpanded(item.stockItemName)}
+                        >
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-6 w-6"
+                              data-testid={`button-expand-${index}`}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {item.stockItemName}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {Math.round(item.totalQuantity).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${item.totalCost.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <Badge variant="secondary" data-testid={`badge-container-count-${index}`}>
+                              {item.containerCount} container{item.containerCount !== 1 ? 's' : ''}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && item.containers.map((container, containerIndex) => (
+                          <TableRow 
+                            key={`${item.stockItemName}-${containerIndex}`}
+                            className="bg-muted/30"
+                            data-testid={`row-container-${index}-${containerIndex}`}
+                          >
+                            <TableCell></TableCell>
+                            <TableCell className="pl-8 text-sm text-muted-foreground">
+                              {container.containerNumber}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {Math.round(container.quantity).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              ${container.cost.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {container.supplierName}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
                     );
                   })}
                 </TableBody>
@@ -274,7 +367,7 @@ export default function StockOTW() {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total Quantity:</span>
                   <span className="ml-2 font-mono font-semibold" data-testid="text-summary-quantity">
-                    {totalQuantity.toFixed(3)}
+                    {Math.round(totalQuantity).toLocaleString()}
                   </span>
                 </div>
                 <div className="text-right">
