@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Package, Edit } from "lucide-react";
+import { Search, Plus, Package, Edit, FileSpreadsheet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
@@ -78,14 +79,22 @@ export default function StockItems() {
             Manage all stock items in your company
           </p>
         </div>
-        <Button 
-          className="gap-2" 
-          onClick={() => setCreateDialogOpen(true)}
-          data-testid="button-add-item"
-        >
-          <Plus className="h-4 w-4" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/import-stock-items">
+            <Button variant="outline" className="gap-2" data-testid="button-import-items">
+              <FileSpreadsheet className="h-4 w-4" />
+              Import Items
+            </Button>
+          </Link>
+          <Button 
+            className="gap-2" 
+            onClick={() => setCreateDialogOpen(true)}
+            data-testid="button-add-item"
+          >
+            <Plus className="h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4">

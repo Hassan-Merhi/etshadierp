@@ -81,16 +81,6 @@ const menuItems = [
     icon: Ship,
   },
   {
-    title: "PO Import",
-    url: "/po-import",
-    icon: Upload,
-  },
-  {
-    title: "POS Import",
-    url: "/pos-import",
-    icon: ShoppingCart,
-  },
-  {
     title: "Financial",
     url: "/financial",
     icon: DollarSign,
@@ -146,11 +136,6 @@ const menuItems = [
     icon: FolderPlus,
   },
   {
-    title: "Import Stock Items",
-    url: "/import-stock-items",
-    icon: FileSpreadsheet,
-  },
-  {
     title: "Stock Query",
     url: "/stock-query",
     icon: Search,
@@ -159,11 +144,6 @@ const menuItems = [
     title: "Sales Report",
     url: "/sales-report",
     icon: PieChart,
-  },
-  {
-    title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
   },
   {
     title: "Settings",
