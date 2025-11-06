@@ -4,7 +4,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2 } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useReactToPrint } from "react-to-print";
@@ -82,6 +82,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
   const [viewAllItems, setViewAllItems] = useState<boolean>(false);
+  const [locationSearchTerm, setLocationSearchTerm] = useState("");
+  const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [itemSearchTerm, setItemSearchTerm] = useState("");
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -182,6 +185,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       group.averageRate = group.totalValue / group.totalQuantity;
     }
   });
+
+  // Sort locations chronologically (by id)
+  const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
+
+  // Filter locations by search term
+  const filteredLocations = sortedLocations.filter((location) =>
+    location.name.toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
+    location.code.toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
+    (location.city ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
+    (location.state ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase())
+  );
+
+  // Sort stock groups chronologically (by id, nulls last)
+  const sortedStockGroups = [...stockGroups].sort((a, b) => {
+    if (a.groupId === null) return 1;
+    if (b.groupId === null) return -1;
+    return a.groupId - b.groupId;
+  });
+
+  // Filter stock groups by search term
+  const filteredStockGroups = sortedStockGroups.filter((group) =>
+    group.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+    (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
+  );
+
+  // Filter stock items by search term
+  const filteredStockItems = selectedGroup?.items.filter((item) =>
+    item.stockItemName.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+    item.stockItemCode.toLowerCase().includes(itemSearchTerm.toLowerCase())
+  ) || [];
 
   // Handle location selection
   const handleLocationClick = (location: Location) => {
@@ -483,47 +516,87 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {!selectedLocationLocal && (
         <div>
           <h1 className="text-3xl font-bold mb-6">Location Inventory</h1>
-          {locationsLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(i => (
-                <Card key={i}>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/2 mt-2" />
-                  </CardHeader>
-                </Card>
-              ))}
+          
+          <Card className="p-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search locations by name, code, city, or state..."
+                value={locationSearchTerm}
+                onChange={(e) => setLocationSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-locations"
+              />
             </div>
-          ) : locations.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
+
+            {locationsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : locations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
                 No locations found. Create a location first.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {locations.map((location) => (
-                <Card
-                  key={location.id}
-                  className="hover-elevate active-elevate-2 cursor-pointer"
-                  onClick={() => handleLocationClick(location)}
-                  data-testid={`card-location-${location.id}`}
-                >
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      {location.name}
-                    </CardTitle>
-                    <CardDescription>
-                      {location.code}
-                      {location.city && ` • ${location.city}`}
-                      {location.state && `, ${location.state}`}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr className="h-12">
+                      <th className="text-left px-3 font-medium">Code</th>
+                      <th className="text-left px-3 font-medium">Name</th>
+                      <th className="text-left px-3 font-medium">City</th>
+                      <th className="text-left px-3 font-medium">State</th>
+                      <th className="text-left px-3 font-medium">Country</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLocations.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No locations found matching your search
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredLocations.map((location) => (
+                        <tr
+                          key={location.id}
+                          className="border-t hover-elevate cursor-pointer h-12"
+                          onClick={() => handleLocationClick(location)}
+                          data-testid={`row-location-${location.id}`}
+                        >
+                          <td className="px-3 font-mono" data-testid={`code-${location.id}`}>
+                            {location.code}
+                          </td>
+                          <td className="px-3 font-medium" data-testid={`name-${location.id}`}>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-muted-foreground" />
+                              {location.name}
+                            </div>
+                          </td>
+                          <td className="px-3" data-testid={`city-${location.id}`}>
+                            {location.city || "-"}
+                          </td>
+                          <td className="px-3" data-testid={`state-${location.id}`}>
+                            {location.state || "-"}
+                          </td>
+                          <td className="px-3" data-testid={`country-${location.id}`}>
+                            {location.country || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!locationsLoading && filteredLocations.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Showing {filteredLocations.length} of {locations.length} locations
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -744,72 +817,99 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {inventoryLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(i => (
-                <Card key={i}>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/2 mt-2" />
-                  </CardHeader>
-                  <CardContent>
-                    <Skeleton className="h-4 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
+
+          <Card className="p-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search stock groups by name or code..."
+                value={groupSearchTerm}
+                onChange={(e) => setGroupSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-groups"
+              />
             </div>
-          ) : stockGroups.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
+
+            {inventoryLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : stockGroups.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
                 No inventory found at this location.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {stockGroups.map((group) => (
-                <Card
-                  key={group.groupId || 0}
-                  className="hover-elevate active-elevate-2 cursor-pointer"
-                  onClick={() => setSelectedGroup(group)}
-                  data-testid={`card-group-${group.groupId || 'uncategorized'}`}
-                >
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Layers className="w-5 h-5" />
-                      {group.groupName}
-                    </CardTitle>
-                    {group.groupCode && (
-                      <CardDescription>{group.groupCode}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Items:</span>
-                        <span className="font-medium">{group.itemCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Qty:</span>
-                        <span className="font-medium">{group.totalQuantity.toFixed(3)}</span>
-                      </div>
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr className="h-12">
+                      <th className="text-left px-3 font-medium">Code</th>
+                      <th className="text-left px-3 font-medium">Name</th>
+                      <th className="text-right px-3 font-medium">Items</th>
+                      <th className="text-right px-3 font-medium">Total Qty</th>
                       {!posUser && (
                         <>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Avg Rate:</span>
-                            <span className="font-medium">${group.averageRate.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Total Value:</span>
-                            <span className="font-medium text-primary">${group.totalValue.toFixed(2)}</span>
-                          </div>
+                          <th className="text-right px-3 font-medium">Avg Rate</th>
+                          <th className="text-right px-3 font-medium">Total Value</th>
                         </>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStockGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan={posUser ? 4 : 6} className="text-center py-8 text-muted-foreground">
+                          No stock groups found matching your search
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredStockGroups.map((group) => (
+                        <tr
+                          key={group.groupId || 0}
+                          className="border-t hover-elevate cursor-pointer h-12"
+                          onClick={() => setSelectedGroup(group)}
+                          data-testid={`row-group-${group.groupId || 'uncategorized'}`}
+                        >
+                          <td className="px-3 font-mono" data-testid={`code-${group.groupId}`}>
+                            {group.groupCode || "-"}
+                          </td>
+                          <td className="px-3 font-medium" data-testid={`name-${group.groupId}`}>
+                            <div className="flex items-center gap-2">
+                              <Layers className="h-4 w-4 text-muted-foreground" />
+                              {group.groupName}
+                            </div>
+                          </td>
+                          <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
+                            {group.itemCount}
+                          </td>
+                          <td className="px-3 text-right font-mono" data-testid={`qty-${group.groupId}`}>
+                            {group.totalQuantity.toFixed(3)}
+                          </td>
+                          {!posUser && (
+                            <>
+                              <td className="px-3 text-right font-mono" data-testid={`rate-${group.groupId}`}>
+                                ${group.averageRate.toFixed(2)}
+                              </td>
+                              <td className="px-3 text-right font-mono font-medium" data-testid={`value-${group.groupId}`}>
+                                ${group.totalValue.toFixed(2)}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {!inventoryLoading && filteredStockGroups.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Showing {filteredStockGroups.length} of {stockGroups.length} stock groups
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -819,55 +919,80 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           <h1 className="text-3xl font-bold mb-6">
             {selectedGroup.groupName} - Stock Items
           </h1>
-          <div ref={tableRef} className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>UOM</TableHead>
-                  {!posUser && (
-                    <>
-                      <TableHead className="text-right">Avg Rate</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                    </>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedGroup.items.map((item, index) => (
-                  <TableRow
-                    key={item.inventoryId}
-                    data-testid={`row-item-${item.stockItemId}`}
-                    className={`cursor-pointer ${
-                      index === selectedRowIndex
-                        ? "bg-accent"
-                        : ""
-                    }`}
-                    onClick={() => setSelectedRowIndex(index)}
-                  >
-                    <TableCell className="font-medium">{item.stockItemCode}</TableCell>
-                    <TableCell>{item.stockItemName}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {parseFloat(item.quantity).toFixed(3)}
-                    </TableCell>
-                    <TableCell>{item.stockItemUom}</TableCell>
+
+          <Card className="p-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search items by name or code..."
+                value={itemSearchTerm}
+                onChange={(e) => setItemSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-items"
+              />
+            </div>
+
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr className="h-12">
+                    <th className="text-left px-3 font-medium">Code</th>
+                    <th className="text-left px-3 font-medium">Name</th>
+                    <th className="text-right px-3 font-medium">Quantity</th>
+                    <th className="text-left px-3 font-medium">UOM</th>
                     {!posUser && (
                       <>
-                        <TableCell className="text-right font-mono">
-                          ${parseFloat(item.averageRate).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          ${parseFloat(item.totalValue).toFixed(2)}
-                        </TableCell>
+                        <th className="text-right px-3 font-medium">Avg Rate</th>
+                        <th className="text-right px-3 font-medium">Total Value</th>
                       </>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStockItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={posUser ? 4 : 6} className="text-center py-8 text-muted-foreground">
+                        {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStockItems.map((item, index) => (
+                      <tr
+                        key={item.inventoryId}
+                        data-testid={`row-item-${item.stockItemId}`}
+                        className={`cursor-pointer border-t h-12 ${
+                          index === selectedRowIndex ? "bg-accent" : "hover-elevate"
+                        }`}
+                        onClick={() => setSelectedRowIndex(index)}
+                      >
+                        <td className="px-3 font-mono">{item.stockItemCode}</td>
+                        <td className="px-3 font-medium">{item.stockItemName}</td>
+                        <td className="px-3 text-right font-mono">
+                          {parseFloat(item.quantity).toFixed(3)}
+                        </td>
+                        <td className="px-3">{item.stockItemUom}</td>
+                        {!posUser && (
+                          <>
+                            <td className="px-3 text-right font-mono">
+                              ${parseFloat(item.averageRate).toFixed(2)}
+                            </td>
+                            <td className="px-3 text-right font-mono font-medium">
+                              ${parseFloat(item.totalValue).toFixed(2)}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {filteredStockItems.length > 0 && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Showing {filteredStockItems.length} of {selectedGroup.items.length} items
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
