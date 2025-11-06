@@ -195,8 +195,8 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Stock Group</FormLabel>
                     <Select
-                      value={field.value?.toString() || ""}
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                      value={field.value?.toString() || "none"}
+                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-stock-group">
@@ -204,7 +204,7 @@ export function StockItemCreateDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Uncategorized</SelectItem>
+                        <SelectItem value="none">Uncategorized</SelectItem>
                         {stockGroups.map((group) => (
                           <SelectItem key={group.id} value={group.id.toString()}>
                             {group.code} - {group.name}
