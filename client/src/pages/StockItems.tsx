@@ -105,17 +105,16 @@ export default function StockItems() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="h-12">
-                  <th className="text-left px-4 font-medium">Code</th>
-                  <th className="text-left px-4 font-medium">Name</th>
-                  <th className="text-right px-4 font-medium">Selling Price</th>
-                  <th className="text-left px-4 font-medium">Status</th>
-                  <th className="text-center px-4 font-medium">Actions</th>
+                  <th className="text-left px-3 font-medium">Name</th>
+                  <th className="text-right px-3 font-medium">Selling Price</th>
+                  <th className="text-left px-3 font-medium">Status</th>
+                  <th className="text-center px-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={4} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
@@ -130,24 +129,21 @@ export default function StockItems() {
                         onClick={() => handleStockItemClick(item.id, item.name)}
                         data-testid={`row-stock-item-${item.id}`}
                       >
-                        <td className="px-4 font-mono text-sm" data-testid={`code-${item.id}`}>
-                          {item.code}
-                        </td>
-                        <td className="px-4 font-medium" data-testid={`name-${item.id}`}>
+                        <td className="px-3 font-medium" data-testid={`name-${item.id}`}>
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-muted-foreground" />
                             {item.name}
                           </div>
                         </td>
-                        <td className="px-4 text-right font-mono" data-testid={`price-${item.id}`}>
+                        <td className="px-3 text-right font-mono" data-testid={`price-${item.id}`}>
                           ${sellingPrice.toFixed(2)}
                         </td>
-                        <td className="px-4" data-testid={`status-${item.id}`}>
+                        <td className="px-3" data-testid={`status-${item.id}`}>
                           <Badge variant={item.active ? "default" : "secondary"}>
                             {item.active ? "Active" : "Inactive"}
                           </Badge>
                         </td>
-                        <td className="px-4 text-center">
+                        <td className="px-3 text-center">
                           <Button
                             size="sm"
                             variant="ghost"
