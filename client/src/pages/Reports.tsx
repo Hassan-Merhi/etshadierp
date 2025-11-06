@@ -1,14 +1,34 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+
+// Helper functions for number formatting
+function formatAmount(num: number): string {
+  const isWholeNumber = num % 1 === 0;
+  if (isWholeNumber) {
+    return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatSmartNumber(num: number | string): string {
+  const value = typeof num === 'string' ? parseFloat(num) : num;
+  const isWholeNumber = value % 1 === 0;
+  if (isWholeNumber) {
+    return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 // Type definitions for report data
 interface AccountItem {
@@ -50,8 +70,10 @@ interface BalanceSheetData {
 
 interface SalesItem {
   id: number;
+  voucherId: number;
   voucherNumber: string;
   voucherDate: string;
+  locationId: number;
   locationName: string;
   stockItemCode: string;
   stockItemName: string;
@@ -62,6 +84,22 @@ interface SalesItem {
   totalSales: string;
   totalCost: string;
   profit: string;
+}
+
+interface GroupedSalesRow {
+  date: string;
+  locationId: number;
+  locationName: string;
+  totalSales: number;
+  totalProfit: number;
+  vouchers: VoucherSummary[];
+}
+
+interface VoucherSummary {
+  voucherId: number;
+  voucherNumber: string;
+  itemsCount: number;
+  totalAmount: number;
 }
 
 interface SalesData {
@@ -181,7 +219,12 @@ interface Supplier {
 
 export default function Reports() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("profit-loss");
+  
+  // Sales dialog state
+  const [salesDialogOpen, setSalesDialogOpen] = useState(false);
+  const [selectedSalesRow, setSelectedSalesRow] = useState<GroupedSalesRow | null>(null);
   
   // Shared filters
   const [startDate, setStartDate] = useState("");
@@ -325,50 +368,61 @@ export default function Reports() {
           [`As of: ${asOfDate || "Current"}`],
           [],
           ["ASSETS"],
-          ["Code", "Account Name", "Amount"],
-          ...balanceSheetData.assets.ledgers.map((item: any) => [item.code, item.name, item.balance]),
-          ...balanceSheetData.assets.banks.map((item: any) => [item.code, item.name, item.balance]),
-          ...balanceSheetData.assets.fixedAssets.map((item: any) => [item.code, item.name, item.balance]),
+          ["Account Name", "Amount"],
+          ...balanceSheetData.assets.ledgers.map((item: any) => [item.name, item.balance]),
+          ...balanceSheetData.assets.banks.map((item: any) => [item.name, item.balance]),
+          ...balanceSheetData.assets.fixedAssets.map((item: any) => [item.name, item.balance]),
           [],
-          ["Total Assets", "", balanceSheetData.assets.total],
+          ["Total Assets", balanceSheetData.assets.total],
           [],
           ["LIABILITIES"],
-          ...balanceSheetData.liabilities.ledgers.map((item: any) => [item.code, item.name, item.balance]),
-          ...balanceSheetData.liabilities.suppliers.map((item: any) => [item.code, item.name, item.balance]),
+          ["Account Name", "Amount"],
+          ...balanceSheetData.liabilities.ledgers.map((item: any) => [item.name, item.balance]),
+          ...balanceSheetData.liabilities.suppliers.map((item: any) => [item.name, item.balance]),
           [],
-          ["Total Liabilities", "", balanceSheetData.liabilities.total],
+          ["Total Liabilities", balanceSheetData.liabilities.total],
           [],
           ["EQUITY"],
-          ...balanceSheetData.equity.accounts.map((item: any) => [item.code, item.name, item.balance]),
+          ["Account Name", "Amount"],
+          ...balanceSheetData.equity.accounts.map((item: any) => [item.name, item.balance]),
           [],
-          ["Total Equity", "", balanceSheetData.equity.total],
+          ["Total Equity", balanceSheetData.equity.total],
         ];
         break;
 
       case "sales":
         if (!salesData) return;
         fileName = "Sales_Report";
+        // Group sales by date and location
+        const groupedSalesExport = salesData.items.reduce((acc: { [key: string]: any }, item: SalesItem) => {
+          const key = `${item.voucherDate}_${item.locationId}`;
+          if (!acc[key]) {
+            acc[key] = {
+              date: item.voucherDate,
+              locationName: item.locationName,
+              totalSales: 0,
+              totalProfit: 0
+            };
+          }
+          acc[key].totalSales += parseFloat(item.totalSales);
+          acc[key].totalProfit += parseFloat(item.profit);
+          return acc;
+        }, {});
+        
         worksheetData = [
           ["Sales Report"],
           [`Period: ${startDate || "All"} to ${endDate || "All"}`],
           [],
-          ["Voucher", "Date", "Location", "Item Code", "Item Name", "Quantity", "Selling Price", "Cost Price", "Total Sales", "Total Cost", "Profit"],
-          ...salesData.items.map((item: any) => [
-            item.voucherNumber,
-            item.voucherDate,
-            item.locationName,
-            item.stockItemCode,
-            item.stockItemName,
-            item.quantity,
-            item.sellingPrice,
-            item.costPrice,
-            item.totalSales,
-            item.totalCost,
-            item.profit,
+          ["Date", "Location", "Total Sales", "Total Profit"],
+          ...Object.values(groupedSalesExport).map((row: any) => [
+            row.date,
+            row.locationName,
+            row.totalSales,
+            row.totalProfit,
           ]),
           [],
-          ["TOTALS", "", "", "", "", salesData.summary.totalQuantity, "", "", salesData.summary.totalSales, salesData.summary.totalCost, salesData.summary.totalProfit],
-          ["Gross Profit Margin", "", "", "", "", "", "", "", "", "", `${salesData.summary.grossProfitMargin.toFixed(2)}%`],
+          ["TOTALS", "", salesData.summary.totalSales, salesData.summary.totalProfit],
+          ["Gross Profit Margin", "", "", `${salesData.summary.grossProfitMargin.toFixed(2)}%`],
         ];
         break;
 
@@ -377,20 +431,20 @@ export default function Reports() {
         fileName = "Stock_Movement";
         const stockRows: any[] = [];
         stockMovementData.items.forEach((item: any) => {
-          stockRows.push([item.stockItemCode, item.stockItemName, "", "", "", ""]);
+          stockRows.push([item.stockItemName, "", "", "", ""]);
           item.locations.forEach((loc: any) => {
-            stockRows.push(["", "", loc.locationName, loc.quantity, loc.averageRate, loc.totalValue]);
+            stockRows.push(["", loc.locationName, loc.quantity, loc.averageRate, loc.totalValue]);
           });
-          stockRows.push(["", "Total", "", item.totalQuantity, "", item.totalValue]);
+          stockRows.push(["Total", "", item.totalQuantity, "", item.totalValue]);
           stockRows.push([]);
         });
         worksheetData = [
           ["Stock Movement Report"],
           [`Period: ${startDate || "All"} to ${endDate || "All"}`],
           [],
-          ["Item Code", "Item Name", "Location", "Quantity", "Avg Rate", "Total Value"],
+          ["Item Name", "Location", "Quantity", "Avg Rate", "Total Value"],
           ...stockRows,
-          ["GRAND TOTALS", "", "", stockMovementData.summary.grandTotalQuantity, "", stockMovementData.summary.grandTotalValue],
+          ["GRAND TOTALS", "", stockMovementData.summary.grandTotalQuantity, "", stockMovementData.summary.grandTotalValue],
         ];
         break;
 
@@ -699,12 +753,9 @@ export default function Reports() {
                         <div className="ml-2 space-y-1">
                           <div className="text-sm font-medium text-muted-foreground">Ledger Accounts</div>
                           {balanceSheetData.assets.ledgers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm">
-                              <span>
-                                <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                                {item.name}
-                              </span>
-                              <span className="font-mono">${item.balance.toFixed(2)}</span>
+                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-ledger-${item.id}`}>
+                              <span>{item.name}</span>
+                              <span className="font-mono">${formatAmount(item.balance)}</span>
                             </div>
                           ))}
                         </div>
@@ -713,12 +764,9 @@ export default function Reports() {
                         <div className="ml-2 space-y-1">
                           <div className="text-sm font-medium text-muted-foreground">Bank Accounts</div>
                           {balanceSheetData.assets.banks.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm">
-                              <span>
-                                <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                                {item.name}
-                              </span>
-                              <span className="font-mono">${item.balance.toFixed(2)}</span>
+                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-bank-${item.id}`}>
+                              <span>{item.name}</span>
+                              <span className="font-mono">${formatAmount(item.balance)}</span>
                             </div>
                           ))}
                         </div>
@@ -727,19 +775,16 @@ export default function Reports() {
                         <div className="ml-2 space-y-1">
                           <div className="text-sm font-medium text-muted-foreground">Fixed Assets</div>
                           {balanceSheetData.assets.fixedAssets.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm">
-                              <span>
-                                <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                                {item.name}
-                              </span>
-                              <span className="font-mono">${item.balance.toFixed(2)}</span>
+                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`asset-fixed-${item.id}`}>
+                              <span>{item.name}</span>
+                              <span className="font-mono">${formatAmount(item.balance)}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       <div className="flex justify-between py-2 font-semibold border-t">
                         <span>Total Assets</span>
-                        <span className="font-mono" data-testid="text-total-assets">${balanceSheetData.assets.total.toFixed(2)}</span>
+                        <span className="font-mono" data-testid="text-total-assets">${formatAmount(balanceSheetData.assets.total)}</span>
                       </div>
                     </div>
                   </div>
@@ -751,12 +796,9 @@ export default function Reports() {
                         <div className="ml-2 space-y-1">
                           <div className="text-sm font-medium text-muted-foreground">Ledger Accounts</div>
                           {balanceSheetData.liabilities.ledgers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm">
-                              <span>
-                                <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                                {item.name}
-                              </span>
-                              <span className="font-mono">${item.balance.toFixed(2)}</span>
+                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`liability-ledger-${item.id}`}>
+                              <span>{item.name}</span>
+                              <span className="font-mono">${formatAmount(item.balance)}</span>
                             </div>
                           ))}
                         </div>
@@ -765,19 +807,16 @@ export default function Reports() {
                         <div className="ml-2 space-y-1">
                           <div className="text-sm font-medium text-muted-foreground">Suppliers</div>
                           {balanceSheetData.liabilities.suppliers.map((item: any) => (
-                            <div key={item.id} className="flex justify-between py-1 text-sm">
-                              <span>
-                                <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                                {item.name}
-                              </span>
-                              <span className="font-mono">${item.balance.toFixed(2)}</span>
+                            <div key={item.id} className="flex justify-between py-1 text-sm" data-testid={`liability-supplier-${item.id}`}>
+                              <span>{item.name}</span>
+                              <span className="font-mono">${formatAmount(item.balance)}</span>
                             </div>
                           ))}
                         </div>
                       )}
                       <div className="flex justify-between py-2 font-semibold border-t">
                         <span>Total Liabilities</span>
-                        <span className="font-mono" data-testid="text-total-liabilities">${balanceSheetData.liabilities.total.toFixed(2)}</span>
+                        <span className="font-mono" data-testid="text-total-liabilities">${formatAmount(balanceSheetData.liabilities.total)}</span>
                       </div>
                     </div>
                   </div>
@@ -786,17 +825,14 @@ export default function Reports() {
                     <h3 className="font-medium mb-3">Equity</h3>
                     <div className="space-y-2">
                       {balanceSheetData.equity.accounts.map((item: any) => (
-                        <div key={item.id} className="flex justify-between py-1 text-sm ml-2">
-                          <span>
-                            <span className="font-mono text-muted-foreground mr-2">{item.code}</span>
-                            {item.name}
-                          </span>
-                          <span className="font-mono">${item.balance.toFixed(2)}</span>
+                        <div key={item.id} className="flex justify-between py-1 text-sm ml-2" data-testid={`equity-account-${item.id}`}>
+                          <span>{item.name}</span>
+                          <span className="font-mono">${formatAmount(item.balance)}</span>
                         </div>
                       ))}
                       <div className="flex justify-between py-2 font-semibold border-t">
                         <span>Total Equity</span>
-                        <span className="font-mono" data-testid="text-total-equity">${balanceSheetData.equity.total.toFixed(2)}</span>
+                        <span className="font-mono" data-testid="text-total-equity">${formatAmount(balanceSheetData.equity.total)}</span>
                       </div>
                     </div>
                   </div>
@@ -820,57 +856,125 @@ export default function Reports() {
               {loadingSales ? (
                 <div className="text-center py-8 text-muted-foreground">Loading...</div>
               ) : salesData ? (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-b">
-                        <tr>
-                          <th className="text-left py-2">Date</th>
-                          <th className="text-left py-2">Voucher</th>
-                          <th className="text-left py-2">Location</th>
-                          <th className="text-left py-2">Item</th>
-                          <th className="text-right py-2">Qty</th>
-                          <th className="text-right py-2">Price</th>
-                          <th className="text-right py-2">Sales</th>
-                          <th className="text-right py-2">Cost</th>
-                          <th className="text-right py-2">Profit</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {salesData.items.map((item: any, idx: number) => (
-                          <tr key={item.id} className="border-b" data-testid={`sales-row-${idx}`}>
-                            <td className="py-2">{item.voucherDate}</td>
-                            <td className="py-2 font-mono text-xs">{item.voucherNumber}</td>
-                            <td className="py-2">{item.locationName}</td>
-                            <td className="py-2">
-                              <div className="text-xs font-mono text-muted-foreground">{item.stockItemCode}</div>
-                              <div>{item.stockItemName}</div>
-                            </td>
-                            <td className="py-2 text-right font-mono">{parseFloat(item.quantity).toFixed(2)}</td>
-                            <td className="py-2 text-right font-mono">${parseFloat(item.sellingPrice).toFixed(2)}</td>
-                            <td className="py-2 text-right font-mono">${parseFloat(item.totalSales).toFixed(2)}</td>
-                            <td className="py-2 text-right font-mono">${parseFloat(item.totalCost).toFixed(2)}</td>
-                            <td className="py-2 text-right font-mono">${parseFloat(item.profit).toFixed(2)}</td>
+                <>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b">
+                          <tr>
+                            <th className="text-left py-2">Date</th>
+                            <th className="text-left py-2">Location</th>
+                            <th className="text-right py-2">Total Sales</th>
+                            <th className="text-right py-2">Total Profit</th>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="font-semibold border-t-2">
-                        <tr>
-                          <td colSpan={4} className="py-2">TOTALS</td>
-                          <td className="py-2 text-right font-mono" data-testid="text-total-quantity">{salesData.summary.totalQuantity.toFixed(2)}</td>
-                          <td className="py-2"></td>
-                          <td className="py-2 text-right font-mono" data-testid="text-total-sales">${salesData.summary.totalSales.toFixed(2)}</td>
-                          <td className="py-2 text-right font-mono" data-testid="text-total-cost">${salesData.summary.totalCost.toFixed(2)}</td>
-                          <td className="py-2 text-right font-mono" data-testid="text-total-profit">${salesData.summary.totalProfit.toFixed(2)}</td>
-                        </tr>
-                        <tr>
-                          <td colSpan={8} className="py-2 text-right">Gross Profit Margin:</td>
-                          <td className="py-2 text-right font-mono" data-testid="text-profit-margin">{salesData.summary.grossProfitMargin.toFixed(2)}%</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            // Group sales by date and location
+                            const groupedSales = salesData.items.reduce((acc: { [key: string]: GroupedSalesRow }, item: SalesItem) => {
+                              const key = `${item.voucherDate}_${item.locationId}`;
+                              if (!acc[key]) {
+                                acc[key] = {
+                                  date: item.voucherDate,
+                                  locationId: item.locationId,
+                                  locationName: item.locationName,
+                                  totalSales: 0,
+                                  totalProfit: 0,
+                                  vouchers: []
+                                };
+                              }
+                              acc[key].totalSales += parseFloat(item.totalSales);
+                              acc[key].totalProfit += parseFloat(item.profit);
+                              
+                              // Track vouchers
+                              const voucherIndex = acc[key].vouchers.findIndex(v => v.voucherId === item.voucherId);
+                              if (voucherIndex === -1) {
+                                acc[key].vouchers.push({
+                                  voucherId: item.voucherId,
+                                  voucherNumber: item.voucherNumber,
+                                  itemsCount: 1,
+                                  totalAmount: parseFloat(item.totalSales)
+                                });
+                              } else {
+                                acc[key].vouchers[voucherIndex].itemsCount += 1;
+                                acc[key].vouchers[voucherIndex].totalAmount += parseFloat(item.totalSales);
+                              }
+                              
+                              return acc;
+                            }, {});
+
+                            const groupedRows = Object.values(groupedSales);
+                            
+                            return groupedRows.map((row, idx) => (
+                              <tr 
+                                key={`${row.date}_${row.locationId}`}
+                                className="border-b hover-elevate cursor-pointer" 
+                                onClick={() => {
+                                  setSelectedSalesRow(row);
+                                  setSalesDialogOpen(true);
+                                }}
+                                data-testid={`sales-group-row-${idx}`}
+                              >
+                                <td className="py-2">{row.date}</td>
+                                <td className="py-2">{row.locationName}</td>
+                                <td className="py-2 text-right font-mono">${formatSmartNumber(row.totalSales)}</td>
+                                <td className="py-2 text-right font-mono">${formatSmartNumber(row.totalProfit)}</td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                        <tfoot className="font-semibold border-t-2">
+                          <tr>
+                            <td colSpan={2} className="py-2">TOTALS</td>
+                            <td className="py-2 text-right font-mono" data-testid="text-total-sales">${formatSmartNumber(salesData.summary.totalSales)}</td>
+                            <td className="py-2 text-right font-mono" data-testid="text-total-profit">${formatSmartNumber(salesData.summary.totalProfit)}</td>
+                          </tr>
+                          <tr>
+                            <td colSpan={3} className="py-2 text-right">Gross Profit Margin:</td>
+                            <td className="py-2 text-right font-mono" data-testid="text-profit-margin">{formatSmartNumber(salesData.summary.grossProfitMargin)}%</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
-                </div>
+
+                  <Dialog open={salesDialogOpen} onOpenChange={setSalesDialogOpen}>
+                    <DialogContent data-testid="dialog-sales-vouchers">
+                      <DialogHeader>
+                        <DialogTitle>
+                          Vouchers - {selectedSalesRow?.locationName} ({selectedSalesRow?.date})
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-2">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="border-b">
+                              <tr>
+                                <th className="text-left py-2">Voucher Number</th>
+                                <th className="text-right py-2">Items Count</th>
+                                <th className="text-right py-2">Total Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedSalesRow?.vouchers.map((voucher, idx) => (
+                                <tr 
+                                  key={voucher.voucherId}
+                                  className="border-b hover-elevate cursor-pointer"
+                                  onClick={() => navigate(`/vouchers/${voucher.voucherId}`)}
+                                  data-testid={`voucher-row-${idx}`}
+                                >
+                                  <td className="py-2 font-mono text-xs">{voucher.voucherNumber}</td>
+                                  <td className="py-2 text-right font-mono">{formatSmartNumber(voucher.itemsCount)}</td>
+                                  <td className="py-2 text-right font-mono">${formatSmartNumber(voucher.totalAmount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">No data available. Click Generate to load report.</div>
               )}
@@ -895,21 +999,20 @@ export default function Reports() {
                     <div key={item.stockItemId} className="border rounded-md p-4" data-testid={`stock-item-${item.stockItemId}`}>
                       <div className="flex justify-between mb-2">
                         <div>
-                          <div className="text-xs font-mono text-muted-foreground">{item.stockItemCode}</div>
                           <div className="font-medium">{item.stockItemName}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-muted-foreground">Total</div>
-                          <div className="font-mono">{item.totalQuantity.toFixed(2)} units</div>
-                          <div className="font-mono">${item.totalValue.toFixed(2)}</div>
+                          <div className="font-mono">{formatSmartNumber(item.totalQuantity)} units</div>
+                          <div className="font-mono">${formatSmartNumber(item.totalValue)}</div>
                         </div>
                       </div>
                       <div className="space-y-1 mt-2 pt-2 border-t">
                         {item.locations.map((loc: any) => (
-                          <div key={loc.locationId} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{loc.locationName}</span>
+                          <div key={loc.locationId} className="flex justify-between text-sm" data-testid={`location-${loc.locationId}`}>
+                            <span className="text-muted-foreground ml-4">{loc.locationName}</span>
                             <span className="font-mono">
-                              {loc.quantity.toFixed(2)} × ${loc.averageRate.toFixed(2)} = ${loc.totalValue.toFixed(2)}
+                              {formatSmartNumber(loc.quantity)} × ${formatSmartNumber(loc.averageRate)} = ${formatSmartNumber(loc.totalValue)}
                             </span>
                           </div>
                         ))}
@@ -919,8 +1022,8 @@ export default function Reports() {
                   <div className="border-t-2 pt-4 font-semibold">
                     <div className="flex justify-between">
                       <span>Grand Totals</span>
-                      <span className="font-mono">
-                        {stockMovementData.summary.grandTotalQuantity.toFixed(2)} units | ${stockMovementData.summary.grandTotalValue.toFixed(2)}
+                      <span className="font-mono" data-testid="text-grand-totals">
+                        {formatSmartNumber(stockMovementData.summary.grandTotalQuantity)} units | ${formatSmartNumber(stockMovementData.summary.grandTotalValue)}
                       </span>
                     </div>
                   </div>
