@@ -552,7 +552,7 @@ export default function Payroll() {
       return await apiRequest("POST", "/api/employees", {
         ...data,
         employeeType: "Worker",
-        companyId: selectedCompany,
+        companyId: selectedCompany?.id,
         joinDate: new Date().toISOString().split("T")[0],
       });
     },
@@ -561,7 +561,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setNewWorkerDialogOpen(false);
       newWorkerForm.reset();
     },
@@ -586,7 +586,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setEditWorkerDialogOpen(false);
       editWorkerForm.reset();
       setSelectedWorkerForEdit(null);
@@ -609,7 +609,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setDeleteWorkerDialogOpen(false);
       setSelectedWorkerForEdit(null);
     },
