@@ -718,22 +718,46 @@ export default function Vouchers() {
         const account = bankAccounts.find((b) => b.id === paymentAccountId);
         return account ? parseFloat(account.balance || "0") : 0;
       } else if (paymentAccountType === "ledger") {
-        const res = await fetch(`/api/accounts/ledger/${paymentAccountId}/transactions`);
-        const transactions = await res.json();
+        // Fetch the ledger account details to get opening balance
+        const accountRes = await fetch(`/api/ledger-accounts/${paymentAccountId}`);
+        const account = await accountRes.json();
+        
+        // Fetch transactions
+        const transRes = await fetch(`/api/accounts/ledger/${paymentAccountId}/transactions`);
+        const transactions = await transRes.json();
+        
+        // Calculate opening balance with side
+        let openingBalance = parseFloat(account.openingBalance || "0");
+        if (account.openingBalanceSide === "Cr") {
+          openingBalance = -openingBalance;
+        }
+        
+        // Sum transactions starting from opening balance
         const balance = transactions.reduce((sum: number, t: any) => {
           const debit = parseFloat(t.debitAmount || "0");
           const credit = parseFloat(t.creditAmount || "0");
           return sum + debit - credit;
-        }, 0);
+        }, openingBalance);
         return balance;
       } else if (paymentAccountType === "supplier") {
-        const res = await fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`);
-        const transactions = await res.json();
+        // Fetch the supplier details to get opening balance
+        const supplierRes = await fetch(`/api/suppliers/${paymentAccountId}`);
+        const supplier = await supplierRes.json();
+        
+        // Fetch transactions
+        const transRes = await fetch(`/api/accounts/supplier/${paymentAccountId}/transactions`);
+        const transactions = await transRes.json();
+        
+        // Opening balance: Positive = we owe them, Negative = they owe us/prepaid
+        const openingBalance = parseFloat(supplier.openingBalance || "0");
+        
+        // Sum transactions starting from opening balance
+        // Credits increase payable, Debits decrease payable
         const balance = transactions.reduce((sum: number, t: any) => {
           const credit = parseFloat(t.creditAmount || "0");
           const debit = parseFloat(t.debitAmount || "0");
           return sum + credit - debit;
-        }, 0);
+        }, openingBalance);
         return balance;
       }
       return 0;
