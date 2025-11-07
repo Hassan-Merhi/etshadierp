@@ -1017,42 +1017,75 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <style>{`
               @media print {
                 body {
-                  margin: 0.5in;
+                  margin: 0.3in;
                 }
                 .print-header {
-                  margin-bottom: 0.5rem !important;
+                  margin-bottom: 0.3rem !important;
+                  padding-bottom: 0.2rem !important;
+                  border-bottom: 2px solid #000 !important;
+                }
+                .print-header h2 {
+                  font-size: 16pt !important;
+                  margin: 0 !important;
+                }
+                .print-header p {
+                  font-size: 9pt !important;
+                  margin: 0 !important;
                 }
                 .print-inventory-list {
-                  font-size: 11pt !important;
-                  line-height: 1.3 !important;
+                  font-size: 10pt !important;
+                  line-height: 1.2 !important;
+                  column-count: 2 !important;
+                  column-gap: 1rem !important;
+                }
+                .print-group-section {
+                  break-inside: avoid !important;
+                  margin-bottom: 0.4rem !important;
                 }
                 .print-group-header {
                   font-weight: bold !important;
-                  margin-top: 0.3rem !important;
-                  margin-bottom: 0.1rem !important;
-                  padding: 0.1rem 0 !important;
+                  font-size: 11pt !important;
+                  margin: 0 !important;
+                  padding: 0.15rem 0 !important;
+                  display: flex !important;
+                  justify-content: space-between !important;
+                  background-color: #f0f0f0 !important;
+                  padding-left: 0.2rem !important;
+                  padding-right: 0.2rem !important;
                 }
                 .print-item-row {
                   display: flex !important;
                   justify-content: space-between !important;
-                  padding: 0.05rem 0 !important;
-                  margin-left: 0.5rem !important;
+                  padding: 0.08rem 0 !important;
+                  margin-left: 0.3rem !important;
+                  font-size: 9pt !important;
                 }
                 .print-item-name {
                   flex: 1 !important;
-                  padding-right: 1rem !important;
+                  padding-right: 0.5rem !important;
+                  overflow: hidden !important;
+                  text-overflow: ellipsis !important;
                 }
                 .print-item-qty {
                   text-align: right !important;
                   white-space: nowrap !important;
-                  min-width: 80px !important;
+                  font-weight: 500 !important;
+                  min-width: 60px !important;
+                }
+                .screen-only {
+                  display: none !important;
+                }
+              }
+              @media screen {
+                .print-header {
+                  display: none !important;
                 }
               }
             `}</style>
-            {/* Print header (hidden on screen) */}
-            <div className="hidden print:block print-header">
+            {/* Print header */}
+            <div className="print-header mb-6">
               <h2 className="text-xl font-bold">{selectedLocationLocal.name}</h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs">
                 Inventory Report - {new Date().toLocaleDateString()}
               </p>
             </div>
@@ -1088,36 +1121,92 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   }, {} as Record<string, { name: string; items: typeof inventory }>);
 
                   return (
-                    <div className="print-inventory-list">
-                      {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
-                        const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
-                        const firstItemUom = items[0]?.stockItemUom || "";
-                        
-                        return (
-                          <div key={groupCode} className="mb-1">
-                            {/* Group header with total */}
-                            <div className="print-group-header flex justify-between font-bold">
-                              <span>{groupCode}</span>
-                              <span className="print-item-qty">
-                                {Math.floor(groupTotal).toLocaleString()} {firstItemUom}
-                              </span>
-                            </div>
-                            
-                            {/* Group items */}
-                            {items.map((item) => (
-                              <div key={item.inventoryId} className="print-item-row">
-                                <span className="print-item-name italic text-sm">
-                                  {item.stockItemName}
-                                </span>
-                                <span className="print-item-qty text-sm">
-                                  {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
-                                </span>
-                              </div>
-                            ))}
+                    <>
+                      {/* Screen view - Spreadsheet table */}
+                      <div className="screen-only">
+                        <Card>
+                          <div className="rounded-md border overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/50">
+                                <tr className="h-10">
+                                  <th className="text-left px-3 font-medium">Name</th>
+                                  <th className="text-right px-3 font-medium">Quantity</th>
+                                  <th className="text-right px-3 font-medium">UOM</th>
+                                  {!posUser && (
+                                    <>
+                                      <th className="text-right px-3 font-medium">Avg Rate</th>
+                                      <th className="text-right px-3 font-medium">Total Value</th>
+                                    </>
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => (
+                                  <>
+                                    {/* Group header row */}
+                                    <tr key={`header-${groupCode}`} className="bg-muted/30">
+                                      <td colSpan={posUser ? 3 : 5} className="px-3 py-2 font-bold">
+                                        {name}
+                                      </td>
+                                    </tr>
+                                    {/* Group items */}
+                                    {items.map((item) => (
+                                      <tr key={item.inventoryId} className="border-t hover-elevate">
+                                        <td className="px-3 py-2">{item.stockItemName}</td>
+                                        <td className="px-3 py-2 text-right font-mono">
+                                          {Math.floor(parseFloat(item.quantity)).toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">{item.stockItemUom}</td>
+                                        {!posUser && (
+                                          <>
+                                            <td className="px-3 py-2 text-right font-mono">
+                                              ${parseFloat(item.averageRate).toFixed(2)}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono font-medium">
+                                              ${parseFloat(item.totalValue).toFixed(2)}
+                                            </td>
+                                          </>
+                                        )}
+                                      </tr>
+                                    ))}
+                                  </>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </Card>
+                      </div>
+
+                      {/* Print view - Compact two-column layout */}
+                      <div className="print-inventory-list">
+                        {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
+                          const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
+                          const firstItemUom = items[0]?.stockItemUom || "";
+                          
+                          return (
+                            <div key={groupCode} className="print-group-section">
+                              {/* Group header with total */}
+                              <div className="print-group-header">
+                                <span>{name}</span>
+                                <span>{Math.floor(groupTotal).toLocaleString()} {firstItemUom}</span>
+                              </div>
+                              
+                              {/* Group items */}
+                              {items.map((item) => (
+                                <div key={item.inventoryId} className="print-item-row">
+                                  <span className="print-item-name">
+                                    {item.stockItemName}
+                                  </span>
+                                  <span className="print-item-qty">
+                                    {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   );
                 })()}
               </div>
