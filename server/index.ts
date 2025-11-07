@@ -68,7 +68,9 @@ const sessionConfig: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Replit serves over HTTPS even in dev mode, so we need secure cookies
+    // Also enable for production
+    secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: 'lax', // Allow cookies with redirects
