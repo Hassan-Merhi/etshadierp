@@ -860,6 +860,10 @@ export default function Vouchers() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       form.reset({
         paymentAccountType: "ledger",
         paymentAccountId: 0,
@@ -1019,6 +1023,10 @@ export default function Vouchers() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       journalForm.reset({
         voucherDate: new Date(),
         entries: [
