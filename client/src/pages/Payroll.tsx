@@ -293,6 +293,31 @@ export default function Payroll() {
     });
   }, [workerStaff]);
 
+  // Worker forms
+  const newWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
+  const editWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
   // Populate edit form when worker is selected
   useEffect(() => {
     if (selectedWorkerForEdit && editWorkerDialogOpen) {
@@ -362,30 +387,6 @@ export default function Payroll() {
     defaultValues: {
       deductionAmount: "",
       payrollMonth: "",
-    },
-  });
-
-  const newWorkerForm = useForm<WorkerFormData>({
-    resolver: zodResolver(workerFormSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      code: "",
-      monthlySalary: "0",
-      department: "",
-      active: true,
-    },
-  });
-
-  const editWorkerForm = useForm<WorkerFormData>({
-    resolver: zodResolver(workerFormSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      code: "",
-      monthlySalary: "0",
-      department: "",
-      active: true,
     },
   });
 
@@ -741,9 +742,8 @@ export default function Payroll() {
                         const openingBal = parseFloat(employee.openingBalance || "0");
                         const deposits = parseFloat(employee.totalDeposits || "0");
                         const withdrawals = parseFloat(employee.totalWithdrawals || "0");
-                        const balance = employee.openingBalanceSide === "Dr" 
-                          ? openingBal + deposits - withdrawals
-                          : -openingBal + deposits - withdrawals;
+                        // Employee balance is opening + deposits - withdrawals (liability account)
+                        const balance = openingBal + deposits - withdrawals;
                         
                         return (
                         <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
