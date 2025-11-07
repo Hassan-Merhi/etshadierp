@@ -955,3 +955,26 @@ export const insertSalaryAdvanceDeductionSchema = createInsertSchema(salaryAdvan
 
 export type InsertSalaryAdvanceDeduction = z.infer<typeof insertSalaryAdvanceDeductionSchema>;
 export type SalaryAdvanceDeduction = typeof salaryAdvanceDeductions.$inferSelect;
+
+// Dashboard Cash Accounts - user-selected accounts to display in dashboard cash section
+export const dashboardCashAccounts = pgTable("dashboard_cash_accounts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  accountType: text("account_type").notNull(),
+  accountId: integer("account_id").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDashboardCashAccountSchema = createInsertSchema(dashboardCashAccounts).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  accountType: z.enum(["ledger", "bank"]),
+  accountId: z.number().min(1, "Account is required"),
+  displayOrder: z.number().optional(),
+});
+
+export type InsertDashboardCashAccount = z.infer<typeof insertDashboardCashAccountSchema>;
+export type DashboardCashAccount = typeof dashboardCashAccounts.$inferSelect;
