@@ -189,10 +189,10 @@ export default function Analytics() {
   // Report filters
   const [reportStartDate, setReportStartDate] = useState("");
   const [reportEndDate, setReportEndDate] = useState("");
-  const [reportLocationId, setReportLocationId] = useState("");
-  const [reportStockGroupId, setReportStockGroupId] = useState("");
-  const [reportSupplierId, setReportSupplierId] = useState("");
-  const [reportContainerStatus, setReportContainerStatus] = useState("");
+  const [reportLocationId, setReportLocationId] = useState("all");
+  const [reportStockGroupId, setReportStockGroupId] = useState("all");
+  const [reportSupplierId, setReportSupplierId] = useState("all");
+  const [reportContainerStatus, setReportContainerStatus] = useState("all");
 
   // Fetch reference data
   const { data: locations = [] } = useQuery<Location[]>({ 
@@ -324,8 +324,8 @@ export default function Analytics() {
     const params = new URLSearchParams();
     if (reportStartDate) params.append("startDate", reportStartDate);
     if (reportEndDate) params.append("endDate", reportEndDate);
-    if (reportLocationId) params.append("locationId", reportLocationId);
-    if (reportStockGroupId) params.append("stockGroupId", reportStockGroupId);
+    if (reportLocationId && reportLocationId !== "all") params.append("locationId", reportLocationId);
+    if (reportStockGroupId && reportStockGroupId !== "all") params.append("stockGroupId", reportStockGroupId);
     return `/api/reports/stock-movement?${params}`;
   };
 
@@ -344,8 +344,8 @@ export default function Analytics() {
     const params = new URLSearchParams();
     if (reportStartDate) params.append("startDate", reportStartDate);
     if (reportEndDate) params.append("endDate", reportEndDate);
-    if (reportSupplierId) params.append("supplierId", reportSupplierId);
-    if (reportContainerStatus) params.append("status", reportContainerStatus);
+    if (reportSupplierId && reportSupplierId !== "all") params.append("supplierId", reportSupplierId);
+    if (reportContainerStatus && reportContainerStatus !== "all") params.append("status", reportContainerStatus);
     return `/api/reports/containers?${params}`;
   };
 
@@ -1283,7 +1283,7 @@ export default function Analytics() {
                     <SelectValue placeholder="All Locations" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Locations</SelectItem>
+                    <SelectItem value="all">All Locations</SelectItem>
                     {locations.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id.toString()}>
                         {loc.name}
@@ -1299,7 +1299,7 @@ export default function Analytics() {
                     <SelectValue placeholder="All Groups" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Groups</SelectItem>
+                    <SelectItem value="all">All Groups</SelectItem>
                     {stockGroups.map((group) => (
                       <SelectItem key={group.id} value={group.id.toString()}>
                         {group.name}
@@ -1398,7 +1398,7 @@ export default function Analytics() {
                     <SelectValue placeholder="All Suppliers" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Suppliers</SelectItem>
+                    <SelectItem value="all">All Suppliers</SelectItem>
                     {suppliers.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id.toString()}>
                         {supplier.name}
@@ -1414,7 +1414,7 @@ export default function Analytics() {
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="In Transit">In Transit</SelectItem>
                     <SelectItem value="Arrived">Arrived</SelectItem>
                     <SelectItem value="Offloaded">Offloaded</SelectItem>
