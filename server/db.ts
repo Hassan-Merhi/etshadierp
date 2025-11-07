@@ -7,7 +7,7 @@ import * as schema from "@shared/schema";
 let connectionString: string;
 
 if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
-  // Use Replit's database in development (no SSL)
+  // Use Replit's database in development (SSL enabled by default for Neon)
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
   connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
   console.log('Using Replit database for development');
@@ -22,10 +22,21 @@ if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
 console.log('Database connection endpoint:', connectionString.replace(/:[^:@]*@/, ':***@'));
 
 // Create PostgreSQL connection pool
-// SSL is required for production databases on Render
+// SSL is required for:
+// - Production databases (always)
+// - Replit's managed database (Neon, which always requires SSL even in dev)
+// - When PGSSLMODE is explicitly set to require
+// - When using DATABASE_URL (typically managed hosting)
+// Default to SSL when using Replit's PGHOST unless PGSSLMODE is explicitly "disable"
+const usingReplitDB = process.env.NODE_ENV === "development" && process.env.PGHOST;
+const requiresSSL = process.env.NODE_ENV === "production" || 
+                    (usingReplitDB && process.env.PGSSLMODE !== 'disable') ||
+                    process.env.PGSSLMODE === 'require' ||
+                    process.env.DATABASE_URL !== undefined;
+
 const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: requiresSSL ? { rejectUnauthorized: false } : false,
 });
 
 export const db = drizzle(pool, { schema });
