@@ -34,6 +34,7 @@ import VoucherEdit from "@/pages/VoucherEdit";
 import Payroll from "@/pages/Payroll";
 import ImportStockItems from "@/pages/ImportStockItems";
 import StockQuery from "@/pages/StockQuery";
+import StockItemDetail from "@/pages/StockItemDetail";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import EditSupplier from "@/pages/EditSupplier";
@@ -88,6 +89,7 @@ function Router({ user }: { user: any }) {
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
       <Route path="/import-stock-items" component={ImportStockItems} />
+      <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
