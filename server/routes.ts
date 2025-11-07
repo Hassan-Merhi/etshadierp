@@ -1988,6 +1988,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get customers with calculated balances (including voucher entries)
+  app.get("/api/customers/stats", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const customers = await storage.getAllCustomers(req.session.currentCompanyId);
+
+      const customersWithBalances = await Promise.all(
+        customers.map(async (customer) => {
+          // If customer has a linked ledger account, calculate balance from voucher entries
+          if (customer.ledgerAccountId) {
+            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId);
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            const openingSide = customer.openingBalanceSide || "Dr";
+
+            // For customers (Asset account - Accounts Receivable):
+            // Debit = increases amount they owe us
+            // Credit = decreases amount they owe us
+            const balance = entries.reduce((sum, entry) => {
+              const debit = parseFloat(entry.debitAmount || "0");
+              const credit = parseFloat(entry.creditAmount || "0");
+
+              if (debit > 0 && credit === 0) {
+                return sum + debit; // Increase receivable
+              } else if (credit > 0 && debit === 0) {
+                return sum - credit; // Decrease receivable
+              }
+              return sum;
+            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+
+            return {
+              ...customer,
+              balance: Math.abs(balance),
+              balanceSide: balance >= 0 ? "Dr" : "Cr",
+            };
+          }
+
+          // If no ledger account, just return opening balance
+          return {
+            ...customer,
+            balance: parseFloat(customer.openingBalance || "0"),
+            balanceSide: customer.openingBalanceSide || "Dr",
+          };
+        })
+      );
+
+      res.json(customersWithBalances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get(
     "/api/customers/:id",
     requireAuth,

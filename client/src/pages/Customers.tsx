@@ -41,8 +41,8 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers", selectedCompany?.id],
+  const { data: customers = [], isLoading } = useQuery<(Customer & { balance: number; balanceSide: string })[]>({
+    queryKey: ["/api/customers/stats", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
@@ -79,7 +79,7 @@ export default function Customers() {
         title: "Success",
         description: "Customer created successfully with ledger account",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateOpen(false);
       form.reset({
@@ -108,7 +108,7 @@ export default function Customers() {
         title: "Success",
         description: "Customer updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/stats", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsEditOpen(false);
       setEditingCustomer(null);
@@ -291,7 +291,7 @@ export default function Customers() {
           <TableHeader>
             <TableRow>
               <TableHead>Legal Name</TableHead>
-              <TableHead className="text-right">Opening Balance</TableHead>
+              <TableHead className="text-right">Current Balance</TableHead>
               <TableHead>Balance Side</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -313,9 +313,9 @@ export default function Customers() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${parseFloat(customer.openingBalance || "0").toFixed(2)}
+                    ${(customer.balance || 0).toFixed(2)}
                   </TableCell>
-                  <TableCell>{customer.openingBalanceSide || "Dr"}</TableCell>
+                  <TableCell>{customer.balanceSide || "Dr"}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"

@@ -72,6 +72,9 @@ export default function ContainerDetail() {
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
 
+  // Determine the back URL based on container status
+  const backUrl = containerData?.container?.status === "SOLD" ? "/sold-containers" : "/containers";
+
   const form = useForm<z.infer<typeof saleFormSchema>>({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
@@ -197,10 +200,10 @@ export default function ContainerDetail() {
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <Package className="w-16 h-16 text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Container not found</h2>
-        <Link href="/containers">
+        <Link href={backUrl}>
           <Button variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Containers
+            {containerData?.container?.status === "SOLD" ? "Back to Sold Containers" : "Back to Containers"}
           </Button>
         </Link>
       </div>
@@ -224,7 +227,7 @@ export default function ContainerDetail() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 flex-wrap">
-        <Link href="/containers">
+        <Link href={backUrl}>
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="w-4 h-4" />
           </Button>
