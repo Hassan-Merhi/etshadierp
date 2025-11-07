@@ -104,6 +104,7 @@ export function StockItemEditDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/stock-items"] });
       toast({
         title: "Stock Item Updated",
         description: "The stock item has been updated successfully.",

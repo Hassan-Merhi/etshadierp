@@ -116,7 +116,7 @@ const menuItems = [
     icon: UserCheck,
   },
   {
-    title: "Create Master Data",
+    title: "Create",
     url: "/create",
     icon: FolderPlus,
   },
