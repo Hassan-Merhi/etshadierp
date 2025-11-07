@@ -81,9 +81,9 @@ const menuItems = [
     icon: Ship,
   },
   {
-    title: "Financial",
-    url: "/financial",
-    icon: DollarSign,
+    title: "Analytics",
+    url: "/analytics",
+    icon: BarChart3,
   },
   {
     title: "Accounts",
@@ -101,11 +101,6 @@ const menuItems = [
     icon: Users,
   },
   {
-    title: "Inter-Company Transfers",
-    url: "/inter-company-transfers",
-    icon: ArrowLeftRight,
-  },
-  {
     title: "Vouchers",
     url: "/vouchers",
     icon: Receipt,
@@ -114,16 +109,6 @@ const menuItems = [
     title: "Daybook",
     url: "/daybook",
     icon: Book,
-  },
-  {
-    title: "Reports",
-    url: "/reports",
-    icon: FileText,
-  },
-  {
-    title: "Profit & Loss",
-    url: "/profit-loss",
-    icon: TrendingUp,
   },
   {
     title: "Payroll",

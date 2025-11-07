@@ -19,19 +19,17 @@ import Dashboard from "@/pages/Dashboard";
 import POS from "@/pages/POS";
 import StockItems from "@/pages/StockItems";
 import Containers from "@/pages/Containers";
-import Financial from "@/pages/Financial";
 import Accounts from "@/pages/Accounts";
 import Suppliers from "@/pages/Suppliers";
 import Vouchers from "@/pages/Vouchers";
 import Daybook from "@/pages/Daybook";
-import Reports from "@/pages/Reports";
+import Analytics from "@/pages/Analytics";
 import AccountingCreate from "@/pages/AccountingCreate";
 import POImport from "@/pages/POImport";
 import POSImport from "@/pages/POSImport";
 import ContainerDetail from "@/pages/ContainerDetail";
 import LocationInventory from "@/pages/LocationInventory";
 import Settings from "@/pages/Settings";
-import ProfitLoss from "@/pages/ProfitLoss";
 import VoucherEdit from "@/pages/VoucherEdit";
 import Payroll from "@/pages/Payroll";
 import ImportStockItems from "@/pages/ImportStockItems";
@@ -42,7 +40,6 @@ import EditSupplier from "@/pages/EditSupplier";
 import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
 import SoldContainers from "@/pages/SoldContainers";
-import InterCompanyTransfers from "@/pages/InterCompanyTransfers";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -81,16 +78,13 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/pos-import" component={POSImport} />
-      <Route path="/financial" component={Financial} />
+      <Route path="/analytics" component={Analytics} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/customers" component={Customers} />
-      <Route path="/inter-company-transfers" component={InterCompanyTransfers} />
       <Route path="/vouchers" component={Vouchers} />
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
-      <Route path="/reports" component={Reports} />
-      <Route path="/profit-loss" component={ProfitLoss} />
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
       <Route path="/import-stock-items" component={ImportStockItems} />

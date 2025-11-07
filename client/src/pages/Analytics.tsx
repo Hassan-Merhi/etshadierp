@@ -1,0 +1,1214 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  Wallet, 
+  Package,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  Download,
+  RefreshCw
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
+
+// Type definitions
+interface Account {
+  id: string;
+  accountId: number;
+  type: string;
+  code: string;
+  name: string;
+  accountType?: string;
+  subType?: string;
+  balance: number;
+  balanceSide: string | null;
+  active: boolean;
+  parentId?: number;
+}
+
+interface LocationSales {
+  locationId: number;
+  locationName: string;
+  locationCode: string;
+  totalSales: number;
+  totalTransactions: number;
+}
+
+interface POSTransaction {
+  id: number;
+  voucherNumber: string;
+  voucherDate: string;
+  createdAt: string;
+  description: string | null;
+  totalAmount: number;
+  totalQuantity: number;
+  itemCount: number;
+  items: any[];
+}
+
+interface ProfitData {
+  totalIncome: number;
+  totalExpenses: number;
+  netProfit: number;
+}
+
+interface FinancialRatiosData {
+  ratios: {
+    grossProfitMargin: number;
+    netProfitMargin: number;
+    currentRatio: number;
+    debtToEquity: number;
+  };
+  underlying: {
+    totalIncome: number;
+    totalExpenses: number;
+    totalSales: number;
+    totalCost: number;
+    grossProfit: number;
+    netProfit: number;
+    totalAssets: number;
+    totalLiabilities: number;
+    totalEquity: number;
+  };
+  filters: {
+    startDate: string | null;
+    endDate: string | null;
+  };
+}
+
+export default function Analytics() {
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+  const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const [detailsPeriod, setDetailsPeriod] = useState("all");
+  const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+  const [ratiosStartDate, setRatiosStartDate] = useState("");
+  const [ratiosEndDate, setRatiosEndDate] = useState("");
+
+  // Fetch all accounts
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch profit data
+  const { data: profitData, isLoading: profitLoading } = useQuery<ProfitData>({
+    queryKey: ["/api/stats/net-profit", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/stats/net-profit", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch net profit");
+      return await response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch sales data
+  const getDateRange = () => {
+    const today = new Date();
+    let startDate = "";
+    let endDate = today.toISOString().split("T")[0];
+    if (selectedPeriod === "today") {
+      startDate = endDate;
+    } else if (selectedPeriod === "month") {
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate = firstDayOfMonth.toISOString().split("T")[0];
+    } else if (selectedPeriod === "year") {
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+      startDate = firstDayOfYear.toISOString().split("T")[0];
+    }
+    return selectedPeriod === "all" ? {} : { startDate, endDate };
+  };
+
+  const dateRange = getDateRange();
+  const { data: salesData = [], isLoading: salesLoading } = useQuery<LocationSales[]>({
+    queryKey: ["/api/financial/sales", selectedCompany?.id, dateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams(dateRange as Record<string, string>);
+      const response = await fetch(`/api/financial/sales?${params}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch sales data");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch detail transactions
+  const getDetailsDateRange = () => {
+    const today = new Date();
+    let startDate = "";
+    let endDate = today.toISOString().split("T")[0];
+    if (detailsPeriod === "today") {
+      startDate = endDate;
+    } else if (detailsPeriod === "month") {
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startDate = firstDayOfMonth.toISOString().split("T")[0];
+    } else if (detailsPeriod === "year") {
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+      startDate = firstDayOfYear.toISOString().split("T")[0];
+    }
+    return detailsPeriod === "all" ? {} : { startDate, endDate };
+  };
+
+  const detailsDateRange = getDetailsDateRange();
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<POSTransaction[]>({
+    queryKey: ["/api/financial/sales", selectedLocationForDetails, "transactions", detailsDateRange],
+    queryFn: async () => {
+      const params = new URLSearchParams(detailsDateRange as Record<string, string>);
+      const response = await fetch(
+        `/api/financial/sales/${selectedLocationForDetails}/transactions?${params}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) throw new Error("Failed to fetch transactions");
+      return response.json();
+    },
+    enabled: !!selectedLocationForDetails,
+  });
+
+  // Fetch financial ratios
+  const { data: ratiosData, isLoading: ratiosLoading } = useQuery<FinancialRatiosData>({
+    queryKey: ["/api/reports/financial-ratios", ratiosStartDate, ratiosEndDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (ratiosStartDate) params.append("startDate", ratiosStartDate);
+      if (ratiosEndDate) params.append("endDate", ratiosEndDate);
+      const response = await fetch(`/api/reports/financial-ratios?${params}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch ratios");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Helper functions
+  const toggleAccount = (accountId: number) => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedAccounts(newExpanded);
+  };
+
+  const groupAccountsByParent = (accountList: Account[]) => {
+    const parentAccounts = accountList.filter(acc => !acc.parentId);
+    const childAccounts = accountList.filter(acc => acc.parentId);
+    
+    const accountMap = new Map<number, Account[]>();
+    childAccounts.forEach(child => {
+      const parentId = child.parentId!;
+      if (!accountMap.has(parentId)) {
+        accountMap.set(parentId, []);
+      }
+      accountMap.get(parentId)!.push(child);
+    });
+
+    return { parentAccounts, accountMap };
+  };
+
+  const calculateChildrenTotal = (parentAccountId: number, accountMap: Map<number, Account[]>) => {
+    const children = accountMap.get(parentAccountId) || [];
+    return children.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  };
+
+  const calculateTotal = (accountList: Account[]) => {
+    const parentIds = new Set(accountList.filter(acc => acc.parentId).map(acc => acc.parentId!));
+    return accountList
+      .filter(acc => !parentIds.has(acc.accountId))
+      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  };
+
+  const calculatePLTotal = (accountList: Account[]) => {
+    return accountList.reduce((sum, acc) => {
+      const amount = acc.balanceSide === "Cr" ? acc.balance : -acc.balance;
+      return sum + amount;
+    }, 0);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(Math.abs(value));
+  };
+
+  // Filter accounts
+  const cashAccounts = accounts.filter(
+    (acc) => acc.type === "Bank" && (
+      acc.name.toLowerCase().includes("cash") || 
+      acc.code.toLowerCase().includes("cash")
+    )
+  );
+
+  const assetAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "Fixed Asset" ||
+      (acc.type === "Ledger" && acc.accountType === "Asset") ||
+      acc.type === "Bank"
+  );
+
+  const expenseAccounts = accounts.filter(
+    (acc) => acc.type === "Ledger" && acc.accountType === "Expense"
+  );
+
+  const directExpenseAccounts = expenseAccounts.filter(
+    (acc) => acc.subType === "Direct Expense"
+  );
+
+  const indirectExpenseAccounts = expenseAccounts.filter(
+    (acc) => acc.subType === "Indirect Expense"
+  );
+
+  const liabilityAccounts = accounts.filter(
+    (acc) => 
+      (acc.type === "Ledger" && (
+        acc.accountType === "Liability" ||
+        acc.accountType === "Accounts Payable" ||
+        acc.accountType === "Loans" ||
+        acc.accountType === "Duty Agent" ||
+        acc.accountType === "Transporter Agent"
+      ))
+  );
+
+  const directIncomeAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "Ledger" &&
+      acc.accountType === "Income" &&
+      acc.subType === "Direct Income"
+  );
+
+  const indirectIncomeAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "Ledger" &&
+      acc.accountType === "Income" &&
+      acc.subType === "Indirect Income"
+  );
+
+  // P&L calculations
+  const totalDirectIncome = calculatePLTotal(directIncomeAccounts);
+  const totalIndirectIncome = calculatePLTotal(indirectIncomeAccounts);
+  const totalIncome = totalDirectIncome + totalIndirectIncome;
+  const totalDirectExpense = Math.abs(calculatePLTotal(directExpenseAccounts));
+  const totalIndirectExpense = Math.abs(calculatePLTotal(indirectExpenseAccounts));
+  const totalExpenses = totalDirectExpense + totalIndirectExpense;
+  const netProfit = totalIncome - totalExpenses;
+
+  // Render hierarchical accounts
+  const renderHierarchicalAccounts = (accountList: Account[], showSide: boolean = false) => {
+    const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
+
+    return (
+      <>
+        {parentAccounts.map((parent) => {
+          const children = accountMap.get(parent.accountId) || [];
+          const hasChildren = children.length > 0;
+          const isExpanded = expandedAccounts.has(parent.accountId);
+          const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
+
+          return (
+            <>
+              <TableRow 
+                key={parent.id} 
+                data-testid={`row-account-${parent.id}`}
+                className={hasChildren ? "hover-elevate cursor-pointer font-medium" : ""}
+                onClick={() => hasChildren && toggleAccount(parent.accountId)}
+              >
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {hasChildren && (
+                      isExpanded ? 
+                        <ChevronDown className="h-4 w-4" /> : 
+                        <ChevronRight className="h-4 w-4" />
+                    )}
+                    <span>{parent.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">
+                  ${(hasChildren ? childrenTotal : parent.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TableCell>
+                {showSide && (
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {parent.balanceSide || "Dr"}
+                  </TableCell>
+                )}
+              </TableRow>
+              {hasChildren && isExpanded && children.map((child) => (
+                <TableRow key={child.id} data-testid={`row-account-${child.id}`}>
+                  <TableCell className="pl-8 text-muted-foreground">
+                    {child.name}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    ${child.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
+                  {showSide && (
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {child.balanceSide || "Dr"}
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </>
+          );
+        })}
+      </>
+    );
+  };
+
+  const renderPLAccountTable = (accountList: Account[], showTotal: boolean = true) => {
+    if (accountsLoading) {
+      return (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      );
+    }
+
+    if (accountList.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>No accounts in this category</p>
+        </div>
+      );
+    }
+
+    const total = calculatePLTotal(accountList);
+
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Code</TableHead>
+              <TableHead>Account Name</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {accountList.map((account) => (
+              <TableRow key={account.id}>
+                <TableCell className="font-mono text-sm">{account.code}</TableCell>
+                <TableCell>{account.name}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatCurrency(account.balance)}
+                </TableCell>
+              </TableRow>
+            ))}
+            {showTotal && (
+              <TableRow className="font-semibold bg-muted/50">
+                <TableCell colSpan={2}>Total</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatCurrency(Math.abs(total))}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  const exportRatiosToExcel = () => {
+    if (!ratiosData) return;
+
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      ["Financial Ratios Report"],
+      [""],
+      ["Ratio", "Value"],
+      ["Gross Profit Margin", `${ratiosData.ratios.grossProfitMargin.toFixed(2)}%`],
+      ["Net Profit Margin", `${ratiosData.ratios.netProfitMargin.toFixed(2)}%`],
+      ["Current Ratio", ratiosData.ratios.currentRatio.toFixed(2)],
+      ["Debt to Equity", ratiosData.ratios.debtToEquity.toFixed(2)],
+      [""],
+      ["Underlying Data", "Amount"],
+      ["Total Income", ratiosData.underlying.totalIncome.toFixed(2)],
+      ["Total Expenses", ratiosData.underlying.totalExpenses.toFixed(2)],
+      ["Net Profit", ratiosData.underlying.netProfit.toFixed(2)],
+      ["Total Assets", ratiosData.underlying.totalAssets.toFixed(2)],
+      ["Total Liabilities", ratiosData.underlying.totalLiabilities.toFixed(2)],
+      ["Total Equity", ratiosData.underlying.totalEquity.toFixed(2)],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Financial Ratios");
+    XLSX.writeFile(wb, "financial-ratios.xlsx");
+
+    toast({ title: "Excel Exported", description: "Report downloaded successfully" });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Analytics</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Comprehensive financial analysis and reporting
+        </p>
+      </div>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
+          <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+                <DollarSign className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {profitLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {profitLoading ? "Loading..." : formatCurrency(profitData?.totalExpenses || 0)}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={`text-2xl font-bold ${
+                    (profitData?.netProfit || 0) >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {profitLoading ? "Loading..." : formatCurrency(profitData?.netProfit || 0)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {ratiosData && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <h3 className="font-medium mb-3">Key Financial Ratios</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Gross Profit Margin</span>
+                    <span className="text-sm font-mono font-medium">
+                      {ratiosData.ratios.grossProfitMargin.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Net Profit Margin</span>
+                    <span className="text-sm font-mono font-medium">
+                      {ratiosData.ratios.netProfitMargin.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Current Ratio</span>
+                    <span className="text-sm font-mono font-medium">
+                      {ratiosData.ratios.currentRatio.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Debt to Equity</span>
+                    <span className="text-sm font-mono font-medium">
+                      {ratiosData.ratios.debtToEquity.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <h3 className="font-medium mb-3">Account Balances</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Total Assets</span>
+                    <span className="text-sm font-mono font-medium">
+                      ${calculateTotal(assetAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Total Liabilities</span>
+                    <span className="text-sm font-mono font-medium">
+                      ${calculateTotal(liabilityAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Cash Balance</span>
+                    <span className="text-sm font-mono font-medium">
+                      ${calculateTotal(cashAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Profit & Loss Tab */}
+        <TabsContent value="profit-loss" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {accountsLoading ? "Loading..." : formatCurrency(totalIncome)}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {accountsLoading ? "Loading..." : formatCurrency(totalExpenses)}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={`text-2xl font-bold ${
+                    netProfit >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {accountsLoading ? "Loading..." : formatCurrency(netProfit)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="p-6">
+              <Tabs defaultValue="direct-income" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="direct-income">Direct Income</TabsTrigger>
+                  <TabsTrigger value="indirect-income">Indirect Income</TabsTrigger>
+                  <TabsTrigger value="direct-expenses">Direct Expenses</TabsTrigger>
+                  <TabsTrigger value="indirect-expenses">Indirect Expenses</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="direct-income" className="mt-4">
+                  <h4 className="font-medium mb-4">Direct Income Accounts</h4>
+                  {renderPLAccountTable(directIncomeAccounts)}
+                </TabsContent>
+
+                <TabsContent value="indirect-income" className="mt-4">
+                  <h4 className="font-medium mb-4">Indirect Income Accounts</h4>
+                  {renderPLAccountTable(indirectIncomeAccounts)}
+                </TabsContent>
+
+                <TabsContent value="direct-expenses" className="mt-4">
+                  <h4 className="font-medium mb-4">Direct Expense Accounts</h4>
+                  {renderPLAccountTable(directExpenseAccounts)}
+                </TabsContent>
+
+                <TabsContent value="indirect-expenses" className="mt-4">
+                  <h4 className="font-medium mb-4">Indirect Expense Accounts</h4>
+                  {renderPLAccountTable(indirectExpenseAccounts)}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Accounts Tab */}
+        <TabsContent value="accounts" className="space-y-4">
+          <Tabs defaultValue="expenses">
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="assets">Assets</TabsTrigger>
+              <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
+              <TabsTrigger value="indirect-expenses">Indirect Exp.</TabsTrigger>
+              <TabsTrigger value="direct-expenses">Direct Exp.</TabsTrigger>
+              <TabsTrigger value="cash">Cash</TabsTrigger>
+            </TabsList>
+
+            {/* Expenses */}
+            <TabsContent value="expenses" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5 text-destructive" />
+                    All Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(expenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : expenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(expenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+
+            {/* Assets */}
+            <TabsContent value="assets" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    All Asset Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(assetAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : assetAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No asset accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(assetAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+
+            {/* Liabilities */}
+            <TabsContent value="liabilities" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-red-500" />
+                    All Liability Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(liabilityAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : liabilityAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No liability accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(liabilityAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+
+            {/* Indirect Expenses */}
+            <TabsContent value="indirect-expenses" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-orange-500" />
+                    Indirect Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(indirectExpenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : indirectExpenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No indirect expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(indirectExpenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+
+            {/* Direct Expenses */}
+            <TabsContent value="direct-expenses" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-red-500" />
+                    Direct Expense Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(directExpenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : directExpenseAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No direct expense accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(directExpenseAccounts)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+
+            {/* Cash */}
+            <TabsContent value="cash" className="space-y-4">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-green-500" />
+                    Cash Accounts
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Total Cash</p>
+                    <p className="text-2xl font-bold font-mono">
+                      ${calculateTotal(cashAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                {accountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : cashAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No cash accounts found
+                  </p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Account Name</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-right">Side</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {renderHierarchicalAccounts(cashAccounts, true)}
+                    </TableBody>
+                  </Table>
+                )}
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+
+        {/* Sales Analytics Tab */}
+        <TabsContent value="sales" className="space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">Sales by Location</h3>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="year">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {salesLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : salesData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No sales data available
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Total Sales</TableHead>
+                    <TableHead className="text-right">Transactions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salesData.map((location) => (
+                    <TableRow key={location.locationId}>
+                      <TableCell className="font-medium">{location.locationName}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${location.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {location.totalTransactions}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedLocationForDetails(location.locationId)}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+
+          {/* Sales Details Dialog */}
+          <Dialog 
+            open={selectedLocationForDetails !== null} 
+            onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
+          >
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Sales Details - {salesData.find(l => l.locationId === selectedLocationForDetails)?.locationName}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <Select value={detailsPeriod} onValueChange={setDetailsPeriod}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="year">This Year</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {transactionsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No transactions found
+                  </p>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Voucher</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Items</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-mono text-sm">
+                              {transaction.voucherNumber}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(transaction.voucherDate).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {transaction.itemCount}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {transaction.totalQuantity}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${transaction.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Transactions:</span>
+                        <span className="font-medium">{transactions.length}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-2">
+                        <span className="text-muted-foreground">Total Quantity:</span>
+                        <span className="font-medium">
+                          {transactions.reduce((sum, t) => sum + t.totalQuantity, 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-2">
+                        <span className="text-muted-foreground">Total Amount:</span>
+                        <span className="font-mono font-medium">
+                          ${transactions.reduce((sum, t) => sum + t.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">Financial Ratios</h3>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setRatiosStartDate("");
+                    setRatiosEndDate("");
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Reset
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={exportRatiosToExcel}
+                  disabled={!ratiosData}
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={ratiosStartDate}
+                  onChange={(e) => setRatiosStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={ratiosEndDate}
+                  onChange={(e) => setRatiosEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {ratiosLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : ratiosData ? (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-medium mb-3">Financial Ratios</h4>
+                  <div className="rounded-md border p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Gross Profit Margin</span>
+                      <span className="font-mono font-medium">
+                        {ratiosData.ratios.grossProfitMargin.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Net Profit Margin</span>
+                      <span className="font-mono font-medium">
+                        {ratiosData.ratios.netProfitMargin.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Current Ratio</span>
+                      <span className="font-mono font-medium">
+                        {ratiosData.ratios.currentRatio.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Debt to Equity</span>
+                      <span className="font-mono font-medium">
+                        {ratiosData.ratios.debtToEquity.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-3">Underlying Data</h4>
+                  <div className="rounded-md border p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Income</span>
+                      <span className="font-mono">
+                        ${ratiosData.underlying.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Expenses</span>
+                      <span className="font-mono">
+                        ${ratiosData.underlying.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Net Profit</span>
+                      <span className="font-mono font-medium">
+                        ${ratiosData.underlying.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Assets</span>
+                      <span className="font-mono">
+                        ${ratiosData.underlying.totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Liabilities</span>
+                      <span className="font-mono">
+                        ${ratiosData.underlying.totalLiabilities.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Equity</span>
+                      <span className="font-mono">
+                        ${ratiosData.underlying.totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
