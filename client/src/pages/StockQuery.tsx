@@ -183,24 +183,36 @@ export default function StockQuery() {
                 </CardHeader>
                 <CardContent>
                   {itemDetails.purchases.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Container #</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itemDetails.purchases.map((purchase, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{purchase.containerNumber || "N/A"}</TableCell>
-                            <TableCell className="text-right font-mono">{formatSmartNumber(purchase.quantity)}</TableCell>
-                            <TableCell className="text-right font-mono">${parseFloat(purchase.rate).toFixed(2)}</TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Container #</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Rate</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {itemDetails.purchases.map((purchase, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{purchase.containerNumber || "N/A"}</TableCell>
+                              <TableCell className="text-right font-mono">{formatSmartNumber(purchase.quantity)}</TableCell>
+                              <TableCell className="text-right font-mono">${parseFloat(purchase.rate).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <div className="mt-3 pt-3 border-t flex justify-end">
+                        <div className="text-sm">
+                          <span className="font-semibold">Total Quantity: </span>
+                          <span className="font-mono">
+                            {formatSmartNumber(
+                              itemDetails.purchases.reduce((sum, p) => sum + parseFloat(p.quantity || "0"), 0)
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-sm text-muted-foreground">No purchase history</p>
                   )}
@@ -217,28 +229,46 @@ export default function StockQuery() {
                 </CardHeader>
                 <CardContent>
                   {itemDetails.sales.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Selling Price</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itemDetails.sales.map((sale, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{format(new Date(sale.saleDate), "MMM dd, yyyy")}</TableCell>
-                            <TableCell>{sale.locationName || "N/A"}</TableCell>
-                            <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
-                            <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-mono">${parseFloat(sale.totalSales).toFixed(2)}</TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Selling Price</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {itemDetails.sales.map((sale, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{format(new Date(sale.saleDate), "MMM dd, yyyy")}</TableCell>
+                              <TableCell>{sale.locationName || "N/A"}</TableCell>
+                              <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
+                              <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-mono">${parseFloat(sale.totalSales).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <div className="mt-3 pt-3 border-t flex justify-end gap-6">
+                        <div className="text-sm">
+                          <span className="font-semibold">Total Quantity: </span>
+                          <span className="font-mono">
+                            {formatSmartNumber(
+                              itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.quantity || "0"), 0)
+                            )}
+                          </span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold">Total Value: </span>
+                          <span className="font-mono">
+                            ${itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.totalSales || "0"), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-sm text-muted-foreground">No sales history</p>
                   )}
@@ -255,34 +285,52 @@ export default function StockQuery() {
                 </CardHeader>
                 <CardContent>
                   {itemDetails.inventoryLocations.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Location</TableHead>
-                          <TableHead className="text-right">Quantity</TableHead>
-                          <TableHead className="text-right">Avg Rate</TableHead>
-                          <TableHead className="text-right">Total Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itemDetails.inventoryLocations.map((loc) => (
-                          <TableRow key={loc.locationId}>
-                            <TableCell>
-                              {loc.locationName} ({loc.locationCode})
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatSmartNumber(loc.quantity)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${parseFloat(loc.averageRate).toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${parseFloat(loc.totalValue).toFixed(2)}
-                            </TableCell>
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Location</TableHead>
+                            <TableHead className="text-right">Quantity</TableHead>
+                            <TableHead className="text-right">Avg Rate</TableHead>
+                            <TableHead className="text-right">Total Value</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {itemDetails.inventoryLocations.map((loc) => (
+                            <TableRow key={loc.locationId}>
+                              <TableCell>
+                                {loc.locationName} ({loc.locationCode})
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatSmartNumber(loc.quantity)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                ${parseFloat(loc.averageRate).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                ${parseFloat(loc.totalValue).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <div className="mt-3 pt-3 border-t flex justify-end gap-6">
+                        <div className="text-sm">
+                          <span className="font-semibold">Total Quantity: </span>
+                          <span className="font-mono">
+                            {formatSmartNumber(
+                              itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.quantity || "0"), 0)
+                            )}
+                          </span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-semibold">Total Value: </span>
+                          <span className="font-mono">
+                            ${itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.totalValue || "0"), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-sm text-muted-foreground">No inventory at any location</p>
                   )}
