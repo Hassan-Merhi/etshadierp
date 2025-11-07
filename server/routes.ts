@@ -1384,6 +1384,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Payroll - Employee Bonus
+  app.post(
+    "/api/payroll/bonus-employee",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { employeeId, amount, date, notes } = req.body;
+
+        if (!employeeId || !amount || !date) {
+          return res
+            .status(400)
+            .json({ message: "Employee, amount, and date are required" });
+        }
+
+        const bonusAmount = parseFloat(amount);
+        if (isNaN(bonusAmount) || bonusAmount <= 0) {
+          return res
+            .status(400)
+            .json({ message: "Amount must be a positive number" });
+        }
+
+        // Get employee
+        const [employee] = await db
+          .select()
+          .from(employees)
+          .where(eq(employees.id, employeeId));
+        if (!employee) {
+          return res.status(404).json({ message: "Employee not found" });
+        }
+
+        // Get or create SALARY_EXPENSE ledger account
+        const allAccounts = await storage.getAllLedgerAccounts(
+          req.session.currentCompanyId,
+        );
+        let salaryExpenseAccount = allAccounts.find(
+          (a: any) => a.code === "SALARY_EXPENSE",
+        );
+
+        if (!salaryExpenseAccount) {
+          salaryExpenseAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId,
+            code: "SALARY_EXPENSE",
+            name: "Salary Expense",
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        // Get or create employee liability account
+        const employeeAccountCode = `EMP-${employee.code}`;
+        let employeeAccount = allAccounts.find(
+          (a: any) => a.code === employeeAccountCode,
+        );
+
+        if (!employeeAccount) {
+          employeeAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId,
+            code: employeeAccountCode,
+            name: `${employee.firstName} ${employee.lastName} - Salary Account`,
+            accountType: "Liability",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        // Create voucher
+        const voucherNumber = `BONUS-${Date.now()}`;
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description:
+              notes ||
+              `Bonus for ${employee.firstName} ${employee.lastName}`,
+            totalAmount: bonusAmount.toFixed(2),
+            optional: false,
+          })
+          .returning();
+
+        // Create voucher entries (double-entry)
+        // Debit: Salary Expense
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salaryExpenseAccount.id,
+          debitAmount: bonusAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Bonus payment - ${voucherNumber}`,
+        });
+
+        // Credit: Employee Liability Account
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: employeeAccount.id,
+          debitAmount: "0",
+          creditAmount: bonusAmount.toFixed(2),
+          narration: `Bonus payment - ${voucherNumber}`,
+        });
+
+        // Update employee balance
+        const newBalance = parseFloat(employee.currentBalance) + bonusAmount;
+        const newTotalDeposits =
+          parseFloat(employee.totalDeposits) + bonusAmount;
+
+        await db
+          .update(employees)
+          .set({
+            currentBalance: newBalance.toFixed(2),
+            totalDeposits: newTotalDeposits.toFixed(2),
+          })
+          .where(eq(employees.id, employeeId));
+
+        res.json({
+          voucher,
+          employee: {
+            ...employee,
+            currentBalance: newBalance.toFixed(2),
+            totalDeposits: newTotalDeposits.toFixed(2),
+          },
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Payroll - Employee Withdrawal
   app.post(
     "/api/payroll/withdraw-employee",

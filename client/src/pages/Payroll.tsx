@@ -51,11 +51,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const depositSchema = z.object({
+  amount: z.string().min(1, "Amount is required"),
+  date: z.string().min(1, "Date is required"),
+  notes: z.string().optional(),
+});
+
+const bonusSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
@@ -92,15 +98,28 @@ const deductionSchema = z.object({
 });
 
 type DepositFormData = z.infer<typeof depositSchema>;
+type BonusFormData = z.infer<typeof bonusSchema>;
 type WithdrawalFormData = z.infer<typeof withdrawalSchema>;
 type BulkPaymentFormData = z.infer<typeof bulkPaymentSchema>;
 type SalaryAdvanceFormData = z.infer<typeof salaryAdvanceSchema>;
 type DeductionFormData = z.infer<typeof deductionSchema>;
 
+const workerFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  code: z.string().min(1, "Worker code is required"),
+  monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
+  department: z.string().optional(),
+  active: z.boolean().default(true),
+});
+
+type WorkerFormData = z.infer<typeof workerFormSchema>;
+
 interface WorkerPayment {
   workerId: number;
   amount: string;
   selected: boolean;
+  manuallyEdited?: boolean;
 }
 
 interface SalaryAdvance {
@@ -121,13 +140,18 @@ interface SalaryAdvance {
 export default function Payroll() {
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   const [bulkPaymentDialogOpen, setBulkPaymentDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
-  const [workerPayments, setWorkerPayments] = useState<Record<number, WorkerPayment>>({});
+  const [newWorkerDialogOpen, setNewWorkerDialogOpen] = useState(false);
+  const [editWorkerDialogOpen, setEditWorkerDialogOpen] = useState(false);
+  const [deleteWorkerDialogOpen, setDeleteWorkerDialogOpen] = useState(false);
+  const [selectedWorkerForEdit, setSelectedWorkerForEdit] = useState<Employee | null>(null);
+  const [workerOverrides, setWorkerOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
@@ -177,37 +201,123 @@ export default function Payroll() {
     return { totalAdvances, outstandingBalance, unpaidCount };
   }, [salaryAdvances]);
 
-  const employeeStaff = employees?.filter((emp) => emp.employeeType === "Employee") || [];
-  const workerStaff = employees?.filter((emp) => emp.employeeType === "Worker") || [];
-
-  // Create stable worker IDs key for dependency tracking
-  const workerIds = useMemo(() => 
-    workerStaff.map(w => w.id).sort().join(','),
-    [workerStaff.map(w => w.id).join(',')]
+  const employeeStaff = useMemo(
+    () => employees?.filter((emp) => emp.employeeType === "Employee") || [],
+    [employees]
+  );
+  
+  const workerStaff = useMemo(
+    () => employees?.filter((emp) => emp.employeeType === "Worker") || [],
+    [employees]
   );
 
-  // Initialize worker payments when workers load or change
+  // Calculate outstanding advances for each worker
+  const workerAdvances = useMemo(() => {
+    if (!salaryAdvances || !workerStaff.length) return {};
+    
+    const advances: Record<number, { total: number; count: number }> = {};
+    workerStaff.forEach(worker => {
+      const workerAdvancesList = salaryAdvances.filter(
+        adv => adv.employeeId === worker.id && !adv.fullyPaid
+      );
+      const total = workerAdvancesList.reduce(
+        (sum, adv) => sum + parseFloat(adv.remainingBalance || "0"),
+        0
+      );
+      advances[worker.id] = {
+        total,
+        count: workerAdvancesList.length,
+      };
+    });
+    return advances;
+  }, [salaryAdvances, workerStaff]);
+
+  // Compute base worker payments from salary and advances
+  const computedPayments = useMemo(() => {
+    const payments: Record<number, WorkerPayment> = {};
+    workerStaff.forEach((worker) => {
+      const monthlySalary = parseFloat(worker.monthlySalary || "0");
+      const advanceAmount = workerAdvances[worker.id]?.total || 0;
+      const netPayment = monthlySalary - advanceAmount;
+      
+      payments[worker.id] = {
+        workerId: worker.id,
+        amount: netPayment.toFixed(2),
+        selected: true,
+        manuallyEdited: false,
+      };
+    });
+    return payments;
+  }, [workerStaff, workerAdvances]);
+
+  // Merge computed payments with manual overrides
+  const workerPayments = useMemo(() => {
+    const finalPayments: Record<number, WorkerPayment> = {};
+    Object.keys(computedPayments).forEach((id) => {
+      const workerId = parseInt(id);
+      const computed = computedPayments[workerId];
+      const override = workerOverrides[workerId];
+      
+      if (override?.manuallyEdited) {
+        // Use override amount but keep other computed values
+        finalPayments[workerId] = {
+          ...computed,
+          amount: override.amount ?? computed.amount,
+          selected: override.selected ?? computed.selected,
+          manuallyEdited: true,
+        };
+      } else {
+        // Use computed values, but preserve selection state if available
+        finalPayments[workerId] = {
+          ...computed,
+          selected: override?.selected ?? computed.selected,
+        };
+      }
+    });
+    return finalPayments;
+  }, [computedPayments, workerOverrides]);
+
+  // Clean up overrides when workers are removed
   useEffect(() => {
-    if (workerStaff.length > 0) {
-      setWorkerPayments(prev => {
-        const newPayments: Record<number, WorkerPayment> = {};
-        workerStaff.forEach((worker) => {
-          // Preserve existing amount if already set, otherwise use monthly salary
-          newPayments[worker.id] = prev[worker.id] || {
-            workerId: worker.id,
-            amount: worker.monthlySalary || "0",
-            selected: true,
-          };
-        });
-        return newPayments;
+    const workerIds = new Set(workerStaff.map(w => w.id));
+    setWorkerOverrides(prev => {
+      const cleaned = { ...prev };
+      let hasChanges = false;
+      Object.keys(cleaned).forEach(id => {
+        if (!workerIds.has(parseInt(id))) {
+          delete cleaned[parseInt(id)];
+          hasChanges = true;
+        }
       });
-    } else {
-      setWorkerPayments({});
+      return hasChanges ? cleaned : prev;
+    });
+  }, [workerStaff]);
+
+  // Populate edit form when worker is selected
+  useEffect(() => {
+    if (selectedWorkerForEdit && editWorkerDialogOpen) {
+      editWorkerForm.reset({
+        firstName: selectedWorkerForEdit.firstName,
+        lastName: selectedWorkerForEdit.lastName,
+        code: selectedWorkerForEdit.code,
+        monthlySalary: selectedWorkerForEdit.monthlySalary,
+        department: selectedWorkerForEdit.department || "",
+        active: selectedWorkerForEdit.active,
+      });
     }
-  }, [selectedCompany, workerIds, workerStaff]);
+  }, [selectedWorkerForEdit, editWorkerDialogOpen, editWorkerForm]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
+    defaultValues: {
+      amount: "",
+      date: new Date().toISOString().split("T")[0],
+      notes: "",
+    },
+  });
+
+  const bonusForm = useForm<BonusFormData>({
+    resolver: zodResolver(bonusSchema),
     defaultValues: {
       amount: "",
       date: new Date().toISOString().split("T")[0],
@@ -255,6 +365,30 @@ export default function Payroll() {
     },
   });
 
+  const newWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
+  const editWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
       return await apiRequest("POST", "/api/payroll/deposit-employee", {
@@ -270,6 +404,32 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setDepositDialogOpen(false);
       depositForm.reset();
+      setSelectedEmployee(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bonusMutation = useMutation({
+    mutationFn: async (data: BonusFormData) => {
+      return await apiRequest("POST", "/api/payroll/bonus-employee", {
+        employeeId: selectedEmployee?.id,
+        ...data,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bonus given successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBonusDialogOpen(false);
+      bonusForm.reset();
       setSelectedEmployee(null);
     },
     onError: (error: Error) => {
@@ -349,7 +509,7 @@ export default function Payroll() {
         title: "Success",
         description: "Salary advance created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
       setAdvanceDialogOpen(false);
       advanceForm.reset();
     },
@@ -372,10 +532,83 @@ export default function Payroll() {
         title: "Success",
         description: "Deduction recorded successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
       setDeductionDialogOpen(false);
       deductionForm.reset();
       setSelectedAdvance(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createWorkerMutation = useMutation({
+    mutationFn: async (data: WorkerFormData) => {
+      return await apiRequest("POST", "/api/employees", {
+        ...data,
+        employeeType: "Worker",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Worker created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setNewWorkerDialogOpen(false);
+      newWorkerForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateWorkerMutation = useMutation({
+    mutationFn: async (data: WorkerFormData & { id: number }) => {
+      return await apiRequest("PUT", `/api/employees/${data.id}`, {
+        ...data,
+        employeeType: "Worker",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Worker updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setEditWorkerDialogOpen(false);
+      editWorkerForm.reset();
+      setSelectedWorkerForEdit(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWorkerMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/employees/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Worker deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setDeleteWorkerDialogOpen(false);
+      setSelectedWorkerForEdit(null);
     },
     onError: (error: Error) => {
       toast({
@@ -396,6 +629,11 @@ export default function Payroll() {
     setWithdrawalDialogOpen(true);
   };
 
+  const handleBonus = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setBonusDialogOpen(true);
+  };
+
   const handleRecordDeduction = (advance: SalaryAdvance) => {
     setSelectedAdvance(advance);
     setDeductionDialogOpen(true);
@@ -403,32 +641,36 @@ export default function Payroll() {
   };
 
   const handleToggleWorker = (workerId: number) => {
-    setWorkerPayments(prev => ({
+    setWorkerOverrides(prev => ({
       ...prev,
       [workerId]: {
         ...prev[workerId],
-        selected: !prev[workerId]?.selected,
+        selected: !(workerPayments[workerId]?.selected ?? true),
       },
     }));
   };
 
   const handleUpdateAmount = (workerId: number, amount: string) => {
-    setWorkerPayments(prev => ({
+    setWorkerOverrides(prev => ({
       ...prev,
       [workerId]: {
-        workerId,
+        ...prev[workerId],
         amount,
-        selected: prev[workerId]?.selected ?? true,
+        manuallyEdited: true,
       },
     }));
   };
 
   const handleSelectAll = () => {
     const allSelected = Object.values(workerPayments).every(p => p.selected);
-    setWorkerPayments(prev => {
+    const newSelected = !allSelected;
+    setWorkerOverrides(prev => {
       const updated = { ...prev };
-      Object.keys(updated).forEach(key => {
-        updated[parseInt(key)].selected = !allSelected;
+      Object.keys(workerPayments).forEach(id => {
+        updated[parseInt(id)] = {
+          ...updated[parseInt(id)],
+          selected: newSelected,
+        };
       });
       return updated;
     });
@@ -535,6 +777,15 @@ export default function Payroll() {
                               >
                                 <TrendingUp className="h-4 w-4 mr-1" />
                                 Deposit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleBonus(employee)}
+                                data-testid={`button-bonus-${employee.id}`}
+                              >
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Bonus
                               </Button>
                               <Button
                                 size="sm"
@@ -648,12 +899,19 @@ export default function Payroll() {
                         <TableHead data-testid="header-name">Name</TableHead>
                         <TableHead data-testid="header-department">Department</TableHead>
                         <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
+                        <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
                         <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
                         <TableHead data-testid="header-status">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {workerStaff.map((worker) => (
+                      {workerStaff.map((worker) => {
+                        const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                        const monthlySalary = parseFloat(worker.monthlySalary || "0");
+                        const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
+                        const hasNegativePayment = paymentAmount < 0;
+                        
+                        return (
                         <TableRow 
                           key={worker.id} 
                           data-testid={`row-worker-${worker.id}`}
@@ -676,17 +934,39 @@ export default function Payroll() {
                             {worker.department || "-"}
                           </TableCell>
                           <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(worker.monthlySalary).toFixed(2)}
+                            {monthlySalary.toFixed(2)}
+                          </TableCell>
+                          <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
+                            {advanceInfo.total > 0 ? (
+                              <span className="text-destructive">
+                                {advanceInfo.total.toFixed(2)}
+                                {advanceInfo.count > 0 && (
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({advanceInfo.count})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
                           </TableCell>
                           <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={workerPayments[worker.id]?.amount || "0"}
-                              onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
-                              className="w-32 text-right font-mono ml-auto"
-                              data-testid={`input-amount-${worker.id}`}
-                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={workerPayments[worker.id]?.amount || "0"}
+                                onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                                className={cn(
+                                  "w-32 text-right font-mono",
+                                  hasNegativePayment && "border-destructive"
+                                )}
+                                data-testid={`input-amount-${worker.id}`}
+                              />
+                              {hasNegativePayment && (
+                                <AlertCircle className="h-4 w-4 text-destructive" />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell data-testid={`cell-status-${worker.id}`}>
                             <Badge variant={worker.active ? "default" : "secondary"}>
@@ -694,7 +974,8 @@ export default function Payroll() {
                             </Badge>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -704,125 +985,240 @@ export default function Payroll() {
         </TabsContent>
 
         <TabsContent value="advances">
-          {/* Summary Statistics */}
-          <div className="grid gap-4 md:grid-cols-3 mb-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Advances Given</p>
-                  <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
-                    ${advancesStats.totalAdvances.toFixed(2)}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-muted-foreground" />
-              </div>
-            </Card>
+          {(() => {
+            // Filter advances to show only workers
+            const workerAdvancesList = salaryAdvances?.filter(adv => 
+              workerStaff.some(worker => worker.id === adv.employeeId)
+            ) || [];
+            
+            // Recalculate stats for workers only
+            const workerAdvancesStats = {
+              totalAdvances: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.amount), 0),
+              outstandingBalance: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.remainingBalance), 0),
+              unpaidCount: workerAdvancesList.filter(adv => !adv.fullyPaid).length,
+            };
+            
+            return (
+              <>
+                {/* Summary Statistics */}
+                <div className="grid gap-4 md:grid-cols-3 mb-4">
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Advances Given</p>
+                        <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
+                          ${workerAdvancesStats.totalAdvances.toFixed(2)}
+                        </p>
+                      </div>
+                      <DollarSign className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                  <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
-                    ${advancesStats.outstandingBalance.toFixed(2)}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-destructive" />
-              </div>
-            </Card>
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                        <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
+                          ${workerAdvancesStats.outstandingBalance.toFixed(2)}
+                        </p>
+                      </div>
+                      <TrendingUp className="h-8 w-8 text-destructive" />
+                    </div>
+                  </Card>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Unpaid Advances</p>
-                  <p className="text-2xl font-semibold" data-testid="text-unpaid-count">
-                    {advancesStats.unpaidCount}
-                  </p>
+                  <Card className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Unpaid Advances</p>
+                        <p className="text-2xl font-semibold" data-testid="text-unpaid-count">
+                          {workerAdvancesStats.unpaidCount}
+                        </p>
+                      </div>
+                      <AlertCircle className="h-8 w-8 text-orange-500" />
+                    </div>
+                  </Card>
                 </div>
-                <AlertCircle className="h-8 w-8 text-orange-500" />
-              </div>
-            </Card>
-          </div>
 
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">Salary Advances</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Track advances given to employees and record deductions
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setAdvanceDialogOpen(true)}
-                  data-testid="button-new-advance"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Advance
-                </Button>
-              </div>
+                {/* Worker Management Section */}
+                <Card className="p-6 mb-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold">Manage Workers</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Add, edit, or remove workers from this company
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => setNewWorkerDialogOpen(true)}
+                        data-testid="button-new-worker"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Worker
+                      </Button>
+                    </div>
 
-              {advancesLoading ? (
-                <Skeleton className="h-[400px] w-full" />
-              ) : !salaryAdvances || salaryAdvances.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No salary advances found</p>
-                  <p className="text-sm mt-2">Click "New Advance" to record a salary advance</p>
-                </div>
-              ) : (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead data-testid="header-employee">Employee</TableHead>
-                        <TableHead data-testid="header-advance-date">Advance Date</TableHead>
-                        <TableHead data-testid="header-amount" className="text-right">Amount</TableHead>
-                        <TableHead data-testid="header-remaining" className="text-right">Remaining Balance</TableHead>
-                        <TableHead data-testid="header-paid-status">Status</TableHead>
-                        <TableHead data-testid="header-advance-actions" className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {salaryAdvances.map((advance) => (
-                        <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
-                          <TableCell data-testid={`cell-employee-${advance.id}`}>
-                            <div>
-                              <div className="font-medium">{advance.employeeName}</div>
-                              <div className="text-sm text-muted-foreground">{advance.employeeCode}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell data-testid={`cell-date-${advance.id}`}>
-                            {format(new Date(advance.advanceDate), "MMM dd, yyyy")}
-                          </TableCell>
-                          <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
-                            ${parseFloat(advance.amount).toFixed(2)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-remaining-${advance.id}`} className="text-right font-mono">
-                            ${parseFloat(advance.remainingBalance).toFixed(2)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-status-${advance.id}`}>
-                            <Badge variant={advance.fullyPaid ? "default" : "secondary"} data-testid={`badge-status-${advance.id}`}>
-                              {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell data-testid={`cell-actions-${advance.id}`} className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRecordDeduction(advance)}
-                              disabled={advance.fullyPaid}
-                              data-testid={`button-record-deduction-${advance.id}`}
+                    {workerStaff.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <p className="text-sm">No workers found. Click "New Worker" to add one.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {workerStaff.map((worker) => {
+                          const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                          const hasAdvances = advanceInfo.total > 0;
+                          const balance = parseFloat(worker.currentBalance || "0");
+                          const canDelete = !hasAdvances && balance === 0;
+                          
+                          return (
+                            <div
+                              key={worker.id}
+                              className="flex items-center justify-between p-3 border rounded-md hover-elevate"
+                              data-testid={`worker-row-${worker.id}`}
                             >
-                              Record Deduction
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          </Card>
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <div className="font-medium">
+                                    {worker.firstName} {worker.lastName}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {worker.code} • Salary: ${parseFloat(worker.monthlySalary).toFixed(2)}
+                                  </div>
+                                </div>
+                                {hasAdvances && (
+                                  <Badge variant="secondary" className="text-destructive">
+                                    ${advanceInfo.total.toFixed(2)} advance
+                                  </Badge>
+                                )}
+                                {balance !== 0 && (
+                                  <Badge variant="secondary">
+                                    Balance: ${balance.toFixed(2)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedWorkerForEdit(worker);
+                                    setEditWorkerDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-worker-${worker.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedWorkerForEdit(worker);
+                                    setDeleteWorkerDialogOpen(true);
+                                  }}
+                                  disabled={!canDelete}
+                                  data-testid={`button-delete-worker-${worker.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold">Salary Advances (Workers Only)</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Track advances given to workers and record deductions
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => setAdvanceDialogOpen(true)}
+                        data-testid="button-new-advance"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Advance
+                      </Button>
+                    </div>
+
+                    {advancesLoading ? (
+                      <Skeleton className="h-[400px] w-full" />
+                    ) : workerStaff.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <p>No workers found</p>
+                        <p className="text-sm mt-2">Create workers from the Workers tab or Create Master Data page</p>
+                      </div>
+                    ) : workerAdvancesList.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <p>No salary advances found for workers</p>
+                        <p className="text-sm mt-2">Click "New Advance" to record a salary advance for a worker</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-md">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead data-testid="header-employee">Worker</TableHead>
+                              <TableHead data-testid="header-advance-date">Advance Date</TableHead>
+                              <TableHead data-testid="header-amount" className="text-right">Amount</TableHead>
+                              <TableHead data-testid="header-remaining" className="text-right">Remaining Balance</TableHead>
+                              <TableHead data-testid="header-paid-status">Status</TableHead>
+                              <TableHead data-testid="header-advance-actions" className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {workerAdvancesList.map((advance) => (
+                              <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
+                                <TableCell data-testid={`cell-employee-${advance.id}`}>
+                                  <div>
+                                    <div className="font-medium">{advance.employeeName}</div>
+                                    <div className="text-sm text-muted-foreground">{advance.employeeCode}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell data-testid={`cell-date-${advance.id}`}>
+                                  {format(new Date(advance.advanceDate), "MMM dd, yyyy")}
+                                </TableCell>
+                                <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
+                                  ${parseFloat(advance.amount).toFixed(2)}
+                                </TableCell>
+                                <TableCell data-testid={`cell-remaining-${advance.id}`} className="text-right font-mono">
+                                  ${parseFloat(advance.remainingBalance).toFixed(2)}
+                                </TableCell>
+                                <TableCell data-testid={`cell-status-${advance.id}`}>
+                                  <Badge variant={advance.fullyPaid ? "default" : "secondary"} data-testid={`badge-status-${advance.id}`}>
+                                    {advance.fullyPaid ? "Fully Paid" : "Outstanding"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell data-testid={`cell-actions-${advance.id}`} className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleRecordDeduction(advance)}
+                                      disabled={advance.fullyPaid}
+                                      data-testid={`button-record-deduction-${advance.id}`}
+                                    >
+                                      Record Deduction
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
@@ -901,6 +1297,88 @@ export default function Payroll() {
                 </Button>
                 <Button type="submit" disabled={depositMutation.isPending} data-testid="button-submit-deposit">
                   {depositMutation.isPending ? "Processing..." : "Deposit"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Bonus Dialog */}
+      <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
+        <DialogContent data-testid="dialog-bonus">
+          <DialogHeader>
+            <DialogTitle>Give Bonus</DialogTitle>
+            <DialogDescription>
+              Give a bonus to {selectedEmployee?.firstName} {selectedEmployee?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...bonusForm}>
+            <form onSubmit={bonusForm.handleSubmit((data) => bonusMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={bonusForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bonus Amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-bonus-amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bonusForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-bonus-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bonusForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Reason for bonus..."
+                        {...field}
+                        data-testid="input-bonus-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBonusDialogOpen(false)}
+                  data-testid="button-cancel-bonus"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={bonusMutation.isPending} data-testid="button-submit-bonus">
+                  {bonusMutation.isPending ? "Processing..." : "Give Bonus"}
                 </Button>
               </div>
             </form>
@@ -1475,6 +1953,322 @@ export default function Payroll() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Worker Dialog */}
+      <Dialog open={newWorkerDialogOpen} onOpenChange={setNewWorkerDialogOpen}>
+        <DialogContent data-testid="dialog-new-worker">
+          <DialogHeader>
+            <DialogTitle>Add New Worker</DialogTitle>
+            <DialogDescription>
+              Create a new worker for this company
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...newWorkerForm}>
+            <form onSubmit={newWorkerForm.handleSubmit((data) => createWorkerMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={newWorkerForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-new-worker-firstname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={newWorkerForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-new-worker-lastname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={newWorkerForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Worker Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-new-worker-code" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={newWorkerForm.control}
+                name="monthlySalary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly Salary</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        data-testid="input-new-worker-salary"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={newWorkerForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-new-worker-department" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={newWorkerForm.control}
+                name="active"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-new-worker-active"
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Active</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setNewWorkerDialogOpen(false)}
+                  data-testid="button-cancel-new-worker"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createWorkerMutation.isPending} data-testid="button-submit-new-worker">
+                  {createWorkerMutation.isPending ? "Creating..." : "Create Worker"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Worker Dialog */}
+      <Dialog open={editWorkerDialogOpen} onOpenChange={setEditWorkerDialogOpen}>
+        <DialogContent data-testid="dialog-edit-worker">
+          <DialogHeader>
+            <DialogTitle>Edit Worker</DialogTitle>
+            <DialogDescription>
+              Update worker information for {selectedWorkerForEdit?.firstName} {selectedWorkerForEdit?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...editWorkerForm}>
+            <form onSubmit={editWorkerForm.handleSubmit((data) => {
+              if (selectedWorkerForEdit) {
+                updateWorkerMutation.mutate({ ...data, id: selectedWorkerForEdit.id });
+              }
+            })} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editWorkerForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-edit-worker-firstname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editWorkerForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-edit-worker-lastname" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editWorkerForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Worker Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-worker-code" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editWorkerForm.control}
+                name="monthlySalary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly Salary</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        data-testid="input-edit-worker-salary"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editWorkerForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-worker-department" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editWorkerForm.control}
+                name="active"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-edit-worker-active"
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Active</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditWorkerDialogOpen(false)}
+                  data-testid="button-cancel-edit-worker"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateWorkerMutation.isPending} data-testid="button-submit-edit-worker">
+                  {updateWorkerMutation.isPending ? "Updating..." : "Update Worker"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Worker Dialog */}
+      <Dialog open={deleteWorkerDialogOpen} onOpenChange={setDeleteWorkerDialogOpen}>
+        <DialogContent data-testid="dialog-delete-worker">
+          <DialogHeader>
+            <DialogTitle>Delete Worker</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedWorkerForEdit?.firstName} {selectedWorkerForEdit?.lastName}?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedWorkerForEdit && (
+            <>
+              {(parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 || 
+                (workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0) && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
+                  <p className="text-sm text-destructive font-medium">
+                    Cannot delete worker:
+                  </p>
+                  <ul className="text-sm text-destructive mt-2 list-disc list-inside">
+                    {parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 && (
+                      <li>Worker has a non-zero balance: ${parseFloat(selectedWorkerForEdit.currentBalance).toFixed(2)}</li>
+                    )}
+                    {(workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0 && (
+                      <li>Worker has outstanding advances: ${(workerAdvances[selectedWorkerForEdit.id]?.total || 0).toFixed(2)}</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteWorkerDialogOpen(false)}
+                  data-testid="button-cancel-delete-worker"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (selectedWorkerForEdit) {
+                      deleteWorkerMutation.mutate(selectedWorkerForEdit.id);
+                    }
+                  }}
+                  disabled={
+                    deleteWorkerMutation.isPending ||
+                    parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 ||
+                    (workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0
+                  }
+                  data-testid="button-confirm-delete-worker"
+                >
+                  {deleteWorkerMutation.isPending ? "Deleting..." : "Delete Worker"}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
