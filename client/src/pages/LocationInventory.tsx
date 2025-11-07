@@ -1016,26 +1016,44 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           <div ref={printRef}>
             <style>{`
               @media print {
-                .print-compact-table th,
-                .print-compact-table td {
-                  padding: 0.25rem 0.375rem !important;
-                  font-size: 0.875rem !important;
-                  line-height: 1.25rem !important;
-                }
-                .print-compact-table th {
-                  font-weight: 600 !important;
+                body {
+                  margin: 0.5in;
                 }
                 .print-header {
-                  margin-bottom: 1rem !important;
+                  margin-bottom: 0.5rem !important;
+                }
+                .print-inventory-list {
+                  font-size: 11pt !important;
+                  line-height: 1.3 !important;
+                }
+                .print-group-header {
+                  font-weight: bold !important;
+                  margin-top: 0.3rem !important;
+                  margin-bottom: 0.1rem !important;
+                  padding: 0.1rem 0 !important;
+                }
+                .print-item-row {
+                  display: flex !important;
+                  justify-content: space-between !important;
+                  padding: 0.05rem 0 !important;
+                  margin-left: 0.5rem !important;
+                }
+                .print-item-name {
+                  flex: 1 !important;
+                  padding-right: 1rem !important;
+                }
+                .print-item-qty {
+                  text-align: right !important;
+                  white-space: nowrap !important;
+                  min-width: 80px !important;
                 }
               }
             `}</style>
             {/* Print header (hidden on screen) */}
-            <div className="hidden print:block print-header mb-6">
-              <h2 className="text-2xl font-bold">{selectedLocationLocal.name}</h2>
-              <p className="text-sm text-muted-foreground">Full Inventory Report</p>
-              <p className="text-sm text-muted-foreground">
-                Printed: {new Date().toLocaleDateString()}
+            <div className="hidden print:block print-header">
+              <h2 className="text-xl font-bold">{selectedLocationLocal.name}</h2>
+              <p className="text-xs text-muted-foreground">
+                Inventory Report - {new Date().toLocaleDateString()}
               </p>
             </div>
 
@@ -1060,69 +1078,48 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   });
 
                   const groupedInventory = sortedInventory.reduce((acc, item) => {
+                    const groupKey = item.stockGroupCode || "UNCAT";
                     const groupName = item.stockGroupName || "Uncategorized";
-                    if (!acc[groupName]) acc[groupName] = [];
-                    acc[groupName].push(item);
+                    if (!acc[groupKey]) {
+                      acc[groupKey] = { name: groupName, items: [] };
+                    }
+                    acc[groupKey].items.push(item);
                     return acc;
-                  }, {} as Record<string, typeof inventory>);
+                  }, {} as Record<string, { name: string; items: typeof inventory }>);
 
-                  return Object.entries(groupedInventory).map(([groupName, items]) => (
-                    <div key={groupName} className="print:break-inside-avoid">
-                      <h3 className="text-lg font-semibold mb-2 print:text-base">{groupName}</h3>
-                      <div className="border rounded-md">
-                        <Table className="print-compact-table">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead className="text-right">Quantity</TableHead>
-                              <TableHead>UOM</TableHead>
-                              {!posUser && (
-                                <>
-                                  <TableHead className="text-right">Avg Rate</TableHead>
-                                  <TableHead className="text-right">Total Value</TableHead>
-                                </>
-                              )}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
+                  return (
+                    <div className="print-inventory-list">
+                      {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
+                        const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
+                        const firstItemUom = items[0]?.stockItemUom || "";
+                        
+                        return (
+                          <div key={groupCode} className="mb-1">
+                            {/* Group header with total */}
+                            <div className="print-group-header flex justify-between font-bold">
+                              <span>{groupCode}</span>
+                              <span className="print-item-qty">
+                                {Math.floor(groupTotal).toLocaleString()} {firstItemUom}
+                              </span>
+                            </div>
+                            
+                            {/* Group items */}
                             {items.map((item) => (
-                              <TableRow
-                                key={item.inventoryId}
-                                data-testid={`row-all-items-${item.stockItemId}`}
-                              >
-                                <TableCell className="font-medium">{item.stockItemName}</TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {Math.floor(parseFloat(item.quantity))}
-                                </TableCell>
-                                <TableCell>{item.stockItemUom}</TableCell>
-                                {!posUser && (
-                                  <>
-                                    <TableCell className="text-right font-mono">
-                                      ${parseFloat(item.averageRate).toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono font-medium">
-                                      ${parseFloat(item.totalValue).toFixed(2)}
-                                    </TableCell>
-                                  </>
-                                )}
-                              </TableRow>
+                              <div key={item.inventoryId} className="print-item-row">
+                                <span className="print-item-name italic text-sm">
+                                  {item.stockItemName}
+                                </span>
+                                <span className="print-item-qty text-sm">
+                                  {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
+                                </span>
+                              </div>
                             ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ));
+                  );
                 })()}
-              </div>
-            )}
-
-            {/* Print summary (hidden on screen, visible when printing) */}
-            {!posUser && (
-              <div className="hidden print:block mt-6">
-                <p className="text-sm">
-                  Total Items: {inventory.length} | Total Inventory Value: $
-                  {inventory.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0).toFixed(2)}
-                </p>
               </div>
             )}
           </div>
