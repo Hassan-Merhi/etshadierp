@@ -90,6 +90,92 @@ interface FinancialRatiosData {
   };
 }
 
+interface StockLocation {
+  locationId: number;
+  locationName: string;
+  quantity: number;
+  averageRate: number;
+  totalValue: number;
+}
+
+interface StockMovementItem {
+  stockItemId: number;
+  stockItemCode: string;
+  stockItemName: string;
+  locations: StockLocation[];
+  totalQuantity: number;
+  totalValue: number;
+}
+
+interface StockMovementData {
+  items: StockMovementItem[];
+  summary: {
+    totalItems: number;
+    grandTotalQuantity: number;
+    grandTotalValue: number;
+  };
+  filters: {
+    startDate: string | null;
+    endDate: string | null;
+    locationId: string | null;
+    stockGroupId: string | null;
+  };
+}
+
+interface Container {
+  id: number;
+  containerNumber: string;
+  supplierName: string;
+  status: string;
+  importDate: string;
+  itemsTotal: string;
+  chargesTotal: string;
+  grandTotal: string;
+}
+
+interface ContainerData {
+  containers: Container[];
+  summary: {
+    totalContainers: number;
+    totalItemsTotal: number;
+    totalChargesTotal: number;
+    totalGrandTotal: number;
+  };
+  filters: {
+    startDate: string | null;
+    endDate: string | null;
+    supplierId: string | null;
+    status: string | null;
+  };
+}
+
+interface Location {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface StockGroup {
+  id: number;
+  code: string;
+  name: string;
+}
+
+interface Supplier {
+  id: number;
+  code: string;
+  name: string;
+}
+
+function formatSmartNumber(num: number | string): string {
+  const value = typeof num === 'string' ? parseFloat(num) : num;
+  const isWholeNumber = value % 1 === 0;
+  if (isWholeNumber) {
+    return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export default function Analytics() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -99,6 +185,43 @@ export default function Analytics() {
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
   const [ratiosStartDate, setRatiosStartDate] = useState("");
   const [ratiosEndDate, setRatiosEndDate] = useState("");
+  
+  // Report filters
+  const [reportStartDate, setReportStartDate] = useState("");
+  const [reportEndDate, setReportEndDate] = useState("");
+  const [reportLocationId, setReportLocationId] = useState("");
+  const [reportStockGroupId, setReportStockGroupId] = useState("");
+  const [reportSupplierId, setReportSupplierId] = useState("");
+  const [reportContainerStatus, setReportContainerStatus] = useState("");
+
+  // Fetch reference data
+  const { data: locations = [] } = useQuery<Location[]>({ 
+    queryKey: ["/api/locations", selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch locations");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+  const { data: stockGroups = [] } = useQuery<StockGroup[]>({ 
+    queryKey: ["/api/stock-groups", selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch stock groups");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+  const { data: suppliers = [] } = useQuery<Supplier[]>({ 
+    queryKey: ["/api/suppliers", selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch suppliers");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
 
   // Fetch all accounts
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -194,6 +317,46 @@ export default function Analytics() {
       return response.json();
     },
     enabled: !!selectedCompany,
+  });
+
+  // Fetch stock movement report
+  const buildStockMovementUrl = () => {
+    const params = new URLSearchParams();
+    if (reportStartDate) params.append("startDate", reportStartDate);
+    if (reportEndDate) params.append("endDate", reportEndDate);
+    if (reportLocationId) params.append("locationId", reportLocationId);
+    if (reportStockGroupId) params.append("stockGroupId", reportStockGroupId);
+    return `/api/reports/stock-movement?${params}`;
+  };
+
+  const { data: stockMovementData, refetch: refetchStockMovement, isLoading: loadingStock } = useQuery<StockMovementData>({
+    queryKey: [buildStockMovementUrl(), selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch stock movement");
+      return response.json();
+    },
+    enabled: false, // Manual trigger via Generate button
+  });
+
+  // Fetch container report
+  const buildContainerUrl = () => {
+    const params = new URLSearchParams();
+    if (reportStartDate) params.append("startDate", reportStartDate);
+    if (reportEndDate) params.append("endDate", reportEndDate);
+    if (reportSupplierId) params.append("supplierId", reportSupplierId);
+    if (reportContainerStatus) params.append("status", reportContainerStatus);
+    return `/api/reports/containers?${params}`;
+  };
+
+  const { data: containerData, refetch: refetchContainers, isLoading: loadingContainers } = useQuery<ContainerData>({
+    queryKey: [buildContainerUrl(), selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch containers");
+      return response.json();
+    },
+    enabled: false, // Manual trigger via Generate button
   });
 
   // Helper functions
@@ -466,11 +629,13 @@ export default function Analytics() {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
+          <TabsTrigger value="stock">Stock Movement</TabsTrigger>
+          <TabsTrigger value="containers">Containers</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -1073,6 +1238,250 @@ export default function Analytics() {
               </div>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        {/* Stock Movement Tab */}
+        <TabsContent value="stock" className="space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Stock Movement Report
+              </h3>
+              <Button
+                size="sm"
+                onClick={() => refetchStockMovement()}
+                disabled={loadingStock}
+              >
+                {loadingStock ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <Label htmlFor="stock-start-date">Start Date</Label>
+                <Input
+                  id="stock-start-date"
+                  type="date"
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="stock-end-date">End Date</Label>
+                <Input
+                  id="stock-end-date"
+                  type="date"
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="stock-location">Location</Label>
+                <Select value={reportLocationId} onValueChange={setReportLocationId}>
+                  <SelectTrigger id="stock-location">
+                    <SelectValue placeholder="All Locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Locations</SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="stock-group">Stock Group</Label>
+                <Select value={reportStockGroupId} onValueChange={setReportStockGroupId}>
+                  <SelectTrigger id="stock-group">
+                    <SelectValue placeholder="All Groups" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Groups</SelectItem>
+                    {stockGroups.map((group) => (
+                      <SelectItem key={group.id} value={group.id.toString()}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingStock ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : stockMovementData ? (
+              <div className="space-y-4">
+                {stockMovementData.items.map((item) => (
+                  <div key={item.stockItemId} className="border rounded-md p-4">
+                    <div className="flex justify-between mb-2">
+                      <div>
+                        <div className="font-medium">{item.stockItemName}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Total</div>
+                        <div className="font-mono">{formatSmartNumber(item.totalQuantity)} units</div>
+                        <div className="font-mono">${formatSmartNumber(item.totalValue)}</div>
+                      </div>
+                    </div>
+                    <div className="space-y-1 mt-2 pt-2 border-t">
+                      {item.locations.map((loc) => (
+                        <div key={loc.locationId} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground ml-4">{loc.locationName}</span>
+                          <span className="font-mono">
+                            {formatSmartNumber(loc.quantity)} × ${formatSmartNumber(loc.averageRate)} = ${formatSmartNumber(loc.totalValue)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="border-t-2 pt-4 font-semibold">
+                  <div className="flex justify-between">
+                    <span>Grand Totals</span>
+                    <span className="font-mono">
+                      {formatSmartNumber(stockMovementData.summary.grandTotalQuantity)} units | ${formatSmartNumber(stockMovementData.summary.grandTotalValue)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No data available. Click Generate to load report.
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Containers Tab */}
+        <TabsContent value="containers" className="space-y-4">
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Container Report
+              </h3>
+              <Button
+                size="sm"
+                onClick={() => refetchContainers()}
+                disabled={loadingContainers}
+              >
+                {loadingContainers ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <Label htmlFor="container-start-date">Start Date</Label>
+                <Input
+                  id="container-start-date"
+                  type="date"
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="container-end-date">End Date</Label>
+                <Input
+                  id="container-end-date"
+                  type="date"
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="container-supplier">Supplier</Label>
+                <Select value={reportSupplierId} onValueChange={setReportSupplierId}>
+                  <SelectTrigger id="container-supplier">
+                    <SelectValue placeholder="All Suppliers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Suppliers</SelectItem>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="container-status">Status</Label>
+                <Select value={reportContainerStatus} onValueChange={setReportContainerStatus}>
+                  <SelectTrigger id="container-status">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="In Transit">In Transit</SelectItem>
+                    <SelectItem value="Arrived">Arrived</SelectItem>
+                    <SelectItem value="Offloaded">Offloaded</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingContainers ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : containerData ? (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Container #</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Import Date</TableHead>
+                        <TableHead className="text-right">Items Total</TableHead>
+                        <TableHead className="text-right">Charges Total</TableHead>
+                        <TableHead className="text-right">Grand Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {containerData.containers.map((container) => (
+                        <TableRow key={container.id}>
+                          <TableCell className="font-mono">{container.containerNumber}</TableCell>
+                          <TableCell>{container.supplierName}</TableCell>
+                          <TableCell>{container.status}</TableCell>
+                          <TableCell>{container.importDate}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(container.itemsTotal).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(container.chargesTotal).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(container.grandTotal).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableBody className="font-semibold border-t-2">
+                      <TableRow>
+                        <TableCell colSpan={4}>TOTALS</TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${containerData.summary.totalItemsTotal.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${containerData.summary.totalChargesTotal.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${containerData.summary.totalGrandTotal.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No data available. Click Generate to load report.
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Reports Tab */}
