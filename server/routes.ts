@@ -5626,31 +5626,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const companies = await storage.getAllCompanies();
         const companyMap = new Map(companies.map((c) => [c.id, c]));
 
-        // Get purchase orders (filtered by company if specified)
-        const allPOs: any[] = [];
-        if (filterCompanyId) {
-          const pos = await storage.getPurchaseOrdersBySupplier(
-            supplierId,
-            filterCompanyId,
-          );
-          allPOs.push(
-            ...pos.map((po) => ({ ...po, companyId: filterCompanyId })),
-          );
-        } else {
-          // Get POs from all companies
-          for (const company of companies) {
-            const pos = await storage.getPurchaseOrdersBySupplier(
-              supplierId,
-              company.id,
-            );
-            allPOs.push(...pos.map((po) => ({ ...po, companyId: company.id })));
-          }
-        }
-
         // Combine all transactions with company information
         const transactions: any[] = [];
 
-        // Add voucher entries
+        // Add voucher entries (which already include PO-generated vouchers)
+        // No need to add POs separately as they're already represented by voucher entries
         for (const entry of voucherEntries) {
           const company = companyMap.get(entry.companyId);
           transactions.push({
@@ -5663,23 +5643,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherType: entry.voucherType,
             debit: parseFloat(entry.debitAmount || "0"),
             credit: parseFloat(entry.creditAmount || "0"),
-          });
-        }
-
-        // Add purchase orders
-        for (const po of allPOs) {
-          const company = companyMap.get(po.companyId);
-          const amount = parseFloat(po.itemsTotal || "0");
-          transactions.push({
-            type: "purchase_order",
-            date: po.createdAt,
-            companyId: po.companyId,
-            companyName: company?.name || "Unknown",
-            docNumber: po.poNumber,
-            description: `Container ${po.containerNumber}`,
-            voucherType: "Purchase",
-            debit: 0,
-            credit: amount, // PO creates payable (credit)
           });
         }
 

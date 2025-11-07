@@ -207,7 +207,6 @@ export default function Suppliers() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
                     <TableHead className="text-right">Containers</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Status</TableHead>
@@ -229,16 +228,6 @@ export default function Suppliers() {
                         >
                           {supplier.legalName}
                         </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm">{supplier.email}</div>
-                          {supplier.phone && (
-                            <div className="text-xs text-muted-foreground">
-                              {supplier.phone}
-                            </div>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell className="text-right" data-testid={`text-containers-${supplier.id}`}>
                         <Badge variant="outline">
