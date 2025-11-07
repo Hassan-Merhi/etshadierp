@@ -207,9 +207,22 @@ export default function Financial() {
       ))
   );
 
-  // Calculate totals
+  // Calculate totals - properly handle parent-child relationships to avoid double counting
   const calculateTotal = (accountList: Account[]) => {
-    return accountList.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
+    
+    return parentAccounts.reduce((sum, parent) => {
+      const children = accountMap.get(parent.accountId) || [];
+      const hasChildren = children.length > 0;
+      
+      // If parent has children, sum the children's balances
+      // If parent has no children, use the parent's balance
+      const accountValue = hasChildren 
+        ? children.reduce((childSum, child) => childSum + (child.balance || 0), 0)
+        : (parent.balance || 0);
+      
+      return sum + accountValue;
+    }, 0);
   };
 
   // Render hierarchical accounts
