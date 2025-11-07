@@ -28,7 +28,6 @@ interface ContainerDetailData {
 
 const saleFormSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
-  salePrice: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Sale price must be positive"),
   commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
   saleDate: z.string().min(1, "Sale date is required"),
 });
@@ -40,7 +39,8 @@ export default function ContainerDetail() {
   const [showSellDialog, setShowSellDialog] = useState(false);
   const { toast } = useToast();
   const [_location, setLocation] = useLocation();
-  const { selectedCompany, companyId } = useCompany();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -67,8 +67,7 @@ export default function ContainerDetail() {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       customerId: "",
-      salePrice: "",
-      commission: "",
+      commission: "0.00",
       saleDate: new Date().toISOString().split('T')[0],
     },
   });
@@ -120,15 +119,15 @@ export default function ContainerDetail() {
   // Sell Container mutation
   const sellContainerMutation = useMutation({
     mutationFn: async (data: z.infer<typeof saleFormSchema>) => {
-      const salePrice = parseFloat(data.salePrice);
+      const containerCost = parseFloat(containerData?.container.grandTotal || "0");
       const commission = parseFloat(data.commission);
-      const totalAmount = salePrice + commission;
+      const totalAmount = containerCost + commission;
 
       await apiRequest("POST", "/api/container-sales", {
         containerId: parseInt(containerId!),
         customerId: parseInt(data.customerId),
         saleDate: data.saleDate,
-        containerCost: data.salePrice,
+        containerCost: containerCost.toString(),
         commission: data.commission,
         totalAmount: totalAmount.toString(),
       });
@@ -542,25 +541,15 @@ export default function ContainerDetail() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="salePrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sale Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-sale-price"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="rounded-md border p-4 bg-muted/50">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Container Cost</span>
+                  <span className="text-lg font-bold">${grandTotal.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Full balance will be charged to customer
+                </p>
+              </div>
 
               <FormField
                 control={form.control}
