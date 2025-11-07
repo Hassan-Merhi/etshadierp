@@ -80,6 +80,11 @@ export default function Suppliers() {
   const totalContainers = suppliers.reduce((sum, s) => sum + Number(s.containerCount || 0), 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0);
   
+  // Sort suppliers alphabetically by name
+  const sortedSuppliers = [...suppliers].sort((a, b) => 
+    a.legalName.localeCompare(b.legalName)
+  );
+  
   const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
     setCompanyFilter("all"); // Reset filter when opening
@@ -201,7 +206,6 @@ export default function Suppliers() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead className="text-right">Containers</TableHead>
@@ -211,14 +215,11 @@ export default function Suppliers() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {suppliers.map((supplier) => (
+                  {sortedSuppliers.map((supplier) => (
                     <TableRow
                       key={supplier.id}
                       data-testid={`row-supplier-${supplier.id}`}
                     >
-                      <TableCell className="font-mono text-sm">
-                        {supplier.code}
-                      </TableCell>
                       <TableCell className="font-medium">
                         <Button
                           variant="ghost"
