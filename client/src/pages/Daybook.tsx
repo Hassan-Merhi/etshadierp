@@ -279,6 +279,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
     queryKey: ["/api/suppliers"],
   });
 
+  // Fetch voucher entries when viewing
+  const { data: viewVoucherEntries = [], isLoading: viewEntriesLoading } = useQuery<VoucherEntry[]>({
+    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/entries`] : [],
+    enabled: !!selectedVoucher && viewDialogOpen,
+  });
+
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
     queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
@@ -851,7 +857,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Voucher #</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -866,9 +871,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     >
                       <TableCell className="font-medium">
                         {format(parseISO(voucher.voucherDate), "MMM dd, yyyy")}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {voucher.voucherNumber}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -1226,7 +1228,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       {/* View Voucher Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Voucher Details</DialogTitle>
             <DialogDescription>
@@ -1234,12 +1236,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
             </DialogDescription>
           </DialogHeader>
           {selectedVoucher && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Voucher Number</p>
-                  <p className="font-mono font-medium">{selectedVoucher.voucherNumber}</p>
-                </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
                   <p className="font-medium">
@@ -1248,15 +1246,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Type</p>
-                  <Badge variant={getVoucherTypeBadgeVariant(selectedVoucher.voucherType)}>
-                    {selectedVoucher.voucherType}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Amount</p>
-                  <p className="font-mono font-bold text-lg">
-                    ${parseFloat(selectedVoucher.totalAmount).toFixed(2)}
-                  </p>
+                  <div className="flex gap-2 items-center">
+                    <Badge variant={getVoucherTypeBadgeVariant(selectedVoucher.voucherType)}>
+                      {selectedVoucher.voucherType}
+                    </Badge>
+                    {selectedVoucher.optional && (
+                      <Badge variant="outline" className="text-xs">
+                        Optional
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
               {selectedVoucher.description && (
@@ -1265,6 +1264,74 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <p className="text-sm">{selectedVoucher.description}</p>
                 </div>
               )}
+              
+              {/* Voucher Entries Table */}
+              <div>
+                <h3 className="font-semibold mb-3">Entries</h3>
+                {viewEntriesLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : viewVoucherEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No entries found
+                  </p>
+                ) : (
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account</TableHead>
+                          <TableHead className="text-right">Debit</TableHead>
+                          <TableHead className="text-right">Credit</TableHead>
+                          <TableHead>Narration</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewVoucherEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              <div className="font-medium">{entry.accountName}</div>
+                              <div className="text-xs text-muted-foreground font-mono">
+                                {entry.accountCode}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(entry.debitAmount) > 0
+                                ? `$${parseFloat(entry.debitAmount).toFixed(2)}`
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(entry.creditAmount) > 0
+                                ? `$${parseFloat(entry.creditAmount).toFixed(2)}`
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {entry.narration || "-"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Totals Row */}
+                        <TableRow className="font-bold bg-muted/50">
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${viewVoucherEntries
+                              .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0)
+                              .toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${viewVoucherEntries
+                              .reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
+                              .toFixed(2)}
+                          </TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
