@@ -117,6 +117,8 @@ export interface IStorage {
   createStockItem(item: InsertStockItem): Promise<StockItem>;
   updateStockItem(id: number, updates: Partial<InsertStockItem>): Promise<StockItem>;
   deleteStockItem(id: number): Promise<void>;
+  bulkGetStockItemsByIds(ids: number[], companyId: number): Promise<StockItem[]>;
+  bulkDeleteStockItems(ids: number[]): Promise<void>;
   
   // Stock Item Code Aliases
   getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]>;
@@ -589,6 +591,26 @@ export class DbStorage implements IStorage {
     await db
       .delete(schema.stockItems)
       .where(eq(schema.stockItems.id, id));
+  }
+
+  async bulkGetStockItemsByIds(ids: number[], companyId: number): Promise<StockItem[]> {
+    if (ids.length === 0) return [];
+    return await db
+      .select()
+      .from(schema.stockItems)
+      .where(
+        and(
+          inArray(schema.stockItems.id, ids),
+          eq(schema.stockItems.companyId, companyId)
+        )
+      );
+  }
+
+  async bulkDeleteStockItems(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db
+      .delete(schema.stockItems)
+      .where(inArray(schema.stockItems.id, ids));
   }
 
   async getStockItemByCodeOrAlias(code: string, companyId: number): Promise<StockItem | undefined> {

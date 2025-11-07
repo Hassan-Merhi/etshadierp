@@ -1,15 +1,28 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Package, Edit, FileSpreadsheet } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
 import { StockItemCreateDialog } from "@/components/StockItemCreateDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface StockItem {
   id: number;
@@ -37,6 +50,10 @@ export default function StockItems() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editStockItemId, setEditStockItemId] = useState<number | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const { toast } = useToast();
 
   const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -45,6 +62,52 @@ export default function StockItems() {
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      return await apiRequest("POST", "/api/stock-items/bulk-delete", { ids });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      setSelectedIds([]);
+      toast({
+        title: "Success",
+        description: data.message || "Stock items deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete stock items",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredStockItems.map(item => item.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(itemId => itemId !== id));
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    deleteMutation.mutate(selectedIds);
+    setDeleteDialogOpen(false);
+  };
 
   const handleStockItemClick = (stockItemId: number, stockItemName: string) => {
     setSelectedStockItemId(stockItemId);
@@ -70,6 +133,9 @@ export default function StockItems() {
     return group ? `${group.code} - ${group.name}` : "Unknown";
   };
 
+  const allFilteredSelected = filteredStockItems.length > 0 && 
+    filteredStockItems.every(item => selectedIds.includes(item.id));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -80,6 +146,17 @@ export default function StockItems() {
           </p>
         </div>
         <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <Button 
+              variant="destructive" 
+              className="gap-2" 
+              onClick={handleDeleteClick}
+              data-testid="button-delete-selected"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
+            </Button>
+          )}
           <Link href="/import-stock-items">
             <Button variant="outline" className="gap-2" data-testid="button-import-items">
               <FileSpreadsheet className="h-4 w-4" />
@@ -120,6 +197,13 @@ export default function StockItems() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="h-12">
+                  <th className="w-12 px-3">
+                    <Checkbox
+                      checked={allFilteredSelected}
+                      onCheckedChange={handleSelectAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </th>
                   <th className="text-left px-3 font-medium">Name</th>
                   <th className="text-right px-3 font-medium">Selling Price</th>
                   <th className="text-left px-3 font-medium">Status</th>
@@ -129,31 +213,50 @@ export default function StockItems() {
               <tbody>
                 {filteredStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? "No items found matching your search" : "No stock items found"}
                     </td>
                   </tr>
                 ) : (
                   filteredStockItems.map((item) => {
                     const sellingPrice = parseFloat(item.sellingPrice || "0");
+                    const isSelected = selectedIds.includes(item.id);
                     
                     return (
                       <tr
                         key={item.id}
-                        className="border-t hover-elevate cursor-pointer h-12"
-                        onClick={() => handleStockItemClick(item.id, item.name)}
+                        className="border-t hover-elevate h-12"
                         data-testid={`row-stock-item-${item.id}`}
                       >
-                        <td className="px-3 font-medium" data-testid={`name-${item.id}`}>
+                        <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                            data-testid={`checkbox-${item.id}`}
+                          />
+                        </td>
+                        <td 
+                          className="px-3 font-medium cursor-pointer" 
+                          onClick={() => handleStockItemClick(item.id, item.name)}
+                          data-testid={`name-${item.id}`}
+                        >
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-muted-foreground" />
                             {item.name}
                           </div>
                         </td>
-                        <td className="px-3 text-right font-mono" data-testid={`price-${item.id}`}>
+                        <td 
+                          className="px-3 text-right font-mono cursor-pointer" 
+                          onClick={() => handleStockItemClick(item.id, item.name)}
+                          data-testid={`price-${item.id}`}
+                        >
                           ${sellingPrice.toFixed(2)}
                         </td>
-                        <td className="px-3" data-testid={`status-${item.id}`}>
+                        <td 
+                          className="px-3 cursor-pointer" 
+                          onClick={() => handleStockItemClick(item.id, item.name)}
+                          data-testid={`status-${item.id}`}
+                        >
                           <Badge variant={item.active ? "default" : "secondary"}>
                             {item.active ? "Active" : "Inactive"}
                           </Badge>
@@ -205,6 +308,28 @@ export default function StockItems() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-confirm-delete">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? 'item' : 'items'}? 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

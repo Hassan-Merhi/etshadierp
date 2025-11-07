@@ -2850,6 +2850,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk delete stock items
+  app.post("/api/stock-items/bulk-delete", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty ids array" });
+      }
+
+      // Get all items that exist and belong to the current company
+      const validItems = await storage.bulkGetStockItemsByIds(ids, req.session.currentCompanyId);
+      const validIds = validItems.map(item => item.id);
+      
+      if (validIds.length === 0) {
+        return res.status(404).json({ message: "No valid stock items found to delete" });
+      }
+
+      await storage.bulkDeleteStockItems(validIds);
+      
+      const skippedCount = ids.length - validIds.length;
+      const message = skippedCount > 0
+        ? `Successfully deleted ${validIds.length} stock item(s). ${skippedCount} item(s) were skipped (not found or belong to another company).`
+        : `Successfully deleted ${validIds.length} stock item(s)`;
+
+      res.json({ 
+        message,
+        deleted: validIds.length,
+        skipped: skippedCount
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
