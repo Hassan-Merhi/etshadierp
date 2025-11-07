@@ -5319,10 +5319,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             debits: 0,
             credits: 0,
           };
-          supplierBalances.set(entry.supplierId, {
-            debits: existing.debits + debit,
-            credits: existing.credits + credit,
-          });
+          // Only count pure credit or pure debit entries to prevent double-counting
+          // This matches the logic in /api/suppliers/stats
+          if (credit > 0 && debit === 0) {
+            supplierBalances.set(entry.supplierId, {
+              debits: existing.debits,
+              credits: existing.credits + credit,
+            });
+          } else if (debit > 0 && credit === 0) {
+            supplierBalances.set(entry.supplierId, {
+              debits: existing.debits + debit,
+              credits: existing.credits,
+            });
+          }
         }
       }
 
@@ -9308,10 +9317,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               debits: 0,
               credits: 0,
             };
-            supplierBalances.set(entry.supplierId, {
-              debits: existing.debits + debit,
-              credits: existing.credits + credit,
-            });
+            // Only count pure credit or pure debit entries to prevent double-counting
+            // This matches the logic in /api/suppliers/stats
+            if (credit > 0 && debit === 0) {
+              supplierBalances.set(entry.supplierId, {
+                debits: existing.debits,
+                credits: existing.credits + credit,
+              });
+            } else if (debit > 0 && credit === 0) {
+              supplierBalances.set(entry.supplierId, {
+                debits: existing.debits + debit,
+                credits: existing.credits,
+              });
+            }
           }
         }
 
