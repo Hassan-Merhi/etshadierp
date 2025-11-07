@@ -9835,6 +9835,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard Cash Accounts - user-selected accounts for dashboard display
+  app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardCashAccounts } = await import("@shared/schema");
+      
+      const accounts = await db
+        .select()
+        .from(dashboardCashAccounts)
+        .where(eq(dashboardCashAccounts.companyId, companyId))
+        .orderBy(dashboardCashAccounts.displayOrder)
+        .execute();
+
+      // Enrich with account details
+      const enrichedAccounts = await Promise.all(
+        accounts.map(async (account) => {
+          let accountDetails: any = null;
+          if (account.accountType === "ledger") {
+            const { ledgerAccounts } = await import("@shared/schema");
+            const [ledger] = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(eq(ledgerAccounts.id, account.accountId))
+              .execute();
+            accountDetails = ledger ? { ...ledger, type: "Ledger" } : null;
+          } else if (account.accountType === "bank") {
+            const { bankAccounts } = await import("@shared/schema");
+            const [bank] = await db
+              .select()
+              .from(bankAccounts)
+              .where(eq(bankAccounts.id, account.accountId))
+              .execute();
+            accountDetails = bank ? { ...bank, type: "Bank" } : null;
+          }
+
+          return {
+            id: account.id,
+            accountType: account.accountType,
+            accountId: account.accountId,
+            displayOrder: account.displayOrder,
+            account: accountDetails,
+          };
+        })
+      );
+
+      // Filter out deleted accounts
+      const validAccounts = enrichedAccounts.filter((a) => a.account !== null);
+      res.json(validAccounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardCashAccounts, insertDashboardCashAccountSchema } = await import("@shared/schema");
+      
+      const data = insertDashboardCashAccountSchema.parse({
+        ...req.body,
+        companyId,
+      });
+
+      const [account] = await db
+        .insert(dashboardCashAccounts)
+        .values(data)
+        .returning()
+        .execute();
+
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dashboard-cash-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardCashAccounts } = await import("@shared/schema");
+      const id = parseInt(req.params.id);
+
+      await db
+        .delete(dashboardCashAccounts)
+        .where(
+          and(
+            eq(dashboardCashAccounts.id, id),
+            eq(dashboardCashAccounts.companyId, companyId)
+          )
+        )
+        .execute();
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
