@@ -209,20 +209,16 @@ export default function Financial() {
 
   // Calculate totals - properly handle parent-child relationships to avoid double counting
   const calculateTotal = (accountList: Account[]) => {
-    const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
+    // Get all account IDs that are parents of other accounts in this list
+    const parentIds = new Set(accountList.filter(acc => acc.parentId).map(acc => acc.parentId!));
     
-    return parentAccounts.reduce((sum, parent) => {
-      const children = accountMap.get(parent.accountId) || [];
-      const hasChildren = children.length > 0;
-      
-      // If parent has children, sum the children's balances
-      // If parent has no children, use the parent's balance
-      const accountValue = hasChildren 
-        ? children.reduce((childSum, child) => childSum + (child.balance || 0), 0)
-        : (parent.balance || 0);
-      
-      return sum + accountValue;
-    }, 0);
+    // Sum only accounts that are NOT parents (leaf accounts)
+    // This includes:
+    // 1. Accounts with no children at all
+    // 2. Child accounts whose parents are not in the filtered list
+    return accountList
+      .filter(acc => !parentIds.has(acc.accountId))
+      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
   };
 
   // Render hierarchical accounts
