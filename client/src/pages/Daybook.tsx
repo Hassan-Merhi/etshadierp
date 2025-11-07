@@ -279,9 +279,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
     queryKey: ["/api/suppliers"],
   });
 
-  // Fetch voucher entries when viewing
-  const { data: viewVoucherEntries = [], isLoading: viewEntriesLoading } = useQuery<VoucherEntry[]>({
-    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/entries`] : [],
+  // Fetch voucher entries when viewing (includes account names and stock items)
+  const { data: viewVoucherEntries = [], isLoading: viewEntriesLoading } = useQuery<any[]>({
+    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/view-entries`] : [],
     enabled: !!selectedVoucher && viewDialogOpen,
   });
 

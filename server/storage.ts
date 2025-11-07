@@ -1527,8 +1527,40 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
-  async getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]> {
-    return await db.select().from(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, voucherId));
+  async getVoucherEntriesByVoucher(voucherId: number): Promise<any[]> {
+    const entries = await db
+      .select({
+        id: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        ledgerAccountId: schema.voucherEntries.ledgerAccountId,
+        bankAccountId: schema.voucherEntries.bankAccountId,
+        fixedAssetId: schema.voucherEntries.fixedAssetId,
+        supplierId: schema.voucherEntries.supplierId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        createdAt: schema.voucherEntries.createdAt,
+        accountName: schema.ledgerAccounts.name,
+        accountCode: schema.ledgerAccounts.code,
+        bankAccountName: schema.bankAccounts.name,
+        bankAccountCode: schema.bankAccounts.code,
+        fixedAssetName: schema.fixedAssets.name,
+        fixedAssetCode: schema.fixedAssets.code,
+        supplierName: schema.suppliers.legalName,
+        supplierCode: schema.suppliers.code,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.ledgerAccounts, eq(schema.voucherEntries.ledgerAccountId, schema.ledgerAccounts.id))
+      .leftJoin(schema.bankAccounts, eq(schema.voucherEntries.bankAccountId, schema.bankAccounts.id))
+      .leftJoin(schema.fixedAssets, eq(schema.voucherEntries.fixedAssetId, schema.fixedAssets.id))
+      .leftJoin(schema.suppliers, eq(schema.voucherEntries.supplierId, schema.suppliers.id))
+      .where(eq(schema.voucherEntries.voucherId, voucherId));
+
+    return entries.map(entry => ({
+      ...entry,
+      accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || 'Unknown Account',
+      accountCode: entry.accountCode || entry.bankAccountCode || entry.fixedAssetCode || entry.supplierCode || '-',
+    }));
   }
 
   async getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]> {

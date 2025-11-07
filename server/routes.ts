@@ -7495,7 +7495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get voucher entries for a specific voucher
+  // Get voucher entries for a specific voucher (for editing)
   app.get("/api/vouchers/:id/entries", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -7517,7 +7517,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
       }
 
+      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
+      res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get voucher entries with full details for viewing (includes account names and stock items)
+  app.get("/api/vouchers/:id/view-entries", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      // Verify voucher exists and belongs to current company
+      const voucher = await storage.getVoucherById(id);
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (voucher.companyId !== req.session.currentCompanyId) {
+        return res
+          .status(403)
+          .json({
+            message: "Access denied: Voucher belongs to a different company",
+          });
+      }
+
+      // Get regular voucher entries with account names
       const entries = await storage.getVoucherEntriesByVoucher(id);
+
+      // For Sales vouchers, also get sales items
+      if (voucher.voucherType === "Sales") {
+        const salesItemsList = await db
+          .select({
+            id: salesItems.id,
+            voucherId: salesItems.voucherId,
+            stockItemId: salesItems.stockItemId,
+            quantity: salesItems.quantity,
+            sellingPrice: salesItems.sellingPrice,
+            totalSales: salesItems.totalSales,
+            stockItemName: stockItems.name,
+            stockItemCode: stockItems.code,
+          })
+          .from(salesItems)
+          .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+          .where(eq(salesItems.voucherId, id));
+
+        if (salesItemsList.length > 0) {
+          const itemsWithDetails = salesItemsList.map((item) => ({
+            id: item.id,
+            voucherId: item.voucherId,
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || 'Unknown Item',
+            stockItemCode: item.stockItemCode || '-',
+            quantity: item.quantity,
+            rate: item.sellingPrice,
+            debitAmount: "0",
+            creditAmount: item.totalSales,
+            narration: `Sale of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.sellingPrice}`,
+            accountName: item.stockItemName || 'Unknown Item',
+            accountCode: item.stockItemCode || '-',
+          }));
+          return res.json([...entries, ...itemsWithDetails]);
+        }
+      }
+
+      // For Production/Consumption vouchers, get stock adjustment items
+      if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption") {
+        const adjustmentVoucher = await db.query.stockAdjustmentVouchers.findFirst({
+          where: eq(stockAdjustmentVouchers.voucherId, id),
+        });
+
+        if (adjustmentVoucher) {
+          const adjustmentItemsList = await db
+            .select({
+              id: stockAdjustmentItems.id,
+              adjustmentId: stockAdjustmentItems.adjustmentId,
+              stockItemId: stockAdjustmentItems.stockItemId,
+              quantity: stockAdjustmentItems.quantity,
+              rate: stockAdjustmentItems.rate,
+              totalAmount: stockAdjustmentItems.totalAmount,
+              stockItemName: stockItems.name,
+              stockItemCode: stockItems.code,
+            })
+            .from(stockAdjustmentItems)
+            .leftJoin(stockItems, eq(stockAdjustmentItems.stockItemId, stockItems.id))
+            .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+          if (adjustmentItemsList.length > 0) {
+            const isProduction = voucher.voucherType === "Production";
+            const itemsWithDetails = adjustmentItemsList.map((item) => ({
+              id: item.id,
+              voucherId: id,
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || 'Unknown Item',
+              stockItemCode: item.stockItemCode || '-',
+              quantity: item.quantity,
+              rate: item.rate,
+              debitAmount: isProduction ? item.totalAmount : "0",
+              creditAmount: isProduction ? "0" : item.totalAmount,
+              narration: `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
+              accountName: item.stockItemName || 'Unknown Item',
+              accountCode: item.stockItemCode || '-',
+            }));
+            return res.json([...entries, ...itemsWithDetails]);
+          }
+        }
+      }
+
       res.json(entries);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
