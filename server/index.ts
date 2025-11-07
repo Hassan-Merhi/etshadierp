@@ -55,11 +55,10 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// Trust proxy for Render's HTTPS termination
-// This allows secure cookies to work behind the reverse proxy
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-}
+// Trust proxy for HTTPS termination
+// This is required for both Replit (development) and Render (production)
+// as both run behind reverse proxies
+app.set("trust proxy", 1);
 
 // Session middleware
 const PgSession = connectPgSimple(session);
@@ -76,12 +75,16 @@ const sessionConfig: session.SessionOptions = {
   },
 };
 
-// Use PostgreSQL session store in production
-if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+// Use PostgreSQL session store when a database is available
+// This ensures sessions persist across server restarts
+if (process.env.DATABASE_URL || process.env.PGHOST) {
+  const connectionString = process.env.DATABASE_URL || 
+    `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
+  
   sessionConfig.store = new PgSession({
     conObject: {
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }, // Required for Render's managed PostgreSQL
+      connectionString,
+      ssl: { rejectUnauthorized: false }, // Required for managed PostgreSQL (Neon/Render)
     },
     createTableIfMissing: true,
   });
