@@ -130,9 +130,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.cashAccountId = firstCompany.cashAccountId;
       }
 
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      // Save session before sending response
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        
+        // Return user without password
+        const { password: _, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
