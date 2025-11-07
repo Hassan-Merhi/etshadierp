@@ -8,6 +8,16 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
 
 ## Recent Changes (November 2025)
 
+### Financial Improvements
+- **Fixed Financial Totals Calculation**: Corrected total calculations in Financial Dashboard to properly handle hierarchical parent-child account relationships. The system now sums only leaf accounts (children) to avoid double-counting when both parent and child accounts exist.
+- **Real-time Balance Updates**: All voucher types (Payment, Receipt, Journal) now properly invalidate account balance queries after creation, ensuring balances update immediately across the application.
+- **Customizable Dashboard Cash Tracking**: Added new "Cash in Hand" section to the main Dashboard:
+  - Users can manually select which accounts (Ledger or Bank) to display
+  - Automatically hides accounts with zero balance
+  - Add/remove accounts using a simple dialog interface
+  - Each account shows current balance in a dedicated card
+  - Data persists per company in the `dashboard_cash_accounts` table
+
 ### UI/UX Improvements
 - **Import Buttons Relocated**: Moved import functionality buttons from Dashboard sidebar to their respective pages for better context:
   - Import Stock Items button added to Stock Items page
