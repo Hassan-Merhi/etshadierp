@@ -488,6 +488,17 @@ function AccountCombobox({
   );
 }
 
+// Helper function to format numbers: removes .00 for whole numbers, keeps decimals otherwise
+function formatNumber(value: number): string {
+  if (Number.isInteger(value)) {
+    return value.toLocaleString();
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export default function VoucherEdit() {
   const { id } = useParams<{ id: string }>();
   const [_location, navigate] = useLocation();
@@ -1319,10 +1330,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${lineTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  ${formatNumber(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -1365,13 +1373,17 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono">
-                              ${salesGrandTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              ${formatNumber(salesGrandTotal)}
                             </div>
                           </td>
                           <td></td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="p-3 text-right font-medium" colSpan={1}>Total Quantity:</td>
+                          <td className="p-3 font-mono font-medium">
+                            {formatNumber(salesForm.watch("items").reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0))}
+                          </td>
+                          <td colSpan={3}></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -1642,10 +1654,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${lineTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  ${formatNumber(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -1688,13 +1697,17 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${purchaseGrandTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              ${formatNumber(purchaseGrandTotal)}
                             </div>
                           </td>
                           <td></td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="p-3 text-right font-medium" colSpan={1}>Total Quantity:</td>
+                          <td className="p-3 font-mono font-medium">
+                            {formatNumber(purchaseForm.watch("items").reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0))}
+                          </td>
+                          <td colSpan={3}></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -1947,10 +1960,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${lineTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  ${formatNumber(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -1993,13 +2003,17 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${adjustmentGrandTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              ${formatNumber(adjustmentGrandTotal)}
                             </div>
                           </td>
                           <td></td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="p-3 text-right font-medium" colSpan={1}>Total Quantity:</td>
+                          <td className="p-3 font-mono font-medium">
+                            {formatNumber(adjustmentForm.watch("items").reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0))}
+                          </td>
+                          <td colSpan={3}></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -2317,10 +2331,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${lineTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  ${formatNumber(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -2363,13 +2374,17 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${transferGrandTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              ${formatNumber(transferGrandTotal)}
                             </div>
                           </td>
                           <td></td>
+                        </tr>
+                        <tr className="border-t">
+                          <td className="p-3 text-right font-medium" colSpan={1}>Total Quantity:</td>
+                          <td className="p-3 font-mono font-medium">
+                            {formatNumber(transferForm.watch("items").reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0))}
+                          </td>
+                          <td colSpan={3}></td>
                         </tr>
                       </tfoot>
                     </table>
@@ -2643,10 +2658,7 @@ export default function VoucherEdit() {
                         </td>
                         <td className="p-3">
                           <div className="text-right font-bold font-mono">
-                            ${paymentTotal.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            ${formatNumber(paymentTotal)}
                           </div>
                         </td>
                         <td></td>
@@ -2877,25 +2889,16 @@ export default function VoucherEdit() {
                         <td className="p-3">
                           <div className="text-right text-sm">
                             <div className="text-muted-foreground">
-                              DR: ${journalDRTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              DR: ${formatNumber(journalDRTotal)}
                             </div>
                             <div className="text-muted-foreground">
-                              CR: ${journalCRTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              CR: ${formatNumber(journalCRTotal)}
                             </div>
                             <div className={cn(
                               "font-bold font-mono mt-1",
                               Math.abs(journalDRTotal - journalCRTotal) > 0.01 && "text-destructive"
                             )}>
-                              Diff: ${Math.abs(journalDRTotal - journalCRTotal).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              Diff: ${formatNumber(Math.abs(journalDRTotal - journalCRTotal))}
                             </div>
                           </div>
                         </td>
