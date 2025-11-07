@@ -83,10 +83,13 @@ export default function Accounts() {
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
   const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
 
-  const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+  const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
     enabled: !!selectedCompany,
   });
+
+  // Filter out suppliers - they have their own dedicated page
+  const accounts = allAccounts.filter(account => account.type !== "Supplier");
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
