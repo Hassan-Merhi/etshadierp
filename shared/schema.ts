@@ -853,6 +853,7 @@ export const containerSales = pgTable("container_sales", {
   saleDate: date("sale_date").notNull(),
   containerCost: decimal("container_cost", { precision: 15, scale: 2 }).notNull(),
   commission: decimal("commission", { precision: 15, scale: 2 }).notNull(),
+  commissionAccountId: integer("commission_account_id"),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
   voucherId: integer("voucher_id"),
   notes: text("notes"),
@@ -869,6 +870,7 @@ export const insertContainerSaleSchema = createInsertSchema(containerSales).omit
   saleDate: z.string().min(1, "Sale date is required"),
   containerCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Container cost must be non-negative"),
   commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
+  commissionAccountId: z.number().optional(),
   totalAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total amount must be positive"),
 });
 

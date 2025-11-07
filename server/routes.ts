@@ -2244,30 +2244,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Container has already been sold" });
         }
 
-        // Get or create COMMISSION_REVENUE ledger account
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let commissionRevenueAccount = allAccounts.find(
-          (a: any) => a.code === "COMMISSION_REVENUE",
-        );
-
-        if (!commissionRevenueAccount) {
-          commissionRevenueAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "COMMISSION_REVENUE",
-            name: "Commission Revenue",
-            accountType: "Income",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
         // Get customer's ledger account
         if (!customer.ledgerAccountId) {
           return res
             .status(400)
             .json({ message: "Customer does not have a ledger account" });
+        }
+
+        // Determine commission account - use provided ID or default to COMMISSION_REVENUE
+        let commissionAccountId = parsed.commissionAccountId;
+        
+        if (commissionAccountId) {
+          // Verify the provided commission account exists and belongs to current company
+          const commissionAccount = await storage.getLedgerAccountById(commissionAccountId);
+          if (!commissionAccount) {
+            return res.status(404).json({ message: "Commission account not found" });
+          }
+          if (commissionAccount.companyId !== req.session.currentCompanyId) {
+            return res.status(403).json({ message: "Commission account belongs to a different company" });
+          }
+        } else {
+          // Get or create default COMMISSION_REVENUE ledger account
+          const allAccounts = await storage.getAllLedgerAccounts(
+            req.session.currentCompanyId,
+          );
+          let commissionRevenueAccount = allAccounts.find(
+            (a: any) => a.code === "COMMISSION_REVENUE",
+          );
+
+          if (!commissionRevenueAccount) {
+            commissionRevenueAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: "COMMISSION_REVENUE",
+              name: "Commission Revenue",
+              accountType: "Income",
+              openingBalance: "0",
+              active: true,
+            });
+          }
+          commissionAccountId = commissionRevenueAccount.id;
         }
 
         // Create voucher for the container sale
@@ -2300,7 +2315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Credit: Commission Revenue Account
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: commissionRevenueAccount.id,
+          ledgerAccountId: commissionAccountId,
           debitAmount: "0",
           creditAmount: parsed.totalAmount,
           narration: `Container sale commission - ${voucherNumber}`,
@@ -2309,7 +2324,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create container sale record with voucher reference
         const sale = await storage.createContainerSale({
           ...parsed,
+          commissionAccountId,
           voucherId: voucher.id,
+        });
+
+        // Update container status to SOLD
+        await storage.updateContainer(parsed.containerId, {
+          status: "SOLD",
         });
 
         res.status(201).json(sale);
@@ -4857,6 +4878,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.currentCompanyId,
       );
       res.json(containers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active containers (not sold)
+  app.get("/api/containers/active", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const containers = await storage.getActiveContainers(
+        req.session.currentCompanyId,
+      );
+      res.json(containers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get sold containers with full details
+  app.get("/api/containers/sold", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const soldContainers = await storage.getSoldContainers(
+        req.session.currentCompanyId,
+      );
+      res.json(soldContainers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

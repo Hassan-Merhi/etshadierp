@@ -1,4 +1,4 @@
-import { eq, and, or, sql, inArray, desc } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc, ne } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -138,6 +138,8 @@ export interface IStorage {
 
   // Containers
   getAllContainers(companyId: number): Promise<Container[]>;
+  getActiveContainers(companyId: number): Promise<Container[]>;
+  getSoldContainers(companyId: number): Promise<any[]>;
   getContainerById(id: number): Promise<Container | undefined>;
   getContainerByNumber(containerNumber: string): Promise<Container | undefined>;
   createContainer(container: InsertContainer): Promise<Container>;
@@ -716,6 +718,51 @@ export class DbStorage implements IStorage {
   // Containers
   async getAllContainers(companyId: number): Promise<Container[]> {
     return await db.select().from(schema.containers).where(eq(schema.containers.companyId, companyId));
+  }
+
+  async getActiveContainers(companyId: number): Promise<Container[]> {
+    return await db.select().from(schema.containers)
+      .where(
+        and(
+          eq(schema.containers.companyId, companyId),
+          ne(schema.containers.status, 'SOLD')
+        )
+      );
+  }
+
+  async getSoldContainers(companyId: number): Promise<any[]> {
+    const results = await db
+      .select({
+        containerId: schema.containers.id,
+        containerNumber: schema.containers.containerNumber,
+        supplierId: schema.containers.supplierId,
+        status: schema.containers.status,
+        importDate: schema.containers.importDate,
+        itemsTotal: schema.containers.itemsTotal,
+        chargesTotal: schema.containers.chargesTotal,
+        grandTotal: schema.containers.grandTotal,
+        saleId: schema.containerSales.id,
+        customerId: schema.containerSales.customerId,
+        customerName: schema.customers.legalName,
+        saleDate: schema.containerSales.saleDate,
+        containerCost: schema.containerSales.containerCost,
+        commission: schema.containerSales.commission,
+        commissionAccountId: schema.containerSales.commissionAccountId,
+        totalAmount: schema.containerSales.totalAmount,
+        notes: schema.containerSales.notes,
+      })
+      .from(schema.containers)
+      .innerJoin(schema.containerSales, eq(schema.containers.id, schema.containerSales.containerId))
+      .innerJoin(schema.customers, eq(schema.containerSales.customerId, schema.customers.id))
+      .where(
+        and(
+          eq(schema.containers.companyId, companyId),
+          eq(schema.containers.status, 'SOLD')
+        )
+      )
+      .orderBy(sql`${schema.containerSales.saleDate} DESC`);
+    
+    return results;
   }
 
   async getContainerById(id: number): Promise<Container | undefined> {

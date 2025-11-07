@@ -29,6 +29,7 @@ interface ContainerDetailData {
 const saleFormSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
+  commissionAccountId: z.string().optional(),
   saleDate: z.string().min(1, "Sale date is required"),
 });
 
@@ -56,6 +57,14 @@ export default function ContainerDetail() {
     enabled: !!companyId,
   });
 
+  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts", companyId],
+    enabled: !!companyId,
+  });
+
+  // Filter for income accounts only for commission dropdown
+  const incomeAccounts = allLedgerAccounts.filter((account) => account.accountType === "Income");
+
   const { data: containerSales = [] } = useQuery<ContainerSale[]>({
     queryKey: ["/api/container-sales", companyId],
     enabled: !!companyId,
@@ -68,6 +77,7 @@ export default function ContainerDetail() {
     defaultValues: {
       customerId: "",
       commission: "0.00",
+      commissionAccountId: "",
       saleDate: new Date().toISOString().split('T')[0],
     },
   });
@@ -79,7 +89,7 @@ export default function ContainerDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active", selectedCompany?.id] });
       toast({
         title: "Purchase Order Deleted",
         description: "The purchase order and associated data have been removed",
@@ -100,7 +110,7 @@ export default function ContainerDetail() {
       await apiRequest("DELETE", `/api/containers/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active", selectedCompany?.id] });
       toast({
         title: "Container Deleted",
         description: "The container and all associated data have been removed",
@@ -129,12 +139,15 @@ export default function ContainerDetail() {
         saleDate: data.saleDate,
         containerCost: containerCost.toString(),
         commission: data.commission,
+        commissionAccountId: data.commissionAccountId ? parseInt(data.commissionAccountId) : undefined,
         totalAmount: totalAmount.toString(),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/container-sales", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/container-sales", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/sold", selectedCompany?.id] });
       toast({
         title: "Container Sold",
         description: "Container sale has been recorded successfully",
@@ -566,6 +579,34 @@ export default function ContainerDetail() {
                         data-testid="input-commission"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="commissionAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commission Account (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-commission-account">
+                          <SelectValue placeholder="Default commission account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {incomeAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id.toString()}>
+                            {account.name} ({account.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Leave empty to use default commission revenue account
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

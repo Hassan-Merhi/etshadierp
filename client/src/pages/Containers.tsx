@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useCompany } from "@/contexts/CompanyContext";
 import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
@@ -17,9 +18,11 @@ export default function Containers() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
+  const { selectedCompany } = useCompany();
   
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
-    queryKey: ["/api/containers"],
+    queryKey: ["/api/containers/active", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
