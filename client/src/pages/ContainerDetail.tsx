@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -124,6 +124,29 @@ export default function ContainerDetail() {
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete container",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reverse Offload mutation
+  const reverseOffloadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/containers/${id}/reverse-offload`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({
+        title: "Offload Reversed",
+        description: "Container status restored to IN_TRANSIT",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reverse Failed",
+        description: error.message || "Failed to reverse offload",
         variant: "destructive",
       });
     },
@@ -262,6 +285,33 @@ export default function ContainerDetail() {
             <Truck className="w-4 h-4" />
             Offload Container
           </Button>
+        )}
+        {container.status === "OFFLOADED" && (
+          <>
+            <Button
+              onClick={() => setShowOffloadDialog(true)}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-edit-offload"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Offload
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirm("Reverse offload? This will delete inventory and vouchers created during offload.")) {
+                  reverseOffloadMutation.mutate(parseInt(containerId!));
+                }
+              }}
+              variant="outline"
+              disabled={reverseOffloadMutation.isPending}
+              className="gap-2"
+              data-testid="button-reverse-offload"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reverse Offload
+            </Button>
+          </>
         )}
         <Button
           variant="destructive"
