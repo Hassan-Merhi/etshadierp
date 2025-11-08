@@ -4912,6 +4912,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Location not found" });
       }
 
+      // Get or create "Sales Revenue" ledger account
+      let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
+      if (!salesRevenueAccount) {
+        salesRevenueAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "SALES_REV",
+          name: "Sales Revenue",
+          accountType: "Income",
+          subType: "Direct Income",
+          openingBalance: "0",
+          openingBalanceSide: "Cr",
+          active: true,
+        });
+      }
+
+      // Get or create "Cost of Goods Sold" ledger account
+      let cogsAccount = await storage.getLedgerAccountByCode("COGS", req.session.currentCompanyId!);
+      if (!cogsAccount) {
+        cogsAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "COGS",
+          name: "Cost of Goods Sold",
+          accountType: "Expense",
+          subType: "Direct Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
       let totalSales = 0;
       let totalCost = 0;
 
@@ -5004,6 +5034,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ),
             );
         }
+
+        // Create voucher entries for double-entry bookkeeping
+        // Credit: Sales Revenue (Income increases with credit)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salesRevenueAccount.id,
+          debitAmount: "0",
+          creditAmount: totalSales.toString(),
+          narration: `POS Sales - ${items.length} items`,
+        });
+
+        // Debit: Cost of Goods Sold (Expense increases with debit)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: cogsAccount.id,
+          debitAmount: totalCost.toString(),
+          creditAmount: "0",
+          narration: `Cost of POS Sales - ${items.length} items`,
+        });
 
         // Update voucher with total amount
         await tx
