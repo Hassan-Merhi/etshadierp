@@ -8,9 +8,20 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
 
 ## Recent Changes (November 2025)
 
+### Database Schema Fixes
+- **Multi-Company Ledger Account Support**: Fixed critical database constraint bug where ledger account codes were globally unique across all companies. Changed to composite unique constraint on `(companyId, code)`, allowing each company to have its own standard accounts (PURCHASES, IMPORT_CHARGES, SALES_REV, COGS).
+  - This fix resolves the "duplicate key value violates unique constraint" error when multiple companies tried to create standard accounts
+  - Applied database migration successfully to production
+
 ### Financial Improvements
 - **Fixed Financial Totals Calculation**: Corrected total calculations in Financial Dashboard to properly handle hierarchical parent-child account relationships. The system now sums only leaf accounts (children) to avoid double-counting when both parent and child accounts exist.
 - **Real-time Balance Updates**: All voucher types (Payment, Receipt, Journal) now properly invalidate account balance queries after creation, ensuring balances update immediately across the application.
+- **Sales Accounting Integration**: POS imports now create proper accounting vouchers with SALES_REV (credit) and COGS (debit) entries for accurate profit tracking
+- **Sales Backfill Script**: Added `/api/sales-import/backfill` endpoint to add accounting entries to existing sales data
+  - Intelligently detects which sales vouchers are missing SALES_REV or COGS entries
+  - Creates only the missing entries (idempotent - safe to re-run)
+  - Uses database transactions for atomic operations
+  - Auto-creates SALES_REV and COGS accounts if they don't exist
 - **Customizable Dashboard Cash Tracking**: Added new "Cash in Hand" section to the main Dashboard:
   - Users can manually select which accounts (Ledger or Bank) to display
   - Automatically hides accounts with zero balance

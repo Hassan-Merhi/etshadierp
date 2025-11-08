@@ -5887,6 +5887,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backfill voucher entries for existing sales
+  app.post("/api/sales-import/backfill", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get or create "Sales Revenue" ledger account
+      let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
+      if (!salesRevenueAccount) {
+        salesRevenueAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "SALES_REV",
+          name: "Sales Revenue",
+          accountType: "Income",
+          subType: "Direct Income",
+          openingBalance: "0",
+          openingBalanceSide: "Cr",
+          active: true,
+        });
+      }
+
+      // Get or create "Cost of Goods Sold" ledger account
+      let cogsAccount = await storage.getLedgerAccountByCode("COGS", req.session.currentCompanyId!);
+      if (!cogsAccount) {
+        cogsAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "COGS",
+          name: "Cost of Goods Sold",
+          accountType: "Expense",
+          subType: "Direct Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
+      // Get all Sales vouchers for this company
+      const allVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, req.session.currentCompanyId!),
+            eq(vouchers.voucherType, "Sales")
+          )
+        )
+        .execute();
+
+      if (allVouchers.length === 0) {
+        return res.json({
+          message: "No sales vouchers found",
+          count: 0,
+        });
+      }
+
+      // Get all existing voucher entries for these vouchers
+      const voucherIds = allVouchers.map(v => v.id);
+      const existingEntries = await db
+        .select()
+        .from(voucherEntries)
+        .where(inArray(voucherEntries.voucherId, voucherIds))
+        .execute();
+
+      // Create a map of voucher ID -> set of ledger account IDs
+      const voucherLedgerMap = new Map<number, Set<number>>();
+      for (const entry of existingEntries) {
+        if (!voucherLedgerMap.has(entry.voucherId)) {
+          voucherLedgerMap.set(entry.voucherId, new Set());
+        }
+        if (entry.ledgerAccountId) {
+          voucherLedgerMap.get(entry.voucherId)!.add(entry.ledgerAccountId);
+        }
+      }
+
+      // Filter to only vouchers that are missing SALES_REV or COGS entries
+      const vouchersNeedingBackfill = allVouchers.filter(v => {
+        const ledgerIds = voucherLedgerMap.get(v.id) || new Set();
+        const hasSalesRev = ledgerIds.has(salesRevenueAccount!.id);
+        const hasCogs = ledgerIds.has(cogsAccount!.id);
+        return !hasSalesRev || !hasCogs;
+      });
+
+      if (vouchersNeedingBackfill.length === 0) {
+        return res.json({
+          message: "All sales vouchers already have SALES_REV and COGS entries",
+          count: 0,
+        });
+      }
+
+      let backfilledCount = 0;
+
+      for (const voucher of vouchersNeedingBackfill) {
+        // Use a transaction to ensure atomic entry creation
+        await db.transaction(async (tx) => {
+          // Get all sales items for this voucher
+          const items = await tx
+            .select()
+            .from(salesItems)
+            .where(eq(salesItems.voucherId, voucher.id))
+            .execute();
+
+          if (items.length === 0) {
+            console.warn(`No sales items found for voucher ${voucher.id}, skipping`);
+            return;
+          }
+
+          // Calculate totals
+          const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
+          const totalCost = items.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
+
+          if (totalSales === 0 && totalCost === 0) {
+            console.warn(`Voucher ${voucher.id} has zero totals, skipping`);
+            return;
+          }
+
+          const ledgerIds = voucherLedgerMap.get(voucher.id) || new Set();
+          
+          // Only create SALES_REV entry if it doesn't exist
+          if (!ledgerIds.has(salesRevenueAccount!.id) && totalSales > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: salesRevenueAccount!.id,
+              debitAmount: "0",
+              creditAmount: totalSales.toFixed(2),
+              narration: `Sales Revenue - ${items.length} items (Backfilled)`,
+            });
+          }
+
+          // Only create COGS entry if it doesn't exist
+          if (!ledgerIds.has(cogsAccount!.id) && totalCost > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: cogsAccount!.id,
+              debitAmount: totalCost.toFixed(2),
+              creditAmount: "0",
+              narration: `Cost of Goods Sold - ${items.length} items (Backfilled)`,
+            });
+          }
+
+          backfilledCount++;
+        });
+      }
+
+      res.json({
+        message: "Sales backfill completed successfully",
+        count: backfilledCount,
+        totalSalesVouchers: allVouchers.length,
+      });
+    } catch (error: any) {
+      console.error("Sales backfill error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all accounts (combined from ledgers, bank accounts, fixed assets, and suppliers)
   app.get("/api/accounts/all", requireAuth, async (req, res) => {
     try {
