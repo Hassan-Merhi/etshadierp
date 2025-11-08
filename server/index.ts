@@ -64,16 +64,17 @@ app.set("trust proxy", 1);
 const PgSession = connectPgSimple(session);
 
 const sessionConfig: session.SessionOptions = {
+  name: 'erp.session', // Explicit cookie name
   secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
   resave: false,
   saveUninitialized: false,
   cookie: {
     // Replit serves over HTTPS even in dev mode, so we need secure cookies
-    // Also enable for production
     secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax', // Allow cookies with redirects
+    path: '/', // Explicit path
+    sameSite: 'lax', // Lax allows same-site requests and top-level navigation
   },
 };
 
