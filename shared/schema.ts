@@ -95,7 +95,7 @@ export type Location = typeof locations.$inferSelect;
 export const ledgerAccounts = pgTable("ledger_accounts", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
+  code: varchar("code", { length: 50 }).notNull(),
   name: text("name").notNull(),
   accountType: text("account_type").notNull(),
   subType: text("sub_type"),
@@ -104,7 +104,9 @@ export const ledgerAccounts = pgTable("ledger_accounts", {
   openingBalanceSide: text("opening_balance_side"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("ledger_accounts_company_code_unique").on(t.companyId, t.code),
+}));
 
 export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit({
   id: true,
