@@ -4899,9 +4899,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { locationId, cashAccountId, saleDate, items } = req.body;
+      const { locationId, saleDate, items } = req.body;
 
-      if (!locationId || !cashAccountId || !saleDate || !items || !Array.isArray(items)) {
+      if (!locationId || !saleDate || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -4909,12 +4909,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(400).json({ message: "Location not found" });
-      }
-
-      // Validate cash account
-      const cashAccount = await storage.getLedgerAccountById(cashAccountId);
-      if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
-        return res.status(400).json({ message: "Invalid cash account" });
       }
 
       let totalSales = 0;
@@ -5017,52 +5011,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalAmount: totalSales.toString(),
           })
           .where(eq(vouchers.id, voucher.id));
-
-        // Get or create SALES REVENUE account
-        let salesRevenueAccount = await tx
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
-              eq(ledgerAccounts.code, "SALREV"),
-            ),
-          )
-          .limit(1);
-
-        if (salesRevenueAccount.length === 0) {
-          // Auto-create SALES REVENUE account
-          const [newAccount] = await tx
-            .insert(ledgerAccounts)
-            .values({
-              companyId: req.session.currentCompanyId!,
-              code: "SALREV",
-              name: "SALES REVENUE",
-              accountType: "Ledger",
-              openingBalance: "0",
-            })
-            .returning();
-          salesRevenueAccount = [newAccount];
-        }
-
-        // Create voucher entries for double-entry accounting
-        // Debit: Cash Account (increase cash)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cashAccountId,
-          debitAmount: totalSales.toString(),
-          creditAmount: "0",
-          narration: `POS Sales - ${items.length} items`,
-        });
-
-        // Credit: Sales Revenue Account (record revenue)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesRevenueAccount[0].id,
-          debitAmount: "0",
-          creditAmount: totalSales.toString(),
-          narration: `POS Sales - ${items.length} items`,
-        });
       });
 
       res.json({
