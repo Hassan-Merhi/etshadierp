@@ -1191,19 +1191,55 @@ export class DbStorage implements IStorage {
       }
     }
 
-    // Create inventory records at destination location with new rates
+    // Add inventory to destination location with weighted average cost
     for (const [stockItemId, data] of Array.from(itemsMap.entries())) {
       const averageOriginalRate = data.weightedRateSum / data.totalQuantity;
       const newRate = averageOriginalRate + additionalCostPerBale;
-      const totalValue = data.totalQuantity * newRate;
+      
+      // Check if inventory exists
+      const [existing] = await db
+        .select()
+        .from(schema.inventory)
+        .where(and(
+          eq(schema.inventory.locationId, locationId),
+          eq(schema.inventory.stockItemId, stockItemId)
+        ));
 
-      await this.updateInventory(
-        locationId,
-        stockItemId,
-        data.totalQuantity.toString(),
-        newRate.toFixed(2),
-        totalValue.toFixed(2)
-      );
+      if (existing) {
+        // Add to existing inventory with weighted average rate
+        const existingQty = parseFloat(existing.quantity);
+        const existingRate = parseFloat(existing.averageRate);
+        const newQty = existingQty + data.totalQuantity;
+        const weightedAvgRate = ((existingQty * existingRate) + (data.totalQuantity * newRate)) / newQty;
+        const newTotalValue = newQty * weightedAvgRate;
+
+        await db
+          .update(schema.inventory)
+          .set({
+            quantity: newQty.toString(),
+            averageRate: weightedAvgRate.toFixed(2),
+            totalValue: newTotalValue.toFixed(2),
+            lastUpdated: new Date(),
+          })
+          .where(eq(schema.inventory.id, existing.id));
+      } else {
+        // Create new inventory record
+        const [location] = await db
+          .select()
+          .from(schema.locations)
+          .where(eq(schema.locations.id, locationId));
+
+        const totalValue = data.totalQuantity * newRate;
+        await db.insert(schema.inventory).values({
+          companyId: location.companyId,
+          locationId,
+          stockItemId,
+          quantity: data.totalQuantity.toString(),
+          averageRate: newRate.toFixed(2),
+          totalValue: totalValue.toFixed(2),
+          lastUpdated: new Date(),
+        });
+      }
     }
 
     // Update container status to OFFLOADED
