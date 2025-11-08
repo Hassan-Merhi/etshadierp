@@ -16,6 +16,12 @@ interface Location {
   name: string;
 }
 
+interface LedgerAccount {
+  id: number;
+  name: string;
+  type: string;
+}
+
 export default function POSImport() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
@@ -23,10 +29,16 @@ export default function POSImport() {
   const [preview, setPreview] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
   const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
+    queryKey: ["/api/accounts/all"],
+    select: (accounts) => accounts.filter(acc => acc.type === "Bank" || acc.type === "Ledger"),
   });
 
   const parseMutation = useMutation({
@@ -146,6 +158,15 @@ export default function POSImport() {
       return;
     }
 
+    if (!selectedCashAccount) {
+      toast({
+        title: "Cash account required",
+        description: "Please select a cash account",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!preview) {
       toast({
         title: "No preview data",
@@ -157,6 +178,7 @@ export default function POSImport() {
 
     validateMutation.mutate({
       locationId: parseInt(selectedLocation),
+      cashAccountId: parseInt(selectedCashAccount),
       saleDate,
       items: preview.items,
     });
@@ -167,6 +189,15 @@ export default function POSImport() {
       toast({
         title: "Location required",
         description: "Please select a location",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedCashAccount) {
+      toast({
+        title: "Cash account required",
+        description: "Please select a cash account",
         variant: "destructive",
       });
       return;
@@ -210,6 +241,7 @@ export default function POSImport() {
 
     importMutation.mutate({
       locationId: parseInt(selectedLocation),
+      cashAccountId: parseInt(selectedCashAccount),
       saleDate,
       items: validationResult.validatedItems,
     });
@@ -248,7 +280,7 @@ export default function POSImport() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="file">Excel File</Label>
               <Input
@@ -266,6 +298,19 @@ export default function POSImport() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="saleDate">Sale Date</Label>
+              <Input
+                id="saleDate"
+                type="date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+                data-testid="input-sale-date"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
                 <SelectTrigger id="location" data-testid="select-location">
@@ -282,14 +327,19 @@ export default function POSImport() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="saleDate">Sale Date</Label>
-              <Input
-                id="saleDate"
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-                data-testid="input-sale-date"
-              />
+              <Label htmlFor="cashAccount">Cash Account</Label>
+              <Select value={selectedCashAccount} onValueChange={setSelectedCashAccount}>
+                <SelectTrigger id="cashAccount" data-testid="select-cash-account">
+                  <SelectValue placeholder="Select cash account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ledgerAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -305,7 +355,7 @@ export default function POSImport() {
 
             <Button
               onClick={handleValidate}
-              disabled={!preview || !selectedLocation || validateMutation.isPending}
+              disabled={!preview || !selectedLocation || !selectedCashAccount || validateMutation.isPending}
               variant="outline"
               data-testid="button-validate"
             >
