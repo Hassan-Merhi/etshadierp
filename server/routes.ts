@@ -64,7 +64,7 @@ import {
   salaryAdvanceDeductions,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, like } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -5417,7 +5417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
-                sql`${vouchers.description} LIKE '%Container ${container.containerNumber}%'`,
+                like(vouchers.description, `%Container ${container.containerNumber}%`),
               ),
             );
 
