@@ -76,7 +76,7 @@ export interface IStorage {
   // Ledger Accounts
   getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
   getLedgerAccountById(id: number): Promise<LedgerAccount | undefined>;
-  getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined>;
+  getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined>;
   createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount>;
   updateLedgerAccount(account: schema.UpdateLedgerAccount): Promise<LedgerAccount>;
@@ -376,8 +376,10 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, companyId));
   }
 
-  async getLedgerAccountByCode(code: string): Promise<LedgerAccount | undefined> {
-    const [account] = await db.select().from(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.code, code));
+  async getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined> {
+    const [account] = await db.select().from(schema.ledgerAccounts).where(
+      and(eq(schema.ledgerAccounts.code, code), eq(schema.ledgerAccounts.companyId, companyId))
+    );
     return account;
   }
 

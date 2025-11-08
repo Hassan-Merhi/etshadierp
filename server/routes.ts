@@ -872,14 +872,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Ensure uniqueness by adding suffix if needed
           let code = baseCode;
           let suffix = 1;
-          while (await storage.getLedgerAccountByCode(code)) {
+          while (await storage.getLedgerAccountByCode(code, req.session.currentCompanyId!)) {
             code = `${baseCode}${suffix}`;
             suffix++;
           }
           parsed.code = code;
         } else {
           // Check for duplicate code if manually provided
-          const existing = await storage.getLedgerAccountByCode(parsed.code);
+          const existing = await storage.getLedgerAccountByCode(parsed.code, req.session.currentCompanyId!);
           if (existing) {
             return res
               .status(400)
@@ -976,7 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Check for duplicate code if code is being changed
         if (parsed.code && parsed.code !== existingAccount.code) {
-          const duplicate = await storage.getLedgerAccountByCode(parsed.code);
+          const duplicate = await storage.getLedgerAccountByCode(parsed.code, req.session.currentCompanyId!);
           if (duplicate) {
             return res
               .status(400)
@@ -2271,7 +2271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-create ledger account for customer with opening balance
       const customerAccountCode = `CUST-${customer.code}`;
       let customerAccount =
-        await storage.getLedgerAccountByCode(customerAccountCode);
+        await storage.getLedgerAccountByCode(customerAccountCode, req.session.currentCompanyId!);
 
       if (!customerAccount) {
         customerAccount = await storage.createLedgerAccount({
@@ -4407,7 +4407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Get or create "Purchases" ledger account for double-entry bookkeeping
-      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
+      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", req.session.currentCompanyId!);
       if (!purchasesAccount) {
         // Create default Purchases account if it doesn't exist
         purchasesAccount = await storage.createLedgerAccount({
@@ -4423,7 +4423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get or create "Import Charges" ledger account for container charges
       let importChargesAccount =
-        await storage.getLedgerAccountByCode("IMPORT_CHARGES");
+        await storage.getLedgerAccountByCode("IMPORT_CHARGES", req.session.currentCompanyId!);
       if (!importChargesAccount) {
         importChargesAccount = await storage.createLedgerAccount({
           companyId: req.session.currentCompanyId!,
@@ -5766,7 +5766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get or create "Purchases" ledger account for double-entry bookkeeping
-      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES");
+      let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", req.session.currentCompanyId!);
       if (!purchasesAccount) {
         purchasesAccount = await storage.createLedgerAccount({
           companyId: req.session.currentCompanyId!,
