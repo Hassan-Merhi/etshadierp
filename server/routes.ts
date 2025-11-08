@@ -5181,16 +5181,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
           additionalCharges = [],
         } = validation.data;
 
-        // Validate container exists and is not already offloaded
+        // Validate container exists
         const container = await storage.getContainerById(containerId);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
         }
 
-        if (container.status === "OFFLOADED") {
-          return res
-            .status(400)
-            .json({ message: "Container is already offloaded" });
+        // Check if this is an edit (container already offloaded)
+        const isEdit = container.status === "OFFLOADED";
+        
+        if (isEdit) {
+          // For edits, first reverse the existing offload
+          const [existingOffload] = await db
+            .select()
+            .from(containerOffloads)
+            .where(eq(containerOffloads.containerId, containerId))
+            .limit(1);
+
+          if (existingOffload) {
+            // Reverse inventory changes
+            const pos = await storage.getPurchaseOrdersByContainer(containerId);
+            for (const po of pos) {
+              const lineItems = await storage.getLineItemsByPO(po.id);
+              for (const item of lineItems) {
+                const [inv] = await db
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, existingOffload.locationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (inv) {
+                  const newQty = parseFloat(inv.quantity) - parseFloat(item.quantity);
+                  if (newQty <= 0) {
+                    await db.delete(inventory).where(eq(inventory.id, inv.id));
+                  } else {
+                    await db.update(inventory).set({ quantity: newQty.toString() }).where(eq(inventory.id, inv.id));
+                  }
+                }
+              }
+            }
+
+            // Delete old vouchers
+            const oldVouchers = await db
+              .select()
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, container.companyId),
+                  sql`${vouchers.description} LIKE '%Container ${container.containerNumber}%'`,
+                ),
+              );
+
+            for (const voucher of oldVouchers) {
+              await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
+              await db.delete(vouchers).where(eq(vouchers.id, voucher.id));
+            }
+
+            // Delete old offload record
+            await db.delete(containerOffloads).where(eq(containerOffloads.id, existingOffload.id));
+          }
+
+          // Set status back to IN_TRANSIT so offloadContainer can proceed
+          await storage.updateContainer(containerId, { status: "IN_TRANSIT" });
         }
 
         // Perform offload
@@ -5248,17 +5305,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Container is not offloaded" });
         }
 
-        // Get offload record
+        // Get offload record (may not exist for old offloads)
         const [offloadRecord] = await db
           .select()
           .from(containerOffloads)
           .where(eq(containerOffloads.containerId, containerId))
           .limit(1);
 
+        // If no offload record exists, just change status back and return
         if (!offloadRecord) {
-          return res
-            .status(404)
-            .json({ message: "Offload record not found" });
+          await db
+            .update(containers)
+            .set({ status: "IN_TRANSIT" })
+            .where(eq(containers.id, containerId));
+          
+          return res.json({ 
+            message: "Container status reversed to IN_TRANSIT (no offload record to clean up)" 
+          });
         }
 
         await db.transaction(async (tx) => {
