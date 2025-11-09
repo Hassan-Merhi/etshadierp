@@ -9747,25 +9747,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude ALL inventory-related costs from net profit calculation
-      // These are cost of acquiring inventory, NOT operating expenses
-      // Net profit should only include actual operating expenses (salaries, rent, utilities, etc.)
+      // Exclude inventory acquisition costs from net profit calculation
+      // These costs are capitalized to inventory until sold, NOT operating expenses
+      // COGS is NOT excluded - it represents sold inventory and should reduce profit
       const excludedExpenseCodes = [
-        "PURCHASES",           // Direct inventory purchases
-        "IMPORT_CHARGES",      // Old consolidated import charges (deprecated)
-        "DUTIES",              // Container import duties
-        "TRANSPORT_CHARGES",   // Container transport costs
-        "TRANSPORT",           // Alternative transport account name
-        "OFFICE_CHARGE",       // Container office charges
-        "OFFICE",              // Alternative office charge account name
-        "CONTAINER_LICENSES",  // Container license fees
-        "LICENSES",            // Alternative license account name
-        "COGS",                // Cost of goods sold (if created incorrectly)
+        "PURCHASES",           // Direct inventory purchases (capitalized)
+        "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
+        "DUTIES",              // Container import duties (capitalized)
+        "TRANSPORTCHARGES",    // Container transport costs (capitalized)
+        "TRANSPORT",           // Alternative transport account name (capitalized)
+        "OFFICECHARGE",        // Container office charges (capitalized)
+        "OFFICE",              // Alternative office charge account name (capitalized)
+        "CONTAINERLICENSES",   // Container license fees (capitalized)
+        "LICENSES",            // Alternative license account name (capitalized)
       ];
-      const expenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Expense" && 
-        !excludedExpenseCodes.includes(acc.code)
-      );
+      
+      // Normalize function: uppercase + remove spaces/underscores for comparison
+      const normalizeCode = (code: string) => 
+        code.toUpperCase().replace(/[\s_-]/g, "");
+      
+      const expenseAccounts = companyAccounts.filter((acc) => {
+        if (acc.accountType !== "Expense") return false;
+        const normalizedCode = normalizeCode(acc.code);
+        return !excludedExpenseCodes.some(excluded => 
+          normalizeCode(excluded) === normalizedCode
+        );
+      });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
       // Get voucher IDs for this company
