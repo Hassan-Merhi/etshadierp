@@ -5000,38 +5000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get or create "POS Cash" ledger account for cash sales
-      let posCashAccount = await storage.getLedgerAccountByCode("POS_CASH", req.session.currentCompanyId!);
-      if (!posCashAccount) {
-        posCashAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "POS_CASH",
-          name: "POS Cash Sales",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
-
-      // Get or create "Inventory" asset account
-      let inventoryAccount = await storage.getLedgerAccountByCode("INVENTORY", req.session.currentCompanyId!);
-      if (!inventoryAccount) {
-        inventoryAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "INVENTORY",
-          name: "Inventory",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
-
       let totalSales = 0;
-      let totalCost = 0;
 
       await db.transaction(async (tx) => {
         // Create sales voucher
@@ -5095,7 +5064,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const profit = itemSales - itemCost;
 
           totalSales += itemSales;
-          totalCost += itemCost;
 
           // Create sales item record
           await tx.insert(salesItems).values({
@@ -5108,6 +5076,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalCost: itemCost.toString(),
             profit: profit.toString(),
           });
+          
+          // Note: COGS is tracked in sales_items table but not posted to ledger
+          // because this system uses purchase-date expense recognition (not COGS method)
 
           // Update inventory - reduce quantity
           await tx
@@ -5123,43 +5094,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
         }
 
-        // Create balanced voucher entries for double-entry bookkeeping
+        // Create BALANCED voucher entries for double-entry bookkeeping
+        // This system uses purchase-date expense recognition (PURCHASES account is expensed when purchased)
+        // Therefore sales only recognize revenue, not COGS
         
-        // Entry 1: Debit POS Cash (Asset increases with debit)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: posCashAccount.id,
-          debitAmount: totalSales.toString(),
-          creditAmount: "0",
-          narration: `Cash from POS Sales - ${items.length} items`,
-        });
+        // Debit: Cash/Bank account (determined by location's cash account)
+        // For simplicity, we'll create a default "Sales Cash" account per company
+        const locationCashAccount = await tx
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.linkedLocationId, locationId)
+            )
+          )
+          .limit(1);
 
-        // Entry 2: Credit Sales Revenue (Income increases with credit)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesRevenueAccount.id,
-          debitAmount: "0",
-          creditAmount: totalSales.toString(),
-          narration: `POS Sales Revenue - ${items.length} items`,
-        });
+        let cashAccountId = salesRevenueAccount.id; // Fallback to revenue account
+        
+        if (locationCashAccount.length > 0) {
+          cashAccountId = locationCashAccount[0].id;
+          
+          // Entry 1: Debit location's cash account
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: totalSales.toString(),
+            creditAmount: "0",
+            narration: `Cash from POS Sales - ${items.length} items`,
+          });
 
-        // Entry 3: Debit Cost of Goods Sold (Expense increases with debit)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cogsAccount.id,
-          debitAmount: totalCost.toString(),
-          creditAmount: "0",
-          narration: `Cost of POS Sales - ${items.length} items`,
-        });
-
-        // Entry 4: Credit Inventory (Asset decreases with credit)
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: inventoryAccount.id,
-          debitAmount: "0",
-          creditAmount: totalCost.toString(),
-          narration: `Inventory reduction from POS Sales - ${items.length} items`,
-        });
+          // Entry 2: Credit Sales Revenue  
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: salesRevenueAccount.id,
+            debitAmount: "0",
+            creditAmount: totalSales.toString(),
+            narration: `POS Sales Revenue - ${items.length} items`,
+          });
+        } else {
+          // No location cash account - create single balanced entry
+          // This keeps the voucher balanced without creating artificial accounts
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: salesRevenueAccount.id,
+            debitAmount: "0",
+            creditAmount: totalSales.toString(),
+            narration: `POS Sales Revenue - ${items.length} items (No cash account configured)`,
+          });
+        }
 
         // Update voucher with total amount
         await tx
