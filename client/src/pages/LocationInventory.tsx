@@ -1080,6 +1080,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 .print-header {
                   display: none !important;
                 }
+                .print-inventory-list {
+                  display: none !important;
+                }
               }
             `}</style>
             {/* Print header */}
