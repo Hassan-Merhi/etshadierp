@@ -636,6 +636,47 @@ export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit(
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;
 
+// Fiscal Period Closures
+export const fiscalPeriodClosures = pgTable("fiscal_period_closures", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "restrict" }),
+  periodStartDate: date("period_start_date").notNull(),
+  periodEndDate: date("period_end_date").notNull(),
+  closureDate: timestamp("closure_date").notNull().defaultNow(),
+  closedByUserId: varchar("closed_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  closingVoucherId: integer("closing_voucher_id").notNull().unique().references(() => vouchers.id, { onDelete: "restrict" }),
+  retainedEarningsAccountId: integer("retained_earnings_account_id").notNull().references(() => ledgerAccounts.id, { onDelete: "restrict" }),
+  totalIncome: decimal("total_income", { precision: 15, scale: 2 }).notNull(),
+  totalExpense: decimal("total_expense", { precision: 15, scale: 2 }).notNull(),
+  netIncome: decimal("net_income", { precision: 15, scale: 2 }).notNull(),
+  status: text("status").notNull().default("CLOSED"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyPeriod: uniqueIndex("fiscal_closures_company_period_unique").on(t.companyId, t.periodEndDate),
+}));
+
+export const insertFiscalPeriodClosureSchema = createInsertSchema(fiscalPeriodClosures).omit({
+  id: true,
+  createdAt: true,
+  closureDate: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  periodStartDate: z.string().min(1, "Period start date is required"),
+  periodEndDate: z.string().min(1, "Period end date is required"),
+  closedByUserId: z.string().min(1, "User is required"),
+  closingVoucherId: z.number().min(1, "Closing voucher is required"),
+  retainedEarningsAccountId: z.number().min(1, "Retained earnings account is required"),
+  totalIncome: z.string(),
+  totalExpense: z.string(),
+  netIncome: z.string(),
+  status: z.enum(["CLOSED", "REOPENED"]).optional(),
+  notes: z.string().optional(),
+});
+
+export type InsertFiscalPeriodClosure = z.infer<typeof insertFiscalPeriodClosureSchema>;
+export type FiscalPeriodClosure = typeof fiscalPeriodClosures.$inferSelect;
+
 // Stock Transfer Vouchers
 export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
   id: serial("id").primaryKey(),
