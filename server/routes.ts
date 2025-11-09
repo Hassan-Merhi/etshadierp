@@ -9858,16 +9858,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude only PURCHASES and old IMPORT_CHARGES from operating expenses
-      // All container charges (DUTIES, TRANSPORT, etc.) and COGS are included as operating expenses
+      // Exclude inventory acquisition costs from monthly profit calculation
+      // These costs are capitalized to inventory until sold, NOT operating expenses
+      // COGS is NOT excluded - it represents sold inventory and should reduce profit
       const excludedExpenseCodes = [
-        "PURCHASES",      // Inventory purchases are assets, not expenses
-        "IMPORT_CHARGES"  // Old consolidated account (deprecated)
+        "PURCHASES",           // Direct inventory purchases (capitalized)
+        "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
+        "DUTIES",              // Container import duties (capitalized)
+        "TRANSPORTCHARGES",    // Container transport costs (capitalized)
+        "TRANSPORT",           // Alternative transport account name (capitalized)
+        "CONTAINERLICENSES",   // Container license fees (capitalized)
+        "LICENSES",            // Alternative license account name (capitalized)
       ];
-      const expenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Expense" && 
-        !excludedExpenseCodes.includes(acc.code)
-      );
+      
+      // Normalize function: uppercase + remove spaces/underscores for comparison
+      const normalizeCode = (code: string) => 
+        code.toUpperCase().replace(/[\s_-]/g, "");
+      
+      const expenseAccounts = companyAccounts.filter((acc) => {
+        if (acc.accountType !== "Expense") return false;
+        const normalizedCode = normalizeCode(acc.code);
+        return !excludedExpenseCodes.some(excluded => 
+          normalizeCode(excluded) === normalizedCode
+        );
+      });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
       // Get all voucher entries for this company
