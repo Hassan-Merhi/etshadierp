@@ -14,7 +14,8 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
   - Applied database migration successfully to production
 
 ### Financial Improvements
-- **Fixed Financial Totals Calculation**: Corrected total calculations in Financial Dashboard to properly handle hierarchical parent-child account relationships. The system now sums only leaf accounts (children) to avoid double-counting when both parent and child accounts exist.
+- **Fixed Financial Totals Calculation**: Corrected total calculations in Analytics and Financial Dashboard to properly handle hierarchical parent-child account relationships. The system now sums only leaf accounts (children) to avoid double-counting when both parent and child accounts exist. Additionally fixed orphaned account handling - accounts whose parent chain is filtered out are now excluded from totals, preventing silent over-counting in all sections (Liabilities, Assets, Expenses, Income).
+- **Fixed Net Profit & Sales Trend Consistency**: Both Net Profit card and Sales & Profit Trend chart now use identical inventory cost exclusion logic with normalized code matching (handles "Transport Charges" vs "TRANSPORT_CHARGES"). Both exclude PURCHASES, DUTIES, TRANSPORT_CHARGES, CONTAINER_LICENSES from operating expenses as these costs are capitalized to inventory until sold.
 - **Real-time Balance Updates**: All voucher types (Payment, Receipt, Journal) now properly invalidate account balance queries after creation, ensuring balances update immediately across the application.
 - **Sales Accounting Integration**: POS imports now create proper accounting vouchers with SALES_REV (credit) and COGS (debit) entries for accurate profit tracking
 - **Sales Backfill Script**: Added `/api/sales-import/backfill` endpoint to add accounting entries to existing sales data

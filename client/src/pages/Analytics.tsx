@@ -392,14 +392,22 @@ export default function Analytics() {
   };
 
   const calculateTotal = (accountList: Account[]) => {
-    // Get all account IDs that are parents (have children)
+    // Get all account IDs that are present in this list
+    const accountIds = new Set(accountList.map(acc => acc.accountId));
+    
+    // Get all account IDs that are parents (have children in this list)
     const parentAccountIds = new Set(
       accountList.filter(acc => acc.parentId).map(acc => acc.parentId!)
     );
     
-    // Only sum leaf accounts (accounts that are not parents)
+    // Only sum accounts that are:
+    // 1. NOT parents (leaf accounts)
+    // 2. Either have no parent OR their parent is in this list (not orphaned)
     return accountList
-      .filter(acc => !parentAccountIds.has(acc.accountId))
+      .filter(acc => 
+        !parentAccountIds.has(acc.accountId) && 
+        (!acc.parentId || accountIds.has(acc.parentId))
+      )
       .reduce((sum, acc) => sum + (acc.balance || 0), 0);
   };
 
