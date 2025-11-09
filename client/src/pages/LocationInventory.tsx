@@ -964,7 +964,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         }`}
                         onClick={() => setSelectedRowIndex(index)}
                       >
-                        <td className="px-3 font-medium underline">{item.stockItemName}</td>
+                        <td className="px-3 font-medium">{item.stockItemName}</td>
                         <td className="px-3 text-right font-mono">
                           {Math.floor(parseFloat(item.quantity))}
                         </td>
@@ -1065,6 +1065,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   padding-right: 0.5rem !important;
                   overflow: hidden !important;
                   text-overflow: ellipsis !important;
+                  text-decoration: underline !important;
                 }
                 .print-item-qty {
                   text-align: right !important;
@@ -1155,7 +1156,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                     {/* Group items */}
                                     {items.map((item) => (
                                       <tr key={item.inventoryId} className="border-t hover-elevate">
-                                        <td className="px-3 py-2 underline">{item.stockItemName}</td>
+                                        <td className="px-3 py-2">{item.stockItemName}</td>
                                         <td className="px-3 py-2 text-right font-mono">
                                           {Math.floor(parseFloat(item.quantity)).toLocaleString()}
                                         </td>
