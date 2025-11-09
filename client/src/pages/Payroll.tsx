@@ -423,6 +423,7 @@ export default function Payroll() {
       code: "",
       monthlySalary: "0",
       department: "",
+      joinDate: new Date().toISOString().split('T')[0],
       openingBalance: "",
       active: true,
     },
@@ -2513,6 +2514,20 @@ export default function Payroll() {
                     <FormLabel>Department (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Warehouse" {...field} value={field.value || ""} data-testid="input-department" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={createEmployeeForm.control}
+                name="joinDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Starting Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-join-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
