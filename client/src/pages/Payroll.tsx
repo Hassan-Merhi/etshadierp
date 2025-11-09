@@ -117,6 +117,17 @@ type BulkPaymentFormData = z.infer<typeof bulkPaymentSchema>;
 type SalaryAdvanceFormData = z.infer<typeof salaryAdvanceSchema>;
 type DeductionFormData = z.infer<typeof deductionSchema>;
 
+const workerFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  code: z.string().min(1, "Worker code is required"),
+  monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
+  department: z.string().optional(),
+  active: z.boolean().default(true),
+});
+
+type WorkerFormData = z.infer<typeof workerFormSchema>;
+
 // Employee form schema - extend insertEmployeeSchema for UI-specific validation
 const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true }).extend({
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
@@ -157,9 +168,14 @@ export default function Payroll() {
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
+  const [newWorkerDialogOpen, setNewWorkerDialogOpen] = useState(false);
+  const [editWorkerDialogOpen, setEditWorkerDialogOpen] = useState(false);
+  const [selectedWorkerForEdit, setSelectedWorkerForEdit] = useState<Employee | null>(null);
+  const [workerOverrides, setWorkerOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
   const [createEmployeeDialogOpen, setCreateEmployeeDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [deleteConflict, setDeleteConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
+  const [deleteWorkerConflict, setDeleteWorkerConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -179,7 +195,20 @@ export default function Payroll() {
     enabled: !!selectedCompany,
   });
 
-  const { data: salaryAdvances, isLoading: advancesLoading} = useQuery<SalaryAdvance[]>({
+  const { data: workerPaymentSummary } = useQuery<{
+    workerPayments: Array<{
+      workerId: number;
+      workerCode: string;
+      workerName: string;
+      totalPaid: string;
+    }>;
+    grandTotal: string;
+  }>({
+    queryKey: ["/api/payroll/worker-payments-summary"],
+    enabled: !!selectedCompany,
+  });
+
+  const { data: salaryAdvances, isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
     queryKey: ["/api/salary-advances", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
@@ -196,6 +225,137 @@ export default function Payroll() {
     
     return { totalAdvances, outstandingBalance, unpaidCount };
   }, [salaryAdvances]);
+
+  const employeeStaff = useMemo(
+    () => employees?.filter((emp) => emp.employeeType === "Employee") || [],
+    [employees]
+  );
+  
+  const workerStaff = useMemo(
+    () => employees?.filter((emp) => emp.employeeType === "Worker") || [],
+    [employees]
+  );
+
+  // Calculate outstanding advances for each worker
+  const workerAdvances = useMemo(() => {
+    if (!salaryAdvances || !workerStaff.length) return {};
+    
+    const advances: Record<number, { total: number; count: number }> = {};
+    workerStaff.forEach(worker => {
+      const workerAdvancesList = salaryAdvances.filter(
+        adv => adv.employeeId === worker.id && !adv.fullyPaid
+      );
+      const total = workerAdvancesList.reduce(
+        (sum, adv) => sum + parseFloat(adv.remainingBalance || "0"),
+        0
+      );
+      advances[worker.id] = {
+        total,
+        count: workerAdvancesList.length,
+      };
+    });
+    return advances;
+  }, [salaryAdvances, workerStaff]);
+
+  // Compute base worker payments from salary and advances
+  const computedPayments = useMemo(() => {
+    const payments: Record<number, WorkerPayment> = {};
+    workerStaff.forEach((worker) => {
+      const monthlySalary = parseFloat(worker.monthlySalary || "0");
+      const advanceAmount = workerAdvances[worker.id]?.total || 0;
+      const netPayment = monthlySalary - advanceAmount;
+      
+      payments[worker.id] = {
+        workerId: worker.id,
+        amount: netPayment.toFixed(2),
+        selected: true,
+        manuallyEdited: false,
+      };
+    });
+    return payments;
+  }, [workerStaff, workerAdvances]);
+
+  // Merge computed payments with manual overrides
+  const workerPayments = useMemo(() => {
+    const finalPayments: Record<number, WorkerPayment> = {};
+    Object.keys(computedPayments).forEach((id) => {
+      const workerId = parseInt(id);
+      const computed = computedPayments[workerId];
+      const override = workerOverrides[workerId];
+      
+      if (override?.manuallyEdited) {
+        // Use override amount but keep other computed values
+        finalPayments[workerId] = {
+          ...computed,
+          amount: override.amount ?? computed.amount,
+          selected: override.selected ?? computed.selected,
+          manuallyEdited: true,
+        };
+      } else {
+        // Use computed values, but preserve selection state if available
+        finalPayments[workerId] = {
+          ...computed,
+          selected: override?.selected ?? computed.selected,
+        };
+      }
+    });
+    return finalPayments;
+  }, [computedPayments, workerOverrides]);
+
+  // Clean up overrides when workers are removed
+  useEffect(() => {
+    const workerIds = new Set(workerStaff.map(w => w.id));
+    setWorkerOverrides(prev => {
+      const cleaned = { ...prev };
+      let hasChanges = false;
+      Object.keys(cleaned).forEach(id => {
+        if (!workerIds.has(parseInt(id))) {
+          delete cleaned[parseInt(id)];
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? cleaned : prev;
+    });
+  }, [workerStaff]);
+
+  // Worker forms
+  const newWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
+  const editWorkerForm = useForm<WorkerFormData>({
+    resolver: zodResolver(workerFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      active: true,
+    },
+  });
+
+  // Populate edit form when worker is selected
+  useEffect(() => {
+    if (selectedWorkerForEdit && editWorkerDialogOpen) {
+      editWorkerForm.reset({
+        firstName: selectedWorkerForEdit.firstName,
+        lastName: selectedWorkerForEdit.lastName,
+        code: selectedWorkerForEdit.code,
+        monthlySalary: selectedWorkerForEdit.monthlySalary,
+        department: selectedWorkerForEdit.department || "",
+        active: selectedWorkerForEdit.active,
+      });
+    }
+  }, [selectedWorkerForEdit, editWorkerDialogOpen, editWorkerForm]);
 
   const depositForm = useForm<DepositFormData>({
     resolver: zodResolver(depositSchema),
@@ -479,24 +639,28 @@ export default function Payroll() {
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/employees/${id}`);
+    mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
+      const queryParam = forceDelete ? "?forceDelete=true" : "";
+      return await apiRequest("DELETE", `/api/employees/${id}${queryParam}`);
     },
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Worker deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
-      setDeleteWorkerDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setSelectedWorkerForEdit(null);
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      // Don't show toast for 409 - let the confirmation dialog handle it
+      if (error.status !== 409) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+        setSelectedWorkerForEdit(null);
+      }
     },
   });
 
@@ -604,6 +768,33 @@ export default function Payroll() {
     }
   };
 
+  const handleDeleteWorker = async (worker: Employee) => {
+    try {
+      await deleteWorkerMutation.mutateAsync({ id: worker.id, forceDelete: false });
+    } catch (error: any) {
+      if (error.status === 409 && error.requiresConfirmation) {
+        // Balance exists - show second confirmation dialog with balance details
+        setDeleteWorkerConflict({
+          employee: worker,
+          employeeBalance: error.employeeBalance || 0,
+          ledgerBalance: error.ledgerBalance || 0,
+        });
+      }
+    }
+  };
+
+  const handleForceDeleteWorker = async () => {
+    if (!deleteWorkerConflict) return;
+    
+    try {
+      await deleteWorkerMutation.mutateAsync({ id: deleteWorkerConflict.employee.id, forceDelete: true });
+      setDeleteWorkerConflict(null);
+    } catch (error: any) {
+      // Error will be handled by mutation's onError
+      setDeleteWorkerConflict(null);
+    }
+  };
+
   const handleToggleWorker = (workerId: number) => {
     setWorkerOverrides(prev => ({
       ...prev,
@@ -659,9 +850,12 @@ export default function Payroll() {
       <h1 className="text-2xl font-semibold">Payroll</h1>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid grid-cols-2 w-[400px]">
+        <TabsList className="grid grid-cols-3 w-[600px]">
           <TabsTrigger value="employees" data-testid="tab-employees">
-            Employees ({employees?.length || 0})
+            Employees ({employeeStaff.length})
+          </TabsTrigger>
+          <TabsTrigger value="workers" data-testid="tab-workers">
+            Workers ({workerStaff.length})
           </TabsTrigger>
           <TabsTrigger value="advances" data-testid="tab-advances">
             Salary Advances ({salaryAdvances?.length || 0})
@@ -673,9 +867,9 @@ export default function Payroll() {
             <div className="space-y-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-lg font-semibold">All Employees</h2>
+                  <h2 className="text-lg font-semibold">Warehouse Staff (Employees)</h2>
                   <p className="text-sm text-muted-foreground">
-                    Manage all company employees. Employees maintain running balance accounts - deposit salary to increase balance, withdraw to decrease.
+                    Employees maintain running balance accounts. Deposit salary to increase balance, withdraw to decrease.
                   </p>
                 </div>
                 <Button
@@ -687,7 +881,7 @@ export default function Payroll() {
                 </Button>
               </div>
 
-              {!employees || employees.length === 0 ? (
+              {employeeStaff.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No employees found</p>
                   <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
@@ -707,7 +901,7 @@ export default function Payroll() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees.map((employee) => {
+                      {employeeStaff.map((employee) => {
                         const openingBal = parseFloat(employee.openingBalance || "0");
                         const deposits = parseFloat(employee.totalDeposits || "0");
                         const withdrawals = parseFloat(employee.totalWithdrawals || "0");
@@ -796,16 +990,192 @@ export default function Payroll() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="workers">
+          {/* Worker Payment Summary */}
+          <Card className="p-6 mb-4">
+            <h3 className="text-lg font-semibold mb-4">Worker Payment Summary</h3>
+            {workerPaymentSummary ? (
+              <div className="space-y-4">
+                <div className="max-h-60 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Worker Name</TableHead>
+                        <TableHead className="text-right">Total Paid</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workerPaymentSummary.workerPayments.map((wp) => (
+                        <TableRow key={wp.workerId} data-testid={`worker-payment-${wp.workerId}`}>
+                          <TableCell className="font-mono">{wp.workerCode}</TableCell>
+                          <TableCell>{wp.workerName}</TableCell>
+                          <TableCell className="text-right font-mono" data-testid={`text-paid-${wp.workerId}`}>
+                            {parseFloat(wp.totalPaid).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <span className="text-lg font-semibold">Grand Total Paid:</span>
+                  <span className="text-lg font-semibold font-mono" data-testid="text-grand-total">
+                    {parseFloat(workerPaymentSummary.grandTotal).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <Skeleton className="h-40 w-full" />
+            )}
+          </Card>
+
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold">Shop Floor Staff (Workers)</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Select workers and adjust amounts to process bulk salary payments
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setBulkPaymentDialogOpen(true)}
+                  disabled={selectedPayments.length === 0}
+                  data-testid="button-bulk-payment"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Pay Selected ({selectedPayments.length})
+                </Button>
+              </div>
+
+              {selectedPayments.length > 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {totalAmount.toFixed(2)}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {workerStaff.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>No workers found</p>
+                  <p className="text-sm mt-2">Create workers from the Create Master Data page</p>
+                </div>
+              ) : (
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={Object.values(workerPayments).every(p => p.selected)}
+                            onCheckedChange={handleSelectAll}
+                            data-testid="checkbox-select-all"
+                          />
+                        </TableHead>
+                        <TableHead data-testid="header-code">Code</TableHead>
+                        <TableHead data-testid="header-name">Name</TableHead>
+                        <TableHead data-testid="header-department">Department</TableHead>
+                        <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
+                        <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
+                        <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
+                        <TableHead data-testid="header-status">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workerStaff.map((worker) => {
+                        const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                        const monthlySalary = parseFloat(worker.monthlySalary || "0");
+                        const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
+                        const hasNegativePayment = paymentAmount < 0;
+                        
+                        return (
+                        <TableRow 
+                          key={worker.id} 
+                          data-testid={`row-worker-${worker.id}`}
+                          className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={workerPayments[worker.id]?.selected || false}
+                              onCheckedChange={() => handleToggleWorker(worker.id)}
+                              data-testid={`checkbox-worker-${worker.id}`}
+                            />
+                          </TableCell>
+                          <TableCell data-testid={`cell-code-${worker.id}`}>
+                            {worker.code}
+                          </TableCell>
+                          <TableCell data-testid={`cell-name-${worker.id}`}>
+                            {worker.firstName} {worker.lastName}
+                          </TableCell>
+                          <TableCell data-testid={`cell-department-${worker.id}`}>
+                            {worker.department || "-"}
+                          </TableCell>
+                          <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
+                            {monthlySalary.toFixed(2)}
+                          </TableCell>
+                          <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
+                            {advanceInfo.total > 0 ? (
+                              <span className="text-destructive">
+                                {advanceInfo.total.toFixed(2)}
+                                {advanceInfo.count > 0 && (
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    ({advanceInfo.count})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={workerPayments[worker.id]?.amount || "0"}
+                                onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                                className={cn(
+                                  "w-32 text-right font-mono",
+                                  hasNegativePayment && "border-destructive"
+                                )}
+                                data-testid={`input-amount-${worker.id}`}
+                              />
+                              {hasNegativePayment && (
+                                <AlertCircle className="h-4 w-4 text-destructive" />
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell data-testid={`cell-status-${worker.id}`}>
+                            <Badge variant={worker.active ? "default" : "secondary"}>
+                              {worker.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="advances">
           {(() => {
-            // Show all salary advances
-            const allAdvancesList = salaryAdvances || [];
+            // Filter advances to show only workers
+            const workerAdvancesList = salaryAdvances?.filter(adv => 
+              workerStaff.some(worker => worker.id === adv.employeeId)
+            ) || [];
             
-            // Calculate stats for all advances
-            const advancesStats = {
-              totalAdvances: allAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.amount), 0),
-              outstandingBalance: allAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.remainingBalance), 0),
-              unpaidCount: allAdvancesList.filter(adv => !adv.fullyPaid).length,
+            // Recalculate stats for workers only
+            const workerAdvancesStats = {
+              totalAdvances: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.amount), 0),
+              outstandingBalance: workerAdvancesList.reduce((sum, adv) => sum + parseFloat(adv.remainingBalance), 0),
+              unpaidCount: workerAdvancesList.filter(adv => !adv.fullyPaid).length,
             };
             
             return (
@@ -817,7 +1187,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Total Advances Given</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
-                          ${advancesStats.totalAdvances.toFixed(2)}
+                          ${workerAdvancesStats.totalAdvances.toFixed(2)}
                         </p>
                       </div>
                       <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -829,7 +1199,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Outstanding Balance</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
-                          ${advancesStats.outstandingBalance.toFixed(2)}
+                          ${workerAdvancesStats.outstandingBalance.toFixed(2)}
                         </p>
                       </div>
                       <TrendingUp className="h-8 w-8 text-destructive" />
@@ -841,7 +1211,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Unpaid Advances</p>
                         <p className="text-2xl font-semibold" data-testid="text-unpaid-count">
-                          {advancesStats.unpaidCount}
+                          {workerAdvancesStats.unpaidCount}
                         </p>
                       </div>
                       <AlertCircle className="h-8 w-8 text-orange-500" />
@@ -849,13 +1219,107 @@ export default function Payroll() {
                   </Card>
                 </div>
 
+                {/* Worker Management Section */}
+                <Card className="p-6 mb-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-lg font-semibold">Manage Workers</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Add, edit, or remove workers from this company
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => setNewWorkerDialogOpen(true)}
+                        data-testid="button-new-worker"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Worker
+                      </Button>
+                    </div>
+
+                    {workerStaff.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <p className="text-sm">No workers found. Click "New Worker" to add one.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2">
+                        {workerStaff.map((worker) => {
+                          const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                          const hasAdvances = advanceInfo.total > 0;
+                          const balance = parseFloat(worker.currentBalance || "0");
+                          const canDelete = !hasAdvances && balance === 0;
+                          
+                          return (
+                            <div
+                              key={worker.id}
+                              className="flex items-center justify-between p-3 border rounded-md hover-elevate"
+                              data-testid={`worker-row-${worker.id}`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div>
+                                  <div className="font-medium">
+                                    {worker.firstName} {worker.lastName}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {worker.code} • Salary: ${parseFloat(worker.monthlySalary).toFixed(2)}
+                                  </div>
+                                </div>
+                                {hasAdvances && (
+                                  <Badge variant="secondary" className="text-destructive">
+                                    ${advanceInfo.total.toFixed(2)} advance
+                                  </Badge>
+                                )}
+                                {balance !== 0 && (
+                                  <Badge variant="secondary">
+                                    Balance: ${balance.toFixed(2)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedWorkerForEdit(worker);
+                                    setEditWorkerDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-worker-${worker.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <ConfirmationDialog
+                                  trigger={
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      data-testid={`button-delete-worker-${worker.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  }
+                                  title="Delete Worker"
+                                  description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                  confirmText="Delete"
+                                  variant="destructive"
+                                  onConfirm={() => handleDeleteWorker(worker)}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
                 <Card className="p-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-lg font-semibold">Salary Advances</h2>
+                        <h2 className="text-lg font-semibold">Salary Advances (Workers Only)</h2>
                         <p className="text-sm text-muted-foreground">
-                          Track salary advances given to employees and record deductions
+                          Track advances given to workers and record deductions
                         </p>
                       </div>
                       <Button
@@ -869,22 +1333,22 @@ export default function Payroll() {
 
                     {advancesLoading ? (
                       <Skeleton className="h-[400px] w-full" />
-                    ) : !employees || employees.length === 0 ? (
+                    ) : workerStaff.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
-                        <p>No employees found</p>
-                        <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
+                        <p>No workers found</p>
+                        <p className="text-sm mt-2">Create workers from the Workers tab or Create Master Data page</p>
                       </div>
-                    ) : allAdvancesList.length === 0 ? (
+                    ) : workerAdvancesList.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
-                        <p>No salary advances found</p>
-                        <p className="text-sm mt-2">Click "New Advance" to record a salary advance for an employee</p>
+                        <p>No salary advances found for workers</p>
+                        <p className="text-sm mt-2">Click "New Advance" to record a salary advance for a worker</p>
                       </div>
                     ) : (
                       <div className="border rounded-md">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead data-testid="header-employee">Employee</TableHead>
+                              <TableHead data-testid="header-employee">Worker</TableHead>
                               <TableHead data-testid="header-advance-date">Advance Date</TableHead>
                               <TableHead data-testid="header-amount" className="text-right">Amount</TableHead>
                               <TableHead data-testid="header-remaining" className="text-right">Remaining Balance</TableHead>
@@ -893,7 +1357,7 @@ export default function Payroll() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {allAdvancesList.map((advance) => (
+                            {workerAdvancesList.map((advance) => (
                               <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
                                 <TableCell data-testid={`cell-employee-${advance.id}`}>
                                   <div>
@@ -1930,67 +2394,40 @@ export default function Payroll() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Worker Dialog */}
-      <Dialog open={deleteWorkerDialogOpen} onOpenChange={setDeleteWorkerDialogOpen}>
-        <DialogContent data-testid="dialog-delete-worker">
-          <DialogHeader>
-            <DialogTitle>Delete Worker</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {selectedWorkerForEdit?.firstName} {selectedWorkerForEdit?.lastName}?
-              This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedWorkerForEdit && (
-            <>
-              {(parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 || 
-                (workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0) && (
-                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4">
-                  <p className="text-sm text-destructive font-medium">
-                    Cannot delete worker:
+      {/* Worker Balance Conflict Dialog */}
+      <AlertDialog open={!!deleteWorkerConflict} onOpenChange={(open) => !open && setDeleteWorkerConflict(null)}>
+        <AlertDialogContent data-testid="dialog-delete-worker-conflict">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Worker Has Non-Zero Balance</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteWorkerConflict && (
+                <>
+                  <span className="font-semibold">{deleteWorkerConflict.employee.firstName} {deleteWorkerConflict.employee.lastName}</span> has a non-zero balance:
+                  <div className="mt-2 space-y-1 font-mono text-sm">
+                    <div>Employee Balance: {deleteWorkerConflict.employeeBalance.toFixed(2)}</div>
+                    <div>Ledger Balance: {deleteWorkerConflict.ledgerBalance.toFixed(2)}</div>
+                  </div>
+                  <p className="mt-3">
+                    Deleting this worker will also delete their linked ledger account. This action cannot be undone.
                   </p>
-                  <ul className="text-sm text-destructive mt-2 list-disc list-inside">
-                    {parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 && (
-                      <li>Worker has a non-zero balance: ${parseFloat(selectedWorkerForEdit.currentBalance).toFixed(2)}</li>
-                    )}
-                    {(workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0 && (
-                      <li>Worker has outstanding advances: ${(workerAdvances[selectedWorkerForEdit.id]?.total || 0).toFixed(2)}</li>
-                    )}
-                  </ul>
-                </div>
+                </>
               )}
-
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDeleteWorkerDialogOpen(false)}
-                  data-testid="button-cancel-delete-worker"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    if (selectedWorkerForEdit) {
-                      deleteWorkerMutation.mutate(selectedWorkerForEdit.id);
-                    }
-                  }}
-                  disabled={
-                    deleteWorkerMutation.isPending ||
-                    parseFloat(selectedWorkerForEdit.currentBalance || "0") !== 0 ||
-                    (workerAdvances[selectedWorkerForEdit.id]?.total || 0) > 0
-                  }
-                  data-testid="button-confirm-delete-worker"
-                >
-                  {deleteWorkerMutation.isPending ? "Deleting..." : "Delete Worker"}
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteWorkerConflict(null)} data-testid="button-cancel-force-delete-worker">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleForceDeleteWorker}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-force-delete-worker"
+            >
+              Delete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create Employee Dialog */}
       <Dialog open={createEmployeeDialogOpen} onOpenChange={setCreateEmployeeDialogOpen}>
