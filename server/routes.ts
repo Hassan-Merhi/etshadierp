@@ -5417,7 +5417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
-                sql`LOWER(${vouchers.description}) LIKE LOWER('%container ${container.containerNumber}%')`,
+                like(sql`LOWER(${vouchers.description})`, `%container ${container.containerNumber.toLowerCase()}%`),
               ),
             );
 
