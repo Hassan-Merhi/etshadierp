@@ -41,6 +41,29 @@ export default function POSImport() {
     queryKey: ["/api/ledger-accounts"],
   });
 
+  const [backfillCashAccount, setBackfillCashAccount] = useState<string>("");
+
+  const backfillMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/sales-import/backfill", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Backfill completed",
+        description: `${data.backfilledCount} sales vouchers updated. ${data.skippedCount} skipped.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Backfill error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const parseMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -250,6 +273,21 @@ export default function POSImport() {
     window.open("/api/pos-import/template", "_blank");
   };
 
+  const handleBackfill = () => {
+    if (!backfillCashAccount) {
+      toast({
+        title: "Cash account required",
+        description: "Please select which cash account to use for existing sales",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    backfillMutation.mutate({
+      cashAccountId: parseInt(backfillCashAccount),
+    });
+  };
+
   const isValidated = validationResult !== null;
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
 
@@ -379,6 +417,51 @@ export default function POSImport() {
               {importMutation.isPending ? "Importing..." : "Import"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Fix Existing Sales Data
+          </CardTitle>
+          <CardDescription>
+            If you have already imported sales without cash account entries, use this to add the missing accounting entries and fix profit calculations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="backfillCashAccount">Cash Account for Existing Sales</Label>
+            <Select value={backfillCashAccount} onValueChange={setBackfillCashAccount}>
+              <SelectTrigger id="backfillCashAccount" data-testid="select-backfill-cash-account">
+                <SelectValue placeholder="Select cash account" />
+              </SelectTrigger>
+              <SelectContent>
+                {ledgerAccounts
+                  .filter((account) => account.accountType === "Asset" || account.accountType === "Cash")
+                  .map((account) => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} ({account.code})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            onClick={handleBackfill}
+            disabled={!backfillCashAccount || backfillMutation.isPending}
+            variant="default"
+            data-testid="button-backfill"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {backfillMutation.isPending ? "Fixing Sales Data..." : "Fix All Existing Sales"}
+          </Button>
+
+          <p className="text-sm text-muted-foreground">
+            This will update all existing sales vouchers to include proper cash account entries, fixing your profit calculations.
+          </p>
         </CardContent>
       </Card>
 
