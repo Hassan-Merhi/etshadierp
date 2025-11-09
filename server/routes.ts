@@ -5962,6 +5962,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      const { cashAccountId } = req.body;
+
+      if (!cashAccountId) {
+        return res.status(400).json({ 
+          message: "Cash account ID is required. Please specify which cash account to use for the sales." 
+        });
+      }
+
+      // Validate cash account
+      const cashAccount = await storage.getLedgerAccountById(cashAccountId);
+      if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
+        return res.status(400).json({ message: "Invalid cash account" });
+      }
+
       // Get or create "Sales Revenue" ledger account
       let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
       if (!salesRevenueAccount) {
@@ -5973,21 +5987,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subType: "Direct Income",
           openingBalance: "0",
           openingBalanceSide: "Cr",
-          active: true,
-        });
-      }
-
-      // Get or create "Sales Cash" account for this company
-      let salesCashAccount = await storage.getLedgerAccountByCode("SALES_CASH", req.session.currentCompanyId!);
-      if (!salesCashAccount) {
-        salesCashAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "SALES_CASH",
-          name: "Sales Cash",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
           active: true,
         });
       }
@@ -6085,10 +6084,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create new balanced entries (periodic inventory system)
           
-          // Entry 1: Debit Sales Cash
+          // Entry 1: Debit Cash Account
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
-            ledgerAccountId: salesCashAccount!.id,
+            ledgerAccountId: cashAccountId,
             debitAmount: totalSales.toFixed(2),
             creditAmount: "0",
             narration: `Cash from POS Sales - ${items.length} items (Backfilled)`,
