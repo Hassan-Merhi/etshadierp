@@ -5962,18 +5962,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { cashAccountId } = req.body;
+      const { locationCashAccountMap } = req.body;
 
-      if (!cashAccountId) {
+      if (!locationCashAccountMap || typeof locationCashAccountMap !== 'object') {
         return res.status(400).json({ 
-          message: "Cash account ID is required. Please specify which cash account to use for the sales." 
+          message: "Location-to-cash-account mapping is required. Please specify which cash account to use for each location's sales." 
         });
       }
 
-      // Validate cash account
-      const cashAccount = await storage.getLedgerAccountById(cashAccountId);
-      if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
-        return res.status(400).json({ message: "Invalid cash account" });
+      // Validate all cash accounts belong to this company
+      const cashAccountIds = Object.values(locationCashAccountMap) as number[];
+      for (const cashAccountId of cashAccountIds) {
+        const cashAccount = await storage.getLedgerAccountById(cashAccountId);
+        if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
+          return res.status(400).json({ message: `Invalid cash account ID: ${cashAccountId}` });
+        }
       }
 
       // Get or create "Sales Revenue" ledger account
@@ -6077,6 +6080,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
 
+          // Determine location for this voucher by checking first sales item
+          const firstItem = items[0];
+          const stockItem = await tx
+            .select()
+            .from(stockItems)
+            .where(eq(stockItems.id, firstItem.stockItemId))
+            .limit(1);
+
+          if (stockItem.length === 0) {
+            console.warn(`Could not find stock item ${firstItem.stockItemId} for voucher ${voucher.id}, skipping`);
+            skippedCount++;
+            return;
+          }
+
+          // Find inventory record to determine location
+          const inventoryRecords = await tx
+            .select()
+            .from(inventory)
+            .where(eq(inventory.stockItemId, stockItem[0].id))
+            .limit(1);
+
+          if (inventoryRecords.length === 0) {
+            console.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
+            skippedCount++;
+            return;
+          }
+
+          const locationId = inventoryRecords[0].locationId;
+          const cashAccountId = locationCashAccountMap[locationId];
+
+          if (!cashAccountId) {
+            console.warn(`No cash account mapped for location ${locationId}, skipping voucher ${voucher.id}`);
+            skippedCount++;
+            return;
+          }
+
           // Delete all existing voucher entries (in case of old format)
           await tx
             .delete(voucherEntries)
@@ -6084,7 +6123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create new balanced entries (periodic inventory system)
           
-          // Entry 1: Debit Cash Account
+          // Entry 1: Debit Cash Account (location-specific)
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
             ledgerAccountId: cashAccountId,

@@ -41,7 +41,7 @@ export default function POSImport() {
     queryKey: ["/api/ledger-accounts"],
   });
 
-  const [backfillCashAccount, setBackfillCashAccount] = useState<string>("");
+  const [locationCashMapping, setLocationCashMapping] = useState<Record<number, number>>({});
 
   const backfillMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -274,18 +274,28 @@ export default function POSImport() {
   };
 
   const handleBackfill = () => {
-    if (!backfillCashAccount) {
+    // Check that all locations have a cash account mapped
+    const unmappedLocations = locations.filter(loc => !locationCashMapping[loc.id]);
+    
+    if (unmappedLocations.length > 0) {
       toast({
-        title: "Cash account required",
-        description: "Please select which cash account to use for existing sales",
+        title: "Missing cash account mappings",
+        description: `Please select a cash account for: ${unmappedLocations.map(l => l.name).join(", ")}`,
         variant: "destructive",
       });
       return;
     }
 
     backfillMutation.mutate({
-      cashAccountId: parseInt(backfillCashAccount),
+      locationCashAccountMap: locationCashMapping,
     });
+  };
+
+  const handleLocationCashAccountChange = (locationId: number, cashAccountId: string) => {
+    setLocationCashMapping(prev => ({
+      ...prev,
+      [locationId]: parseInt(cashAccountId),
+    }));
   };
 
   const isValidated = validationResult !== null;
@@ -427,31 +437,41 @@ export default function POSImport() {
             Fix Existing Sales Data
           </CardTitle>
           <CardDescription>
-            If you have already imported sales without cash account entries, use this to add the missing accounting entries and fix profit calculations.
+            Map each location to its cash account, then click to fix all existing sales vouchers and correct profit calculations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="backfillCashAccount">Cash Account for Existing Sales</Label>
-            <Select value={backfillCashAccount} onValueChange={setBackfillCashAccount}>
-              <SelectTrigger id="backfillCashAccount" data-testid="select-backfill-cash-account">
-                <SelectValue placeholder="Select cash account" />
-              </SelectTrigger>
-              <SelectContent>
-                {ledgerAccounts
-                  .filter((account) => account.accountType === "Asset" || account.accountType === "Cash")
-                  .map((account) => (
-                    <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} ({account.code})
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <Label>Location to Cash Account Mapping</Label>
+            {locations.map((location) => (
+              <div key={location.id} className="grid grid-cols-2 gap-2 items-center">
+                <Label htmlFor={`loc-${location.id}`} className="text-sm font-normal">
+                  {location.name}
+                </Label>
+                <Select 
+                  value={locationCashMapping[location.id]?.toString() || ""} 
+                  onValueChange={(value) => handleLocationCashAccountChange(location.id, value)}
+                >
+                  <SelectTrigger id={`loc-${location.id}`} data-testid={`select-cash-${location.id}`}>
+                    <SelectValue placeholder="Select cash account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ledgerAccounts
+                      .filter((account) => account.accountType === "Asset" || account.accountType === "Cash")
+                      .map((account) => (
+                        <SelectItem key={account.id} value={account.id.toString()}>
+                          {account.name} ({account.code})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
           </div>
 
           <Button
             onClick={handleBackfill}
-            disabled={!backfillCashAccount || backfillMutation.isPending}
+            disabled={locations.some(loc => !locationCashMapping[loc.id]) || backfillMutation.isPending}
             variant="default"
             data-testid="button-backfill"
           >
@@ -460,7 +480,7 @@ export default function POSImport() {
           </Button>
 
           <p className="text-sm text-muted-foreground">
-            This will update all existing sales vouchers to include proper cash account entries, fixing your profit calculations.
+            This will update all existing sales vouchers to use the correct cash account for each location, fixing your profit calculations.
           </p>
         </CardContent>
       </Card>
