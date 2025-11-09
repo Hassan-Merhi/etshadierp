@@ -42,8 +42,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield } from "lucide-react";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange } from "lucide-react";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
+import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const userFormSchema = insertUserSchema;
 const companyFormSchema = insertCompanySchema;
@@ -67,6 +69,7 @@ type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
+  const { selectedCompany, currentRole } = useCompany();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -453,6 +456,10 @@ export default function Settings() {
           <TabsTrigger value="permissions" data-testid="tab-permissions">
             <Shield className="h-4 w-4 mr-2" />
             User Permissions
+          </TabsTrigger>
+          <TabsTrigger value="fiscal" data-testid="tab-fiscal">
+            <CalendarRange className="h-4 w-4 mr-2" />
+            Fiscal Period
           </TabsTrigger>
         </TabsList>
 
@@ -928,6 +935,14 @@ export default function Settings() {
               )}
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Fiscal Period Tab */}
+        <TabsContent value="fiscal" className="space-y-4">
+          <FiscalPeriodTab 
+            currentCompanyId={selectedCompany?.id} 
+            userRole={currentRole} 
+          />
         </TabsContent>
       </Tabs>
 
