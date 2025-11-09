@@ -925,7 +925,7 @@ export default function Accounts() {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="account-search"
-                  placeholder="Search by name, code, or type..."
+                  placeholder="Search by name or type..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -978,9 +978,6 @@ export default function Accounts() {
                               <Badge variant="outline" className="text-xs">
                                 {account.type}
                               </Badge>
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {account.code}
-                              </span>
                               <span className="text-sm">{account.name}</span>
                             </div>
                           </button>
@@ -1001,9 +998,6 @@ export default function Accounts() {
                                 <Badge variant="outline" className="text-xs">
                                   {child.type}
                                 </Badge>
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  {child.code}
-                                </span>
                                 <span className="text-sm">{child.name}</span>
                               </div>
                             </button>
@@ -1020,13 +1014,7 @@ export default function Accounts() {
           {selectedAccount && (
             <Card className="bg-muted/50">
               <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Account Code</p>
-                    <p className="font-mono font-medium" data-testid="text-account-code">
-                      {selectedAccount.code}
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Account Type</p>
                     <Badge variant="outline" data-testid="badge-account-type">
@@ -1241,7 +1229,7 @@ export default function Accounts() {
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="edit-account-search"
-                    placeholder="Search by name, code, or type..."
+                    placeholder="Search by name or type..."
                     value={editSearchTerm}
                     onChange={(e) => setEditSearchTerm(e.target.value)}
                     className="pl-9"
