@@ -130,7 +130,10 @@ export interface IStorage {
   // Bank Accounts
   getAllBankAccounts(companyId: number): Promise<BankAccount[]>;
   getBankAccountByCode(code: string): Promise<BankAccount | undefined>;
+  getBankAccountById(id: number, companyId: number): Promise<BankAccount | undefined>;
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
+  updateBankAccount(id: number, updates: Partial<InsertBankAccount>, companyId: number): Promise<BankAccount>;
+  deleteBankAccount(id: number, companyId: number): Promise<void>;
 
   // Fixed Assets
   getAllFixedAssets(companyId: number): Promise<FixedAsset[]>;
@@ -804,9 +807,90 @@ export class DbStorage implements IStorage {
     return account;
   }
 
+  async getBankAccountById(id: number, companyId: number): Promise<BankAccount | undefined> {
+    const [account] = await db.select()
+      .from(schema.bankAccounts)
+      .where(
+        and(
+          eq(schema.bankAccounts.id, id),
+          eq(schema.bankAccounts.companyId, companyId)
+        )
+      );
+    return account;
+  }
+
   async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
     const [created] = await db.insert(schema.bankAccounts).values(account).returning();
     return created;
+  }
+
+  async updateBankAccount(id: number, updates: Partial<InsertBankAccount>, companyId: number): Promise<BankAccount> {
+    // Get the existing account scoped to company
+    const existing = await this.getBankAccountById(id, companyId);
+    if (!existing) {
+      throw new Error("Bank account not found");
+    }
+
+    // If updating code, check uniqueness within company
+    if (updates.code && updates.code !== existing.code) {
+      const [duplicate] = await db.select()
+        .from(schema.bankAccounts)
+        .where(
+          and(
+            eq(schema.bankAccounts.code, updates.code),
+            eq(schema.bankAccounts.companyId, companyId),
+            ne(schema.bankAccounts.id, id)
+          )
+        );
+      
+      if (duplicate) {
+        throw new Error("Bank account code already exists in this company");
+      }
+    }
+
+    // Update the account - scoped to both id AND companyId
+    const [updated] = await db.update(schema.bankAccounts)
+      .set(updates)
+      .where(
+        and(
+          eq(schema.bankAccounts.id, id),
+          eq(schema.bankAccounts.companyId, companyId)
+        )
+      )
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Bank account not found");
+    }
+    
+    return updated;
+  }
+
+  async deleteBankAccount(id: number, companyId: number): Promise<void> {
+    // Verify account exists and belongs to company
+    const existing = await this.getBankAccountById(id, companyId);
+    if (!existing) {
+      throw new Error("Bank account not found");
+    }
+
+    // Check if bank account has any voucher entries
+    const entries = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.bankAccountId, id));
+
+    const entryCount = entries[0]?.count || 0;
+    if (entryCount > 0) {
+      throw new Error(`Cannot delete bank account: ${entryCount} voucher entries exist`);
+    }
+
+    // Safe to delete - scoped to both id AND companyId
+    await db.delete(schema.bankAccounts)
+      .where(
+        and(
+          eq(schema.bankAccounts.id, id),
+          eq(schema.bankAccounts.companyId, companyId)
+        )
+      );
   }
 
   // Fixed Assets

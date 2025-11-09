@@ -3919,6 +3919,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
       const id = parseInt(req.params.id);
       const parsed = insertBankAccountSchema.partial().parse(req.body);
 
@@ -3941,10 +3945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ message: "Dr/Cr side requires opening balance amount" });
       }
 
-      const account = await storage.updateBankAccount(id, parsed);
-      if (!account) {
-        return res.status(404).json({ message: "Bank account not found" });
-      }
+      const account = await storage.updateBankAccount(id, parsed, req.session.currentCompanyId);
       res.json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -3953,8 +3954,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
       const id = parseInt(req.params.id);
-      await storage.deleteBankAccount(id);
+      await storage.deleteBankAccount(id, req.session.currentCompanyId);
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
