@@ -5282,7 +5282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(
                 and(
                   eq(vouchers.companyId, container.companyId),
-                  sql`${vouchers.description} LIKE '%Container ${container.containerNumber}%'`,
+                  sql`LOWER(${vouchers.description}) LIKE LOWER('%container ${container.containerNumber}%')`,
                 ),
               );
 
@@ -5417,7 +5417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
-                like(vouchers.description, `%Container ${container.containerNumber}%`),
+                sql`LOWER(${vouchers.description}) LIKE LOWER('%container ${container.containerNumber}%')`,
               ),
             );
 
