@@ -1258,35 +1258,38 @@ export class DbStorage implements IStorage {
     // Create voucher entries for charges with associated supplier accounts
     const voucherDate = new Date().toISOString().split('T')[0];
     
-    // Find or create "IMPORT_CHARGES" ledger account for debiting inventory-related costs
-    let importChargesAccount = await db
-      .select()
-      .from(schema.ledgerAccounts)
-      .where(
-        and(
-          eq(schema.ledgerAccounts.companyId, location.companyId),
-          eq(schema.ledgerAccounts.code, "IMPORT_CHARGES")
+    // Helper function to find or create expense accounts
+    const findOrCreateExpenseAccount = async (code: string, name: string) => {
+      let account = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, location.companyId),
+            eq(schema.ledgerAccounts.code, code)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!importChargesAccount.length) {
-      const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-        companyId: location.companyId,
-        code: "IMPORT_CHARGES",
-        name: "Import Charges",
-        accountType: "Expense",
-        subType: "Direct Expense",
-        openingBalance: "0",
-        openingBalanceSide: "Debit",
-      }).returning();
-      importChargesAccount = [newAccount];
-    }
+      if (!account.length) {
+        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: location.companyId,
+          code,
+          name,
+          accountType: "Expense",
+          subType: "Direct Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+        }).returning();
+        account = [newAccount];
+      }
 
-    const importChargesLedgerId = importChargesAccount[0].id;
+      return account[0].id;
+    };
     
     // Duties voucher entry
     if (dutiesAccountId && parseFloat(duties) > 0) {
+      const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties");
       const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1297,10 +1300,10 @@ export class DbStorage implements IStorage {
         totalAmount: duties,
       }).returning();
 
-      // Debit: Import Charges (Expense increases)
+      // Debit: Duties Expense (Expense increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: importChargesLedgerId,
+        ledgerAccountId: dutiesExpenseAccountId,
         debitAmount: duties,
         creditAmount: "0",
         narration: `Duties for container ${container.containerNumber}`,
@@ -1318,6 +1321,7 @@ export class DbStorage implements IStorage {
 
     // Office charges voucher entry
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
+      const officeExpenseAccountId = await findOrCreateExpenseAccount("OFFICE_CHARGES", "Office Charges");
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1328,10 +1332,10 @@ export class DbStorage implements IStorage {
         totalAmount: officeCharges,
       }).returning();
 
-      // Debit: Office Charges Account (Expense increases)
+      // Debit: Office Charges Expense (Expense increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: officeChargesAccountId,
+        ledgerAccountId: officeExpenseAccountId,
         debitAmount: officeCharges,
         creditAmount: "0",
         narration: `Office charges for container ${container.containerNumber}`,
@@ -1349,6 +1353,7 @@ export class DbStorage implements IStorage {
 
     // Transport fees voucher entry
     if (transportAccountId && parseFloat(transportFees) > 0) {
+      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges");
       const voucherNumber = `TRANS-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1359,10 +1364,10 @@ export class DbStorage implements IStorage {
         totalAmount: transportFees,
       }).returning();
 
-      // Debit: Import Charges (Expense increases)
+      // Debit: Transport Expense (Expense increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: importChargesLedgerId,
+        ledgerAccountId: transportExpenseAccountId,
         debitAmount: transportFees,
         creditAmount: "0",
         narration: `Transport fees for container ${container.containerNumber}`,
@@ -1378,6 +1383,13 @@ export class DbStorage implements IStorage {
       });
     }
 
+    // Transfer charges (if any)
+    if (parseFloat(transferCharges) > 0) {
+      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges");
+      // Note: Transfer charges don't have a supplier account, so we'll need to specify one in the UI
+      // For now, we'll skip creating a voucher entry if no supplier is specified
+    }
+
     // Additional charges voucher entries
     for (const charge of additionalCharges) {
       if (charge.amount > 0) {
@@ -1391,10 +1403,14 @@ export class DbStorage implements IStorage {
           totalAmount: charge.amount.toFixed(2),
         }).returning();
 
-        // Debit: Import Charges (Expense increases)
+        // Debit: Additional Charge Expense (Expense increases)
+        const additionalExpenseAccountId = await findOrCreateExpenseAccount(
+          "ADDITIONAL_CHARGES", 
+          "Additional Container Charges"
+        );
         await db.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: importChargesLedgerId,
+          ledgerAccountId: additionalExpenseAccountId,
           debitAmount: charge.amount.toFixed(2),
           creditAmount: "0",
           narration: `${charge.description} for container ${container.containerNumber}`,

@@ -9526,11 +9526,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude PURCHASES and IMPORT_CHARGES from operating expenses
+      // Exclude inventory-related expenses from operating expenses
+      const inventoryExpenseCodes = [
+        "PURCHASES", 
+        "IMPORT_CHARGES",
+        "DUTIES",
+        "TRANSPORT",
+        "OFFICE_CHARGES",
+        "TRANSFER_CHARGES",
+        "ADDITIONAL_CHARGES"
+      ];
       const expenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Expense" && 
-        acc.code !== "PURCHASES" && 
-        acc.code !== "IMPORT_CHARGES"
+        !inventoryExpenseCodes.includes(acc.code)
       );
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 

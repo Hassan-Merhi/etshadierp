@@ -88,8 +88,12 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
-  // Filter out suppliers - they have their own dedicated page
-  const accounts = allAccounts.filter(account => account.type !== "Supplier");
+  // Filter out suppliers and inventory accounts - they have their own dedicated page
+  const accounts = allAccounts.filter(account => 
+    account.type !== "Supplier" && 
+    account.code !== "PURCHASES" && 
+    account.code !== "IMPORT_CHARGES"
+  );
 
   const { data: ledgerAccounts = [], isLoading: ledgerAccountsLoading } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
