@@ -2497,8 +2497,8 @@ export class DbStorage implements IStorage {
             newValue = currentValue + totalAmount;
             newRate = newQty > 0 ? newValue / newQty : 0;
           } else {
-            // Consumption - subtract from inventory
-            newQty = currentQty - quantity;
+            // Consumption - subtract from inventory (use absolute value to ensure reduction)
+            newQty = currentQty - Math.abs(quantity);
             newValue = newQty > 0 ? newQty * currentRate : 0;
             newRate = currentRate;
           }
