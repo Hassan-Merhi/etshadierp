@@ -8621,6 +8621,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Fiscal Period Closing
+  // Close a fiscal period (Admin/Owner only)
+  app.post("/api/fiscal-period/close", requireAuth, async (req, res) => {
+    try {
+      // Check role authorization - use currentRole from session
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ 
+          message: "Only Admins and Owners can close fiscal periods" 
+        });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { 
+        periodStartDate, 
+        periodEndDate, 
+        retainedEarningsAccountId, 
+        notes 
+      } = req.body;
+
+      // Validate required fields
+      if (!periodStartDate || !periodEndDate || !retainedEarningsAccountId) {
+        return res.status(400).json({ 
+          message: "Period start date, end date, and retained earnings account are required" 
+        });
+      }
+
+      // Parse and validate retained earnings account ID
+      const accountId = parseInt(retainedEarningsAccountId);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ 
+          message: "Invalid retained earnings account ID" 
+        });
+      }
+
+      // Validate dates are valid and in correct order
+      const startDate = new Date(periodStartDate);
+      const endDate = new Date(periodEndDate);
+      
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return res.status(400).json({ 
+          message: "Invalid date format. Use YYYY-MM-DD" 
+        });
+      }
+
+      if (startDate > endDate) {
+        return res.status(400).json({ 
+          message: "Period start date must be before or equal to end date" 
+        });
+      }
+
+      // Validate retained earnings account exists and is an Equity account
+      const retainedEarningsAccount = await storage.getLedgerAccountById(accountId);
+      if (!retainedEarningsAccount) {
+        return res.status(400).json({ 
+          message: "Retained earnings account not found" 
+        });
+      }
+      if (retainedEarningsAccount.accountType !== "Equity") {
+        return res.status(400).json({ 
+          message: "Retained earnings account must be an Equity account" 
+        });
+      }
+      if (retainedEarningsAccount.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ 
+          message: "Retained earnings account belongs to a different company" 
+        });
+      }
+
+      const closure = await storage.closeFiscalPeriod(
+        req.session.currentCompanyId,
+        periodStartDate,
+        periodEndDate,
+        accountId,
+        req.session.userId!,
+        notes
+      );
+
+      res.json(closure);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get fiscal period closures for current company
+  app.get("/api/fiscal-period/closures", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const closures = await storage.getFiscalPeriodClosures(req.session.currentCompanyId);
+      res.json(closures);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get POS sales grouped by location with optional date filtering
   app.get("/api/financial/sales", requireAuth, async (req, res) => {
     try {
