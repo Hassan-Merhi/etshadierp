@@ -1154,6 +1154,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/employees/:id", requireAuth, async (req, res) => {
+    try {
+      // Only Admin can delete employees
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin") {
+        return res.status(403).json({ 
+          message: "Only Admin users can delete employees" 
+        });
+      }
+
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get employee to verify it exists and belongs to current company
+      const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
+      const employee = allEmployees.find(e => e.id === employeeId);
+      
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      if (employee.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ 
+          message: "Access denied: Employee belongs to a different company" 
+        });
+      }
+
+      // Check for forceDelete flag from query parameter
+      const forceDelete = req.query.forceDelete === "true";
+
+      const result = await storage.deleteEmployee(employeeId, forceDelete);
+
+      if (!result.success) {
+        // If balance check failed, return 409 Conflict with balance details
+        if (result.employeeBalance !== undefined || result.ledgerBalance !== undefined) {
+          return res.status(409).json({
+            message: result.message,
+            employeeBalance: result.employeeBalance,
+            ledgerBalance: result.ledgerBalance,
+            requiresConfirmation: true
+          });
+        }
+        // Other errors (salary advances, transaction history)
+        return res.status(400).json({ message: result.message });
+      }
+
+      res.json({ message: "Employee deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Employee Groups
   app.get("/api/employee-groups", requireAuth, async (req, res) => {
     try {
