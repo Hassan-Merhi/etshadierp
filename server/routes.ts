@@ -9723,9 +9723,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const incomeAccountIds = companyAccounts
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
-      const expenseAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Expense")
-        .map((acc) => acc.id);
+      
+      // Exclude only PURCHASES and old IMPORT_CHARGES from operating expenses
+      // All container charges (DUTIES, TRANSPORT, etc.) and COGS are included as operating expenses
+      const excludedExpenseCodes = [
+        "PURCHASES",      // Inventory purchases are assets, not expenses
+        "IMPORT_CHARGES"  // Old consolidated account (deprecated)
+      ];
+      const expenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Expense" && 
+        !excludedExpenseCodes.includes(acc.code)
+      );
+      const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
       // Get all voucher entries for this company
       const companyVouchers = await db
