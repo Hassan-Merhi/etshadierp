@@ -9747,11 +9747,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude only PURCHASES and old IMPORT_CHARGES from operating expenses
-      // All container charges (DUTIES, TRANSPORT, etc.) are included as operating expenses
+      // Exclude ALL inventory-related costs from net profit calculation
+      // These are cost of acquiring inventory, NOT operating expenses
+      // Net profit should only include actual operating expenses (salaries, rent, utilities, etc.)
       const excludedExpenseCodes = [
-        "PURCHASES",      // Inventory purchases are assets, not expenses
-        "IMPORT_CHARGES"  // Old consolidated account (deprecated)
+        "PURCHASES",           // Direct inventory purchases
+        "IMPORT_CHARGES",      // Old consolidated import charges (deprecated)
+        "DUTIES",              // Container import duties
+        "TRANSPORT_CHARGES",   // Container transport costs
+        "TRANSPORT",           // Alternative transport account name
+        "OFFICE_CHARGE",       // Container office charges
+        "OFFICE",              // Alternative office charge account name
+        "CONTAINER_LICENSES",  // Container license fees
+        "LICENSES",            // Alternative license account name
+        "COGS",                // Cost of goods sold (if created incorrectly)
       ];
       const expenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Expense" && 

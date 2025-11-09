@@ -1,0 +1,326 @@
+Gotcha, thanks for explaining — you’re not making clothes, you’re running a used/original clothing sorting & baling factory. I’ll describe it in your context.
+
+I’ll treat your factory as a “used clothing sorting & baling operation” and show how it’s typically run step by step.
+
+1. Big picture of your business
+
+Input:
+
+Containers of original / credential clothing from:
+
+Europe
+
+Australia
+
+America
+
+These are mixed (all kinds of garments together in bags/sacks).
+
+Inside your factory:
+
+You offload the containers.
+
+Workers open bags and sort items into categories.
+
+Each category is compressed into bales.
+
+Bales are weighed, labeled, and entered on an invoice.
+
+You sell the bales to your customers (wholesalers, shop owners, exporters, etc.).
+
+Output:
+
+Bales like:
+
+Children cotton
+
+Ladies jeans
+
+Men’s T-shirts
+
+Mixed summer
+
+Shoes, Bags, etc.
+Each bale has: category + origin + weight + maybe quality.
+
+2. Typical workflow inside your factory
+Step 1: Receiving the containers
+
+Container arrives → offload into your warehouse.
+
+Record:
+
+Container number
+
+Supplier (Europe/Australia/USA)
+
+Estimated weight
+
+You might tag them as:
+
+EU–01, AU–02, US–03, etc. so you know later which stock came from where.
+
+Step 2: Opening & rough sorting
+
+You set up sorting tables or conveyor lines.
+
+Workers open the original bags and do a first (rough) sort:
+
+By wearer:
+
+Men
+
+Women
+
+Children
+
+By item type:
+
+T-shirts
+
+Shirts
+
+Trousers/jeans
+
+Dresses/skirts
+
+Jackets/coats
+
+Underwear
+
+By other big groups:
+
+Shoes
+
+Bags
+
+Bedding (sheets, blankets)
+
+Waste (too damaged, dirty, etc.)
+
+At this stage it’s fast sorting, not very detailed. The idea is to get big categories separated.
+
+Step 3: Fine sorting & grading
+
+Now each big category goes for detailed sorting:
+
+Example: Children cotton
+Someone will sort children’s clothes by:
+
+Material / season:
+
+Cotton summer
+
+Winter / fleece
+
+Condition (grade) – you can define your own grades, for example:
+
+Cream / Grade A – new or almost new, branded, no stains, no holes
+
+Grade B – good condition, minor wear
+
+Grade C – more wear, for cheaper markets
+
+Wipers / recycling – for cutting into rags
+(You may or may not use all these — just an example system.)
+
+Example: Ladies items could be split into:
+
+Ladies jeans
+
+Ladies tops / T-shirts
+
+Ladies dresses
+
+Ladies winter (jackets, cardigans)
+
+Etc.
+
+Each category/grade is collected in its own cage, bin, or trolley.
+
+3. Making the bales
+
+When a bin/trolley is full for a certain category, it goes to the press (baling machine).
+
+Step 1: Loading the press
+
+Load the sorted clothes (e.g. Children cotton summer, Grade A).
+
+Press to your standard bale weight:
+
+e.g. 45 kg, 50 kg, 55 kg, 100 kg – whatever you use.
+
+Step 2: Strapping & labeling
+
+Strap the bale with metal or plastic straps.
+
+Attach a label or write directly on the bale:
+
+Bale code (e.g. KID-COT-SUM-A-001)
+
+Category (Children Cotton Summer)
+
+Grade (A/B/C)
+
+Origin (EU / AUS / USA)
+
+Weight (e.g. 45.3 kg)
+
+Date pressed
+
+All this info should also go into your stock sheet or system.
+
+Step 3: Moving to finished bale area
+
+Finished, labeled bales are moved to a “ready for sale” area.
+
+You might have rows like:
+
+Row 1: Children bales
+
+Row 2: Ladies bales
+
+Row 3: Men’s bales
+
+Row 4: Shoes, bags, bedding, etc.
+
+4. Invoicing and selling to customers
+
+When a customer places an order, you usually sell bales by type, grade, and origin, not piece by piece.
+
+a) Order example
+
+Customer wants:
+
+50 bales – Children cotton mix, EU origin
+
+30 bales – Ladies jeans, AUS origin
+
+20 bales – Men’s T-shirts, USA origin
+
+b) Preparing the invoice
+
+For each bale you include:
+
+Bale code
+
+Description (e.g. “Children cotton mix, EU, Grade B”)
+
+Weight
+
+Price per kg or price per bale
+
+Total per line
+
+Grand total
+
+So your invoice lines might look like:
+
+KID-COT-MIX-EU-045 – Children cotton mix, EU, 45.2 kg × $X/kg
+
+LAD-JEANS-AUS-012 – Ladies jeans, AUS, 55.0 kg × $Y/kg
+… and so on.
+
+You can also group them:
+
+50 bales Children cotton mix, EU – total weight 2,250 kg – $X/kg
+
+30 bales Ladies jeans, AUS – total weight 1,650 kg – $Y/kg
+
+c) Loading & delivery
+
+Pick the bales listed on the invoice.
+
+Load onto truck / container.
+
+Customer signs delivery note (and maybe you send packing list + invoice sets).
+
+5. Main roles in this kind of factory
+
+You don’t need sewing operators; your key people are:
+
+Warehouse / receiving team
+
+Offload containers, count bags, keep stock.
+
+Sorters
+
+Do first and second sorting.
+
+Need clear training on categories and quality grades.
+
+Quality controller (QC)
+
+Checks that the category and quality match the label.
+
+Prevents cheating or mistakes (e.g. winter in summer bales, too many damaged pieces).
+
+Press/baling operators
+
+Operate the press safely.
+
+Ensure correct weights and labels.
+
+Stock / inventory person
+
+Records every bale produced.
+
+Tracks what stock is available by type, origin, grade.
+
+Sales / admin
+
+Talks to customers.
+
+Prepares invoices, packing lists, and receipts.
+
+Safety / maintenance
+
+Keeps presses, forklifts, and warehouse safe and working.
+
+6. Simple visual example of categories & bales
+
+You might define your main product list like this:
+
+Children
+
+Children cotton summer
+
+Children winter mix
+
+Children mixed (all season)
+
+Ladies
+
+Ladies T-shirts
+
+Ladies blouses/shirts
+
+Ladies jeans
+
+Ladies dresses
+
+Ladies winter jackets
+
+Men
+
+Men’s T-shirts
+
+Men’s shirts
+
+Men’s jeans/trousers
+
+Men’s jackets
+
+Others
+
+Shoes mix
+
+Bags mix
+
+Bedding / household
+
+Towels
+
+Wipers / cut rags
+
+For each of these, you can have Grade A / B / C and EU / AUS / USA as extra info.
