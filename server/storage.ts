@@ -86,6 +86,7 @@ export interface IStorage {
   getAllEmployees(companyId: number): Promise<Employee[]>;
   getEmployeeByCode(code: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
+  deleteEmployee(id: number, forceDelete?: boolean): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}>;
 
   // Employee Groups
   getAllEmployeeGroups(companyId: number): Promise<schema.EmployeeGroup[]>;
@@ -438,6 +439,101 @@ export class DbStorage implements IStorage {
   async createEmployee(employee: InsertEmployee): Promise<Employee> {
     const [created] = await db.insert(schema.employees).values([employee as any]).returning();
     return created;
+  }
+
+  async deleteEmployee(id: number, forceDelete: boolean = false): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}> {
+    return await db.transaction(async (tx) => {
+      // Get the employee
+      const [employee] = await tx
+        .select()
+        .from(schema.employees)
+        .where(eq(schema.employees.id, id));
+
+      if (!employee) {
+        return { success: false, message: "Employee not found" };
+      }
+
+      // Check if employee has any salary advances
+      const salaryAdvances = await tx
+        .select()
+        .from(schema.salaryAdvances)
+        .where(eq(schema.salaryAdvances.employeeId, id))
+        .limit(1);
+
+      if (salaryAdvances.length > 0) {
+        return { 
+          success: false, 
+          message: "Cannot delete employee with salary advances. Please remove all salary advances first." 
+        };
+      }
+
+      // Check employee's current balance
+      const employeeBalance = parseFloat(employee.currentBalance || "0");
+      
+      // Find linked ledger account by matching employee code
+      const [linkedAccount] = await tx
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.code, employee.code),
+            eq(schema.ledgerAccounts.companyId, employee.companyId)
+          )
+        );
+
+      let ledgerBalance = 0;
+
+      if (linkedAccount) {
+        // Check if ledger account has any voucher entries
+        const voucherEntries = await tx
+          .select({ id: schema.voucherEntries.id })
+          .from(schema.voucherEntries)
+          .where(eq(schema.voucherEntries.ledgerAccountId, linkedAccount.id))
+          .limit(1);
+
+        if (voucherEntries.length > 0) {
+          return { 
+            success: false, 
+            message: "Cannot delete employee. The linked ledger account has transaction history." 
+          };
+        }
+
+        // Calculate ledger account balance from opening balance
+        const openingBalance = parseFloat(linkedAccount.openingBalance || "0");
+        const openingSide = linkedAccount.openingBalanceSide || "Dr";
+        ledgerBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
+      }
+
+      // If either balance is non-zero and forceDelete is false, require confirmation
+      if (!forceDelete && (Math.abs(employeeBalance) > 0.01 || Math.abs(ledgerBalance) > 0.01)) {
+        return {
+          success: false,
+          message: "Employee or linked account has a non-zero balance. Admin confirmation required.",
+          employeeBalance: employeeBalance,
+          ledgerBalance: ledgerBalance
+        };
+      }
+
+      // Proceed with deletion
+      if (linkedAccount) {
+        // Delete linked ledger account
+        await tx
+          .delete(schema.ledgerAccounts)
+          .where(eq(schema.ledgerAccounts.id, linkedAccount.id));
+      }
+
+      // Remove employee from any groups
+      await tx
+        .delete(schema.employeeGroupMembers)
+        .where(eq(schema.employeeGroupMembers.employeeId, id));
+
+      // Delete the employee
+      await tx
+        .delete(schema.employees)
+        .where(eq(schema.employees.id, id));
+
+      return { success: true };
+    });
   }
 
   // Employee Groups
