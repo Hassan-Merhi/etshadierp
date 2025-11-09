@@ -1393,6 +1393,19 @@ export default function Accounts() {
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={editForm.control}
+                          name="subType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sub Type (Optional)</FormLabel>
+                              <FormControl>
+                                <Input {...field} value={field.value || ""} placeholder="Leave blank or enter sub type" data-testid="input-edit-subtype" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={editForm.control}
