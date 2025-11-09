@@ -225,7 +225,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip />
+                <Tooltip formatter={(value: number) => value.toFixed(2)} />
                 <Line
                   type="monotone"
                   dataKey="sales"
@@ -259,7 +259,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip />
+                <Tooltip formatter={(value: number) => value.toFixed(2)} />
                 <Bar dataKey="sales" fill="hsl(var(--chart-1))" />
               </BarChart>
             </ResponsiveContainer>
