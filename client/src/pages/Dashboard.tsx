@@ -201,7 +201,7 @@ export default function Dashboard() {
         <KPICard
           title="Net Profit"
           value={isLoading ? "Loading..." : formatCurrency(profitData?.netProfit || 0)}
-          change={isLoading ? "" : `Expenses: ${formatCurrency(profitData?.totalExpenses || 0)}`}
+          change="Income minus operating expenses"
           changeType={(profitData?.netProfit ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
           data-testid="kpi-net-profit"
