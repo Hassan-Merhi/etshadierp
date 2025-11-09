@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import {
   Table,
   TableBody,
@@ -39,6 +41,16 @@ import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +63,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
+import { insertEmployeeSchema } from "@shared/schema";
 import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -115,6 +128,14 @@ const workerFormSchema = z.object({
 
 type WorkerFormData = z.infer<typeof workerFormSchema>;
 
+// Employee form schema - extend insertEmployeeSchema for UI-specific validation
+const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true }).extend({
+  monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
+  openingBalance: z.string().optional(),
+});
+
+type EmployeeFormData = z.infer<typeof employeeFormSchema>;
+
 interface WorkerPayment {
   workerId: number;
   amount: string;
@@ -152,8 +173,12 @@ export default function Payroll() {
   const [deleteWorkerDialogOpen, setDeleteWorkerDialogOpen] = useState(false);
   const [selectedWorkerForEdit, setSelectedWorkerForEdit] = useState<Employee | null>(null);
   const [workerOverrides, setWorkerOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
+  const [createEmployeeDialogOpen, setCreateEmployeeDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [deleteConflict, setDeleteConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -390,6 +415,19 @@ export default function Payroll() {
     },
   });
 
+  const createEmployeeForm = useForm<EmployeeFormData>({
+    resolver: zodResolver(employeeFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      code: "",
+      monthlySalary: "0",
+      department: "",
+      openingBalance: "",
+      active: true,
+    },
+  });
+
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
       return await apiRequest("POST", "/api/payroll/deposit-employee", {
@@ -622,6 +660,62 @@ export default function Payroll() {
     },
   });
 
+  // Employee mutations
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: EmployeeFormData) => {
+      if (!selectedCompany?.id) throw new Error("No company selected");
+      return await apiRequest("POST", "/api/employees", {
+        ...data,
+        companyId: selectedCompany.id,
+        employeeType: "Employee",
+        monthlySalary: data.monthlySalary || "0",
+        openingBalance: data.openingBalance || "0",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setCreateEmployeeDialogOpen(false);
+      createEmployeeForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async ({ id, forceDelete = false }: { id: number; forceDelete?: boolean }) => {
+      const queryParam = forceDelete ? "?forceDelete=true" : "";
+      return await apiRequest("DELETE", `/api/employees/${id}${queryParam}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setEmployeeToDelete(null);
+    },
+    onError: (error: any) => {
+      // Don't show toast for 409 - let the confirmation dialog handle it
+      if (error.status !== 409) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+        setEmployeeToDelete(null);
+      }
+    },
+  });
+
   const handleDeposit = (employee: Employee) => {
     setSelectedEmployee(employee);
     setDepositDialogOpen(true);
@@ -641,6 +735,33 @@ export default function Payroll() {
     setSelectedAdvance(advance);
     setDeductionDialogOpen(true);
     deductionForm.reset();
+  };
+
+  const handleDeleteEmployee = async (employee: Employee) => {
+    try {
+      await deleteEmployeeMutation.mutateAsync({ id: employee.id, forceDelete: false });
+    } catch (error: any) {
+      if (error.status === 409 && error.requiresConfirmation) {
+        // Balance exists - show second confirmation dialog with balance details
+        setDeleteConflict({
+          employee,
+          employeeBalance: error.employeeBalance || 0,
+          ledgerBalance: error.ledgerBalance || 0,
+        });
+      }
+    }
+  };
+
+  const handleForceDeleteEmployee = async () => {
+    if (!deleteConflict) return;
+    
+    try {
+      await deleteEmployeeMutation.mutateAsync({ id: deleteConflict.employee.id, forceDelete: true });
+      setDeleteConflict(null);
+    } catch (error: any) {
+      // Error will be handled by mutation's onError
+      setDeleteConflict(null);
+    }
   };
 
   const handleToggleWorker = (workerId: number) => {
@@ -713,11 +834,20 @@ export default function Payroll() {
         <TabsContent value="employees">
           <Card className="p-6">
             <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Warehouse Staff (Employees)</h2>
-                <p className="text-sm text-muted-foreground">
-                  Employees maintain running balance accounts. Deposit salary to increase balance, withdraw to decrease.
-                </p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-lg font-semibold">Warehouse Staff (Employees)</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Employees maintain running balance accounts. Deposit salary to increase balance, withdraw to decrease.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setCreateEmployeeDialogOpen(true)}
+                  data-testid="button-create-employee"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create Employee
+                </Button>
               </div>
 
               {employeeStaff.length === 0 ? (
@@ -799,6 +929,23 @@ export default function Payroll() {
                                 <TrendingDown className="h-4 w-4 mr-1" />
                                 Withdraw
                               </Button>
+                              <ConfirmationDialog
+                                trigger={
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    data-testid={`button-delete-${employee.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                }
+                                title="Delete Employee"
+                                description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
+                                confirmText="Delete"
+                                variant="destructive"
+                                onConfirm={() => handleDeleteEmployee(employee)}
+                              />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2273,6 +2420,169 @@ export default function Payroll() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Create Employee Dialog */}
+      <Dialog open={createEmployeeDialogOpen} onOpenChange={setCreateEmployeeDialogOpen}>
+        <DialogContent data-testid="dialog-create-employee">
+          <DialogHeader>
+            <DialogTitle>Create New Employee</DialogTitle>
+            <DialogDescription>
+              Add a new warehouse staff employee to the payroll system
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...createEmployeeForm}>
+            <form onSubmit={createEmployeeForm.handleSubmit((data) => createEmployeeMutation.mutate(data))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={createEmployeeForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John" {...field} data-testid="input-first-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={createEmployeeForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} data-testid="input-last-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={createEmployeeForm.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Employee Code (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-generated if left blank" {...field} data-testid="input-code" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={createEmployeeForm.control}
+                name="monthlySalary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly Salary</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-monthly-salary"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={createEmployeeForm.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Department (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Warehouse" {...field} value={field.value || ""} data-testid="input-department" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={createEmployeeForm.control}
+                name="openingBalance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opening Balance (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-opening-balance"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateEmployeeDialogOpen(false)}
+                  data-testid="button-cancel-create"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createEmployeeMutation.isPending} data-testid="button-submit-create">
+                  {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Balance Conflict Warning Dialog */}
+      <AlertDialog open={!!deleteConflict} onOpenChange={(open) => !open && setDeleteConflict(null)}>
+        <AlertDialogContent data-testid="dialog-delete-conflict">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Employee Has Non-Zero Balance</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConflict && (
+                <>
+                  <span className="font-semibold">{deleteConflict.employee.firstName} {deleteConflict.employee.lastName}</span> has a non-zero balance:
+                  <div className="mt-2 space-y-1 font-mono text-sm">
+                    <div>Employee Balance: {deleteConflict.employeeBalance.toFixed(2)}</div>
+                    <div>Ledger Balance: {deleteConflict.ledgerBalance.toFixed(2)}</div>
+                  </div>
+                  <p className="mt-3">
+                    Deleting this employee will also delete their linked ledger account. This action cannot be undone.
+                  </p>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConflict(null)} data-testid="button-cancel-force-delete">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleForceDeleteEmployee}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-force-delete"
+            >
+              Delete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
