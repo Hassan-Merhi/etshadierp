@@ -210,6 +210,17 @@ export interface IStorage {
   deleteVoucherEntry(id: number): Promise<void>;
   deleteVoucher(id: number): Promise<void>;
 
+  // Fiscal Period Closing
+  closeFiscalPeriod(
+    companyId: number,
+    periodStartDate: string,
+    periodEndDate: string,
+    retainedEarningsAccountId: number,
+    closedByUserId: string,
+    notes?: string
+  ): Promise<schema.FiscalPeriodClosure>;
+  getFiscalPeriodClosures(companyId: number): Promise<schema.FiscalPeriodClosure[]>;
+
   // Stock Transfers
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 
@@ -2076,6 +2087,213 @@ export class DbStorage implements IStorage {
     
     // STEP 4: Delete the voucher itself
     await db.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
+  }
+
+  // Fiscal Period Closing
+  async closeFiscalPeriod(
+    companyId: number,
+    periodStartDate: string,
+    periodEndDate: string,
+    retainedEarningsAccountId: number,
+    closedByUserId: string,
+    notes?: string
+  ): Promise<schema.FiscalPeriodClosure> {
+    return await db.transaction(async (tx) => {
+      // Check if closure already exists for this period
+      const existingClosure = await tx
+        .select()
+        .from(schema.fiscalPeriodClosures)
+        .where(
+          and(
+            eq(schema.fiscalPeriodClosures.companyId, companyId),
+            eq(schema.fiscalPeriodClosures.periodEndDate, periodEndDate)
+          )
+        );
+
+      if (existingClosure.length > 0) {
+        throw new Error(`Fiscal period ending ${periodEndDate} has already been closed`);
+      }
+
+      // Get all Income and Expense ledger accounts for this company
+      const accounts = await tx
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, companyId),
+            or(
+              eq(schema.ledgerAccounts.accountType, "Income"),
+              eq(schema.ledgerAccounts.accountType, "Expense")
+            )
+          )
+        );
+
+      if (accounts.length === 0) {
+        throw new Error("No Income or Expense accounts found for this company");
+      }
+
+      // Calculate balances for each account
+      interface AccountBalance {
+        accountId: number;
+        accountCode: string;
+        accountName: string;
+        accountType: string;
+        balance: number;
+      }
+
+      const accountBalances: AccountBalance[] = [];
+      let totalIncome = 0;
+      let totalExpense = 0;
+
+      for (const account of accounts) {
+        // Start with opening balance
+        const openingBalance = parseFloat(account.openingBalance || "0");
+        const openingSide = account.openingBalanceSide || "Dr";
+        let balance = openingSide === "Dr" ? openingBalance : -openingBalance;
+
+        // Get voucher entries for this account within the fiscal period only
+        const entries = await tx
+          .select()
+          .from(schema.voucherEntries)
+          .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+          .where(
+            and(
+              eq(schema.voucherEntries.ledgerAccountId, account.id),
+              sql`${schema.vouchers.voucherDate} >= ${periodStartDate}`,
+              sql`${schema.vouchers.voucherDate} <= ${periodEndDate}`,
+              eq(schema.vouchers.companyId, companyId),
+              eq(schema.vouchers.optional, false)
+            )
+          );
+
+        // Sum up debits and credits
+        for (const entry of entries) {
+          const debit = parseFloat(entry.voucher_entries.debitAmount || "0");
+          const credit = parseFloat(entry.voucher_entries.creditAmount || "0");
+          balance += debit - credit;
+        }
+
+        // For Income accounts, credit balance is positive (we track as negative for closing)
+        // For Expense accounts, debit balance is positive
+        if (account.accountType === "Income") {
+          totalIncome += -balance; // Income accounts have credit balances (negative)
+          accountBalances.push({
+            accountId: account.id,
+            accountCode: account.code,
+            accountName: account.name,
+            accountType: account.accountType,
+            balance: -balance, // Store as positive for income
+          });
+        } else {
+          totalExpense += balance; // Expense accounts have debit balances (positive)
+          accountBalances.push({
+            accountId: account.id,
+            accountCode: account.code,
+            accountName: account.name,
+            accountType: account.accountType,
+            balance: balance,
+          });
+        }
+      }
+
+      const netIncome = totalIncome - totalExpense;
+
+      // Create the closing voucher
+      const voucherNumber = `FISCAL-CLOSE-${periodEndDate}-${Date.now()}`;
+      const [closingVoucher] = await tx.insert(schema.vouchers).values({
+        companyId,
+        voucherNumber,
+        voucherType: "Journal",
+        voucherDate: periodEndDate,
+        description: `Fiscal Period Close: ${periodStartDate} to ${periodEndDate}${notes ? ` - ${notes}` : ''}`,
+        totalAmount: Math.abs(netIncome).toFixed(2),
+        optional: false,
+      }).returning();
+
+      // Create voucher entries to zero out each Income and Expense account
+      for (const account of accountBalances) {
+        if (account.balance === 0) continue;
+
+        if (account.accountType === "Income") {
+          // Debit Income accounts to zero them out
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: closingVoucher.id,
+            ledgerAccountId: account.accountId,
+            debitAmount: account.balance.toFixed(2),
+            creditAmount: "0",
+            narration: `Close ${account.accountName} for period ending ${periodEndDate}`,
+          });
+        } else {
+          // Credit Expense accounts to zero them out
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: closingVoucher.id,
+            ledgerAccountId: account.accountId,
+            debitAmount: "0",
+            creditAmount: account.balance.toFixed(2),
+            narration: `Close ${account.accountName} for period ending ${periodEndDate}`,
+          });
+        }
+      }
+
+      // Create entry to Retained Earnings for net income
+      if (netIncome !== 0) {
+        if (netIncome > 0) {
+          // Profit: Credit Retained Earnings
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: closingVoucher.id,
+            ledgerAccountId: retainedEarningsAccountId,
+            debitAmount: "0",
+            creditAmount: netIncome.toFixed(2),
+            narration: `Net Income for period ending ${periodEndDate}`,
+          });
+        } else {
+          // Loss: Debit Retained Earnings
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: closingVoucher.id,
+            ledgerAccountId: retainedEarningsAccountId,
+            debitAmount: Math.abs(netIncome).toFixed(2),
+            creditAmount: "0",
+            narration: `Net Loss for period ending ${periodEndDate}`,
+          });
+        }
+      }
+
+      // Record the closure
+      const [closure] = await tx.insert(schema.fiscalPeriodClosures).values({
+        companyId,
+        periodStartDate,
+        periodEndDate,
+        closedByUserId,
+        closingVoucherId: closingVoucher.id,
+        retainedEarningsAccountId,
+        totalIncome: totalIncome.toFixed(2),
+        totalExpense: totalExpense.toFixed(2),
+        netIncome: netIncome.toFixed(2),
+        status: "CLOSED",
+        notes: notes || null,
+      }).returning();
+
+      // Reset opening balances for Income/Expense accounts to 0 for next period
+      for (const account of accountBalances) {
+        await tx
+          .update(schema.ledgerAccounts)
+          .set({
+            openingBalance: "0",
+            openingBalanceSide: "Dr",
+          })
+          .where(eq(schema.ledgerAccounts.id, account.accountId));
+      }
+
+      return closure;
+    });
+  }
+
+  async getFiscalPeriodClosures(companyId: number): Promise<schema.FiscalPeriodClosure[]> {
+    return await db
+      .select()
+      .from(schema.fiscalPeriodClosures)
+      .where(eq(schema.fiscalPeriodClosures.companyId, companyId))
+      .orderBy(sql`${schema.fiscalPeriodClosures.periodEndDate} DESC`);
   }
 
   // Stock Transfers
