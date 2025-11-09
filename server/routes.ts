@@ -5095,12 +5095,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Create BALANCED voucher entries for double-entry bookkeeping
-        // This system uses purchase-date expense recognition (PURCHASES account is expensed when purchased)
-        // Therefore sales only recognize revenue, not COGS
+        // Periodic inventory system: Purchases are expensed when purchased
+        // Sales recognize revenue immediately; COGS calculated at period-end
         
-        // Debit: Cash/Bank account (determined by location's cash account)
-        // For simplicity, we'll create a default "Sales Cash" account per company
-        const locationCashAccount = await tx
+        // Get location's linked cash account
+        const locationCashAccounts = await tx
           .select()
           .from(ledgerAccounts)
           .where(
@@ -5111,39 +5110,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
           .limit(1);
 
-        let cashAccountId = salesRevenueAccount.id; // Fallback to revenue account
-        
-        if (locationCashAccount.length > 0) {
-          cashAccountId = locationCashAccount[0].id;
-          
-          // Entry 1: Debit location's cash account
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: cashAccountId,
-            debitAmount: totalSales.toString(),
-            creditAmount: "0",
-            narration: `Cash from POS Sales - ${items.length} items`,
-          });
-
-          // Entry 2: Credit Sales Revenue  
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: salesRevenueAccount.id,
-            debitAmount: "0",
-            creditAmount: totalSales.toString(),
-            narration: `POS Sales Revenue - ${items.length} items`,
-          });
-        } else {
-          // No location cash account - create single balanced entry
-          // This keeps the voucher balanced without creating artificial accounts
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: salesRevenueAccount.id,
-            debitAmount: "0",
-            creditAmount: totalSales.toString(),
-            narration: `POS Sales Revenue - ${items.length} items (No cash account configured)`,
-          });
+        if (locationCashAccounts.length === 0) {
+          throw new Error(
+            `Location does not have a linked cash account. Please configure a cash account for this location in Settings.`
+          );
         }
+
+        const cashAccount = locationCashAccounts[0];
+        
+        // Entry 1: Debit Cash (Asset increases with debit)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: cashAccount.id,
+          debitAmount: totalSales.toString(),
+          creditAmount: "0",
+          narration: `Cash from POS Sales - ${items.length} items`,
+        });
+
+        // Entry 2: Credit Sales Revenue (Income increases with credit)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salesRevenueAccount.id,
+          debitAmount: "0",
+          creditAmount: totalSales.toString(),
+          narration: `Sales Revenue - ${items.length} items`,
+        });
 
         // Update voucher with total amount
         await tx
@@ -6000,49 +5991,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get or create "Cost of Goods Sold" ledger account
-      let cogsAccount = await storage.getLedgerAccountByCode("COGS", req.session.currentCompanyId!);
-      if (!cogsAccount) {
-        cogsAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "COGS",
-          name: "Cost of Goods Sold",
-          accountType: "Expense",
-          subType: "Direct Expense",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
-
-      // Get or create "POS Cash" ledger account
-      let posCashAccount = await storage.getLedgerAccountByCode("POS_CASH", req.session.currentCompanyId!);
-      if (!posCashAccount) {
-        posCashAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "POS_CASH",
-          name: "POS Cash Sales",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
-      }
-
-      // Get or create "Inventory" asset account
-      let inventoryAccount = await storage.getLedgerAccountByCode("INVENTORY", req.session.currentCompanyId!);
-      if (!inventoryAccount) {
-        inventoryAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "INVENTORY",
-          name: "Inventory",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
+      // Get all locations for this company to find their cash accounts
+      const companyLocations = await storage.getAllLocations(req.session.currentCompanyId!);
+      const locationCashAccountMap = new Map<number, number>(); // locationId -> cashAccountId
+      
+      for (const location of companyLocations) {
+        const cashAccounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
+              eq(ledgerAccounts.linkedLocationId, location.id)
+            )
+          )
+          .limit(1);
+        
+        if (cashAccounts.length > 0) {
+          locationCashAccountMap.set(location.id, cashAccounts[0].id);
+        }
       }
 
       // Get all Sales vouchers for this company
@@ -6083,14 +6050,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Filter to only vouchers that are missing any of the required entries
+      // Get all sales items to determine locations
+      const allSalesItems = await db
+        .select()
+        .from(salesItems)
+        .where(inArray(salesItems.voucherId, voucherIds))
+        .execute();
+      
+      // Create map of voucher ID -> location ID (from first sales item's stock item)
+      const voucherLocationMap = new Map<number, number>();
+      for (const item of allSalesItems) {
+        if (!voucherLocationMap.has(item.voucherId)) {
+          // Get stock item to find inventory location
+          const stockItem = await db
+            .select()
+            .from(stockItems)
+            .where(eq(stockItems.id, item.stockItemId))
+            .limit(1);
+          
+          if (stockItem.length > 0) {
+            const inventoryRecord = await db
+              .select()
+              .from(inventory)
+              .where(eq(inventory.stockItemId, stockItem[0].id))
+              .limit(1);
+            
+            if (inventoryRecord.length > 0) {
+              voucherLocationMap.set(item.voucherId, inventoryRecord[0].locationId);
+            }
+          }
+        }
+      }
+
+      // Filter to vouchers that need backfill (missing entries or have wrong structure)
       const vouchersNeedingBackfill = allVouchers.filter(v => {
         const ledgerIds = voucherLedgerMap.get(v.id) || new Set();
+        const entryCount = ledgerIds.size;
+        
+        // Need backfill if:
+        // 1. No entries at all
+        // 2. Missing sales revenue
+        // 3. Has wrong number of entries (old format had COGS/Inventory)
         const hasSalesRev = ledgerIds.has(salesRevenueAccount!.id);
-        const hasCogs = ledgerIds.has(cogsAccount!.id);
-        const hasPosCash = ledgerIds.has(posCashAccount!.id);
-        const hasInventory = ledgerIds.has(inventoryAccount!.id);
-        return !hasSalesRev || !hasCogs || !hasPosCash || !hasInventory;
+        return entryCount === 0 || !hasSalesRev || entryCount !== 2;
       });
 
       if (vouchersNeedingBackfill.length === 0) {
@@ -6101,9 +6103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let backfilledCount = 0;
+      let skippedCount = 0;
 
       for (const voucher of vouchersNeedingBackfill) {
-        // Use a transaction to ensure atomic entry creation
+        // Use a transaction to ensure atomic updates
         await db.transaction(async (tx) => {
           // Get all sales items for this voucher
           const items = await tx
@@ -6114,73 +6117,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (items.length === 0) {
             console.warn(`No sales items found for voucher ${voucher.id}, skipping`);
+            skippedCount++;
             return;
           }
 
-          // Calculate totals
+          // Calculate total sales
           const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
-          const totalCost = items.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
 
-          if (totalSales === 0 && totalCost === 0) {
-            console.warn(`Voucher ${voucher.id} has zero totals, skipping`);
+          if (totalSales === 0) {
+            console.warn(`Voucher ${voucher.id} has zero sales, skipping`);
+            skippedCount++;
             return;
           }
 
-          const ledgerIds = voucherLedgerMap.get(voucher.id) || new Set();
-          
-          // Create balanced entries (only create missing ones)
-          
-          // Entry 1: Debit POS Cash (if missing)
-          if (!ledgerIds.has(posCashAccount!.id) && totalSales > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: posCashAccount!.id,
-              debitAmount: totalSales.toFixed(2),
-              creditAmount: "0",
-              narration: `Cash from POS Sales - ${items.length} items (Backfilled)`,
-            });
-          }
-          
-          // Entry 2: Credit Sales Revenue (if missing)
-          if (!ledgerIds.has(salesRevenueAccount!.id) && totalSales > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: salesRevenueAccount!.id,
-              debitAmount: "0",
-              creditAmount: totalSales.toFixed(2),
-              narration: `Sales Revenue - ${items.length} items (Backfilled)`,
-            });
+          // Get location for this voucher
+          const locationId = voucherLocationMap.get(voucher.id);
+          if (!locationId) {
+            console.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
+            skippedCount++;
+            return;
           }
 
-          // Entry 3: Debit COGS (if missing)
-          if (!ledgerIds.has(cogsAccount!.id) && totalCost > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: cogsAccount!.id,
-              debitAmount: totalCost.toFixed(2),
-              creditAmount: "0",
-              narration: `Cost of Goods Sold - ${items.length} items (Backfilled)`,
-            });
+          const cashAccountId = locationCashAccountMap.get(locationId);
+          if (!cashAccountId) {
+            console.warn(`No cash account found for location ${locationId}, skipping voucher ${voucher.id}`);
+            skippedCount++;
+            return;
           }
 
-          // Entry 4: Credit Inventory (if missing)
-          if (!ledgerIds.has(inventoryAccount!.id) && totalCost > 0) {
-            await tx.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: inventoryAccount!.id,
-              debitAmount: "0",
-              creditAmount: totalCost.toFixed(2),
-              narration: `Inventory reduction from POS Sales - ${items.length} items (Backfilled)`,
-            });
-          }
+          // Delete all existing voucher entries (in case of old format)
+          await tx
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucher.id));
+
+          // Create new balanced entries (periodic inventory system)
+          
+          // Entry 1: Debit Cash
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: totalSales.toFixed(2),
+            creditAmount: "0",
+            narration: `Cash from POS Sales - ${items.length} items (Backfilled)`,
+          });
+
+          // Entry 2: Credit Sales Revenue
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: salesRevenueAccount!.id,
+            debitAmount: "0",
+            creditAmount: totalSales.toFixed(2),
+            narration: `Sales Revenue - ${items.length} items (Backfilled)`,
+          });
 
           backfilledCount++;
         });
       }
 
       res.json({
-        message: "Sales backfill completed successfully",
-        count: backfilledCount,
+        message: `Sales backfill completed. ${backfilledCount} vouchers updated, ${skippedCount} skipped.`,
+        backfilledCount,
+        skippedCount,
         totalSalesVouchers: allVouchers.length,
       });
     } catch (error: any) {
