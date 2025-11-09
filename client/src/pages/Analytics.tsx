@@ -441,8 +441,6 @@ export default function Analytics() {
     "DUTIES",              // Container import duties
     "TRANSPORTCHARGES",    // Container transport costs
     "TRANSPORT",           // Alternative transport account name
-    "OFFICECHARGE",        // Container office charges
-    "OFFICE",              // Alternative office charge account name
     "CONTAINERLICENSES",   // Container license fees
     "LICENSES",            // Alternative license account name
   ];

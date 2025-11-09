@@ -9756,8 +9756,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "DUTIES",              // Container import duties (capitalized)
         "TRANSPORTCHARGES",    // Container transport costs (capitalized)
         "TRANSPORT",           // Alternative transport account name (capitalized)
-        "OFFICECHARGE",        // Container office charges (capitalized)
-        "OFFICE",              // Alternative office charge account name (capitalized)
         "CONTAINERLICENSES",   // Container license fees (capitalized)
         "LICENSES",            // Alternative license account name (capitalized)
       ];
