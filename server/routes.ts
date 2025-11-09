@@ -9525,9 +9525,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const incomeAccountIds = companyAccounts
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
-      const expenseAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Expense")
-        .map((acc) => acc.id);
+      
+      // Exclude PURCHASES and IMPORT_CHARGES from operating expenses
+      const expenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Expense" && 
+        acc.code !== "PURCHASES" && 
+        acc.code !== "IMPORT_CHARGES"
+      );
+      const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
       // Get voucher IDs for this company
       const companyVouchers = await db
@@ -9562,6 +9567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate total expenses (debits - credits for expense accounts)
+      // Excludes PURCHASES and IMPORT_CHARGES (inventory costs)
       let totalExpenses = 0;
       for (const entry of companyEntries) {
         if (
