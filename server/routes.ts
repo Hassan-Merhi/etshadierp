@@ -4958,9 +4958,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { locationId, saleDate, items } = req.body;
+      const { locationId, saleDate, items, cashAccountId } = req.body;
 
-      if (!locationId || !saleDate || !items || !Array.isArray(items)) {
+      if (!locationId || !saleDate || !items || !Array.isArray(items) || !cashAccountId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -4968,6 +4968,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(400).json({ message: "Location not found" });
+      }
+
+      // Validate cash account
+      const cashAccount = await storage.getLedgerAccountById(cashAccountId);
+      if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
+        return res.status(400).json({ message: "Invalid cash account" });
       }
 
       // Get or create "Sales Revenue" ledger account
@@ -5098,30 +5104,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Periodic inventory system: Purchases are expensed when purchased
         // Sales recognize revenue immediately; COGS calculated at period-end
         
-        // Get location's linked cash account
-        const locationCashAccounts = await tx
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
-              eq(ledgerAccounts.linkedLocationId, locationId)
-            )
-          )
-          .limit(1);
-
-        if (locationCashAccounts.length === 0) {
-          throw new Error(
-            `Location does not have a linked cash account. Please configure a cash account for this location in Settings.`
-          );
-        }
-
-        const cashAccount = locationCashAccounts[0];
-        
-        // Entry 1: Debit Cash (Asset increases with debit)
+        // Entry 1: Debit Cash Account (Asset increases with debit)
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: cashAccount.id,
+          ledgerAccountId: cashAccountId,
           debitAmount: totalSales.toString(),
           creditAmount: "0",
           narration: `Cash from POS Sales - ${items.length} items`,
@@ -5991,25 +5977,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get all locations for this company to find their cash accounts
-      const companyLocations = await storage.getAllLocations(req.session.currentCompanyId!);
-      const locationCashAccountMap = new Map<number, number>(); // locationId -> cashAccountId
-      
-      for (const location of companyLocations) {
-        const cashAccounts = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
-              eq(ledgerAccounts.linkedLocationId, location.id)
-            )
-          )
-          .limit(1);
-        
-        if (cashAccounts.length > 0) {
-          locationCashAccountMap.set(location.id, cashAccounts[0].id);
-        }
+      // Get or create "Sales Cash" account for this company
+      let salesCashAccount = await storage.getLedgerAccountByCode("SALES_CASH", req.session.currentCompanyId!);
+      if (!salesCashAccount) {
+        salesCashAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "SALES_CASH",
+          name: "Sales Cash",
+          accountType: "Asset",
+          subType: "Current Asset",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
       }
 
       // Get all Sales vouchers for this company
@@ -6047,38 +6027,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (entry.ledgerAccountId) {
           voucherLedgerMap.get(entry.voucherId)!.add(entry.ledgerAccountId);
-        }
-      }
-
-      // Get all sales items to determine locations
-      const allSalesItems = await db
-        .select()
-        .from(salesItems)
-        .where(inArray(salesItems.voucherId, voucherIds))
-        .execute();
-      
-      // Create map of voucher ID -> location ID (from first sales item's stock item)
-      const voucherLocationMap = new Map<number, number>();
-      for (const item of allSalesItems) {
-        if (!voucherLocationMap.has(item.voucherId)) {
-          // Get stock item to find inventory location
-          const stockItem = await db
-            .select()
-            .from(stockItems)
-            .where(eq(stockItems.id, item.stockItemId))
-            .limit(1);
-          
-          if (stockItem.length > 0) {
-            const inventoryRecord = await db
-              .select()
-              .from(inventory)
-              .where(eq(inventory.stockItemId, stockItem[0].id))
-              .limit(1);
-            
-            if (inventoryRecord.length > 0) {
-              voucherLocationMap.set(item.voucherId, inventoryRecord[0].locationId);
-            }
-          }
         }
       }
 
@@ -6130,21 +6078,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
 
-          // Get location for this voucher
-          const locationId = voucherLocationMap.get(voucher.id);
-          if (!locationId) {
-            console.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
-            skippedCount++;
-            return;
-          }
-
-          const cashAccountId = locationCashAccountMap.get(locationId);
-          if (!cashAccountId) {
-            console.warn(`No cash account found for location ${locationId}, skipping voucher ${voucher.id}`);
-            skippedCount++;
-            return;
-          }
-
           // Delete all existing voucher entries (in case of old format)
           await tx
             .delete(voucherEntries)
@@ -6152,10 +6085,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create new balanced entries (periodic inventory system)
           
-          // Entry 1: Debit Cash
+          // Entry 1: Debit Sales Cash
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
-            ledgerAccountId: cashAccountId,
+            ledgerAccountId: salesCashAccount!.id,
             debitAmount: totalSales.toFixed(2),
             creditAmount: "0",
             narration: `Cash from POS Sales - ${items.length} items (Backfilled)`,
