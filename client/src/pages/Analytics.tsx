@@ -433,9 +433,30 @@ export default function Analytics() {
       acc.type === "Bank"
   );
 
-  const expenseAccounts = accounts.filter(
-    (acc) => acc.type === "Ledger" && acc.accountType === "Expense"
-  );
+  // Exclude inventory-related accounts from expense display
+  // These are capitalized to inventory, not operating expenses
+  const excludedExpenseCodes = [
+    "PURCHASES",           // Direct inventory purchases
+    "IMPORTCHARGES",       // Old consolidated import charges
+    "DUTIES",              // Container import duties
+    "TRANSPORTCHARGES",    // Container transport costs
+    "TRANSPORT",           // Alternative transport account name
+    "OFFICECHARGE",        // Container office charges
+    "OFFICE",              // Alternative office charge account name
+    "CONTAINERLICENSES",   // Container license fees
+    "LICENSES",            // Alternative license account name
+  ];
+  
+  const normalizeCode = (code: string) => 
+    code.toUpperCase().replace(/[\s_-]/g, "");
+  
+  const expenseAccounts = accounts.filter((acc) => {
+    if (acc.type !== "Ledger" || acc.accountType !== "Expense") return false;
+    const normalizedCode = normalizeCode(acc.code);
+    return !excludedExpenseCodes.some(excluded => 
+      normalizeCode(excluded) === normalizedCode
+    );
+  });
 
   const directExpenseAccounts = expenseAccounts.filter(
     (acc) => acc.subType === "Direct Expense"
