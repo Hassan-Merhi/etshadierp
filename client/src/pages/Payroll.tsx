@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import {
   Table,
@@ -64,7 +65,7 @@ import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2 } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -132,6 +133,7 @@ type WorkerFormData = z.infer<typeof workerFormSchema>;
 const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true }).extend({
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   openingBalance: z.string().optional(),
+  employeeGroupId: z.string().optional(),
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -211,6 +213,65 @@ export default function Payroll() {
   const { data: salaryAdvances, isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
     queryKey: ["/api/salary-advances", selectedCompany?.id],
     enabled: !!selectedCompany,
+  });
+
+  const { data: employeeGroups = [] } = useQuery<any[]>({
+    queryKey: ["/api/employee-groups", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Employee Groups state
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
+
+  // Employee Groups mutations
+  const createGroupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/employee-groups", {
+        name: newGroupName,
+        description: newGroupDescription,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee group created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
+      setNewGroupName("");
+      setNewGroupDescription("");
+      setCreateGroupDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create employee group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: number) => {
+      await apiRequest("DELETE", `/api/employee-groups/${groupId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Employee group deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete employee group",
+        variant: "destructive",
+      });
+    },
   });
 
   const cashAccounts = ledgerAccounts?.filter((acc) => acc.accountType === "Cash") || [];
@@ -669,13 +730,21 @@ export default function Payroll() {
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: EmployeeFormData) => {
       if (!selectedCompany?.id) throw new Error("No company selected");
-      return await apiRequest("POST", "/api/employees", {
-        ...data,
+      const { employeeGroupId, ...employeeData } = data;
+      const payload: any = {
+        ...employeeData,
         companyId: selectedCompany.id,
         employeeType: "Employee",
         monthlySalary: data.monthlySalary || "0",
         openingBalance: data.openingBalance || "0",
-      });
+      };
+      
+      // Include employeeGroupId if selected (parse from string to number)
+      if (employeeGroupId && employeeGroupId !== "") {
+        payload.employeeGroupId = parseInt(employeeGroupId, 10);
+      }
+      
+      return await apiRequest("POST", "/api/employees", payload);
     },
     onSuccess: () => {
       toast({
@@ -683,6 +752,7 @@ export default function Payroll() {
         description: "Employee created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
       setCreateEmployeeDialogOpen(false);
       createEmployeeForm.reset();
     },
@@ -881,6 +951,96 @@ export default function Payroll() {
                   Create Employee
                 </Button>
               </div>
+
+              {/* Employee Groups Management */}
+              <Collapsible open={groupsExpanded} onOpenChange={setGroupsExpanded}>
+                <Card className="border-dashed">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="w-full flex items-center justify-between p-4 hover-elevate"
+                      data-testid="button-toggle-groups"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">Employee Groups ({employeeGroups.length})</span>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          groupsExpanded && "rotate-180"
+                        )}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-muted-foreground">
+                          Organize employees into groups for easier management
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => setCreateGroupDialogOpen(true)}
+                          data-testid="button-create-group"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create Group
+                        </Button>
+                      </div>
+                      
+                      {employeeGroups.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <p className="text-sm">No groups created yet</p>
+                        </div>
+                      ) : (
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead data-testid="header-group-name">Group Name</TableHead>
+                                <TableHead data-testid="header-group-description">Description</TableHead>
+                                <TableHead data-testid="header-group-actions" className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {employeeGroups.map((group: any) => (
+                                <TableRow key={group.id} data-testid={`row-group-${group.id}`}>
+                                  <TableCell data-testid={`cell-group-name-${group.id}`}>
+                                    {group.name}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-group-description-${group.id}`} className="text-muted-foreground">
+                                    {group.description || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-group-actions-${group.id}`} className="text-right">
+                                    <ConfirmationDialog
+                                      trigger={
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          data-testid={`button-delete-group-${group.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-1" />
+                                          Delete
+                                        </Button>
+                                      }
+                                      title="Delete Employee Group"
+                                      description={`Are you sure you want to delete the group "${group.name}"? This will remove all employee assignments to this group.`}
+                                      onConfirm={() => deleteGroupMutation.mutate(group.id)}
+                                      confirmText="Delete"
+                                      cancelText="Cancel"
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
 
               {employeeStaff.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
@@ -2554,6 +2714,34 @@ export default function Payroll() {
                 )}
               />
 
+              <FormField
+                control={createEmployeeForm.control}
+                name="employeeGroupId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Employee Group (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-employee-group">
+                          <SelectValue placeholder="Select a group" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="" data-testid="option-no-group">
+                          No Group
+                        </SelectItem>
+                        {employeeGroups.map((group: any) => (
+                          <SelectItem key={group.id} value={group.id.toString()} data-testid={`option-group-${group.id}`}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -2606,6 +2794,62 @@ export default function Payroll() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Group Dialog */}
+      <Dialog open={createGroupDialogOpen} onOpenChange={setCreateGroupDialogOpen}>
+        <DialogContent data-testid="dialog-create-group">
+          <DialogHeader>
+            <DialogTitle>Create Employee Group</DialogTitle>
+            <DialogDescription>
+              Create a new group to organize employees
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Group Name</label>
+              <Input
+                placeholder="e.g., Warehouse Team"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                data-testid="input-group-name"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Description (Optional)</label>
+              <Textarea
+                placeholder="Brief description of the group"
+                value={newGroupDescription}
+                onChange={(e) => setNewGroupDescription(e.target.value)}
+                data-testid="input-group-description"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCreateGroupDialogOpen(false);
+                  setNewGroupName("");
+                  setNewGroupDescription("");
+                }}
+                data-testid="button-cancel-group"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => createGroupMutation.mutate()}
+                disabled={!newGroupName.trim() || createGroupMutation.isPending}
+                data-testid="button-submit-group"
+              >
+                {createGroupMutation.isPending ? "Creating..." : "Create Group"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
