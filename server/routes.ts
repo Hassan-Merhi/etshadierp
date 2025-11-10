@@ -9765,7 +9765,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code.toUpperCase().replace(/[\s_-]/g, "");
       
       const expenseAccounts = companyAccounts.filter((acc) => {
-        if (acc.accountType !== "Expense") return false;
+        // Support both correct format (accountType="Expense") and legacy format
+        // (accountType="Indirect Expense" or "Direct Expense")
+        const isExpenseAccount = 
+          acc.accountType === "Expense" || 
+          acc.accountType === "Indirect Expense" || 
+          acc.accountType === "Direct Expense";
+        
+        if (!isExpenseAccount) return false;
+        
         const normalizedCode = normalizeCode(acc.code);
         return !excludedExpenseCodes.some(excluded => 
           normalizeCode(excluded) === normalizedCode
@@ -9876,7 +9884,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code.toUpperCase().replace(/[\s_-]/g, "");
       
       const expenseAccounts = companyAccounts.filter((acc) => {
-        if (acc.accountType !== "Expense") return false;
+        // Support both correct format (accountType="Expense") and legacy format
+        // (accountType="Indirect Expense" or "Direct Expense")
+        const isExpenseAccount = 
+          acc.accountType === "Expense" || 
+          acc.accountType === "Indirect Expense" || 
+          acc.accountType === "Direct Expense";
+        
+        if (!isExpenseAccount) return false;
+        
         const normalizedCode = normalizeCode(acc.code);
         return !excludedExpenseCodes.some(excluded => 
           normalizeCode(excluded) === normalizedCode
@@ -10161,7 +10177,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (acc) => acc.accountType === "Income",
         );
         const expenseAccounts = companyAccounts.filter(
-          (acc) => acc.accountType === "Expense",
+          (acc) => 
+            acc.accountType === "Expense" || 
+            acc.accountType === "Indirect Expense" || 
+            acc.accountType === "Direct Expense",
         );
 
         const incomeAccountIds = incomeAccounts.map((acc) => acc.id);
