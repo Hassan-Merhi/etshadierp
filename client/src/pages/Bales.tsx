@@ -96,7 +96,7 @@ export default function Bales() {
         barcodeInputRef.current.value = "";
       }
     },
-    onError: (error: any) {
+    onError: (error: any) => {
       toast({
         title: "Error creating bale",
         description: error.message,
