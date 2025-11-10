@@ -23,6 +23,7 @@ import {
   Ship,
   HandCoins,
   ArrowLeftRight,
+  Package2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -79,6 +80,11 @@ const menuItems = [
     title: "Stock OTW",
     url: "/stock-otw",
     icon: Ship,
+  },
+  {
+    title: "Factory Bales",
+    url: "/bales",
+    icon: Package2,
   },
   {
     title: "Analytics",

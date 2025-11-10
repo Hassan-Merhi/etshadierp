@@ -11028,6 +11028,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bales API Routes
+  app.get("/api/bales", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const bales = await storage.getAllBales(companyId);
+      res.json(bales);
+    } catch (error: any) {
+      console.error("Error fetching bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bales/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      const bale = await storage.getBaleById(id);
+      
+      if (!bale) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      // Check company ownership
+      if (bale.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error fetching bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bales/barcode/:barcode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const barcode = req.params.barcode;
+      const bale = await storage.getBaleByBarcode(barcode, companyId);
+      
+      if (!bale) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error fetching bale by barcode:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bales", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertBaleSchema } = await import("@shared/schema");
+      const data = insertBaleSchema.parse({ ...req.body, companyId });
+
+      // Check for duplicate barcode
+      const existing = await storage.getBaleByBarcode(data.barcode, companyId);
+      if (existing) {
+        return res.status(409).json({ message: "Barcode already exists" });
+      }
+
+      const bale = await storage.createBale(data);
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error creating bale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/bales/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existing = await storage.getBaleById(id);
+      
+      if (!existing) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      // Check company ownership
+      if (existing.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Prevent companyId changes
+      const { companyId: _, ...updateData } = req.body;
+      const bale = await storage.updateBale(id, updateData);
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error updating bale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/bales/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      const existing = await storage.getBaleById(id);
+      
+      if (!existing) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      // Check company ownership
+      if (existing.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteBale(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bales/import", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertBaleSchema } = await import("@shared/schema");
+      const balesData = req.body.bales || [];
+
+      if (!Array.isArray(balesData)) {
+        return res.status(400).json({ message: "Invalid data format" });
+      }
+
+      const validatedBales = balesData.map((b: any) => 
+        insertBaleSchema.parse({ ...b, companyId })
+      );
+
+      const created = await storage.bulkCreateBales(validatedBales);
+      res.json({ success: true, count: created.length, bales: created });
+    } catch (error: any) {
+      console.error("Error importing bales:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Company Settings API Routes
+  app.get("/api/company-settings", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const settings = await storage.getCompanySettings(companyId);
+      res.json(settings || { companyId });
+    } catch (error: any) {
+      console.error("Error fetching company settings:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/company-settings", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertCompanySettingsSchema } = await import("@shared/schema");
+      const data = insertCompanySettingsSchema.parse({ ...req.body, companyId });
+
+      const settings = await storage.upsertCompanySettings(data);
+      res.json(settings);
+    } catch (error: any) {
+      console.error("Error updating company settings:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

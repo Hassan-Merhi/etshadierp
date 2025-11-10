@@ -1023,3 +1023,73 @@ export const insertDashboardCashAccountSchema = createInsertSchema(dashboardCash
 
 export type InsertDashboardCashAccount = z.infer<typeof insertDashboardCashAccountSchema>;
 export type DashboardCashAccount = typeof dashboardCashAccounts.$inferSelect;
+
+// Company Settings - stores company-specific configuration like logos
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().unique(),
+  logoUrl: text("logo_url"),
+  logoFileName: text("logo_file_name"),
+  logoUpdatedAt: timestamp("logo_updated_at"),
+  invoiceFooter: text("invoice_footer"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  logoUrl: z.string().optional(),
+  logoFileName: z.string().optional(),
+  invoiceFooter: z.string().optional(),
+});
+
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
+
+// Bales - tracks factory bales for clothing grading/sorting business
+export const bales = pgTable("bales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  containerId: integer("container_id"),
+  barcode: varchar("barcode", { length: 100 }).notNull(),
+  category: text("category").notNull(),
+  grade: text("grade").notNull(),
+  origin: text("origin").notNull(),
+  weight: decimal("weight", { precision: 10, scale: 3 }).notNull(),
+  datePressed: date("date_pressed").notNull(),
+  price: decimal("price", { precision: 12, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).default("USD"),
+  soldAt: timestamp("sold_at"),
+  soldVoucherId: integer("sold_voucher_id"),
+  status: text("status").notNull().default("AVAILABLE"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyBarcode: uniqueIndex("bales_company_barcode_unique").on(t.companyId, t.barcode),
+}));
+
+export const insertBaleSchema = createInsertSchema(bales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  containerId: z.number().optional(),
+  barcode: z.string().min(1, "Barcode is required"),
+  category: z.string().min(1, "Category is required"),
+  grade: z.enum(["A", "B", "C"]),
+  origin: z.enum(["EU", "AUS", "USA"]),
+  weight: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  datePressed: z.string().min(1, "Date pressed is required"),
+  price: z.string().optional(),
+  currency: z.string().length(3).optional(),
+  status: z.enum(["AVAILABLE", "HOLD", "SOLD"]).optional(),
+});
+
+export type InsertBale = z.infer<typeof insertBaleSchema>;
+export type Bale = typeof bales.$inferSelect;

@@ -275,6 +275,19 @@ export interface IStorage {
   createDraftPosSale(draft: schema.InsertDraftPosSale, items: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>): Promise<schema.DraftPosSale>;
   updateDraftPosSale(id: number, draft: Partial<schema.InsertDraftPosSale>, items?: Array<{stockItemId: number, quantity: string, rate: string, amount: string}>): Promise<schema.DraftPosSale>;
   deleteDraftPosSale(id: number): Promise<void>;
+
+  // Company Settings
+  getCompanySettings(companyId: number): Promise<schema.CompanySettings | undefined>;
+  upsertCompanySettings(settings: schema.InsertCompanySettings): Promise<schema.CompanySettings>;
+
+  // Bales
+  getAllBales(companyId: number): Promise<schema.Bale[]>;
+  getBaleById(id: number): Promise<schema.Bale | undefined>;
+  getBaleByBarcode(barcode: string, companyId: number): Promise<schema.Bale | undefined>;
+  createBale(bale: schema.InsertBale): Promise<schema.Bale>;
+  updateBale(id: number, updates: Partial<schema.InsertBale>): Promise<schema.Bale>;
+  deleteBale(id: number): Promise<void>;
+  bulkCreateBales(bales: schema.InsertBale[]): Promise<schema.Bale[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -3054,6 +3067,97 @@ export class DbStorage implements IStorage {
       .where(eq(schema.draftPosSaleItems.draftId, id));
     await db.delete(schema.draftPosSales)
       .where(eq(schema.draftPosSales.id, id));
+  }
+
+  // Company Settings
+  async getCompanySettings(companyId: number): Promise<schema.CompanySettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(schema.companySettings)
+      .where(eq(schema.companySettings.companyId, companyId));
+    return settings;
+  }
+
+  async upsertCompanySettings(settings: schema.InsertCompanySettings): Promise<schema.CompanySettings> {
+    const existing = await this.getCompanySettings(settings.companyId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(schema.companySettings)
+        .set({ ...settings, updatedAt: sql`now()` })
+        .where(eq(schema.companySettings.companyId, settings.companyId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(schema.companySettings)
+        .values(settings)
+        .returning();
+      return created;
+    }
+  }
+
+  // Bales
+  async getAllBales(companyId: number): Promise<schema.Bale[]> {
+    return await db
+      .select()
+      .from(schema.bales)
+      .where(and(
+        eq(schema.bales.companyId, companyId),
+        eq(schema.bales.active, true)
+      ))
+      .orderBy(desc(schema.bales.createdAt));
+  }
+
+  async getBaleById(id: number): Promise<schema.Bale | undefined> {
+    const [bale] = await db
+      .select()
+      .from(schema.bales)
+      .where(eq(schema.bales.id, id));
+    return bale;
+  }
+
+  async getBaleByBarcode(barcode: string, companyId: number): Promise<schema.Bale | undefined> {
+    const [bale] = await db
+      .select()
+      .from(schema.bales)
+      .where(and(
+        eq(schema.bales.barcode, barcode),
+        eq(schema.bales.companyId, companyId)
+      ));
+    return bale;
+  }
+
+  async createBale(bale: schema.InsertBale): Promise<schema.Bale> {
+    const [created] = await db
+      .insert(schema.bales)
+      .values(bale)
+      .returning();
+    return created;
+  }
+
+  async updateBale(id: number, updates: Partial<schema.InsertBale>): Promise<schema.Bale> {
+    const [updated] = await db
+      .update(schema.bales)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.bales.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBale(id: number): Promise<void> {
+    await db
+      .update(schema.bales)
+      .set({ active: false })
+      .where(eq(schema.bales.id, id));
+  }
+
+  async bulkCreateBales(bales: schema.InsertBale[]): Promise<schema.Bale[]> {
+    if (bales.length === 0) return [];
+    return await db
+      .insert(schema.bales)
+      .values(bales)
+      .returning();
   }
 }
 

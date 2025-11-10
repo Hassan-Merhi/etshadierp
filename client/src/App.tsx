@@ -41,6 +41,7 @@ import EditSupplier from "@/pages/EditSupplier";
 import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
 import SoldContainers from "@/pages/SoldContainers";
+import Bales from "@/pages/Bales";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -93,6 +94,7 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
+      <Route path="/bales" component={Bales} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>
