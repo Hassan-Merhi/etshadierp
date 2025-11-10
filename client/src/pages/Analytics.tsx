@@ -457,7 +457,17 @@ export default function Analytics() {
     code.toUpperCase().replace(/[\s_-]/g, "");
   
   const expenseAccounts = accounts.filter((acc) => {
-    if (acc.type !== "Ledger" || acc.accountType !== "Expense") return false;
+    if (acc.type !== "Ledger") return false;
+    
+    // Support both correct format (accountType="Expense") and legacy format
+    // (accountType="Indirect Expense" or "Direct Expense")
+    const isExpenseAccount = 
+      acc.accountType === "Expense" || 
+      acc.accountType === "Indirect Expense" || 
+      acc.accountType === "Direct Expense";
+    
+    if (!isExpenseAccount) return false;
+    
     const normalizedCode = normalizeCode(acc.code);
     return !excludedExpenseCodes.some(excluded => 
       normalizeCode(excluded) === normalizedCode
@@ -465,11 +475,11 @@ export default function Analytics() {
   });
 
   const directExpenseAccounts = expenseAccounts.filter(
-    (acc) => acc.subType === "Direct Expense"
+    (acc) => acc.subType === "Direct Expense" || acc.accountType === "Direct Expense"
   );
 
   const indirectExpenseAccounts = expenseAccounts.filter(
-    (acc) => acc.subType === "Indirect Expense"
+    (acc) => acc.subType === "Indirect Expense" || acc.accountType === "Indirect Expense"
   );
 
   const liabilityAccounts = accounts.filter(

@@ -16,6 +16,11 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
 ### Financial Improvements
 - **Fixed Financial Totals Calculation**: Corrected total calculations in Analytics and Financial Dashboard to properly handle hierarchical parent-child account relationships. The system now sums only leaf accounts (children) to avoid double-counting when both parent and child accounts exist. Additionally fixed orphaned account handling - accounts whose parent chain is filtered out are now excluded from totals, preventing silent over-counting in all sections (Liabilities, Assets, Expenses, Income).
 - **Fixed Net Profit & Sales Trend Consistency**: Both Net Profit card and Sales & Profit Trend chart now use identical inventory cost exclusion logic with normalized code matching (handles "Transport Charges" vs "TRANSPORT_CHARGES"). Both exclude PURCHASES, DUTIES, TRANSPORT_CHARGES, CONTAINER_LICENSES from operating expenses as these costs are capitalized to inventory until sold.
+- **Fixed Expense Account Recognition in Net Profit**: Resolved critical bug where expense payments weren't being counted in net profit calculations. The system now recognizes expense accounts in both correct format (accountType="Expense" with subType="Indirect Expense"/"Direct Expense") and legacy format (accountType="Indirect Expense"/"Direct Expense"). This fix applies to:
+  - `/api/stats/net-profit` endpoint (Dashboard)
+  - `/api/stats/monthly-data` endpoint (Sales & Profit Trend)
+  - Analytics page P&L calculations
+  - All expense filtering throughout the application
 - **Real-time Balance Updates**: All voucher types (Payment, Receipt, Journal) now properly invalidate account balance queries after creation, ensuring balances update immediately across the application.
 - **Sales Accounting Integration**: POS imports now create proper accounting vouchers with SALES_REV (credit) and COGS (debit) entries for accurate profit tracking
 - **Sales Backfill Script**: Added `/api/sales-import/backfill` endpoint to add accounting entries to existing sales data
