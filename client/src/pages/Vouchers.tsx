@@ -1400,15 +1400,60 @@ export default function Vouchers() {
   ) => {
     const isLastRow = rowIndex === journalFields.length - 1;
     
-    // Handle Tab on DR/CR Select - move to Account
-    if (fieldName === "type" && e.key === "Tab" && !e.shiftKey) {
-      e.preventDefault();
-      setTimeout(() => {
-        const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
-        if (accountInput) {
-          accountInput.focus();
+    // Arrow key navigation for type field
+    if (fieldName === "type") {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setTimeout(() => {
+            const prevTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex - 1}"]`) as HTMLInputElement;
+            if (prevTypeInput) {
+              prevTypeInput.focus();
+              prevTypeInput.select();
+            }
+          }, 50);
         }
-      }, 50);
+        return;
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (rowIndex < journalFields.length - 1) {
+          setTimeout(() => {
+            const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextTypeInput) {
+              nextTypeInput.focus();
+              nextTypeInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setTimeout(() => {
+          const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
+          if (accountInput) accountInput.focus();
+        }, 50);
+        return;
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        // Wrap to current row's Amount field (circular navigation)
+        setTimeout(() => {
+          const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
+        }, 50);
+        return;
+      } else if (e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        setTimeout(() => {
+          const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
+          if (accountInput) {
+            accountInput.focus();
+          }
+        }, 50);
+        return;
+      }
     }
     
     // Arrow key navigation for amount field
@@ -1448,8 +1493,11 @@ export default function Vouchers() {
         e.preventDefault();
         if (rowIndex < journalFields.length - 1) {
           setTimeout(() => {
-            const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex + 1}"]`) as HTMLInputElement;
-            if (nextAccountInput) nextAccountInput.focus();
+            const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextTypeInput) {
+              nextTypeInput.focus();
+              nextTypeInput.select();
+            }
           }, 50);
         }
         return;
@@ -1470,9 +1518,10 @@ export default function Vouchers() {
         });
       }
       setTimeout(() => {
-        const nextRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
-        if (nextRowSelect) {
-          nextRowSelect.focus();
+        const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+        if (nextRowInput) {
+          nextRowInput.focus();
+          nextRowInput.select();
         }
       }, 100);
     }
@@ -1490,17 +1539,19 @@ export default function Vouchers() {
           amount: "",
         });
         setTimeout(() => {
-          const newRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (newRowSelect) {
-            newRowSelect.focus();
+          const newRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (newRowInput) {
+            newRowInput.focus();
+            newRowInput.select();
           }
         }, 100);
       } else {
         // Not last row - move to DR/CR of next row
         setTimeout(() => {
-          const nextRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
-          if (nextRowSelect) {
-            nextRowSelect.focus();
+          const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (nextRowInput) {
+            nextRowInput.focus();
+            nextRowInput.select();
           }
         }, 50);
       }
@@ -2354,17 +2405,22 @@ export default function Vouchers() {
                                 name={`entries.${index}.type`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger data-testid={`select-journal-type-${index}`} onKeyDown={(e) => handleJournalKeyDown(e, index, "type")}>
-                                          <SelectValue placeholder="DR/CR" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="DR">DR</SelectItem>
-                                        <SelectItem value="CR">CR</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder="DR/CR"
+                                        className="uppercase text-center"
+                                        maxLength={2}
+                                        data-testid={`input-journal-type-${index}`}
+                                        onChange={(e) => {
+                                          const value = e.target.value.toUpperCase();
+                                          if (value === "" || value === "D" || value === "DR" || value === "C" || value === "CR") {
+                                            field.onChange(value === "D" ? "DR" : value === "C" ? "CR" : value);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "type")}
+                                      />
+                                    </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -2428,8 +2484,11 @@ export default function Vouchers() {
                                         }}
                                         onArrowLeft={() => {
                                           setTimeout(() => {
-                                            const typeSelect = document.querySelector(`[data-testid="select-journal-type-${index}"]`) as HTMLButtonElement;
-                                            if (typeSelect) typeSelect.focus();
+                                            const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLInputElement;
+                                            if (typeInput) {
+                                              typeInput.focus();
+                                              typeInput.select();
+                                            }
                                           }, 50);
                                         }}
                                         allAccounts={allAccounts}
