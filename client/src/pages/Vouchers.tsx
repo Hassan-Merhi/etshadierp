@@ -1336,9 +1336,9 @@ export default function Vouchers() {
         });
       }
       setTimeout(() => {
-        const newRowButton = document.querySelector(`[data-testid="button-account-${rowIndex + 1}"]`) as HTMLButtonElement;
-        if (newRowButton) {
-          newRowButton.focus();
+        const newRowInput = document.querySelector(`[data-testid="input-account-${rowIndex + 1}"]`) as HTMLInputElement;
+        if (newRowInput) {
+          newRowInput.focus();
         }
       }, 100);
     }
@@ -1711,6 +1711,15 @@ export default function Vouchers() {
                                           form.setValue(`entries.${index}.accountId`, id);
                                           form.setValue(`entries.${index}.accountName`, name);
                                         }}
+                                        onTabPressed={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
+                                        }}
                                         allAccounts={allAccounts}
                                         rowIndex={index}
                                         placeholder="Select account..."
@@ -1973,6 +1982,15 @@ export default function Vouchers() {
                                           form.setValue(`entries.${index}.accountType`, type);
                                           form.setValue(`entries.${index}.accountId`, id);
                                           form.setValue(`entries.${index}.accountName`, name);
+                                        }}
+                                        onTabPressed={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
                                         }}
                                         allAccounts={allAccounts}
                                         rowIndex={index}

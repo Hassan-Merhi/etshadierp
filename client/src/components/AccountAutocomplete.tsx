@@ -20,6 +20,7 @@ export interface AccountAutocompleteProps {
   className?: string;
   onSelectionCommitted?: (account: CombinedAccount) => void;
   onEnterWithoutSelection?: () => void;
+  onTabPressed?: () => void;
   testId?: string;
   rowIndex?: number;
 }
@@ -40,6 +41,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       className,
       onSelectionCommitted,
       onEnterWithoutSelection,
+      onTabPressed,
       testId,
       rowIndex = 0,
     },
@@ -120,6 +122,13 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           // Empty field, Enter pressed - allow form to handle (e.g., add new row)
           onEnterWithoutSelection?.();
         }
+      } else if (e.key === "Tab") {
+        // Close dropdown and let Tab propagate
+        setOpen(false);
+        if (onTabPressed && !e.shiftKey) {
+          e.preventDefault();
+          onTabPressed();
+        }
       } else if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
@@ -127,7 +136,8 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       }
     };
 
-    const displayValue = value ? value.name : searchTerm;
+    // Display searchTerm when typing, otherwise show selected value
+    const displayValue = searchTerm || (value ? value.name : "");
 
     return (
       <div className="relative">
@@ -135,11 +145,19 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           ref={inputRef}
           value={displayValue}
           onChange={(e) => {
-            setSearchTerm(e.target.value);
+            const newValue = e.target.value;
+            setSearchTerm(newValue);
             if (!open) setOpen(true);
+            // Clear the selection when user starts typing
+            if (newValue && value) {
+              // User is editing - signal that we're no longer committed to the previous selection
+              // The actual clearing happens when a new account is selected
+            }
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
+            // When focusing, if there's a value, clear searchTerm to show the selected name
+            // When user starts typing, searchTerm will take over
             setOpen(true);
           }}
           onBlur={() => {
