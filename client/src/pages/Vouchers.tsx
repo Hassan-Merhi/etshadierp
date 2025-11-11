@@ -1326,6 +1326,51 @@ export default function Vouchers() {
       }, 50);
     }
     
+    // Arrow key navigation for amount field
+    if (fieldName === "amount") {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setTimeout(() => {
+            const prevAmountInput = document.querySelector(`[data-testid="input-amount-${rowIndex - 1}"]`) as HTMLInputElement;
+            if (prevAmountInput) {
+              prevAmountInput.focus();
+              prevAmountInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (rowIndex < fields.length - 1) {
+          setTimeout(() => {
+            const nextAmountInput = document.querySelector(`[data-testid="input-amount-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextAmountInput) {
+              nextAmountInput.focus();
+              nextAmountInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setTimeout(() => {
+          const accountInput = document.querySelector(`[data-testid="input-account-${rowIndex}"]`) as HTMLInputElement;
+          if (accountInput) accountInput.focus();
+        }, 50);
+        return;
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (rowIndex < fields.length - 1) {
+          setTimeout(() => {
+            const nextAccountInput = document.querySelector(`[data-testid="input-account-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextAccountInput) nextAccountInput.focus();
+          }, 50);
+        }
+        return;
+      }
+    }
+    
     // Handle both Tab and Enter for navigation on input fields
     if (fieldName === "amount" && ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter")) {
       e.preventDefault();
@@ -1723,6 +1768,42 @@ export default function Vouchers() {
                                             }
                                           }, 50);
                                         }}
+                                        onArrowUp={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevAccountInput = document.querySelector(`[data-testid="input-account-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevAccountInput) prevAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowDown={() => {
+                                          if (index < fields.length - 1) {
+                                            setTimeout(() => {
+                                              const nextAccountInput = document.querySelector(`[data-testid="input-account-${index + 1}"]`) as HTMLInputElement;
+                                              if (nextAccountInput) nextAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowRight={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onArrowLeft={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevAmountInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevAmountInput) {
+                                                prevAmountInput.focus();
+                                                prevAmountInput.select();
+                                              }
+                                            }, 50);
+                                          }
+                                        }}
                                         allAccounts={allAccounts}
                                         rowIndex={index}
                                         placeholder="Select account..."
@@ -1994,6 +2075,42 @@ export default function Vouchers() {
                                               amountInput.select();
                                             }
                                           }, 50);
+                                        }}
+                                        onArrowUp={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevAccountInput = document.querySelector(`[data-testid="input-account-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevAccountInput) prevAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowDown={() => {
+                                          if (index < fields.length - 1) {
+                                            setTimeout(() => {
+                                              const nextAccountInput = document.querySelector(`[data-testid="input-account-${index + 1}"]`) as HTMLInputElement;
+                                              if (nextAccountInput) nextAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowRight={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onArrowLeft={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevAmountInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevAmountInput) {
+                                                prevAmountInput.focus();
+                                                prevAmountInput.select();
+                                              }
+                                            }, 50);
+                                          }
                                         }}
                                         allAccounts={allAccounts}
                                         rowIndex={index}

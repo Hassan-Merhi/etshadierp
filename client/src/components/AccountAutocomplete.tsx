@@ -20,6 +20,10 @@ export interface AccountAutocompleteProps {
   onSelectionCommitted?: (account: CombinedAccount) => void;
   onEnterWithoutSelection?: () => void;
   onTabPressed?: () => void;
+  onArrowUp?: () => void;
+  onArrowDown?: () => void;
+  onArrowLeft?: () => void;
+  onArrowRight?: () => void;
   testId?: string;
   rowIndex?: number;
 }
@@ -41,6 +45,10 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       onSelectionCommitted,
       onEnterWithoutSelection,
       onTabPressed,
+      onArrowUp,
+      onArrowDown,
+      onArrowLeft,
+      onArrowRight,
       testId,
       rowIndex = 0,
     },
@@ -112,6 +120,38 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         e.preventDefault();
         setOpen(false);
         setSearchTerm(null);
+      } else if (e.key === "ArrowUp") {
+        if (open && filteredAccounts.length > 0) {
+          // When dropdown is open, navigate within the list
+          e.preventDefault();
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredAccounts.length - 1));
+        } else {
+          // When dropdown is closed, navigate between fields
+          e.preventDefault();
+          onArrowUp?.();
+        }
+      } else if (e.key === "ArrowDown") {
+        if (open && filteredAccounts.length > 0) {
+          // When dropdown is open, navigate within the list
+          e.preventDefault();
+          setHighlightedIndex((prev) => (prev < filteredAccounts.length - 1 ? prev + 1 : 0));
+        } else {
+          // When dropdown is closed, navigate between fields
+          e.preventDefault();
+          onArrowDown?.();
+        }
+      } else if (e.key === "ArrowLeft") {
+        // Only navigate between fields when dropdown is closed
+        if (!open) {
+          e.preventDefault();
+          onArrowLeft?.();
+        }
+      } else if (e.key === "ArrowRight") {
+        // Only navigate between fields when dropdown is closed
+        if (!open) {
+          e.preventDefault();
+          onArrowRight?.();
+        }
       }
     };
 
