@@ -10,6 +10,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { VoucherEditDialog } from "@/components/VoucherEditDialog";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 import {
   Card,
   CardContent,
@@ -1562,30 +1564,48 @@ export default function Vouchers() {
   const handleTransferKeyDown = (
     e: React.KeyboardEvent,
     rowIndex: number,
-    fieldName: "sourceLocation" | "stockItem" | "quantity" | "rate"
+    fieldName: "quantity" | "rate"
   ) => {
     const isLastRow = rowIndex === transferFields.length - 1;
     
-    // Handle both Tab and Enter for navigation
-    if ((e.key === "Tab" && !e.shiftKey) || e.key === "Enter") {
-      e.preventDefault();
-      
-      if (fieldName === "sourceLocation") {
+    // Arrow key navigation for quantity field
+    if (fieldName === "quantity") {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setTimeout(() => {
+            const prevInput = document.querySelector(`[data-testid="input-transfer-quantity-${rowIndex - 1}"]`) as HTMLInputElement;
+            if (prevInput) {
+              prevInput.focus();
+              prevInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (rowIndex < transferFields.length - 1) {
+          setTimeout(() => {
+            const nextInput = document.querySelector(`[data-testid="input-transfer-quantity-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextInput) {
+              nextInput.focus();
+              nextInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
         setTimeout(() => {
-          const stockItemButton = document.querySelector(`[data-testid="button-transfer-stock-${rowIndex}"]`) as HTMLButtonElement;
-          if (stockItemButton) {
-            stockItemButton.focus();
+          const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${rowIndex}"]`) as HTMLInputElement;
+          if (stockItemInput) {
+            stockItemInput.focus();
+            stockItemInput.select();
           }
         }, 50);
-      } else if (fieldName === "stockItem") {
-        setTimeout(() => {
-          const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${rowIndex}"]`) as HTMLInputElement;
-          if (quantityInput) {
-            quantityInput.focus();
-            quantityInput.select();
-          }
-        }, 50);
-      } else if (fieldName === "quantity") {
+        return;
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
         setTimeout(() => {
           const rateInput = document.querySelector(`[data-testid="input-transfer-rate-${rowIndex}"]`) as HTMLInputElement;
           if (rateInput) {
@@ -1593,26 +1613,110 @@ export default function Vouchers() {
             rateInput.select();
           }
         }, 50);
-      } else if (fieldName === "rate") {
-        // On rate field (ENTER only) - create new row and focus source location
-        if (e.key === "Enter") {
-          if (isLastRow) {
-            appendTransfer({
-              sourceLocationId: 0,
-              sourceLocationName: "",
-              stockItemId: 0,
-              stockItemName: "",
-              quantity: "",
-              rate: "",
-            });
+        return;
+      } else if (e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        setTimeout(() => {
+          const rateInput = document.querySelector(`[data-testid="input-transfer-rate-${rowIndex}"]`) as HTMLInputElement;
+          if (rateInput) {
+            rateInput.focus();
+            rateInput.select();
           }
+        }, 50);
+        return;
+      }
+    }
+    
+    // Arrow key navigation for rate field
+    if (fieldName === "rate") {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (rowIndex > 0) {
           setTimeout(() => {
-            const newRowSelect = document.querySelector(`[data-testid="select-source-location-${rowIndex + 1}"]`) as HTMLButtonElement;
-            if (newRowSelect) {
-              newRowSelect.focus();
+            const prevInput = document.querySelector(`[data-testid="input-transfer-rate-${rowIndex - 1}"]`) as HTMLInputElement;
+            if (prevInput) {
+              prevInput.focus();
+              prevInput.select();
             }
-          }, 100);
+          }, 50);
         }
+        return;
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (rowIndex < transferFields.length - 1) {
+          setTimeout(() => {
+            const nextInput = document.querySelector(`[data-testid="input-transfer-rate-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextInput) {
+              nextInput.focus();
+              nextInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setTimeout(() => {
+          const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${rowIndex}"]`) as HTMLInputElement;
+          if (quantityInput) {
+            quantityInput.focus();
+            quantityInput.select();
+          }
+        }, 50);
+        return;
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (rowIndex < transferFields.length - 1) {
+          setTimeout(() => {
+            const nextSourceInput = document.querySelector(`[data-testid="input-source-location-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextSourceInput) {
+              nextSourceInput.focus();
+              nextSourceInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        // On last row - create new row
+        if (isLastRow) {
+          appendTransfer({
+            sourceLocationId: 0,
+            sourceLocationName: "",
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          });
+        }
+        setTimeout(() => {
+          const nextRowInput = document.querySelector(`[data-testid="input-source-location-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (nextRowInput) {
+            nextRowInput.focus();
+            nextRowInput.select();
+          }
+        }, 100);
+        return;
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        // On last row - create new row
+        if (isLastRow) {
+          appendTransfer({
+            sourceLocationId: 0,
+            sourceLocationName: "",
+            stockItemId: 0,
+            stockItemName: "",
+            quantity: "",
+            rate: "",
+          });
+        }
+        setTimeout(() => {
+          const nextRowInput = document.querySelector(`[data-testid="input-source-location-${rowIndex + 1}"]`) as HTMLInputElement;
+          if (nextRowInput) {
+            nextRowInput.focus();
+            nextRowInput.select();
+          }
+        }, 100);
+        return;
       }
     }
   };
@@ -2726,41 +2830,60 @@ export default function Vouchers() {
                                 name={`entries.${index}.sourceLocationId`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <Select
-                                      value={field.value > 0 ? field.value.toString() : ""}
-                                      onValueChange={(value) => {
-                                        const locationId = parseInt(value);
-                                        field.onChange(locationId);
-                                        const location = locations.find(l => l.id === locationId);
-                                        if (location) {
-                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, `${location.code} - ${location.name}`);
+                                    <FormControl>
+                                      <LocationAutocomplete
+                                        value={field.value}
+                                        onChange={(locationId, locationName) => {
+                                          field.onChange(locationId);
+                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, locationName);
                                           setTransferInventorySource(locationId);
-                                        }
-                                        setActiveTransferRow(index);
-                                      }}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger 
-                                          data-testid={`select-source-location-${index}`}
-                                          onFocus={() => {
-                                            setActiveTransferRow(index);
-                                            if (transferEntries[index].sourceLocationId > 0) {
-                                              setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                            }
-                                          }}
-                                          onKeyDown={(e) => handleTransferKeyDown(e, index, "sourceLocation")}
-                                        >
-                                          <SelectValue placeholder="Select source location..." />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {locations.map((location) => (
-                                          <SelectItem key={location.id} value={location.id.toString()}>
-                                            {location.code} - {location.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                          setActiveTransferRow(index);
+                                        }}
+                                        locations={locations}
+                                        onFocus={() => {
+                                          setActiveTransferRow(index);
+                                          if (transferEntries[index].sourceLocationId > 0) {
+                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                          }
+                                        }}
+                                        onArrowUp={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevInput = document.querySelector(`[data-testid="input-source-location-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevInput) {
+                                                prevInput.focus();
+                                                prevInput.select();
+                                              }
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowDown={() => {
+                                          if (index < transferFields.length - 1) {
+                                            setTimeout(() => {
+                                              const nextInput = document.querySelector(`[data-testid="input-source-location-${index + 1}"]`) as HTMLInputElement;
+                                              if (nextInput) {
+                                                nextInput.focus();
+                                                nextInput.select();
+                                              }
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowRight={() => {
+                                          setTimeout(() => {
+                                            const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
+                                            if (stockItemInput) stockItemInput.focus();
+                                          }, 50);
+                                        }}
+                                        onTab={() => {
+                                          setTimeout(() => {
+                                            const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
+                                            if (stockItemInput) stockItemInput.focus();
+                                          }, 50);
+                                        }}
+                                        placeholder="Type location..."
+                                        testId={`input-source-location-${index}`}
+                                      />
+                                    </FormControl>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -2773,7 +2896,7 @@ export default function Vouchers() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <StockItemCombobox
+                                      <StockItemAutocomplete
                                         value={
                                           transferEntries[index].stockItemId > 0
                                             ? {
@@ -2800,15 +2923,63 @@ export default function Vouchers() {
                                           }
                                         }}
                                         stockItems={stockItems}
-                                        rowIndex={index}
-                                        testIdPrefix="button-transfer-stock"
                                         onFocus={() => {
                                           setActiveTransferRow(index);
                                           if (transferEntries[index].sourceLocationId > 0) {
                                             setTransferInventorySource(transferEntries[index].sourceLocationId);
                                           }
                                         }}
-                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "stockItem")}
+                                        onArrowUp={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevInput = document.querySelector(`[data-testid="input-stock-item-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevInput) {
+                                                prevInput.focus();
+                                                prevInput.select();
+                                              }
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowDown={() => {
+                                          if (index < transferFields.length - 1) {
+                                            setTimeout(() => {
+                                              const nextInput = document.querySelector(`[data-testid="input-stock-item-${index + 1}"]`) as HTMLInputElement;
+                                              if (nextInput) {
+                                                nextInput.focus();
+                                                nextInput.select();
+                                              }
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowLeft={() => {
+                                          setTimeout(() => {
+                                            const sourceInput = document.querySelector(`[data-testid="input-source-location-${index}"]`) as HTMLInputElement;
+                                            if (sourceInput) {
+                                              sourceInput.focus();
+                                              sourceInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onArrowRight={() => {
+                                          setTimeout(() => {
+                                            const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                            if (quantityInput) {
+                                              quantityInput.focus();
+                                              quantityInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onTab={() => {
+                                          setTimeout(() => {
+                                            const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                            if (quantityInput) {
+                                              quantityInput.focus();
+                                              quantityInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        placeholder="Type item name..."
+                                        testId={`input-stock-item-${index}`}
                                       />
                                     </FormControl>
                                     <FormMessage />
