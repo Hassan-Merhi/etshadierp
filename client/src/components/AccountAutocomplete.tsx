@@ -47,7 +47,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     ref
   ) => {
     const [open, setOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState<string | null>(null);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
@@ -58,13 +58,13 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         inputRef.current?.focus();
       },
       clear: () => {
-        setSearchTerm("");
+        setSearchTerm(null);
       },
     }));
 
     // Filter accounts based on search term (search both name and code/barcode)
     const filteredAccounts = useMemo(() => {
-      if (!searchTerm) return allAccounts;
+      if (searchTerm === null || searchTerm === "") return allAccounts;
       const term = searchTerm.toLowerCase();
       return allAccounts.filter((acc) =>
         acc.name.toLowerCase().includes(term) ||
@@ -89,7 +89,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
 
     const handleSelectAccount = (account: CombinedAccount) => {
       onChange(account.type, account.id, account.name);
-      setSearchTerm("");
+      setSearchTerm(null);
       setOpen(false);
       onSelectionCommitted?.(account);
     };
@@ -111,12 +111,12 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       } else if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
-        setSearchTerm("");
+        setSearchTerm(null);
       }
     };
 
-    // Display searchTerm when typing, otherwise show selected value
-    const displayValue = searchTerm || (value ? value.name : "");
+    // Show searchTerm if user has started editing (not null), otherwise show selected value  
+    const displayValue = searchTerm !== null ? searchTerm : (value?.name || "");
     
     // Unique IDs for accessibility
     const listboxId = `account-listbox-${rowIndex}`;
@@ -135,25 +135,17 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
             const newValue = e.target.value;
             setSearchTerm(newValue);
             if (!open) setOpen(true);
-            // Clear the selection when user starts typing
-            if (newValue && value) {
-              // User is editing - signal that we're no longer committed to the previous selection
-              // The actual clearing happens when a new account is selected
-            }
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            // When focusing, if there's a value, clear searchTerm to show the selected name
-            // When user starts typing, searchTerm will take over
+            // Open dropdown to show all accounts for browsing
             setOpen(true);
           }}
           onBlur={() => {
             // Delay to allow click on dropdown
             setTimeout(() => {
               setOpen(false);
-              if (!value) {
-                setSearchTerm("");
-              }
+              setSearchTerm(null);
             }, 200);
           }}
           placeholder={placeholder}
