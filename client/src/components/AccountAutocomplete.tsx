@@ -1,7 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useRef, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,14 +79,13 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
 
     // Scroll highlighted item into view
     useEffect(() => {
-      if (listRef.current && open) {
-        const items = listRef.current.querySelectorAll('[role="option"]');
-        const highlightedElement = items[highlightedIndex] as HTMLElement;
-        if (highlightedElement) {
-          highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (listRef.current && open && filteredAccounts.length > 0) {
+        const highlightedButton = listRef.current.querySelector(`[data-index="${highlightedIndex}"]`) as HTMLElement;
+        if (highlightedButton) {
+          highlightedButton.scrollIntoView({ block: "nearest", behavior: "smooth" });
         }
       }
-    }, [highlightedIndex, open]);
+    }, [highlightedIndex, open, filteredAccounts.length]);
 
     const handleSelectAccount = (account: CombinedAccount) => {
       onChange(account.type, account.id, account.name);
@@ -140,11 +137,19 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
 
     // Display searchTerm when typing, otherwise show selected value
     const displayValue = searchTerm || (value ? value.name : "");
+    
+    // Unique IDs for accessibility
+    const listboxId = `account-listbox-${rowIndex}`;
+    const activeOptionId = `account-option-${rowIndex}-${highlightedIndex}`;
 
     return (
       <div className="relative">
         <Input
           ref={inputRef}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-activedescendant={open && filteredAccounts.length > 0 ? activeOptionId : undefined}
           value={displayValue}
           onChange={(e) => {
             const newValue = e.target.value;
@@ -177,37 +182,38 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           data-testid={testId || `input-account-${rowIndex}`}
         />
         {open && filteredAccounts.length > 0 && (
-          <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto">
-            <Command shouldFilter={false} onKeyDown={(e) => e.stopPropagation()}>
-              <CommandList ref={listRef}>
-                <CommandEmpty>No accounts found.</CommandEmpty>
-                <CommandGroup>
-                  {filteredAccounts.map((account, idx) => (
-                    <CommandItem
-                      key={`${account.type}-${account.id}`}
-                      value={account.name}
-                      onSelect={() => handleSelectAccount(account)}
-                      className={cn(
-                        "cursor-pointer",
-                        idx === highlightedIndex && "bg-accent"
-                      )}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          value?.type === account.type && value?.id === account.id
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      <div className="flex-1">
-                        {account.name}
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+          <div 
+            ref={listRef}
+            id={listboxId}
+            className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto"
+            role="listbox"
+          >
+            {filteredAccounts.map((account, idx) => (
+              <button
+                key={`${account.type}-${account.id}`}
+                id={`account-option-${rowIndex}-${idx}`}
+                type="button"
+                onClick={() => handleSelectAccount(account)}
+                role="option"
+                aria-selected={value?.type === account.type && value?.id === account.id}
+                data-index={idx}
+                className={cn(
+                  "w-full text-left px-3 py-2 flex items-center gap-2 hover-elevate active-elevate-2",
+                  idx === highlightedIndex && "bg-accent"
+                )}
+                data-testid={`account-option-${idx}`}
+              >
+                <Check
+                  className={cn(
+                    "h-4 w-4 flex-shrink-0",
+                    value?.type === account.type && value?.id === account.id
+                      ? "opacity-100"
+                      : "opacity-0"
+                  )}
+                />
+                <span className="flex-1">{account.name}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>
