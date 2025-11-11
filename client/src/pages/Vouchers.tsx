@@ -506,22 +506,25 @@ export default function Vouchers() {
     queryKey: ["/api/employees"],
   });
 
-  // Combine all accounts for autocomplete
+  // Combine all accounts for autocomplete (names only, no codes)
   const allAccounts = useMemo<CombinedAccount[]>(() => [
     ...ledgerAccounts.map((a) => ({
       type: "ledger" as const,
       id: a.id,
-      name: `${a.code} - ${a.name}`,
+      name: a.name,
+      code: a.code,
     })),
     ...bankAccounts.map((a) => ({
       type: "bank" as const,
       id: a.id,
-      name: `${a.accountNumber} - ${a.bankName}`,
+      name: a.bankName,
+      code: a.accountNumber,
     })),
     ...suppliers.map((s) => ({
       type: "supplier" as const,
       id: s.id,
-      name: `${s.code} - ${s.legalName}`,
+      name: s.legalName,
+      code: s.code,
     })),
   ], [ledgerAccounts, bankAccounts, suppliers]);
 

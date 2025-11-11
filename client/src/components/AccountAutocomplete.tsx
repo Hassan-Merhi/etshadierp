@@ -9,6 +9,7 @@ export type CombinedAccount = {
   type: "ledger" | "bank" | "supplier";
   id: number;
   name: string;
+  code: string;
 };
 
 export interface AccountAutocompleteProps {
@@ -63,12 +64,13 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       },
     }));
 
-    // Filter accounts based on search term
+    // Filter accounts based on search term (search both name and code/barcode)
     const filteredAccounts = useMemo(() => {
       if (!searchTerm) return allAccounts;
       const term = searchTerm.toLowerCase();
       return allAccounts.filter((acc) =>
-        acc.name.toLowerCase().includes(term)
+        acc.name.toLowerCase().includes(term) ||
+        acc.code.toLowerCase().includes(term)
       );
     }, [allAccounts, searchTerm]);
 
@@ -176,7 +178,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
         />
         {open && filteredAccounts.length > 0 && (
           <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto">
-            <Command>
+            <Command shouldFilter={false} onKeyDown={(e) => e.stopPropagation()}>
               <CommandList ref={listRef}>
                 <CommandEmpty>No accounts found.</CommandEmpty>
                 <CommandGroup>
