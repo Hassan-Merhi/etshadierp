@@ -95,25 +95,38 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+      console.log("🔑 Key pressed:", e.key);
+      console.log("📊 State:", { open, highlightedIndex, filteredCount: filteredAccounts.length, allCount: allAccounts.length, searchTerm });
+      
       if (e.key === "ArrowDown") {
+        console.log("⬇️ ArrowDown handler");
         e.preventDefault();
         if (filteredAccounts.length > 0) {
           if (!open) {
+            console.log("Opening dropdown");
             setOpen(true);
           } else {
+            console.log("Moving highlight down from", highlightedIndex);
             setHighlightedIndex((prev) =>
               Math.min(prev + 1, filteredAccounts.length - 1)
             );
           }
+        } else {
+          console.log("❌ No filtered accounts");
         }
       } else if (e.key === "ArrowUp") {
+        console.log("⬆️ ArrowUp handler");
         e.preventDefault();
         if (filteredAccounts.length > 0) {
           if (!open) {
+            console.log("Opening dropdown");
             setOpen(true);
           } else if (highlightedIndex > 0) {
+            console.log("Moving highlight up from", highlightedIndex);
             setHighlightedIndex((prev) => Math.max(prev - 1, 0));
           }
+        } else {
+          console.log("❌ No filtered accounts");
         }
       } else if (e.key === "Enter") {
         e.preventDefault();
