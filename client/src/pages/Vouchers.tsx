@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +8,8 @@ import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { VoucherEditDialog } from "@/components/VoucherEditDialog";
+import { AccountAutocomplete } from "@/components/AccountAutocomplete";
+import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import {
   Card,
   CardContent,
@@ -503,6 +505,25 @@ export default function Vouchers() {
   const { data: employees = [] } = useQuery<any[]>({
     queryKey: ["/api/employees"],
   });
+
+  // Combine all accounts for autocomplete
+  const allAccounts = useMemo<CombinedAccount[]>(() => [
+    ...ledgerAccounts.map((a) => ({
+      type: "ledger" as const,
+      id: a.id,
+      name: `${a.code} - ${a.name}`,
+    })),
+    ...bankAccounts.map((a) => ({
+      type: "bank" as const,
+      id: a.id,
+      name: `${a.accountNumber} - ${a.bankName}`,
+    })),
+    ...suppliers.map((s) => ({
+      type: "supplier" as const,
+      id: s.id,
+      name: `${s.code} - ${s.legalName}`,
+    })),
+  ], [ledgerAccounts, bankAccounts, suppliers]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -1569,7 +1590,7 @@ export default function Vouchers() {
                             {activeTab === "payment" ? "Pay From" : "Receive In"}
                           </FormLabel>
                           <FormControl>
-                            <AccountCombobox
+                            <AccountAutocomplete
                               value={
                                 paymentAccountId > 0
                                   ? {
@@ -1584,10 +1605,10 @@ export default function Vouchers() {
                                 form.setValue("paymentAccountId", id);
                                 form.setValue("paymentAccountName", name);
                               }}
-                              ledgerAccounts={ledgerAccounts}
-                              bankAccounts={bankAccounts}
-                              suppliers={suppliers}
+                              allAccounts={allAccounts}
                               rowIndex={-1}
+                              placeholder={activeTab === "payment" ? "Pay from..." : "Receive in..."}
+                              testId="input-pay-from"
                             />
                           </FormControl>
                           {paymentAccountId > 0 && (
@@ -1675,7 +1696,7 @@ export default function Vouchers() {
                                 render={({ field: accountField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <AccountCombobox
+                                      <AccountAutocomplete
                                         value={
                                           entries[index].accountId > 0
                                             ? {
@@ -1690,11 +1711,10 @@ export default function Vouchers() {
                                           form.setValue(`entries.${index}.accountId`, id);
                                           form.setValue(`entries.${index}.accountName`, name);
                                         }}
-                                        ledgerAccounts={ledgerAccounts}
-                                        bankAccounts={bankAccounts}
-                                        suppliers={suppliers}
+                                        allAccounts={allAccounts}
                                         rowIndex={index}
-                                        onKeyDown={(e) => handleKeyDown(e, index, "account")}
+                                        placeholder="Select account..."
+                                        testId={`input-account-${index}`}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -1833,7 +1853,7 @@ export default function Vouchers() {
                             {activeTab === "payment" ? "Pay From" : "Receive In"}
                           </FormLabel>
                           <FormControl>
-                            <AccountCombobox
+                            <AccountAutocomplete
                               value={
                                 paymentAccountId > 0
                                   ? {
@@ -1848,10 +1868,10 @@ export default function Vouchers() {
                                 form.setValue("paymentAccountId", id);
                                 form.setValue("paymentAccountName", name);
                               }}
-                              ledgerAccounts={ledgerAccounts}
-                              bankAccounts={bankAccounts}
-                              suppliers={suppliers}
+                              allAccounts={allAccounts}
                               rowIndex={-1}
+                              placeholder={activeTab === "payment" ? "Pay from..." : "Receive in..."}
+                              testId="input-receive-in"
                             />
                           </FormControl>
                           {paymentAccountId > 0 && (
@@ -1939,7 +1959,7 @@ export default function Vouchers() {
                                 render={({ field: accountField }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <AccountCombobox
+                                      <AccountAutocomplete
                                         value={
                                           entries[index].accountId > 0
                                             ? {
@@ -1954,11 +1974,10 @@ export default function Vouchers() {
                                           form.setValue(`entries.${index}.accountId`, id);
                                           form.setValue(`entries.${index}.accountName`, name);
                                         }}
-                                        ledgerAccounts={ledgerAccounts}
-                                        bankAccounts={bankAccounts}
-                                        suppliers={suppliers}
+                                        allAccounts={allAccounts}
                                         rowIndex={index}
-                                        onKeyDown={(e) => handleKeyDown(e, index, "account")}
+                                        placeholder="Select account..."
+                                        testId={`input-account-${index}`}
                                       />
                                     </FormControl>
                                     <FormMessage />
