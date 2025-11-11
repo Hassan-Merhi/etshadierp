@@ -1404,23 +1404,77 @@ export default function Vouchers() {
     if (fieldName === "type" && e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       setTimeout(() => {
-        const accountButton = document.querySelector(`[data-testid="button-journal-account-${rowIndex}"]`) as HTMLButtonElement;
-        if (accountButton) {
-          accountButton.focus();
+        const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
+        if (accountInput) {
+          accountInput.focus();
         }
       }, 50);
     }
     
-    // Handle Tab on Account button - move to Amount
-    if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
-      e.preventDefault();
-      setTimeout(() => {
-        const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
-        if (amountInput) {
-          amountInput.focus();
-          amountInput.select();
+    // Arrow key navigation for amount field
+    if (fieldName === "amount") {
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (rowIndex > 0) {
+          setTimeout(() => {
+            const prevAmountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex - 1}"]`) as HTMLInputElement;
+            if (prevAmountInput) {
+              prevAmountInput.focus();
+              prevAmountInput.select();
+            }
+          }, 50);
         }
-      }, 50);
+        return;
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (rowIndex < journalFields.length - 1) {
+          setTimeout(() => {
+            const nextAmountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextAmountInput) {
+              nextAmountInput.focus();
+              nextAmountInput.select();
+            }
+          }, 50);
+        }
+        return;
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setTimeout(() => {
+          const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
+          if (accountInput) accountInput.focus();
+        }, 50);
+        return;
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (rowIndex < journalFields.length - 1) {
+          setTimeout(() => {
+            const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex + 1}"]`) as HTMLInputElement;
+            if (nextAccountInput) nextAccountInput.focus();
+          }, 50);
+        }
+        return;
+      }
+    }
+    
+    // Handle Tab on Amount - move to DR/CR of next row or create new row
+    if (fieldName === "amount" && e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      // On last row - create new row
+      if (isLastRow) {
+        appendJournal({
+          type: "DR",
+          accountType: "ledger",
+          accountId: 0,
+          accountName: "",
+          amount: "",
+        });
+      }
+      setTimeout(() => {
+        const nextRowSelect = document.querySelector(`[data-testid="select-journal-type-${rowIndex + 1}"]`) as HTMLButtonElement;
+        if (nextRowSelect) {
+          nextRowSelect.focus();
+        }
+      }, 100);
     }
     
     // Handle Enter on Amount - create new row if last row, then focus DR/CR of new row
@@ -2323,7 +2377,7 @@ export default function Vouchers() {
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormControl>
-                                      <AccountCombobox
+                                      <AccountAutocomplete
                                         value={
                                           journalEntries[index].accountId > 0
                                             ? {
@@ -2338,12 +2392,50 @@ export default function Vouchers() {
                                           journalForm.setValue(`entries.${index}.accountId`, id);
                                           journalForm.setValue(`entries.${index}.accountName`, name);
                                         }}
-                                        ledgerAccounts={ledgerAccounts}
-                                        bankAccounts={bankAccounts}
-                                        suppliers={suppliers}
+                                        onTabPressed={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onArrowUp={() => {
+                                          if (index > 0) {
+                                            setTimeout(() => {
+                                              const prevAccountInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                              if (prevAccountInput) prevAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowDown={() => {
+                                          if (index < journalFields.length - 1) {
+                                            setTimeout(() => {
+                                              const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                              if (nextAccountInput) nextAccountInput.focus();
+                                            }, 50);
+                                          }
+                                        }}
+                                        onArrowRight={() => {
+                                          setTimeout(() => {
+                                            const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                            if (amountInput) {
+                                              amountInput.focus();
+                                              amountInput.select();
+                                            }
+                                          }, 50);
+                                        }}
+                                        onArrowLeft={() => {
+                                          setTimeout(() => {
+                                            const typeSelect = document.querySelector(`[data-testid="select-journal-type-${index}"]`) as HTMLButtonElement;
+                                            if (typeSelect) typeSelect.focus();
+                                          }, 50);
+                                        }}
+                                        allAccounts={allAccounts}
                                         rowIndex={index}
-                                        testIdPrefix="button-journal-account"
-                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "account")}
+                                        placeholder="Select account..."
+                                        testId={`input-journal-account-${index}`}
                                       />
                                     </FormControl>
                                     <FormMessage />
