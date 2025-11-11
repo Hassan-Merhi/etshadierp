@@ -95,34 +95,34 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (!open && filteredAccounts.length > 0 && searchTerm) {
-        setOpen(true);
-      }
-
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (open && filteredAccounts.length > 0) {
-          setHighlightedIndex((prev) =>
-            Math.min(prev + 1, filteredAccounts.length - 1)
-          );
-        } else if (!open && filteredAccounts.length > 0) {
-          setOpen(true);
+        if (filteredAccounts.length > 0) {
+          if (!open) {
+            setOpen(true);
+          } else {
+            setHighlightedIndex((prev) =>
+              Math.min(prev + 1, filteredAccounts.length - 1)
+            );
+          }
         }
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        if (open && highlightedIndex > 0) {
-          setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+        if (filteredAccounts.length > 0) {
+          if (!open) {
+            setOpen(true);
+          } else if (highlightedIndex > 0) {
+            setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+          }
         }
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (open && filteredAccounts.length > 0 && highlightedIndex >= 0) {
           handleSelectAccount(filteredAccounts[highlightedIndex]);
         } else if (!searchTerm && !value) {
-          // Empty field, Enter pressed - allow form to handle (e.g., add new row)
           onEnterWithoutSelection?.();
         }
       } else if (e.key === "Tab") {
-        // Close dropdown and let Tab propagate
         setOpen(false);
         if (onTabPressed && !e.shiftKey) {
           e.preventDefault();
