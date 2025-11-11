@@ -95,31 +95,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        // Stop propagation to prevent parent handlers from intercepting
-        e.stopPropagation();
-        e.preventDefault();
-        if (filteredAccounts.length > 0) {
-          if (!open) {
-            setOpen(true);
-          } else {
-            setHighlightedIndex((prev) =>
-              Math.min(prev + 1, filteredAccounts.length - 1)
-            );
-          }
-        }
-      } else if (e.key === "ArrowUp") {
-        // Stop propagation to prevent parent handlers from intercepting
-        e.stopPropagation();
-        e.preventDefault();
-        if (filteredAccounts.length > 0) {
-          if (!open) {
-            setOpen(true);
-          } else if (highlightedIndex > 0) {
-            setHighlightedIndex((prev) => Math.max(prev - 1, 0));
-          }
-        }
-      } else if (e.key === "Enter") {
+      if (e.key === "Enter") {
         e.preventDefault();
         if (open && filteredAccounts.length > 0 && highlightedIndex >= 0) {
           handleSelectAccount(filteredAccounts[highlightedIndex]);
