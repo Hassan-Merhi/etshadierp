@@ -42,9 +42,11 @@ interface StockGroup {
   name: string;
 }
 
-// Extend the schema to make stockGroupId optional for the form
+// Extend the schema to make stockGroupId and companyId optional for the form
+// (companyId is added during submission)
 const formSchema = insertStockItemSchema.extend({
   stockGroupId: z.number().optional().nullable(),
+  companyId: z.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
