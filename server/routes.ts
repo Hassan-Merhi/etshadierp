@@ -6493,6 +6493,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all accounts for voucher sidebar (optimized format with balances)
+  app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+
+      // Fetch all account types
+      const ledgers = await storage.getAllLedgerAccounts(companyId);
+      const banks = await storage.getAllBankAccounts(companyId);
+      const assets = await storage.getAllFixedAssets(companyId);
+      const suppliers = await storage.getAllSuppliers();
+      const employeesData = await storage.getAllEmployees(companyId);
+
+      // Get all voucher entries for this company's vouchers
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(eq(vouchers.companyId, companyId))
+        .execute();
+
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+
+      // Get all voucher entries for this company
+      const allEntries =
+        companyVoucherIds.length > 0
+          ? await db
+              .select()
+              .from(voucherEntries)
+              .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+              .execute()
+          : [];
+
+      // Group entries by account type and calculate balances
+      const ledgerBalances = new Map<number, { debits: number; credits: number }>();
+      const bankBalances = new Map<number, { debits: number; credits: number }>();
+      const assetBalances = new Map<number, { debits: number; credits: number }>();
+      const supplierBalances = new Map<number, { debits: number; credits: number }>();
+
+      for (const entry of allEntries) {
+        const debit = parseFloat(entry.debitAmount || "0");
+        const credit = parseFloat(entry.creditAmount || "0");
+
+        if (entry.ledgerAccountId) {
+          const existing = ledgerBalances.get(entry.ledgerAccountId) || { debits: 0, credits: 0 };
+          ledgerBalances.set(entry.ledgerAccountId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.bankAccountId) {
+          const existing = bankBalances.get(entry.bankAccountId) || { debits: 0, credits: 0 };
+          bankBalances.set(entry.bankAccountId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.fixedAssetId) {
+          const existing = assetBalances.get(entry.fixedAssetId) || { debits: 0, credits: 0 };
+          assetBalances.set(entry.fixedAssetId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
+        }
+
+        if (entry.supplierId) {
+          const existing = supplierBalances.get(entry.supplierId) || { debits: 0, credits: 0 };
+          // Only count pure credit or pure debit entries to prevent double-counting
+          if (credit > 0 && debit === 0) {
+            supplierBalances.set(entry.supplierId, {
+              debits: existing.debits,
+              credits: existing.credits + credit,
+            });
+          } else if (debit > 0 && credit === 0) {
+            supplierBalances.set(entry.supplierId, {
+              debits: existing.debits + debit,
+              credits: existing.credits,
+            });
+          }
+        }
+      }
+
+      // Helper function to calculate signed balance (positive = Dr, negative = Cr)
+      const calculateSignedBalance = (
+        openingBalance: string,
+        openingBalanceSide: string | null,
+        debits: number,
+        credits: number,
+      ) => {
+        let balance = parseFloat(openingBalance || "0");
+
+        // If opening balance has a side, convert to signed number
+        if (openingBalanceSide === "Cr") {
+          balance = -balance;
+        }
+
+        // Add net change (debits increase, credits decrease)
+        return balance + debits - credits;
+      };
+
+      // Build simplified account array for sidebar
+      const accounts = [
+        // Bank accounts
+        ...banks.map((account) => {
+          const movements = bankBalances.get(account.id) || { debits: 0, credits: 0 };
+          const balance = calculateSignedBalance(
+            account.openingBalance || "0",
+            account.openingBalanceSide,
+            movements.debits,
+            movements.credits,
+          );
+
+          return {
+            id: account.id,
+            type: "bank",
+            name: account.name,
+            code: account.code,
+            balance,
+          };
+        }),
+        // Ledger accounts
+        ...ledgers.map((account) => {
+          const movements = ledgerBalances.get(account.id) || { debits: 0, credits: 0 };
+          const balance = calculateSignedBalance(
+            account.openingBalance || "0",
+            account.openingBalanceSide,
+            movements.debits,
+            movements.credits,
+          );
+
+          return {
+            id: account.id,
+            type: "ledger",
+            name: account.name,
+            code: account.code,
+            balance,
+          };
+        }),
+        // Suppliers
+        ...suppliers.map((supplier) => {
+          const movements = supplierBalances.get(supplier.id) || { debits: 0, credits: 0 };
+          // Suppliers: Credits increase payable (negative balance), Debits decrease payable
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          const balance = -(openingBalance + movements.credits - movements.debits);
+
+          return {
+            id: supplier.id,
+            type: "supplier",
+            name: supplier.legalName,
+            code: supplier.code,
+            balance,
+          };
+        }),
+        // Employees
+        ...employeesData.map((employee) => {
+          const balance = parseFloat(employee.currentBalance || "0");
+
+          return {
+            id: employee.id,
+            type: "employee",
+            name: `${employee.firstName} ${employee.lastName}`,
+            code: employee.code,
+            balance,
+          };
+        }),
+        // Fixed Assets
+        ...assets.map((asset) => {
+          const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
+          const balance = calculateSignedBalance(
+            asset.openingBalance || "0",
+            "Dr", // Fixed assets are always debit balance
+            movements.debits,
+            movements.credits,
+          );
+
+          return {
+            id: asset.id,
+            type: "fixedAsset",
+            name: asset.name,
+            code: asset.code,
+            balance,
+          };
+        }),
+      ];
+
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get transactions for a specific ledger account with optional date filtering
   app.get("/api/accounts/ledger/:id/transactions", async (req, res) => {
     try {

@@ -12,6 +12,7 @@ import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
+import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import {
   Card,
   CardContent,
@@ -505,6 +506,13 @@ export default function Vouchers() {
   const [_location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Sidebar state management
+  const [sidebarSearchValue, setSidebarSearchValue] = useState("");
+  const [sidebarHighlightedIndex, setSidebarHighlightedIndex] = useState(0);
+  const [sidebarActiveTab, setSidebarActiveTab] = useState("bank");
+  const [mostUsedAccounts, setMostUsedAccounts] = useState<Account[]>([]);
+  const amountInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+
   // Fetch data
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts"],
@@ -532,6 +540,11 @@ export default function Vouchers() {
 
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
     queryKey: ["/api/fixed-assets"],
+  });
+
+  // Fetch accounts for sidebar (with balances)
+  const { data: sidebarAccounts = [] } = useQuery<Account[]>({
+    queryKey: ["/api/accounts/voucher-sidebar"],
   });
 
   // Combine all accounts for autocomplete (names only, no codes)
@@ -846,6 +859,48 @@ export default function Vouchers() {
       });
     },
   });
+
+  // Handle account selection from sidebar
+  const handleSidebarAccountSelect = (account: Account) => {
+    // Find if there's an empty entry to populate
+    const emptyEntryIndex = entries.findIndex(
+      (e) => e.accountId === 0 || !e.accountName
+    );
+
+    if (emptyEntryIndex >= 0) {
+      // Fill the existing empty entry
+      form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
+      form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
+      form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
+      
+      // Focus the amount input for that row
+      setTimeout(() => {
+        const amountInput = amountInputRefs.current[emptyEntryIndex];
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    } else {
+      // Add a new entry
+      append({
+        accountType: account.type,
+        accountId: account.id,
+        accountName: account.name,
+        amount: "",
+      });
+      
+      // Focus the amount input for the new row
+      setTimeout(() => {
+        const newIndex = entries.length;
+        const amountInput = amountInputRefs.current[newIndex];
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    }
+  };
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -1940,16 +1995,17 @@ export default function Vouchers() {
         </TabsList>
 
         <TabsContent value="payment" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {activeTab === "payment" ? "Payment" : "Receipt"} Voucher
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  {/* Header section */}
+          <div className="flex gap-4">
+            {/* Left column: Form (60%) */}
+            <div className="flex-1" style={{ width: "60%" }}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Voucher</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      {/* Header section */}
                   <div className="flex items-start justify-between gap-4">
                     {/* Left: Payment account selector */}
                     <FormField
@@ -2253,20 +2309,38 @@ export default function Vouchers() {
                     )}
                   />
 
-                  {/* Submit button */}
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={saveMutation.isPending || total === 0}
-                      data-testid="button-save-voucher"
-                    >
-                      {saveMutation.isPending ? "Saving..." : "Save Voucher"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+                      {/* Submit button */}
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          disabled={saveMutation.isPending || total === 0}
+                          data-testid="button-save-voucher"
+                        >
+                          {saveMutation.isPending ? "Saving..." : "Save Voucher"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right column: Account Sidebar (40%) */}
+            <div className="sticky top-4 h-fit" style={{ width: "40%", maxHeight: "calc(100vh - 2rem)" }}>
+              <AccountSidebar
+                accounts={sidebarAccounts}
+                onSelectAccount={handleSidebarAccountSelect}
+                searchValue={sidebarSearchValue}
+                onSearchChange={setSidebarSearchValue}
+                selectedAccountId={null}
+                highlightedIndex={sidebarHighlightedIndex}
+                onHighlightedIndexChange={setSidebarHighlightedIndex}
+                activeTab={sidebarActiveTab}
+                onTabChange={setSidebarActiveTab}
+                mostUsedAccounts={mostUsedAccounts}
+              />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="receipt" className="space-y-4">
