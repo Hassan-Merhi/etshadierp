@@ -67,6 +67,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil } from "lucide-react";
@@ -183,12 +184,14 @@ const voucherFormSchema = z.object({
   voucherDate: z.date(),
   entries: z.array(voucherEntrySchema).min(1, "Add at least one entry"),
   notes: z.string().optional(),
+  optional: z.boolean().default(false),
 });
 
 const journalFormSchema = z.object({
   voucherDate: z.date(),
   entries: z.array(journalEntrySchema).min(1, "Add at least one entry"),
   notes: z.string().optional(),
+  optional: z.boolean().default(false),
 });
 
 const stockTransferEntrySchema = z.object({
@@ -205,6 +208,7 @@ const stockTransferFormSchema = z.object({
   destinationLocationId: z.number().min(1, "Destination location required"),
   entries: z.array(stockTransferEntrySchema).min(1),
   notes: z.string().optional(),
+  optional: z.boolean().default(false),
 });
 
 const stockAdjustmentEntrySchema = z.object({
@@ -220,6 +224,7 @@ const stockAdjustmentFormSchema = z.object({
   locationId: z.number().min(1, "Location required"),
   entries: z.array(stockAdjustmentEntrySchema).min(1, "At least one entry is required"),
   notes: z.string().optional(),
+  optional: z.boolean().default(false),
 });
 
 type VoucherFormData = z.infer<typeof voucherFormSchema>;
@@ -579,6 +584,7 @@ export default function Vouchers() {
         },
       ],
       notes: "",
+      optional: false,
     },
   });
 
@@ -705,6 +711,7 @@ export default function Vouchers() {
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
         description: `${voucherType} voucher`,
         totalAmount: total.toString(),
+        optional: data.optional,
       });
       const voucher = await voucherRes.json();
 
@@ -891,6 +898,7 @@ export default function Vouchers() {
         },
       ],
       notes: "",
+      optional: false,
     },
   });
 
@@ -927,6 +935,7 @@ export default function Vouchers() {
         description: "Journal voucher",
         notes: data.notes || "",
         totalAmount: totalDebit.toString(),
+        optional: data.optional,
       });
       const voucher = await voucherRes.json();
 
@@ -1061,6 +1070,7 @@ export default function Vouchers() {
         },
       ],
       notes: "",
+      optional: false,
     },
   });
 
@@ -1186,6 +1196,7 @@ export default function Vouchers() {
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
         description: `Stock transfer from ${sourceNames} to ${destName}`,
         totalAmount: transferTotal.toString(),
+        optional: data.optional,
       });
       const voucher = await voucherRes.json();
 
@@ -1274,6 +1285,7 @@ export default function Vouchers() {
       locationId: 0,
       entries: [],
       notes: "",
+      optional: false,
     },
   });
 
@@ -1340,6 +1352,7 @@ export default function Vouchers() {
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
         description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
         totalAmount: totalAmount.toString(),
+        optional: data.optional,
       });
       const voucher = await voucherRes.json();
 
@@ -2213,6 +2226,28 @@ export default function Vouchers() {
                     )}
                   />
 
+                  {/* Optional checkbox */}
+                  <FormField
+                    control={form.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Mark as Optional
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
                   {/* Submit button */}
                   <div className="flex justify-end">
                     <Button
@@ -2521,6 +2556,28 @@ export default function Vouchers() {
                     )}
                   />
 
+                  {/* Optional checkbox */}
+                  <FormField
+                    control={form.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Mark as Optional
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
                   {/* Submit button */}
                   <div className="flex justify-end">
                     <Button
@@ -2806,6 +2863,28 @@ export default function Vouchers() {
                           />
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Optional checkbox */}
+                  <FormField
+                    control={journalForm.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-journal-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Mark as Optional
+                          </FormLabel>
+                        </div>
                       </FormItem>
                     )}
                   />
@@ -3208,6 +3287,28 @@ export default function Vouchers() {
                     )}
                   />
 
+                  {/* Optional checkbox */}
+                  <FormField
+                    control={stockTransferForm.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-transfer-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Mark as Optional
+                          </FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
                   {/* Submit button */}
                   <div className="flex justify-end">
                     <Button
@@ -3574,6 +3675,28 @@ export default function Vouchers() {
                           />
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Optional checkbox */}
+                  <FormField
+                    control={stockAdjustmentForm.control}
+                    name="optional"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="checkbox-adjustment-optional"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Mark as Optional
+                          </FormLabel>
+                        </div>
                       </FormItem>
                     )}
                   />
