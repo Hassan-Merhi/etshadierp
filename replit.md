@@ -46,6 +46,12 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
   - Include container numbers in purchase history
   - Removed Code and UOM columns from stock items list
   - Smart number formatting removes .00 from whole numbers while preserving full decimal precision
+- **Voucher Form Simplification (November 12, 2025)**: Streamlined all voucher-related forms to improve usability:
+  - **Removed codes from all dropdown displays**: Ledger accounts, bank accounts, suppliers, employees, fixed assets, locations, and stock items now show names only
+  - **Alphabetical sorting**: All account/item dropdowns sorted alphabetically using `localeCompare()` for consistent A-Z ordering
+  - **Affected pages**: Vouchers (Payment/Receipt/Journal/Transfer/Adjustment tabs), VoucherEdit, VoucherEditDialog, Daybook, AccountingCreate
+  - **Components updated**: StockItemCombobox, AccountCombobox, LocationAutocomplete, StockItemAutocomplete, AccountAutocomplete
+  - **Note**: Management tables (e.g., Stock Items page stock groups) intentionally retain codes for administrative search/filtering purposes
 
 ## User Preferences
 

@@ -221,7 +221,7 @@ function AccountCombobox({
     ...fixedAssets.map((f) => ({
       type: "fixedAsset" as const,
       id: f.id,
-      name: f.name,
+      name: f.assetName,
     })),
   ].sort((a, b) => a.name.localeCompare(b.name));
 

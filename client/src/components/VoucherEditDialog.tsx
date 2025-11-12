@@ -297,7 +297,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
     }
     if (entry.fixedAssetId) {
       const asset = fixedAssets.find(a => a.id === entry.fixedAssetId);
-      return asset ? asset.name : "";
+      return asset ? asset.assetName : "";
     }
     return "";
   };
