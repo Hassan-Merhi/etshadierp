@@ -4941,7 +4941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           validatedItem.stockItemName = stockItem.name;
           validatedItem.stockItemUom = stockItem.uom;
 
-          // Check if location has this item in inventory
+          // Check if location has this item in inventory for cost price calculation
           const inventoryItem = await db
             .select()
             .from(inventory)
@@ -4953,26 +4953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
-          // Check inventory only if user doesn't have permission to sell negative stock
-          const canSellNegativeStock = req.user?.canSellNegativeStock || false;
-          
-          if (!canSellNegativeStock) {
-            if (
-              inventoryItem.length === 0 ||
-              parseFloat(inventoryItem[0].quantity) < item.quantity
-            ) {
-              const available =
-                inventoryItem.length > 0
-                  ? parseFloat(inventoryItem[0].quantity)
-                  : 0;
-              validatedItem.error = `Insufficient inventory. Available: ${available}, Requested: ${item.quantity}`;
-              errors.push(
-                `Row ${item.rowNum}: Insufficient inventory for '${stockItem.name}'. Available: ${available}, Requested: ${item.quantity}`,
-              );
-            }
-          }
-
-          // Get cost price for profit calculation
+          // Get cost price for profit calculation (allow negative stock for POS imports)
           if (inventoryItem.length > 0) {
             validatedItem.costPrice = parseFloat(
               inventoryItem[0].averageRate || "0",
