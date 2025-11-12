@@ -4953,18 +4953,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
-          if (
-            inventoryItem.length === 0 ||
-            parseFloat(inventoryItem[0].quantity) < item.quantity
-          ) {
-            const available =
-              inventoryItem.length > 0
-                ? parseFloat(inventoryItem[0].quantity)
-                : 0;
-            validatedItem.error = `Insufficient inventory. Available: ${available}, Requested: ${item.quantity}`;
-            errors.push(
-              `Row ${item.rowNum}: Insufficient inventory for '${stockItem.name}'. Available: ${available}, Requested: ${item.quantity}`,
-            );
+          // Check inventory only if user doesn't have permission to sell negative stock
+          const canSellNegativeStock = req.user?.canSellNegativeStock || false;
+          
+          if (!canSellNegativeStock) {
+            if (
+              inventoryItem.length === 0 ||
+              parseFloat(inventoryItem[0].quantity) < item.quantity
+            ) {
+              const available =
+                inventoryItem.length > 0
+                  ? parseFloat(inventoryItem[0].quantity)
+                  : 0;
+              validatedItem.error = `Insufficient inventory. Available: ${available}, Requested: ${item.quantity}`;
+              errors.push(
+                `Row ${item.rowNum}: Insufficient inventory for '${stockItem.name}'. Available: ${available}, Requested: ${item.quantity}`,
+              );
+            }
           }
 
           // Get cost price for profit calculation
