@@ -13,6 +13,8 @@ import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 import AccountSidebar, { Account } from "@/components/AccountSidebar";
+import { useVoucherEntries } from "@/hooks/useVoucherEntries";
+import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
 import {
   Card,
   CardContent,
