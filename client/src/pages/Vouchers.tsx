@@ -514,6 +514,9 @@ export default function Vouchers() {
   const [sidebarHighlightedIndex, setSidebarHighlightedIndex] = useState(0);
   const [sidebarActiveTab, setSidebarActiveTab] = useState("bank");
   const [mostUsedAccounts, setMostUsedAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
   // Fetch data
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
@@ -872,8 +875,11 @@ export default function Vouchers() {
       (e: any) => e.accountId === 0 || !e.accountName
     );
 
+    let targetRowIndex: number;
+
     if (emptyEntryIndex >= 0) {
       // Fill the existing empty entry
+      targetRowIndex = emptyEntryIndex;
       form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
       form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
       form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
@@ -890,6 +896,7 @@ export default function Vouchers() {
       });
     } else {
       // Add a new entry with all account data
+      targetRowIndex = currentEntries.length;
       append({
         accountType: account.type,
         accountId: account.id,
@@ -899,13 +906,37 @@ export default function Vouchers() {
       
       // Focus the amount input for the new row after it's been added
       requestAnimationFrame(() => {
-        const newIndex = currentEntries.length; // Use current length, not stale entries
         const amountInput = document.querySelector(
-          `[data-testid="input-amount-${newIndex}"]`
+          `[data-testid="input-amount-${targetRowIndex}"]`
         ) as HTMLInputElement;
         if (amountInput) {
           amountInput.focus();
           amountInput.select();
+        }
+      });
+    }
+    
+    // Set selected account and active row for sidebar highlighting
+    setSelectedAccountId(account.id);
+    setSelectedAccountType(account.type);
+    setActiveRowIndex(targetRowIndex);
+  };
+  
+  // Clear selection when amount is committed (blur or Enter with amount > 0)
+  const handleAmountCommit = (rowIndex: number) => {
+    // Only clear if this is the active row
+    if (rowIndex === activeRowIndex) {
+      setSelectedAccountId(null);
+      setSelectedAccountType(null);
+      setActiveRowIndex(null);
+      
+      // Refocus sidebar search to support auto-focus workflow
+      requestAnimationFrame(() => {
+        const searchInput = document.querySelector(
+          '[data-testid="input-search-account"]'
+        ) as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
         }
       });
     }
@@ -2022,7 +2053,10 @@ export default function Vouchers() {
             sidebarActiveTab={sidebarActiveTab}
             setSidebarActiveTab={setSidebarActiveTab}
             mostUsedAccounts={mostUsedAccounts}
+            selectedAccountId={selectedAccountId}
+            selectedAccountType={selectedAccountType}
             handleSidebarAccountSelect={handleSidebarAccountSelect}
+            handleAmountCommit={handleAmountCommit}
             handlePrint={handlePrint}
             onSubmit={onSubmit}
             activeTab={activeTab}

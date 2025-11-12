@@ -17,6 +17,7 @@ interface VoucherEntriesTableProps {
   entries: VoucherEntry[];
   total: number;
   mode: "payment" | "receipt";
+  onAmountCommit?: (rowIndex: number) => void;
 }
 
 export function VoucherEntriesTable({
@@ -25,6 +26,7 @@ export function VoucherEntriesTable({
   entries,
   total,
   mode,
+  onAmountCommit,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
 
@@ -37,12 +39,38 @@ export function VoucherEntriesTable({
     });
   };
 
+  const handleBlur = (index: number) => {
+    if (!onAmountCommit) return;
+    
+    const amount = Number(entries[index]?.amount);
+    if (!isNaN(amount) && amount > 0) {
+      onAmountCommit(index);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const amount = parseFloat(entries[index].amount);
+      const amount = Number(entries[index]?.amount);
+      
       if (!isNaN(amount) && amount > 0) {
+        // Call commit callback to clear selection and refocus search
+        if (onAmountCommit) {
+          onAmountCommit(index);
+        }
+        
+        // Then add a new row
         handleAddRow();
+        
+        // Focus the new row's amount input
+        requestAnimationFrame(() => {
+          const newRowIndex = entries.length;
+          const newInput = document.querySelector(`[data-testid="input-amount-${newRowIndex}"]`) as HTMLInputElement;
+          if (newInput) {
+            newInput.focus();
+            newInput.select();
+          }
+        });
       }
     } else if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
@@ -98,6 +126,7 @@ export function VoucherEntriesTable({
                           className="font-mono"
                           data-testid={`input-amount-${index}`}
                           onKeyDown={(e) => handleKeyDown(e, index)}
+                          onBlur={() => handleBlur(index)}
                         />
                       </FormControl>
                       <FormMessage />

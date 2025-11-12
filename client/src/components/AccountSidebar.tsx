@@ -18,6 +18,7 @@ interface AccountSidebarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   selectedAccountId: number | null;
+  selectedAccountType: string | null;
   highlightedIndex: number;
   onHighlightedIndexChange: (index: number) => void;
   activeTab: string;
@@ -31,6 +32,7 @@ export default function AccountSidebar({
   searchValue,
   onSearchChange,
   selectedAccountId,
+  selectedAccountType,
   highlightedIndex,
   onHighlightedIndexChange,
   activeTab,
@@ -54,10 +56,15 @@ export default function AccountSidebar({
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Reset highlighted index when filtered accounts change
+  // Clamp highlighted index to filtered list length when list changes
   useEffect(() => {
-    onHighlightedIndexChange(0);
-  }, [searchValue, activeTab]);
+    const maxIndex = Math.max(0, filteredAccounts.length - 1);
+    if (highlightedIndex > maxIndex) {
+      onHighlightedIndexChange(Math.min(highlightedIndex, maxIndex));
+    } else {
+      onHighlightedIndexChange(0);
+    }
+  }, [searchValue, activeTab, filteredAccounts.length]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -134,7 +141,7 @@ export default function AccountSidebar({
             </div>
           ) : (
             filteredAccounts.map((account, idx) => {
-              const isSelected = account.id === selectedAccountId && account.type === activeTab;
+              const isSelected = account.id === selectedAccountId && account.type === selectedAccountType;
               const isHighlighted = idx === highlightedIndex;
               const showNumberBadge = activeTab === "quick" && idx < 9;
               

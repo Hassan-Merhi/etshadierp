@@ -43,7 +43,10 @@ interface PaymentVoucherTabProps {
   sidebarActiveTab: string;
   setSidebarActiveTab: (tab: string) => void;
   mostUsedAccounts: Account[];
+  selectedAccountId: number | null;
+  selectedAccountType: string | null;
   handleSidebarAccountSelect: (account: Account) => void;
+  handleAmountCommit: (rowIndex: number) => void;
   handlePrint: () => void;
   onSubmit: (values: any) => void;
   activeTab: "payment" | "receipt";
@@ -67,7 +70,10 @@ export function PaymentVoucherTab({
   sidebarActiveTab,
   setSidebarActiveTab,
   mostUsedAccounts,
+  selectedAccountId,
+  selectedAccountType,
   handleSidebarAccountSelect,
+  handleAmountCommit,
   handlePrint,
   onSubmit,
   activeTab,
@@ -188,6 +194,7 @@ export function PaymentVoucherTab({
                   entries={entries}
                   total={total}
                   mode="payment"
+                  onAmountCommit={handleAmountCommit}
                 />
 
                 {/* Notes field */}
@@ -255,7 +262,8 @@ export function PaymentVoucherTab({
           onSelectAccount={handleSidebarAccountSelect}
           searchValue={sidebarSearchValue}
           onSearchChange={setSidebarSearchValue}
-          selectedAccountId={null}
+          selectedAccountId={selectedAccountId}
+          selectedAccountType={selectedAccountType}
           highlightedIndex={sidebarHighlightedIndex}
           onHighlightedIndexChange={setSidebarHighlightedIndex}
           activeTab={sidebarActiveTab}
