@@ -645,6 +645,46 @@ export default function Vouchers() {
           return sum + credit - debit;
         }, openingBalance);
         return balance;
+      } else if (paymentAccountType === "employee") {
+        // Fetch the employee details to get opening balance
+        const employeeRes = await fetch(`/api/employees/${paymentAccountId}`);
+        const employee = await employeeRes.json();
+        
+        // Fetch transactions
+        const transRes = await fetch(`/api/accounts/employee/${paymentAccountId}/transactions`);
+        const transactions = await transRes.json();
+        
+        // Opening balance: Positive = we owe them (salary payable), Negative = they owe us (advance)
+        const openingBalance = parseFloat(employee.openingBalance || "0");
+        
+        // Sum transactions starting from opening balance
+        // Credits increase payable (we owe them), Debits decrease payable (we paid them)
+        const balance = transactions.reduce((sum: number, t: any) => {
+          const credit = parseFloat(t.creditAmount || "0");
+          const debit = parseFloat(t.debitAmount || "0");
+          return sum + credit - debit;
+        }, openingBalance);
+        return balance;
+      } else if (paymentAccountType === "fixedAsset") {
+        // Fetch the fixed asset details to get opening balance
+        const assetRes = await fetch(`/api/fixed-assets/${paymentAccountId}`);
+        const asset = await assetRes.json();
+        
+        // Fetch transactions
+        const transRes = await fetch(`/api/accounts/fixed-asset/${paymentAccountId}/transactions`);
+        const transactions = await transRes.json();
+        
+        // Opening balance for fixed assets (book value)
+        const openingBalance = parseFloat(asset.openingBalance || "0");
+        
+        // Sum transactions starting from opening balance
+        // Debits increase asset value, Credits decrease (depreciation)
+        const balance = transactions.reduce((sum: number, t: any) => {
+          const debit = parseFloat(t.debitAmount || "0");
+          const credit = parseFloat(t.creditAmount || "0");
+          return sum + debit - credit;
+        }, openingBalance);
+        return balance;
       }
       return 0;
     },
