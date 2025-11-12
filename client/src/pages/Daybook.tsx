@@ -201,29 +201,29 @@ function AccountCombobox({
     ...ledgerAccounts.map((a) => ({
       type: "ledger" as const,
       id: a.id,
-      name: `${a.code} - ${a.name}`,
+      name: a.name,
     })),
     ...bankAccounts.map((a) => ({
       type: "bank" as const,
       id: a.id,
-      name: `${a.code} - ${a.name}`,
+      name: a.bankName,
     })),
     ...suppliers.map((s) => ({
       type: "supplier" as const,
       id: s.id,
-      name: `${s.code} - ${s.legalName}`,
+      name: s.legalName,
     })),
     ...employees.map((e) => ({
       type: "employee" as const,
       id: e.id,
-      name: `${e.code} - ${e.firstName} ${e.lastName}`,
+      name: `${e.firstName} ${e.lastName}`,
     })),
     ...fixedAssets.map((f) => ({
       type: "fixedAsset" as const,
       id: f.id,
-      name: `${f.assetCode} - ${f.assetName}`,
+      name: f.name,
     })),
-  ];
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

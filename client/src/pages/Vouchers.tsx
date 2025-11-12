@@ -345,6 +345,8 @@ function StockItemCombobox({
 }) {
   const [open, setOpen] = useState(false);
 
+  const sortedStockItems = [...stockItems].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -367,12 +369,12 @@ function StockItemCombobox({
           <CommandList className="bg-popover text-popover-foreground">
             <CommandEmpty>No stock item found.</CommandEmpty>
             <CommandGroup>
-              {stockItems.map((item) => (
+              {sortedStockItems.map((item) => (
                 <CommandItem
                   key={item.id}
-                  value={`${item.code} - ${item.name}`}
+                  value={item.name}
                   onSelect={() => {
-                    onChange(item.id, `${item.code} - ${item.name}`);
+                    onChange(item.id, item.name);
                     setOpen(false);
                   }}
                   data-testid={`option-stock-item-${item.id}`}
@@ -383,7 +385,7 @@ function StockItemCombobox({
                       value?.id === item.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {item.code} - {item.name}
+                  {item.name}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -1134,7 +1136,7 @@ export default function Vouchers() {
       return {
         type: "ledger",
         id: ledgerAccount.id,
-        name: `${ledgerAccount.code} - ${ledgerAccount.name}`,
+        name: ledgerAccount.name,
       };
     }
     
@@ -1146,7 +1148,7 @@ export default function Vouchers() {
       return {
         type: "bank",
         id: bankAccount.id,
-        name: `${bankAccount.accountNumber} - ${bankAccount.bankName}`,
+        name: bankAccount.bankName,
       };
     }
     
@@ -1158,7 +1160,7 @@ export default function Vouchers() {
       return {
         type: "supplier",
         id: supplier.id,
-        name: `${supplier.code} - ${supplier.legalName}`,
+        name: supplier.legalName,
       };
     }
     

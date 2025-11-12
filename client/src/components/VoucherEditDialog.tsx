@@ -281,23 +281,23 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   const getAccountName = (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
       const account = ledgerAccounts.find(a => a.id === entry.ledgerAccountId);
-      return account ? `${account.code} - ${account.name}` : "";
+      return account ? account.name : "";
     }
     if (entry.bankAccountId) {
       const account = bankAccounts.find(a => a.id === entry.bankAccountId);
-      return account ? `${account.accountNumber} - ${account.bankName}` : "";
+      return account ? account.bankName : "";
     }
     if (entry.supplierId) {
       const supplier = suppliers.find(s => s.id === entry.supplierId);
-      return supplier ? `${supplier.code} - ${supplier.name}` : "";
+      return supplier ? supplier.legalName : "";
     }
     if (entry.employeeId) {
       const employee = employees.find(e => e.id === entry.employeeId);
-      return employee ? `${employee.code} - ${employee.firstName} ${employee.lastName}` : "";
+      return employee ? `${employee.firstName} ${employee.lastName}` : "";
     }
     if (entry.fixedAssetId) {
       const asset = fixedAssets.find(a => a.id === entry.fixedAssetId);
-      return asset ? `${asset.assetCode} - ${asset.assetName}` : "";
+      return asset ? asset.name : "";
     }
     return "";
   };

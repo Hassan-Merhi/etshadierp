@@ -354,6 +354,8 @@ function StockItemCombobox({
 }) {
   const [open, setOpen] = useState(false);
 
+  const sortedStockItems = [...stockItems].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -374,12 +376,12 @@ function StockItemCombobox({
           <CommandList className="bg-popover text-popover-foreground">
             <CommandEmpty>No stock item found.</CommandEmpty>
             <CommandGroup>
-              {stockItems.map((item) => (
+              {sortedStockItems.map((item) => (
                 <CommandItem
                   key={item.id}
-                  value={`${item.code} - ${item.name}`}
+                  value={item.name}
                   onSelect={() => {
-                    onChange(item.id, `${item.code} - ${item.name}`);
+                    onChange(item.id, item.name);
                     setOpen(false);
                   }}
                   data-testid={`option-stock-item-${item.id}`}
@@ -390,7 +392,7 @@ function StockItemCombobox({
                       value?.id === item.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {item.code} - {item.name}
+                  {item.name}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -425,19 +427,19 @@ function AccountCombobox({
     ...ledgerAccounts.map((a) => ({
       type: "ledger" as const,
       id: a.id,
-      name: `${a.code} - ${a.name}`,
+      name: a.name,
     })),
     ...bankAccounts.map((a) => ({
       type: "bank" as const,
       id: a.id,
-      name: `${a.accountNumber} - ${a.bankName}`,
+      name: a.bankName,
     })),
     ...suppliers.map((s) => ({
       type: "supplier" as const,
       id: s.id,
-      name: `${s.code} - ${s.legalName}`,
+      name: s.legalName,
     })),
-  ];
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -646,21 +648,21 @@ export default function VoucherEdit() {
       return account ? {
         type: "ledger" as const,
         id: account.id,
-        name: `${account.code} - ${account.name}`,
+        name: account.name,
       } : null;
     } else if (entry.bankAccountId) {
       const account = bankAccounts.find(a => a.id === entry.bankAccountId);
       return account ? {
         type: "bank" as const,
         id: account.id,
-        name: `${account.accountNumber} - ${account.bankName}`,
+        name: account.bankName,
       } : null;
     } else if (entry.supplierId) {
       const supplier = suppliers.find(s => s.id === entry.supplierId);
       return supplier ? {
         type: "supplier" as const,
         id: supplier.id,
-        name: `${supplier.code} - ${supplier.legalName}`,
+        name: supplier.legalName,
       } : null;
     }
     return null;
