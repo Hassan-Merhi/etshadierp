@@ -1962,6 +1962,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get employees with calculated balances from transactions
+  app.get(
+    "/api/payroll/employees-with-balances",
+    requireAuth,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const employeesWithBalances = await storage.getEmployeesWithBalances(
+          req.session.currentCompanyId
+        );
+        res.json(employeesWithBalances);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Get worker payment summary (total paid to each worker)
   app.get(
     "/api/payroll/worker-payments-summary",

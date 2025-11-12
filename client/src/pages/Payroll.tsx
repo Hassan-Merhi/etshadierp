@@ -182,8 +182,8 @@ export default function Payroll() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data: employees, isLoading: employeesLoading } = useQuery<Employee[]>({
-    queryKey: ["/api/employees"],
+  const { data: employees, isLoading: employeesLoading} = useQuery<Array<Employee & { calculatedBalance: string }>>({
+    queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -502,6 +502,7 @@ export default function Payroll() {
         title: "Success",
         description: "Salary deposited successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setDepositDialogOpen(false);
       depositForm.reset();
@@ -528,6 +529,7 @@ export default function Payroll() {
         title: "Success",
         description: "Bonus given successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setBonusDialogOpen(false);
       bonusForm.reset();
@@ -554,6 +556,7 @@ export default function Payroll() {
         title: "Success",
         description: "Withdrawal processed successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setWithdrawalDialogOpen(false);
       withdrawalForm.reset();
@@ -581,6 +584,7 @@ export default function Payroll() {
         title: "Success",
         description: "Bulk payment processed successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/worker-payments-summary"] });
       setBulkPaymentDialogOpen(false);
@@ -661,6 +665,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker created successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setNewWorkerDialogOpen(false);
       newWorkerForm.reset();
@@ -686,6 +691,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker updated successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setEditWorkerDialogOpen(false);
       editWorkerForm.reset();
@@ -710,6 +716,7 @@ export default function Payroll() {
         title: "Success",
         description: "Worker deleted successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setSelectedWorkerForEdit(null);
     },
@@ -751,6 +758,7 @@ export default function Payroll() {
         title: "Success",
         description: "Employee created successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
       setCreateEmployeeDialogOpen(false);
@@ -775,6 +783,7 @@ export default function Payroll() {
         title: "Success",
         description: "Employee deleted successfully",
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setEmployeeToDelete(null);
     },
@@ -1063,11 +1072,8 @@ export default function Payroll() {
                     </TableHeader>
                     <TableBody>
                       {employeeStaff.map((employee) => {
-                        const openingBal = parseFloat(employee.openingBalance || "0");
-                        const deposits = parseFloat(employee.totalDeposits || "0");
-                        const withdrawals = parseFloat(employee.totalWithdrawals || "0");
-                        // Employee balance is opening + deposits - withdrawals (liability account)
-                        const balance = openingBal + deposits - withdrawals;
+                        // Use the calculated balance from the API
+                        const balance = parseFloat(employee.calculatedBalance || "0");
                         
                         return (
                         <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
@@ -1081,10 +1087,10 @@ export default function Payroll() {
                             {balance.toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalDeposits).toFixed(2)}
+                            {parseFloat(employee.totalDeposits || "0").toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-withdrawals-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalWithdrawals).toFixed(2)}
+                            {parseFloat(employee.totalWithdrawals || "0").toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${employee.id}`}>
                             <Badge variant={employee.active ? "default" : "secondary"}>

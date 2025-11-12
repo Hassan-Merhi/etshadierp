@@ -809,6 +809,7 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
       form.reset({
         paymentAccountType: "ledger",
         paymentAccountId: 0,
@@ -978,6 +979,7 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
       journalForm.reset({
         voucherDate: new Date(),
         entries: [
