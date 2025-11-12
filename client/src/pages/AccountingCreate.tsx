@@ -75,7 +75,7 @@ const getDefaultValues = (entityType: EntityType) => {
     case "stockGroup":
       return { name: "", active: true };
     case "stockItem":
-      return { name: "", uom: "PCS", openingQty: "0", openingRate: "0", openingValue: "0", sellingPrice: "0", reorderLevel: "0", active: true };
+      return { name: "", uom: "", openingQty: "0", openingRate: "0", openingValue: "0", sellingPrice: "0", reorderLevel: "0", active: true };
     default:
       return {};
   }
