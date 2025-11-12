@@ -120,6 +120,7 @@ export function StockItemCreateDialog({
   };
 
   const onInvalid = (errors: any) => {
+    console.log("Form validation errors:", errors);
     const errorMessages = Object.values(errors)
       .map((err: any) => err.message)
       .filter(Boolean);
@@ -127,7 +128,7 @@ export function StockItemCreateDialog({
     if (errorMessages.length > 0) {
       toast({
         title: "Validation Error",
-        description: errorMessages[0] as string,
+        description: errorMessages.join(", "),
         variant: "destructive",
       });
     }
