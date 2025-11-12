@@ -46,11 +46,13 @@ export function StockItemAutocomplete({
 
   const displayValue = searchTerm !== null ? searchTerm : (value ? value.name : "");
 
+  const sortedItems = [...stockItems].sort((a, b) => a.name.localeCompare(b.name));
+
   const filteredItems = searchTerm !== null && searchTerm.length > 0
-    ? stockItems.filter((item) =>
+    ? sortedItems.filter((item) =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : stockItems;
+    : sortedItems;
 
   const handleSelect = (item: StockItem) => {
     onChange(item.id, item.name);

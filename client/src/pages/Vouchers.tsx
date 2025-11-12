@@ -260,19 +260,19 @@ function AccountCombobox({
     ...ledgerAccounts.map((a) => ({
       type: "ledger" as const,
       id: a.id,
-      name: `${a.code} - ${a.name}`,
+      name: a.name,
     })),
     ...bankAccounts.map((a) => ({
       type: "bank" as const,
       id: a.id,
-      name: `${a.accountNumber} - ${a.bankName}`,
+      name: a.bankName,
     })),
     ...suppliers.map((s) => ({
       type: "supplier" as const,
       id: s.id,
-      name: `${s.code} - ${s.legalName}`,
+      name: s.legalName,
     })),
-  ];
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -533,40 +533,43 @@ export default function Vouchers() {
   });
 
   // Combine all accounts for autocomplete (names only, no codes)
-  const allAccounts = useMemo<CombinedAccount[]>(() => [
-    ...ledgerAccounts.map((a) => ({
-      type: "ledger" as const,
-      id: a.id,
-      name: a.name,
-      code: a.code,
-    })),
-    ...bankAccounts.map((a) => ({
-      type: "bank" as const,
-      id: a.id,
-      name: a.bankName,
-      code: a.accountNumber,
-    })),
-    ...suppliers.map((s) => ({
-      type: "supplier" as const,
-      id: s.id,
-      name: s.legalName,
-      code: s.code,
-    })),
-    ...employees.map((e) => ({
-      type: "employee" as const,
-      id: e.id,
-      name: `${e.firstName} ${e.lastName}`,
-      code: e.code,
-      openingBalance: e.openingBalance,
-    })),
-    ...fixedAssets.map((f) => ({
-      type: "fixedAsset" as const,
-      id: f.id,
-      name: f.name,
-      code: f.code,
-      openingBalance: f.openingBalance,
-    })),
-  ], [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
+  const allAccounts = useMemo<CombinedAccount[]>(() => {
+    const accounts = [
+      ...ledgerAccounts.map((a) => ({
+        type: "ledger" as const,
+        id: a.id,
+        name: a.name,
+        code: a.code,
+      })),
+      ...bankAccounts.map((a) => ({
+        type: "bank" as const,
+        id: a.id,
+        name: a.bankName,
+        code: a.accountNumber,
+      })),
+      ...suppliers.map((s) => ({
+        type: "supplier" as const,
+        id: s.id,
+        name: s.legalName,
+        code: s.code,
+      })),
+      ...employees.map((e) => ({
+        type: "employee" as const,
+        id: e.id,
+        name: `${e.firstName} ${e.lastName}`,
+        code: e.code,
+        openingBalance: e.openingBalance,
+      })),
+      ...fixedAssets.map((f) => ({
+        type: "fixedAsset" as const,
+        id: f.id,
+        name: f.name,
+        code: f.code,
+        openingBalance: f.openingBalance,
+      })),
+    ];
+    return accounts.sort((a, b) => a.name.localeCompare(b.name));
+  }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -2933,9 +2936,9 @@ export default function Vouchers() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {locations.map((location) => (
+                                {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
                                   <SelectItem key={location.id} value={location.id.toString()}>
-                                    {location.code} - {location.name}
+                                    {location.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -3355,7 +3358,7 @@ export default function Vouchers() {
                               const stockItem = stockItems.find(s => s.id === item.stockItemId);
                               if (stockItem) {
                                 stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
-                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, `${stockItem.code} - ${stockItem.name}`);
+                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
                                 stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
                                 
                                 // Move focus to quantity field
@@ -3425,9 +3428,9 @@ export default function Vouchers() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {locations.map((location) => (
+                              {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
                                 <SelectItem key={location.id} value={location.id.toString()}>
-                                  {location.code} - {location.name}
+                                  {location.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
