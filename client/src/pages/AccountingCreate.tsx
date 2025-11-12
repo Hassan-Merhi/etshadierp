@@ -219,68 +219,12 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
             <FormField
               control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="LOC001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="Main Warehouse" data-testid="input-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="city"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>City</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="New York" data-testid="input-city" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="state"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>State</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="NY" data-testid="input-state" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="country"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Country</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="USA" data-testid="input-country" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -339,9 +283,13 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
   const subTypes = getSubTypes();
 
   // Fetch parent ledger accounts for dropdown
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
   });
+  
+  // Filter to show only parent accounts (accounts with no parent themselves)
+  // Use strict comparison to handle 0, null, undefined correctly
+  const ledgerAccounts = allLedgerAccounts.filter((acc: any) => acc.parentId === null || acc.parentId === undefined);
 
   // Form for creating parent account
   const parentForm = useForm({
@@ -683,40 +631,12 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 
             <FormField
               control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="+1 234 567 8900" data-testid="input-phone" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="joinDate"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Starting Date *</FormLabel>
                   <FormControl>
                     <Input {...field} type="text" placeholder="YYYY-MM-DD" data-testid="input-join-date" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="department"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Department</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Sales" data-testid="input-department" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -793,20 +713,6 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="SUP001" data-testid="input-code" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="legalName"
               render={({ field }) => (
                 <FormItem>
@@ -814,76 +720,9 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                   <FormControl>
                     <Input {...field} placeholder="ABC Suppliers Inc." data-testid="input-legal-name" />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email *</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="email" placeholder="contact@supplier.com" data-testid="input-email" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="+1 234 567 8900" data-testid="input-phone" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="123 Business St, City, State" data-testid="input-address" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="taxId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tax ID (GST/VAT)</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="GST123456" data-testid="input-tax-id" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="paymentTerms"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Terms</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Net 30" data-testid="input-payment-terms" />
-                  </FormControl>
+                  <FormDescription>
+                    Code will be auto-generated from name
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

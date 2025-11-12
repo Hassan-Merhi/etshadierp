@@ -1335,19 +1335,6 @@ export default function Accounts() {
                       <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
                         <FormField
                           control={editForm.control}
-                          name="code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Code</FormLabel>
-                              <FormControl>
-                                <Input {...field} data-testid="input-edit-code" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={editForm.control}
                           name="name"
                           render={({ field }) => (
                             <FormItem>
@@ -1494,19 +1481,6 @@ export default function Accounts() {
                   <CardContent>
                     <Form {...bankForm}>
                       <form onSubmit={bankForm.handleSubmit(onBankSubmit)} className="space-y-4">
-                        <FormField
-                          control={bankForm.control}
-                          name="code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Account Code</FormLabel>
-                              <FormControl>
-                                <Input {...field} data-testid="input-edit-bank-code" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                         <FormField
                           control={bankForm.control}
                           name="name"

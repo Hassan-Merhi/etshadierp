@@ -449,18 +449,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: req.session.currentCompanyId,
       });
 
-      // Check for duplicate code within the current company
-      const existing = await storage.getLocationByCode(
-        parsed.code,
-        req.session.currentCompanyId,
-      );
-      if (existing) {
-        return res
-          .status(400)
-          .json({ message: "Location code already exists" });
+      // Auto-generate code from name if not provided
+      if (!parsed.code) {
+        // Generate code from name: remove non-alphanumeric, take first 6 letters, uppercase
+        const sanitized = parsed.name.trim().replace(/[^a-zA-Z0-9]/g, '');
+        let baseCode = sanitized.substring(0, 6).toUpperCase();
+        
+        // Fallback if baseCode is empty after sanitization
+        if (!baseCode || baseCode.length === 0) {
+          baseCode = "LOC";
+        }
+        
+        // Ensure uniqueness by adding suffix if needed
+        let code = baseCode;
+        let suffix = 1;
+        while (await storage.getLocationByCode(code, req.session.currentCompanyId)) {
+          code = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        parsed.code = code;
+      } else {
+        // Check for duplicate code if manually provided
+        const existing = await storage.getLocationByCode(
+          parsed.code,
+          req.session.currentCompanyId,
+        );
+        if (existing) {
+          return res
+            .status(400)
+            .json({ message: "Location code already exists" });
+        }
       }
 
-      const location = await storage.createLocation(parsed);
+      // Provide defaults for optional fields
+      const locationData = {
+        ...parsed,
+        city: parsed.city || '',
+        state: parsed.state || '',
+        country: parsed.country || '',
+      };
+
+      const location = await storage.createLocation(locationData);
       res.status(201).json(location);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -2148,15 +2177,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = insertSupplierSchema.parse(req.body);
 
-      // Check for duplicate code
-      const existing = await storage.getSupplierByCode(parsed.code);
-      if (existing) {
-        return res
-          .status(400)
-          .json({ message: "Supplier code already exists" });
+      // Auto-generate code from legalName if not provided
+      if (!parsed.code) {
+        // Generate code from name: remove non-alphanumeric, take first 6 letters, uppercase
+        const sanitized = parsed.legalName.trim().replace(/[^a-zA-Z0-9]/g, '');
+        let baseCode = sanitized.substring(0, 6).toUpperCase();
+        
+        // Fallback if baseCode is empty after sanitization
+        if (!baseCode || baseCode.length === 0) {
+          baseCode = "SUP";
+        }
+        
+        // Ensure uniqueness by adding suffix if needed
+        let code = baseCode;
+        let suffix = 1;
+        while (await storage.getSupplierByCode(code)) {
+          code = `${baseCode}${suffix}`;
+          suffix++;
+        }
+        parsed.code = code;
+      } else {
+        // Check for duplicate code if manually provided
+        const existing = await storage.getSupplierByCode(parsed.code);
+        if (existing) {
+          return res
+            .status(400)
+            .json({ message: "Supplier code already exists" });
+        }
       }
 
-      const supplier = await storage.createSupplier(parsed);
+      // Provide defaults for optional fields
+      const supplierData = {
+        ...parsed,
+        email: parsed.email || '',
+        phone: parsed.phone || '',
+        address: parsed.address || '',
+        taxId: parsed.taxId || '',
+        paymentTerms: parsed.paymentTerms || '',
+      };
+
+      const supplier = await storage.createSupplier(supplierData);
       res.status(201).json(supplier);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

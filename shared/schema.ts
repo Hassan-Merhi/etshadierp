@@ -85,8 +85,11 @@ export const insertLocationSchema = createInsertSchema(locations).omit({
   createdAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
+  code: z.string().optional(),
   name: z.string().min(1, "Name is required"),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  country: z.string().optional(),
 });
 
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
@@ -234,9 +237,13 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
   id: true,
   createdAt: true,
 }).extend({
-  code: z.string().min(1, "Code is required"),
+  code: z.string().optional(),
   legalName: z.string().min(1, "Legal name is required"),
-  email: z.string().email("Invalid email format"),
+  email: z.string().email("Invalid email format").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  taxId: z.string().optional(),
+  paymentTerms: z.string().optional(),
   openingBalance: z.string().optional(),
 });
 

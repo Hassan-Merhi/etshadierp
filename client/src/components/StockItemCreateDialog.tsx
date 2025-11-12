@@ -76,6 +76,8 @@ export function StockItemCreateDialog({
       reorderLevel: "0",
       active: true,
     },
+    mode: "onSubmit",
+    shouldFocusError: true,
   });
 
   // Create mutation
@@ -117,6 +119,20 @@ export function StockItemCreateDialog({
     } as InsertStockItem);
   };
 
+  const onInvalid = (errors: any) => {
+    const errorMessages = Object.values(errors)
+      .map((err: any) => err.message)
+      .filter(Boolean);
+    
+    if (errorMessages.length > 0) {
+      toast({
+        title: "Validation Error",
+        description: errorMessages[0] as string,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleCancel = () => {
     form.reset();
     onOpenChange(false);
@@ -130,7 +146,7 @@ export function StockItemCreateDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
