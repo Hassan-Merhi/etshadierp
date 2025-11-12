@@ -94,8 +94,21 @@ interface Supplier {
   legalName: string;
 }
 
+interface Employee {
+  id: number;
+  code: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface FixedAsset {
+  id: number;
+  code: string;
+  name: string;
+}
+
 interface VoucherEntry {
-  accountType: "ledger" | "bank" | "supplier";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
   accountId: number;
   accountName: string;
   amount: string;
@@ -103,7 +116,7 @@ interface VoucherEntry {
 
 interface JournalEntry {
   type: "DR" | "CR";
-  accountType: "ledger" | "bank" | "supplier";
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
   accountId: number;
   accountName: string;
   amount: string;
@@ -139,7 +152,7 @@ interface StockAdjustmentEntry {
 }
 
 const voucherEntrySchema = z.object({
-  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -151,7 +164,7 @@ const voucherEntrySchema = z.object({
 
 const journalEntrySchema = z.object({
   type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   amount: z.string()
@@ -162,7 +175,7 @@ const journalEntrySchema = z.object({
 });
 
 const voucherFormSchema = z.object({
-  paymentAccountType: z.enum(["ledger", "bank", "supplier"]),
+  paymentAccountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
@@ -504,8 +517,12 @@ export default function Vouchers() {
     queryKey: ["/api/locations"],
   });
 
-  const { data: employees = [] } = useQuery<any[]>({
+  const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
+  });
+
+  const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
+    queryKey: ["/api/fixed-assets"],
   });
 
   // Combine all accounts for autocomplete (names only, no codes)
@@ -528,7 +545,19 @@ export default function Vouchers() {
       name: s.legalName,
       code: s.code,
     })),
-  ], [ledgerAccounts, bankAccounts, suppliers]);
+    ...employees.map((e) => ({
+      type: "employee" as const,
+      id: e.id,
+      name: `${e.firstName} ${e.lastName}`,
+      code: e.code,
+    })),
+    ...fixedAssets.map((f) => ({
+      type: "fixedAsset" as const,
+      id: f.id,
+      name: f.name,
+      code: f.code,
+    })),
+  ], [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -661,6 +690,10 @@ export default function Vouchers() {
             entryData.bankAccountId = entry.accountId;
           } else if (entry.accountType === "supplier") {
             entryData.supplierId = entry.accountId;
+          } else if (entry.accountType === "employee") {
+            entryData.employeeId = entry.accountId;
+          } else if (entry.accountType === "fixedAsset") {
+            entryData.fixedAssetId = entry.accountId;
           }
           entryData.debitAmount = entry.amount;
           entryData.creditAmount = "0";
@@ -674,6 +707,10 @@ export default function Vouchers() {
             paymentEntryData.bankAccountId = data.paymentAccountId;
           } else if (data.paymentAccountType === "supplier") {
             paymentEntryData.supplierId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "employee") {
+            paymentEntryData.employeeId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "fixedAsset") {
+            paymentEntryData.fixedAssetId = data.paymentAccountId;
           }
           paymentEntryData.debitAmount = "0";
           paymentEntryData.creditAmount = entry.amount;
@@ -687,6 +724,10 @@ export default function Vouchers() {
             paymentEntryData.bankAccountId = data.paymentAccountId;
           } else if (data.paymentAccountType === "supplier") {
             paymentEntryData.supplierId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "employee") {
+            paymentEntryData.employeeId = data.paymentAccountId;
+          } else if (data.paymentAccountType === "fixedAsset") {
+            paymentEntryData.fixedAssetId = data.paymentAccountId;
           }
           paymentEntryData.debitAmount = entry.amount;
           paymentEntryData.creditAmount = "0";
@@ -700,6 +741,10 @@ export default function Vouchers() {
             entryData.bankAccountId = entry.accountId;
           } else if (entry.accountType === "supplier") {
             entryData.supplierId = entry.accountId;
+          } else if (entry.accountType === "employee") {
+            entryData.employeeId = entry.accountId;
+          } else if (entry.accountType === "fixedAsset") {
+            entryData.fixedAssetId = entry.accountId;
           }
           entryData.debitAmount = "0";
           entryData.creditAmount = entry.amount;
@@ -857,6 +902,10 @@ export default function Vouchers() {
           entryData.bankAccountId = entry.accountId;
         } else if (entry.accountType === "supplier") {
           entryData.supplierId = entry.accountId;
+        } else if (entry.accountType === "employee") {
+          entryData.employeeId = entry.accountId;
+        } else if (entry.accountType === "fixedAsset") {
+          entryData.fixedAssetId = entry.accountId;
         }
 
         // Set debit or credit based on type

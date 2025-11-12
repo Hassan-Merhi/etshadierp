@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CombinedAccount = {
-  type: "ledger" | "bank" | "supplier";
+  type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
   id: number;
   name: string;
   code: string;
@@ -12,7 +12,7 @@ export type CombinedAccount = {
 
 export interface AccountAutocompleteProps {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset", id: number, name: string) => void;
   allAccounts: CombinedAccount[];
   placeholder?: string;
   disabled?: boolean;
