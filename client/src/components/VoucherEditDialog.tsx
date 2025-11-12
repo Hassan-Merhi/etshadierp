@@ -318,7 +318,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* Voucher Header */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="voucherNumber"
@@ -395,25 +395,6 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="optional"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col justify-end">
-                      <div className="flex items-center space-x-2">
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="switch-optional"
-                          />
-                        </FormControl>
-                        <Label>Optional (non-posting)</Label>
-                      </div>
-                    </FormItem>
-                  )}
-                />
               </div>
 
               <FormField
@@ -425,6 +406,26 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                     <FormControl>
                       <Textarea {...field} data-testid="input-description" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="optional"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center space-x-2">
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-optional"
+                        />
+                      </FormControl>
+                      <Label htmlFor="optional" className="cursor-pointer">Optional (non-posting)</Label>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
