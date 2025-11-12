@@ -6521,6 +6521,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get transactions for a specific employee with optional date filtering
+  app.get(
+    "/api/accounts/employee/:id/transactions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const employeeId = parseInt(req.params.id);
+
+        if (isNaN(employeeId)) {
+          return res.status(400).json({ message: "Invalid employee ID" });
+        }
+
+        const { startDate, endDate, companyId } = req.query;
+
+        // Use query param companyId or session companyId, or undefined for all companies
+        const filterCompanyId = companyId
+          ? parseInt(companyId as string)
+          : req.session.currentCompanyId;
+
+        const transactions = await storage.getVoucherEntriesByEmployee(
+          employeeId,
+          filterCompanyId,
+          startDate as string | undefined,
+          endDate as string | undefined,
+        );
+
+        res.json(transactions);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Get all vouchers with date filtering
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
