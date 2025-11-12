@@ -96,7 +96,7 @@ function EntityFormWrapper({
   
   const form = useForm({
     resolver: zodResolver(config.schema),
-    defaultValues: defaultValues,
+    defaultValues: defaultValues as any,
   });
 
   const createMutation = useMutation({
@@ -116,7 +116,7 @@ function EntityFormWrapper({
       });
       queryClient.invalidateQueries({ queryKey: [config.endpoint] });
       queryClient.invalidateQueries({ queryKey: [config.endpoint, selectedCompany?.id] });
-      form.reset(getDefaultValues(entityType));
+      form.reset(getDefaultValues(entityType) as any);
     },
     onError: (error: any) => {
       toast({
