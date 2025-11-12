@@ -1,56 +1,62 @@
-import { UseFormReturn } from "react-hook-form";
+import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Plus } from "lucide-react";
-import { VoucherEntry } from "@/hooks/useVoucherEntries";
+
+export interface VoucherEntry {
+  accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
+  accountId: number;
+  accountName: string;
+  amount: string;
+}
 
 interface VoucherEntriesTableProps {
   form: UseFormReturn<any>;
+  fieldArray: UseFieldArrayReturn<any, "entries", "id">;
   entries: VoucherEntry[];
   total: number;
-  amountInputRefs: React.MutableRefObject<(HTMLInputElement | null)[]>;
-  onRemoveEntry: (index: number) => void;
-  onAddRow: () => void;
   mode: "payment" | "receipt";
 }
 
 export function VoucherEntriesTable({
   form,
+  fieldArray,
   entries,
   total,
-  amountInputRefs,
-  onRemoveEntry,
-  onAddRow,
   mode,
 }: VoucherEntriesTableProps) {
-  const handleKeyDown = (e: React.KeyboardEvent, index: number, field: "account" | "amount") => {
+  const { fields, append, remove } = fieldArray;
+
+  const handleAddRow = () => {
+    append({
+      accountType: "ledger",
+      accountId: 0,
+      accountName: "",
+      amount: "",
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      
-      if (field === "amount") {
-        const amount = parseFloat(entries[index].amount);
-        if (!isNaN(amount) && amount > 0) {
-          onAddRow();
-        }
+      const amount = parseFloat(entries[index].amount);
+      if (!isNaN(amount) && amount > 0) {
+        handleAddRow();
       }
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
-      if (index > 0) {
-        const prevInput = amountInputRefs.current[index - 1];
-        if (prevInput) {
-          prevInput.focus();
-          prevInput.select();
-        }
+      const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
+      if (prevInput) {
+        prevInput.focus();
+        prevInput.select();
       }
-    } else if (e.key === "ArrowDown") {
+    } else if (e.key === "ArrowDown" && index < entries.length - 1) {
       e.preventDefault();
-      if (index < entries.length - 1) {
-        const nextInput = amountInputRefs.current[index + 1];
-        if (nextInput) {
-          nextInput.focus();
-          nextInput.select();
-        }
+      const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
       }
     }
   };
@@ -66,11 +72,11 @@ export function VoucherEntriesTable({
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry, index) => (
-            <tr key={index} className="border-t hover-elevate">
+          {fields.map((field, index) => (
+            <tr key={field.id} className="border-t hover-elevate">
               <td className="p-3">
                 <div className="text-sm" data-testid={`text-account-${index}`}>
-                  {entry.accountName || (
+                  {entries[index]?.accountName || (
                     <span className="text-muted-foreground italic">
                       Click an account in the sidebar →
                     </span>
@@ -91,10 +97,7 @@ export function VoucherEntriesTable({
                           placeholder="0.00"
                           className="font-mono"
                           data-testid={`input-amount-${index}`}
-                          onKeyDown={(e) => handleKeyDown(e, index, "amount")}
-                          ref={(el) => {
-                            amountInputRefs.current[index] = el;
-                          }}
+                          onKeyDown={(e) => handleKeyDown(e, index)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -103,12 +106,12 @@ export function VoucherEntriesTable({
                 />
               </td>
               <td className="p-2">
-                {entries.length > 1 && (
+                {fields.length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => onRemoveEntry(index)}
+                    onClick={() => remove(index)}
                     data-testid={`button-remove-${index}`}
                   >
                     ×
@@ -125,7 +128,7 @@ export function VoucherEntriesTable({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={onAddRow}
+                onClick={handleAddRow}
                 data-testid="button-add-row"
               >
                 <Plus className="h-4 w-4 mr-2" />

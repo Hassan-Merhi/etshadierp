@@ -15,6 +15,7 @@ import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import { useVoucherEntries } from "@/hooks/useVoucherEntries";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
+import { PaymentVoucherTab } from "@/components/vouchers/PaymentVoucherTab";
 import {
   Card,
   CardContent,
@@ -1997,17 +1998,42 @@ export default function Vouchers() {
         </TabsList>
 
         <TabsContent value="payment" className="space-y-4">
-          <div className="flex gap-4">
-            {/* Left column: Form (60%) */}
-            <div className="flex-1" style={{ width: "60%" }}>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Voucher</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      {/* Header section */}
+          <PaymentVoucherTab
+            form={form}
+            fieldArray={{ fields, append, remove }}
+            entries={entries}
+            total={total}
+            paymentAccountId={paymentAccountId}
+            paymentAccountType={paymentAccountType}
+            paymentAccountName={paymentAccountName}
+            accountBalance={accountBalance}
+            allAccounts={allAccounts}
+            sidebarAccounts={sidebarAccounts}
+            sidebarSearchValue={sidebarSearchValue}
+            setSidebarSearchValue={setSidebarSearchValue}
+            sidebarHighlightedIndex={sidebarHighlightedIndex}
+            setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+            sidebarActiveTab={sidebarActiveTab}
+            setSidebarActiveTab={setSidebarActiveTab}
+            mostUsedAccounts={mostUsedAccounts}
+            handleSidebarAccountSelect={handleSidebarAccountSelect}
+            handlePrint={handlePrint}
+            onSubmit={onSubmit}
+            activeTab={activeTab}
+          />
+        </TabsContent>
+
+        <TabsContent value="receipt" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {activeTab === "payment" ? "Payment" : "Receipt"} Voucher
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  {/* Header section */}
                   <div className="flex items-start justify-between gap-4">
                     {/* Left: Payment account selector */}
                     <FormField
