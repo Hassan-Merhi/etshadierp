@@ -202,6 +202,7 @@ export interface IStorage {
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesBySupplier(supplierId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
+  getVoucherEntriesByEmployee(employeeId: number, companyId?: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByVoucher(voucherId: number): Promise<VoucherEntry[]>;
   getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number>;
@@ -1795,6 +1796,50 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.supplierId, supplierId),
+      eq(schema.vouchers.optional, false)
+    ];
+    
+    if (companyId) {
+      conditions.push(eq(schema.vouchers.companyId, companyId));
+    }
+    
+    if (startDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
+    }
+    
+    if (endDate) {
+      conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+    }
+
+    const query = db
+      .select({
+        entryId: schema.voucherEntries.id,
+        voucherId: schema.voucherEntries.voucherId,
+        debitAmount: schema.voucherEntries.debitAmount,
+        creditAmount: schema.voucherEntries.creditAmount,
+        narration: schema.voucherEntries.narration,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        voucherDescription: schema.vouchers.description,
+        companyId: schema.vouchers.companyId,
+      })
+      .from(schema.voucherEntries)
+      .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+      .where(and(...conditions))
+      .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
+
+    return await query;
+  }
+
+  async getVoucherEntriesByEmployee(
+    employeeId: number,
+    companyId?: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<any[]> {
+    const conditions = [
+      eq(schema.voucherEntries.employeeId, employeeId),
       eq(schema.vouchers.optional, false)
     ];
     
