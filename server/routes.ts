@@ -3975,7 +3975,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assets = await storage.getAllFixedAssets(
         req.session.currentCompanyId,
       );
-      res.json(assets);
+      // Transform to match frontend expectations (assetCode, assetName)
+      const transformedAssets = assets.map(asset => ({
+        ...asset,
+        assetCode: asset.code,
+        assetName: asset.name,
+      }));
+      res.json(transformedAssets);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
