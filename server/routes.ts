@@ -5062,7 +5062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-          // Get current inventory
+          // Get current inventory (allow negative stock for historical sales import)
           const [inventoryRecord] = await tx
             .select()
             .from(inventory)
@@ -5074,20 +5074,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
-          if (!inventoryRecord) {
-            throw new Error(
-              `No inventory found for ${stockItem.name} at location ${location.name}`,
-            );
+          // Get cost price and current quantity (allow imports with zero/negative stock)
+          let costPrice = 0;
+          let currentQty = 0;
+          
+          if (inventoryRecord) {
+            costPrice = parseFloat(inventoryRecord.averageRate || "0");
+            currentQty = parseFloat(inventoryRecord.quantity);
           }
 
-          const availableQty = parseFloat(inventoryRecord.quantity);
-          if (availableQty < item.quantity) {
-            throw new Error(
-              `Insufficient inventory for ${stockItem.name}. Available: ${availableQty}, Requested: ${item.quantity}`,
-            );
-          }
-
-          const costPrice = parseFloat(inventoryRecord.averageRate || "0");
           const itemSales = item.quantity * item.rate;
           const itemCost = item.quantity * costPrice;
           const profit = itemSales - itemCost;
@@ -5109,18 +5104,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Note: COGS is tracked in sales_items table but not posted to ledger
           // because this system uses purchase-date expense recognition (not COGS method)
 
-          // Update inventory - reduce quantity
-          await tx
-            .update(inventory)
-            .set({
-              quantity: (availableQty - item.quantity).toString(),
-            })
-            .where(
-              and(
-                eq(inventory.stockItemId, stockItem.id),
-                eq(inventory.locationId, locationId),
-              ),
-            );
+          // Update or create inventory record - allow negative stock
+          if (inventoryRecord) {
+            // Update existing inventory - reduce quantity (can go negative)
+            await tx
+              .update(inventory)
+              .set({
+                quantity: (currentQty - item.quantity).toString(),
+              })
+              .where(
+                and(
+                  eq(inventory.stockItemId, stockItem.id),
+                  eq(inventory.locationId, locationId),
+                ),
+              );
+          } else {
+            // Create new inventory record with negative quantity
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId,
+              stockItemId: stockItem.id,
+              quantity: (-item.quantity).toString(),
+              averageRate: "0",
+              totalValue: "0",
+            });
+          }
         }
 
         // Create BALANCED voucher entries for double-entry bookkeeping
