@@ -397,39 +397,41 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} data-testid="input-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="optional"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center space-x-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-optional"
-                        />
+                        <Textarea {...field} data-testid="input-description" />
                       </FormControl>
-                      <Label htmlFor="optional" className="cursor-pointer">Optional (non-posting)</Label>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="optional"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col justify-end pb-2">
+                      <div className="flex items-center space-x-2">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-optional"
+                          />
+                        </FormControl>
+                        <Label htmlFor="optional" className="cursor-pointer font-medium">Optional (non-posting)</Label>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Voucher Entries */}
               <div className="space-y-4">
