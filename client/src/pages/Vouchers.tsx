@@ -514,7 +514,6 @@ export default function Vouchers() {
   const [sidebarHighlightedIndex, setSidebarHighlightedIndex] = useState(0);
   const [sidebarActiveTab, setSidebarActiveTab] = useState("bank");
   const [mostUsedAccounts, setMostUsedAccounts] = useState<Account[]>([]);
-  const amountInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   // Fetch data
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
@@ -865,9 +864,12 @@ export default function Vouchers() {
 
   // Handle account selection from sidebar
   const handleSidebarAccountSelect = (account: Account) => {
+    // Get the current entries from form state
+    const currentEntries = form.getValues("entries");
+    
     // Find if there's an empty entry to populate
-    const emptyEntryIndex = entries.findIndex(
-      (e) => e.accountId === 0 || !e.accountName
+    const emptyEntryIndex = currentEntries.findIndex(
+      (e: any) => e.accountId === 0 || !e.accountName
     );
 
     if (emptyEntryIndex >= 0) {
@@ -877,15 +879,17 @@ export default function Vouchers() {
       form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
       
       // Focus the amount input for that row
-      setTimeout(() => {
-        const amountInput = amountInputRefs.current[emptyEntryIndex];
+      requestAnimationFrame(() => {
+        const amountInput = document.querySelector(
+          `[data-testid="input-amount-${emptyEntryIndex}"]`
+        ) as HTMLInputElement;
         if (amountInput) {
           amountInput.focus();
           amountInput.select();
         }
-      }, 50);
+      });
     } else {
-      // Add a new entry
+      // Add a new entry with all account data
       append({
         accountType: account.type,
         accountId: account.id,
@@ -893,15 +897,17 @@ export default function Vouchers() {
         amount: "",
       });
       
-      // Focus the amount input for the new row
-      setTimeout(() => {
-        const newIndex = entries.length;
-        const amountInput = amountInputRefs.current[newIndex];
+      // Focus the amount input for the new row after it's been added
+      requestAnimationFrame(() => {
+        const newIndex = currentEntries.length; // Use current length, not stale entries
+        const amountInput = document.querySelector(
+          `[data-testid="input-amount-${newIndex}"]`
+        ) as HTMLInputElement;
         if (amountInput) {
           amountInput.focus();
           amountInput.select();
         }
-      }, 50);
+      });
     }
   };
 
@@ -2351,24 +2357,6 @@ export default function Vouchers() {
                   </Form>
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Right column: Account Sidebar (40%) */}
-            <div className="sticky top-4 h-fit" style={{ width: "40%", maxHeight: "calc(100vh - 2rem)" }}>
-              <AccountSidebar
-                accounts={sidebarAccounts}
-                onSelectAccount={handleSidebarAccountSelect}
-                searchValue={sidebarSearchValue}
-                onSearchChange={setSidebarSearchValue}
-                selectedAccountId={null}
-                highlightedIndex={sidebarHighlightedIndex}
-                onHighlightedIndexChange={setSidebarHighlightedIndex}
-                activeTab={sidebarActiveTab}
-                onTabChange={setSidebarActiveTab}
-                mostUsedAccounts={mostUsedAccounts}
-              />
-            </div>
-          </div>
         </TabsContent>
 
         <TabsContent value="receipt" className="space-y-4">
