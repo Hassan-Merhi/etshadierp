@@ -99,12 +99,14 @@ interface Employee {
   code: string;
   firstName: string;
   lastName: string;
+  openingBalance?: string;
 }
 
 interface FixedAsset {
   id: number;
   code: string;
   name: string;
+  openingBalance?: string;
 }
 
 interface VoucherEntry {
@@ -550,12 +552,14 @@ export default function Vouchers() {
       id: e.id,
       name: `${e.firstName} ${e.lastName}`,
       code: e.code,
+      openingBalance: e.openingBalance,
     })),
     ...fixedAssets.map((f) => ({
       type: "fixedAsset" as const,
       id: f.id,
       name: f.name,
       code: f.code,
+      openingBalance: f.openingBalance,
     })),
   ], [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
 
@@ -594,6 +598,11 @@ export default function Vouchers() {
   const paymentAccountType = form.watch("paymentAccountType");
   const paymentAccountId = form.watch("paymentAccountId");
   const paymentAccountName = form.watch("paymentAccountName");
+  
+  // Find the selected account in allAccounts to get openingBalance
+  const selectedAccount = useMemo(() => {
+    return allAccounts.find(acc => acc.type === paymentAccountType && acc.id === paymentAccountId);
+  }, [allAccounts, paymentAccountType, paymentAccountId]);
   
   // Calculate balance for selected account
   const { data: accountBalance = 0 } = useQuery({
@@ -646,16 +655,12 @@ export default function Vouchers() {
         }, openingBalance);
         return balance;
       } else if (paymentAccountType === "employee") {
-        // Fetch the employee details to get opening balance
-        const employeeRes = await fetch(`/api/employees/${paymentAccountId}`);
-        const employee = await employeeRes.json();
+        // Use opening balance from selected account
+        const openingBalance = parseFloat(selectedAccount?.openingBalance || "0");
         
         // Fetch transactions
         const transRes = await fetch(`/api/accounts/employee/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
-        
-        // Opening balance: Positive = we owe them (salary payable), Negative = they owe us (advance)
-        const openingBalance = parseFloat(employee.openingBalance || "0");
         
         // Sum transactions starting from opening balance
         // Credits increase payable (we owe them), Debits decrease payable (we paid them)
@@ -666,16 +671,12 @@ export default function Vouchers() {
         }, openingBalance);
         return balance;
       } else if (paymentAccountType === "fixedAsset") {
-        // Fetch the fixed asset details to get opening balance
-        const assetRes = await fetch(`/api/fixed-assets/${paymentAccountId}`);
-        const asset = await assetRes.json();
+        // Use opening balance from selected account
+        const openingBalance = parseFloat(selectedAccount?.openingBalance || "0");
         
         // Fetch transactions
         const transRes = await fetch(`/api/accounts/fixed-asset/${paymentAccountId}/transactions`);
         const transactions = await transRes.json();
-        
-        // Opening balance for fixed assets (book value)
-        const openingBalance = parseFloat(asset.openingBalance || "0");
         
         // Sum transactions starting from opening balance
         // Debits increase asset value, Credits decrease (depreciation)

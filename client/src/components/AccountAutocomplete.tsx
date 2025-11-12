@@ -8,6 +8,7 @@ export type CombinedAccount = {
   id: number;
   name: string;
   code: string;
+  openingBalance?: string;
 };
 
 export interface AccountAutocompleteProps {
