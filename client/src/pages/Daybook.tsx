@@ -277,6 +277,7 @@ function AccountCombobox({
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const [, navigate] = useLocation();
   const [filters, setFilters] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
     endDate: format(new Date(), "yyyy-MM-dd"),
@@ -285,8 +286,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createFormInitialized, setCreateFormInitialized] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [voucherToEdit, setVoucherToEdit] = useState<Voucher | null>(null);
   const [editFormInitialized, setEditFormInitialized] = useState(false);
@@ -324,26 +323,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
     queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
     enabled: !!voucherToEdit && editDialogOpen,
-  });
-  
-  // Create form with react-hook-form and zod
-  const createForm = useForm<CreateVoucherForm>({
-    resolver: zodResolver(createVoucherSchema),
-    defaultValues: {
-      voucherType: "Journal",
-      voucherDate: format(new Date(), "yyyy-MM-dd"),
-      description: "",
-      optional: false,
-      entries: [
-        { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
-        { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
-      ],
-    },
-  });
-
-  const { fields: createFields, append: createAppend, remove: createRemove } = useFieldArray({
-    control: createForm.control,
-    name: "entries",
   });
   
   // Edit form with react-hook-form and zod
@@ -446,69 +425,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return user?.role === "Admin";
   };
 
-  // Create voucher mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: CreateVoucherForm) => {
-      if (!selectedCompany) {
-        throw new Error("No company selected");
-      }
-
-      const voucherNumber = `${data.voucherType.toUpperCase().replace(/\s+/g, '')}-${Date.now()}`;
-      const totalAmount = data.entries.reduce((sum, entry) => 
-        sum + Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")), 0
-      );
-
-      const voucher = {
-        companyId: selectedCompany,
-        voucherNumber,
-        voucherType: data.voucherType,
-        voucherDate: data.voucherDate,
-        description: data.description,
-        optional: data.optional,
-        totalAmount: totalAmount.toString(),
-      };
-
-      const entries = data.entries.map(entry => ({
-        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
-        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
-        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-        employeeId: entry.accountType === "employee" ? entry.accountId : null,
-        fixedAssetId: entry.accountType === "fixedAsset" ? entry.accountId : null,
-        debitAmount: entry.debitAmount,
-        creditAmount: entry.creditAmount,
-        narration: entry.narration || null,
-      }));
-
-      return await apiRequest("POST", "/api/vouchers/with-entries", { voucher, entries });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      toast({
-        title: "Success",
-        description: "Voucher created successfully",
-      });
-      setCreateDialogOpen(false);
-      createForm.reset({
-        voucherType: "Journal",
-        voucherDate: format(new Date(), "yyyy-MM-dd"),
-        description: "",
-        optional: false,
-        entries: [
-          { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
-          { accountType: "ledger", accountId: 0, accountName: "", debitAmount: "0", creditAmount: "0", narration: "" },
-        ],
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create voucher",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Edit voucher mutation
   const editMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: number; updates: EditVoucherForm }) => {
@@ -585,22 +501,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
     setViewDialogOpen(true);
   };
 
-  const handleNewEntry = (voucherType: string) => {
-    createForm.setValue("voucherType", voucherType as any);
-    setCreateDialogOpen(true);
-  };
-
-  const handleSaveCreate = (data: CreateVoucherForm) => {
-    createMutation.mutate(data);
-  };
-
-  const [_location, setLocation] = useLocation();
-
   const handleEdit = (voucher: Voucher) => {
     // Navigate to appropriate editing interface based on voucher type
     const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase", "Consumption", "Production", "Mixed", "Stock Transfer"];
     if (editableTypes.includes(voucher.voucherType)) {
-      setLocation(`/vouchers/${voucher.id}/edit`);
+      navigate(`/vouchers/${voucher.id}/edit`);
     } else {
       // For other types, show the generic dialog (temporary fallback)
       setVoucherToEdit(voucher);
@@ -717,59 +622,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <FileDown className="w-4 h-4" />
             Export to Excel
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button data-testid="button-new-entry" className="gap-2">
-                <Plus className="w-4 h-4" />
-                New Entry
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Journal")}
-                data-testid="menu-item-journal"
-              >
-                Journal
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Payment")}
-                data-testid="menu-item-payment"
-              >
-                Payment
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Receipt")}
-                data-testid="menu-item-receipt"
-              >
-                Receipt
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Stock Transfer")}
-                data-testid="menu-item-stock-transfer"
-              >
-                Stock Transfer
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Sales")}
-                data-testid="menu-item-sales"
-              >
-                Sales
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Purchase")}
-                data-testid="menu-item-purchase"
-              >
-                Purchase
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleNewEntry("Contra")}
-                data-testid="menu-item-contra"
-              >
-                Contra
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button 
+            onClick={() => navigate("/vouchers")}
+            data-testid="button-new-voucher" 
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Voucher
+          </Button>
         </div>
       </div>
 
@@ -976,296 +836,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
           )}
         </CardContent>
       </Card>
-
-      {/* Create Voucher Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Voucher</DialogTitle>
-            <DialogDescription>
-              Create a new accounting voucher with multiple entries. Debits must equal credits.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...createForm}>
-            <form onSubmit={createForm.handleSubmit(handleSaveCreate)} className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={createForm.control}
-                  name="voucherType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Voucher Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-create-voucher-type">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Journal">Journal</SelectItem>
-                          <SelectItem value="Payment">Payment</SelectItem>
-                          <SelectItem value="Receipt">Receipt</SelectItem>
-                          <SelectItem value="Stock Transfer">Stock Transfer</SelectItem>
-                          <SelectItem value="Sales">Sales</SelectItem>
-                          <SelectItem value="Purchase">Purchase</SelectItem>
-                          <SelectItem value="Contra">Contra</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="voucherDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="date"
-                          {...field}
-                          data-testid="input-create-voucher-date"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={createForm.control}
-                  name="optional"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-md border p-3 space-y-0">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-sm">Optional</FormLabel>
-                        <div className="text-xs text-muted-foreground">
-                          Does not affect books
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-create-optional"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={createForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Enter voucher description (optional)"
-                        rows={2}
-                        data-testid="textarea-create-description"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Entry Rows */}
-              <div className="border rounded-md p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Voucher Entries</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => createAppend({ 
-                      accountType: "ledger", 
-                      accountId: 0, 
-                      accountName: "", 
-                      debitAmount: "0", 
-                      creditAmount: "0", 
-                      narration: "" 
-                    })}
-                    data-testid="button-add-entry"
-                    className="gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Entry
-                  </Button>
-                </div>
-
-                {createFields.map((field, index) => (
-                  <div key={field.id} className="border rounded-md p-4 space-y-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Entry {index + 1}
-                      </span>
-                      {createFields.length > 2 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => createRemove(index)}
-                          data-testid={`button-remove-entry-${index}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <FormField
-                      control={createForm.control}
-                      name={`entries.${index}.accountType`}
-                      render={({ field: typeField }) => (
-                        <FormItem>
-                          <FormLabel>Account</FormLabel>
-                          <FormControl>
-                            <AccountCombobox
-                              value={
-                                createForm.watch(`entries.${index}.accountId`)
-                                  ? {
-                                      type: typeField.value,
-                                      id: createForm.watch(`entries.${index}.accountId`),
-                                      name: createForm.watch(`entries.${index}.accountName`),
-                                    }
-                                  : null
-                              }
-                              onChange={(type, id, name) => {
-                                createForm.setValue(`entries.${index}.accountType`, type);
-                                createForm.setValue(`entries.${index}.accountId`, id);
-                                createForm.setValue(`entries.${index}.accountName`, name);
-                              }}
-                              ledgerAccounts={ledgerAccounts}
-                              bankAccounts={bankAccounts}
-                              suppliers={suppliers}
-                              employees={employees}
-                              fixedAssets={fixedAssets}
-                              rowIndex={index}
-                              testIdPrefix="button-create-account"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={createForm.control}
-                        name={`entries.${index}.debitAmount`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Debit Amount</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="font-mono"
-                                data-testid={`input-create-debit-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={createForm.control}
-                        name={`entries.${index}.creditAmount`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Credit Amount</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="font-mono"
-                                data-testid={`input-create-credit-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={createForm.control}
-                      name={`entries.${index}.narration`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Narration (Optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Enter narration"
-                              data-testid={`input-create-narration-${index}`}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ))}
-
-                {/* Totals Display */}
-                {createForm.watch("entries") && createForm.watch("entries").length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-                      <div className="text-right">
-                        <span className="text-muted-foreground mr-2">Total Debits:</span>
-                        <span className="font-bold">
-                          ${createForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-muted-foreground mr-2">Total Credits:</span>
-                        <span className="font-bold">
-                          ${createForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    {createForm.formState.errors.entries && (
-                      <p className="text-sm text-destructive mt-2 text-center">
-                        {createForm.formState.errors.entries.message}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCreateDialogOpen(false)}
-                  data-testid="button-cancel-create"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  data-testid="button-save-create"
-                >
-                  {createMutation.isPending ? "Creating..." : "Create Voucher"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
 
       {/* View Voucher Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
