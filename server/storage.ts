@@ -444,7 +444,13 @@ export class DbStorage implements IStorage {
 
   // Employees
   async getAllEmployees(companyId: number): Promise<Employee[]> {
-    return await db.select().from(schema.employees).where(eq(schema.employees.companyId, companyId));
+    const employees = await db.select().from(schema.employees).where(eq(schema.employees.companyId, companyId));
+    // Ensure camelCase mapping works correctly
+    return employees.map(emp => ({
+      ...emp,
+      firstName: (emp as any).firstName || (emp as any).first_name,
+      lastName: (emp as any).lastName || (emp as any).last_name,
+    })) as Employee[];
   }
 
   async getEmployeeByCode(code: string): Promise<Employee | undefined> {
