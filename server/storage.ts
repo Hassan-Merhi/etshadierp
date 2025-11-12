@@ -1863,6 +1863,7 @@ export class DbStorage implements IStorage {
         bankAccountId: schema.voucherEntries.bankAccountId,
         fixedAssetId: schema.voucherEntries.fixedAssetId,
         supplierId: schema.voucherEntries.supplierId,
+        employeeId: schema.voucherEntries.employeeId,
         debitAmount: schema.voucherEntries.debitAmount,
         creditAmount: schema.voucherEntries.creditAmount,
         narration: schema.voucherEntries.narration,
@@ -1875,19 +1876,29 @@ export class DbStorage implements IStorage {
         fixedAssetCode: schema.fixedAssets.code,
         supplierName: schema.suppliers.legalName,
         supplierCode: schema.suppliers.code,
+        employeeFirstName: schema.employees.firstName,
+        employeeLastName: schema.employees.lastName,
+        employeeCode: schema.employees.code,
       })
       .from(schema.voucherEntries)
       .leftJoin(schema.ledgerAccounts, eq(schema.voucherEntries.ledgerAccountId, schema.ledgerAccounts.id))
       .leftJoin(schema.bankAccounts, eq(schema.voucherEntries.bankAccountId, schema.bankAccounts.id))
       .leftJoin(schema.fixedAssets, eq(schema.voucherEntries.fixedAssetId, schema.fixedAssets.id))
       .leftJoin(schema.suppliers, eq(schema.voucherEntries.supplierId, schema.suppliers.id))
+      .leftJoin(schema.employees, eq(schema.voucherEntries.employeeId, schema.employees.id))
       .where(eq(schema.voucherEntries.voucherId, voucherId));
 
-    return entries.map(entry => ({
-      ...entry,
-      accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || 'Unknown Account',
-      accountCode: entry.accountCode || entry.bankAccountCode || entry.fixedAssetCode || entry.supplierCode || '-',
-    }));
+    return entries.map(entry => {
+      const employeeName = entry.employeeFirstName && entry.employeeLastName 
+        ? `${entry.employeeFirstName} ${entry.employeeLastName}` 
+        : null;
+      
+      return {
+        ...entry,
+        accountName: entry.accountName || entry.bankAccountName || entry.fixedAssetName || entry.supplierName || employeeName || 'Unknown Account',
+        accountCode: entry.accountCode || entry.bankAccountCode || entry.fixedAssetCode || entry.supplierCode || entry.employeeCode || '-',
+      };
+    });
   }
 
   async getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]> {

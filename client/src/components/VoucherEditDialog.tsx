@@ -67,6 +67,13 @@ interface Supplier {
   legalName: string;
 }
 
+interface Employee {
+  id: number;
+  code: string;
+  firstName: string;
+  lastName: string;
+}
+
 interface FixedAsset {
   id: number;
   assetCode: string;
@@ -78,6 +85,7 @@ interface VoucherEntry {
   bankAccountId: number | null;
   fixedAssetId: number | null;
   supplierId: number | null;
+  employeeId: number | null;
   debitAmount: string;
   creditAmount: string;
   narration: string;
@@ -88,6 +96,7 @@ const voucherEntrySchema = z.object({
   bankAccountId: z.number().nullable(),
   fixedAssetId: z.number().nullable(),
   supplierId: z.number().nullable(),
+  employeeId: z.number().nullable(),
   debitAmount: z.string(),
   creditAmount: z.string(),
   narration: z.string(),
@@ -121,6 +130,10 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
     queryKey: ["/api/suppliers"],
     enabled: open,
   });
+  const { data: employees = [] } = useQuery<Employee[]>({ 
+    queryKey: ["/api/employees"],
+    enabled: open,
+  });
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({ 
     queryKey: ["/api/fixed-assets"],
     enabled: open,
@@ -146,6 +159,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
           bankAccountId: null,
           fixedAssetId: null,
           supplierId: null,
+          employeeId: null,
           debitAmount: "0",
           creditAmount: "0",
           narration: "",
@@ -176,6 +190,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
               bankAccountId: entry.bankAccountId || null,
               fixedAssetId: entry.fixedAssetId || null,
               supplierId: entry.supplierId || null,
+              employeeId: entry.employeeId || null,
               debitAmount: entry.debitAmount || "0",
               creditAmount: entry.creditAmount || "0",
               narration: entry.narration || "",
@@ -186,6 +201,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                 bankAccountId: null,
                 fixedAssetId: null,
                 supplierId: null,
+                employeeId: null,
                 debitAmount: "0",
                 creditAmount: "0",
                 narration: "",
@@ -211,6 +227,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
         bankAccountId: entry.bankAccountId,
         fixedAssetId: entry.fixedAssetId,
         supplierId: entry.supplierId,
+        employeeId: entry.employeeId,
         debitAmount: entry.debitAmount,
         creditAmount: entry.creditAmount,
         narration: entry.narration,
@@ -273,6 +290,10 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
     if (entry.supplierId) {
       const supplier = suppliers.find(s => s.id === entry.supplierId);
       return supplier ? `${supplier.code} - ${supplier.name}` : "";
+    }
+    if (entry.employeeId) {
+      const employee = employees.find(e => e.id === entry.employeeId);
+      return employee ? `${employee.code} - ${employee.firstName} ${employee.lastName}` : "";
     }
     if (entry.fixedAssetId) {
       const asset = fixedAssets.find(a => a.id === entry.fixedAssetId);
@@ -423,6 +444,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                         bankAccountId: null,
                         fixedAssetId: null,
                         supplierId: null,
+                        employeeId: null,
                         debitAmount: "0",
                         creditAmount: "0",
                         narration: "",
@@ -456,6 +478,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                   form.watch(`entries.${index}.ledgerAccountId`)?.toString() ||
                                   form.watch(`entries.${index}.bankAccountId`)?.toString() ||
                                   form.watch(`entries.${index}.supplierId`)?.toString() ||
+                                  form.watch(`entries.${index}.employeeId`)?.toString() ||
                                   form.watch(`entries.${index}.fixedAssetId`)?.toString() ||
                                   ""
                                 }
@@ -464,11 +487,13 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                   form.setValue(`entries.${index}.ledgerAccountId`, null);
                                   form.setValue(`entries.${index}.bankAccountId`, null);
                                   form.setValue(`entries.${index}.supplierId`, null);
+                                  form.setValue(`entries.${index}.employeeId`, null);
                                   form.setValue(`entries.${index}.fixedAssetId`, null);
 
                                   if (type === "ledger") form.setValue(`entries.${index}.ledgerAccountId`, parseInt(id));
                                   if (type === "bank") form.setValue(`entries.${index}.bankAccountId`, parseInt(id));
                                   if (type === "supplier") form.setValue(`entries.${index}.supplierId`, parseInt(id));
+                                  if (type === "employee") form.setValue(`entries.${index}.employeeId`, parseInt(id));
                                   if (type === "asset") form.setValue(`entries.${index}.fixedAssetId`, parseInt(id));
                                 }}
                               >
@@ -492,6 +517,12 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                   {suppliers.map((sup) => (
                                     <SelectItem key={`supplier-${sup.id}`} value={`supplier-${sup.id}`}>
                                       {sup.code} - {sup.name}
+                                    </SelectItem>
+                                  ))}
+                                  <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Employees</div>
+                                  {employees.map((emp) => (
+                                    <SelectItem key={`employee-${emp.id}`} value={`employee-${emp.id}`}>
+                                      {emp.code} - {emp.firstName} {emp.lastName}
                                     </SelectItem>
                                   ))}
                                   <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Fixed Assets</div>

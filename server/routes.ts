@@ -6744,6 +6744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 bankAccountId: entry.bankAccountId || null,
                 fixedAssetId: entry.fixedAssetId || null,
                 supplierId: entry.supplierId || null,
+                employeeId: entry.employeeId || null,
                 debitAmount: entry.debitAmount || "0",
                 creditAmount: entry.creditAmount || "0",
                 narration: entry.narration || null,
@@ -8403,6 +8404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               bankAccountId: entry.bankAccountId || null,
               fixedAssetId: entry.fixedAssetId || null,
               supplierId: entry.supplierId || null,
+              employeeId: entry.employeeId || null,
               debitAmount: entry.debitAmount || "0",
               creditAmount: entry.creditAmount || "0",
               narration: entry.narration || null,
@@ -8422,6 +8424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 bankAccountId: oldEntry.bankAccountId,
                 fixedAssetId: oldEntry.fixedAssetId,
                 supplierId: oldEntry.supplierId,
+                employeeId: oldEntry.employeeId,
                 debitAmount: oldEntry.debitAmount,
                 creditAmount: oldEntry.creditAmount,
                 narration: oldEntry.narration,
@@ -8462,8 +8465,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
       }
 
-      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, id));
-      res.json(entries);
+      // Use storage method to get entries with account names from joins
+      const entries = await storage.getVoucherEntriesByVoucher(id);
+      
+      // Transform entries to include accountType for the Daybook editor
+      const transformedEntries = entries.map(entry => {
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountId = entry.ledgerAccountId;
+        
+        if (entry.bankAccountId) {
+          accountType = "bank";
+          accountId = entry.bankAccountId;
+        } else if (entry.supplierId) {
+          accountType = "supplier";
+          accountId = entry.supplierId;
+        } else if (entry.employeeId) {
+          accountType = "employee";
+          accountId = entry.employeeId;
+        } else if (entry.fixedAssetId) {
+          accountType = "fixedAsset";
+          accountId = entry.fixedAssetId;
+        }
+        
+        return {
+          ...entry,
+          accountType,
+          accountId: accountId || 0,
+        };
+      });
+      
+      res.json(transformedEntries);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

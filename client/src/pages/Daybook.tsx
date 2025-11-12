@@ -101,9 +101,22 @@ interface Supplier {
   legalName: string;
 }
 
+interface Employee {
+  id: number;
+  code: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface FixedAsset {
+  id: number;
+  assetCode: string;
+  assetName: string;
+}
+
 // Zod schema for new entry rows
 const newEntryRowSchema = z.object({
-  accountType: z.enum(["ledger", "bank", "supplier"]),
+  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
   debitAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
@@ -167,14 +180,18 @@ function AccountCombobox({
   ledgerAccounts,
   bankAccounts,
   suppliers,
+  employees,
+  fixedAssets,
   rowIndex,
   testIdPrefix = "button-account",
 }: {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier", id: number, name: string) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset", id: number, name: string) => void;
   ledgerAccounts: LedgerAccount[];
   bankAccounts: BankAccount[];
   suppliers: Supplier[];
+  employees: Employee[];
+  fixedAssets: FixedAsset[];
   rowIndex: number;
   testIdPrefix?: string;
 }) {
@@ -195,6 +212,16 @@ function AccountCombobox({
       type: "supplier" as const,
       id: s.id,
       name: `${s.code} - ${s.legalName}`,
+    })),
+    ...employees.map((e) => ({
+      type: "employee" as const,
+      id: e.id,
+      name: `${e.code} - ${e.firstName} ${e.lastName}`,
+    })),
+    ...fixedAssets.map((f) => ({
+      type: "fixedAsset" as const,
+      id: f.id,
+      name: `${f.assetCode} - ${f.assetName}`,
     })),
   ];
 
@@ -279,6 +306,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
     queryKey: ["/api/suppliers"],
   });
 
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+  });
+
+  const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
+    queryKey: ["/api/fixed-assets"],
+  });
+
   // Fetch voucher entries when viewing (includes account names and stock items)
   const { data: viewVoucherEntries = [], isLoading: viewEntriesLoading } = useQuery<any[]>({
     queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/view-entries`] : [],
@@ -337,7 +372,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         description: voucherToEdit.description || "",
         optional: voucherToEdit.optional,
         entries: voucherEntries.map(entry => ({
-          accountType: entry.accountType as "ledger" | "bank" | "supplier",
+          accountType: entry.accountType as "ledger" | "bank" | "supplier" | "employee" | "fixedAsset",
           accountId: entry.accountId,
           accountName: entry.accountName,
           debitAmount: entry.debitAmount || "0",
@@ -437,6 +472,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
         bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
         supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        employeeId: entry.accountType === "employee" ? entry.accountId : null,
+        fixedAssetId: entry.accountType === "fixedAsset" ? entry.accountId : null,
         debitAmount: entry.debitAmount,
         creditAmount: entry.creditAmount,
         narration: entry.narration || null,
@@ -480,6 +517,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
         bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
         supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        employeeId: entry.accountType === "employee" ? entry.accountId : null,
+        fixedAssetId: entry.accountType === "fixedAsset" ? entry.accountId : null,
         debitAmount: entry.debitAmount,
         creditAmount: entry.creditAmount,
         narration: entry.narration || null,
@@ -1105,6 +1144,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               ledgerAccounts={ledgerAccounts}
                               bankAccounts={bankAccounts}
                               suppliers={suppliers}
+                              employees={employees}
+                              fixedAssets={fixedAssets}
                               rowIndex={index}
                               testIdPrefix="button-create-account"
                             />
@@ -1520,6 +1561,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 ledgerAccounts={ledgerAccounts}
                                 bankAccounts={bankAccounts}
                                 suppliers={suppliers}
+                                employees={employees}
+                                fixedAssets={fixedAssets}
                                 rowIndex={index}
                                 testIdPrefix="button-edit-account"
                               />
