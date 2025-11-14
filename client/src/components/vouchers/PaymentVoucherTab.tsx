@@ -40,9 +40,7 @@ interface PaymentVoucherTabProps {
   setSidebarSearchValue: (value: string) => void;
   sidebarHighlightedIndex: number;
   setSidebarHighlightedIndex: (index: number) => void;
-  sidebarActiveTab: string;
-  setSidebarActiveTab: (tab: string) => void;
-  mostUsedAccounts: Account[];
+  // Removed: sidebarActiveTab, setSidebarActiveTab, mostUsedAccounts (no longer needed without tabs)
   selectedAccountId: number | null;
   selectedAccountType: string | null;
   handleSidebarAccountSelect: (account: Account) => void;
@@ -67,9 +65,6 @@ export function PaymentVoucherTab({
   setSidebarSearchValue,
   sidebarHighlightedIndex,
   setSidebarHighlightedIndex,
-  sidebarActiveTab,
-  setSidebarActiveTab,
-  mostUsedAccounts,
   selectedAccountId,
   selectedAccountType,
   handleSidebarAccountSelect,
@@ -266,9 +261,6 @@ export function PaymentVoucherTab({
           selectedAccountType={selectedAccountType}
           highlightedIndex={sidebarHighlightedIndex}
           onHighlightedIndexChange={setSidebarHighlightedIndex}
-          activeTab={sidebarActiveTab}
-          onTabChange={setSidebarActiveTab}
-          mostUsedAccounts={mostUsedAccounts}
         />
       </div>
     </div>

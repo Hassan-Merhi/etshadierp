@@ -2050,9 +2050,6 @@ export default function Vouchers() {
             setSidebarSearchValue={setSidebarSearchValue}
             sidebarHighlightedIndex={sidebarHighlightedIndex}
             setSidebarHighlightedIndex={setSidebarHighlightedIndex}
-            sidebarActiveTab={sidebarActiveTab}
-            setSidebarActiveTab={setSidebarActiveTab}
-            mostUsedAccounts={mostUsedAccounts}
             selectedAccountId={selectedAccountId}
             selectedAccountType={selectedAccountType}
             handleSidebarAccountSelect={handleSidebarAccountSelect}
