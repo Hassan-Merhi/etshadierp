@@ -870,24 +870,19 @@ export default function Vouchers() {
     // Get the current entries from form state
     const currentEntries = form.getValues("entries");
     
-    // Find if there's an empty entry to populate
-    const emptyEntryIndex = currentEntries.findIndex(
-      (e: any) => e.accountId === 0 || !e.accountName
-    );
-
     let targetRowIndex: number;
 
-    if (emptyEntryIndex >= 0) {
-      // Fill the existing empty entry
-      targetRowIndex = emptyEntryIndex;
-      form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
-      form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
-      form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
+    // If there's an active row (user is typing in that row), fill it
+    if (activeRowIndex !== null && activeRowIndex < currentEntries.length) {
+      targetRowIndex = activeRowIndex;
+      form.setValue(`entries.${activeRowIndex}.accountType`, account.type);
+      form.setValue(`entries.${activeRowIndex}.accountId`, account.id);
+      form.setValue(`entries.${activeRowIndex}.accountName`, account.name);
       
       // Focus the amount input for that row
       requestAnimationFrame(() => {
         const amountInput = document.querySelector(
-          `[data-testid="input-amount-${emptyEntryIndex}"]`
+          `[data-testid="input-amount-${activeRowIndex}"]`
         ) as HTMLInputElement;
         if (amountInput) {
           amountInput.focus();
@@ -895,25 +890,49 @@ export default function Vouchers() {
         }
       });
     } else {
-      // Add a new entry with all account data
-      targetRowIndex = currentEntries.length;
-      append({
-        accountType: account.type,
-        accountId: account.id,
-        accountName: account.name,
-        amount: "",
-      });
-      
-      // Focus the amount input for the new row after it's been added
-      requestAnimationFrame(() => {
-        const amountInput = document.querySelector(
-          `[data-testid="input-amount-${targetRowIndex}"]`
-        ) as HTMLInputElement;
-        if (amountInput) {
-          amountInput.focus();
-          amountInput.select();
-        }
-      });
+      // Find if there's an empty entry to populate
+      const emptyEntryIndex = currentEntries.findIndex(
+        (e: any) => e.accountId === 0 || !e.accountName
+      );
+
+      if (emptyEntryIndex >= 0) {
+        // Fill the existing empty entry
+        targetRowIndex = emptyEntryIndex;
+        form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
+        form.setValue(`entries.${emptyEntryIndex}.accountId`, account.id);
+        form.setValue(`entries.${emptyEntryIndex}.accountName`, account.name);
+        
+        // Focus the amount input for that row
+        requestAnimationFrame(() => {
+          const amountInput = document.querySelector(
+            `[data-testid="input-amount-${emptyEntryIndex}"]`
+          ) as HTMLInputElement;
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
+        });
+      } else {
+        // Add a new entry with all account data
+        targetRowIndex = currentEntries.length;
+        append({
+          accountType: account.type,
+          accountId: account.id,
+          accountName: account.name,
+          amount: "",
+        });
+        
+        // Focus the amount input for the new row after it's been added
+        requestAnimationFrame(() => {
+          const amountInput = document.querySelector(
+            `[data-testid="input-amount-${targetRowIndex}"]`
+          ) as HTMLInputElement;
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
+        });
+      }
     }
     
     // Set selected account and active row for sidebar highlighting
