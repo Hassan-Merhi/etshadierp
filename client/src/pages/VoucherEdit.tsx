@@ -584,7 +584,7 @@ export default function VoucherEdit() {
 
     // Add ledger accounts
     ledgerAccounts.forEach(ledger => {
-      const accountData = allAccountsData.find(a => a.type === "ledger" && a.id === ledger.id);
+      const accountData = allAccountsData.find(a => a.id === `ledger-${ledger.id}`);
       const baseBalance = parseFloat(accountData?.balance || "0");
       const adjustment = balanceAdjustments[`ledger-${ledger.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
@@ -600,7 +600,7 @@ export default function VoucherEdit() {
 
     // Add bank accounts
     bankAccounts.forEach(bank => {
-      const accountData = allAccountsData.find(a => a.type === "bank" && a.id === bank.id);
+      const accountData = allAccountsData.find(a => a.id === `bank-${bank.id}`);
       const baseBalance = parseFloat(accountData?.balance || bank.balance || "0");
       const adjustment = balanceAdjustments[`bank-${bank.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
@@ -616,7 +616,7 @@ export default function VoucherEdit() {
 
     // Add suppliers
     suppliers.forEach(supplier => {
-      const accountData = allAccountsData.find(a => a.type === "supplier" && a.id === supplier.id);
+      const accountData = allAccountsData.find(a => a.id === `supplier-${supplier.id}`);
       const baseBalance = parseFloat(accountData?.balance || "0");
       const adjustment = balanceAdjustments[`supplier-${supplier.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
