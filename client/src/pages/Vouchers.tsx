@@ -929,6 +929,8 @@ export default function Vouchers() {
       setSelectedAccountId(null);
       setSelectedAccountType(null);
       setActiveRowIndex(null);
+      setSidebarSearchValue("");
+      setSidebarHighlightedIndex(0);
       
       // Refocus sidebar search to support auto-focus workflow
       requestAnimationFrame(() => {
@@ -941,6 +943,18 @@ export default function Vouchers() {
       });
     }
   };
+
+  // Sync active row's accountName to sidebar search (like POS does with itemName)
+  useEffect(() => {
+    if (activeRowIndex !== null) {
+      const entries = form.watch("entries");
+      const activeEntry = entries[activeRowIndex];
+      if (activeEntry) {
+        setSidebarSearchValue(activeEntry.accountName || "");
+        setSidebarHighlightedIndex(0);
+      }
+    }
+  }, [form.watch("entries"), activeRowIndex]);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -2057,6 +2071,8 @@ export default function Vouchers() {
             handlePrint={handlePrint}
             onSubmit={onSubmit}
             activeTab={activeTab}
+            activeRowIndex={activeRowIndex}
+            setActiveRowIndex={setActiveRowIndex}
           />
         </TabsContent>
 

@@ -40,7 +40,6 @@ interface PaymentVoucherTabProps {
   setSidebarSearchValue: (value: string) => void;
   sidebarHighlightedIndex: number;
   setSidebarHighlightedIndex: (index: number) => void;
-  // Removed: sidebarActiveTab, setSidebarActiveTab, mostUsedAccounts (no longer needed without tabs)
   selectedAccountId: number | null;
   selectedAccountType: string | null;
   handleSidebarAccountSelect: (account: Account) => void;
@@ -48,6 +47,8 @@ interface PaymentVoucherTabProps {
   handlePrint: () => void;
   onSubmit: (values: any) => void;
   activeTab: "payment" | "receipt";
+  activeRowIndex: number | null;
+  setActiveRowIndex: (index: number | null) => void;
 }
 
 export function PaymentVoucherTab({
@@ -72,6 +73,8 @@ export function PaymentVoucherTab({
   handlePrint,
   onSubmit,
   activeTab,
+  activeRowIndex,
+  setActiveRowIndex,
 }: PaymentVoucherTabProps) {
   return (
     <div className="flex gap-4">
@@ -192,8 +195,18 @@ export function PaymentVoucherTab({
                   entries={entries}
                   total={total}
                   mode="payment"
-                  allAccounts={allAccounts}
                   onAmountCommit={handleAmountCommit}
+                  activeRow={activeRowIndex}
+                  onRowFocus={(rowIndex, fieldName) => {
+                    if (fieldName === "account") {
+                      setActiveRowIndex(rowIndex);
+                      setSidebarSearchValue(entries[rowIndex]?.accountName || "");
+                      setSidebarHighlightedIndex(0);
+                    }
+                  }}
+                  onRowBlur={() => {
+                    // Don't clear activeRow on blur - let amount commit handle it
+                  }}
                 />
 
                 {/* Notes field */}
