@@ -2142,7 +2142,7 @@ export default function Vouchers() {
             handleAmountCommit={handleAmountCommit}
             handlePrint={handlePrint}
             onSubmit={onSubmit}
-            activeTab={activeTab}
+            activeTab="payment"
             activeRowIndex={activeRowIndex}
             setActiveRowIndex={setActiveRowIndex}
           />
