@@ -611,10 +611,11 @@ export default function Vouchers() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const fieldArray = useFieldArray({
     control: form.control,
     name: "entries",
   });
+  const { fields, append, remove } = fieldArray;
 
   // Calculate total
   const entries = form.watch("entries");
@@ -2121,7 +2122,7 @@ export default function Vouchers() {
         <TabsContent value="payment" className="space-y-4">
           <PaymentVoucherTab
             form={form}
-            fieldArray={{ fields, append, remove }}
+            fieldArray={fieldArray}
             entries={entries}
             total={total}
             paymentAccountId={paymentAccountId}

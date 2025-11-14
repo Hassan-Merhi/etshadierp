@@ -47,7 +47,7 @@ interface PaymentVoucherTabProps {
   handleAmountCommit: (rowIndex: number) => void;
   handlePrint: () => void;
   onSubmit: (values: any) => void;
-  activeTab: "payment" | "receipt";
+  activeTab: "payment" | "receipt" | "journal" | "transfer" | "adjustment";
   activeRowIndex: number | null;
   setActiveRowIndex: (index: number | null) => void;
 }
@@ -289,7 +289,7 @@ export function PaymentVoucherTab({
           highlightedIndex={sidebarHighlightedIndex}
           onHighlightedIndexChange={setSidebarHighlightedIndex}
           entries={entries}
-          mode={activeTab}
+          mode={activeTab === "payment" || activeTab === "receipt" ? activeTab : "payment"}
           paymentAccountId={paymentAccountId}
           paymentAccountType={paymentAccountType}
           voucherTotal={total}
