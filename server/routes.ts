@@ -6397,7 +6397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             id: `ledger-${account.id}`,
             accountId: account.id,
-            type: "Ledger",
+            type: "ledger",
             code: account.code,
             name: account.name,
             accountType: account.accountType,
@@ -6423,7 +6423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             id: `bank-${account.id}`,
             accountId: account.id,
-            type: "Bank",
+            type: "bank",
             code: account.code,
             name: `${account.name} (${account.bankName})`,
             balance,
@@ -6447,7 +6447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             id: `asset-${asset.id}`,
             accountId: asset.id,
-            type: "Fixed Asset",
+            type: "fixedAsset",
             code: asset.code,
             name: asset.name,
             balance,
@@ -6476,7 +6476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return {
             id: `supplier-${supplier.id}`,
             accountId: supplier.id,
-            type: "Supplier",
+            type: "supplier",
             code: supplier.code,
             name: supplier.legalName,
             balance: absoluteBalance,
