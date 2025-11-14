@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Plus } from "lucide-react";
+import { AccountAutocomplete, CombinedAccount } from "@/components/AccountAutocomplete";
 
 export interface VoucherEntry {
   accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
@@ -17,6 +18,7 @@ interface VoucherEntriesTableProps {
   entries: VoucherEntry[];
   total: number;
   mode: "payment" | "receipt";
+  allAccounts: CombinedAccount[];
   onAmountCommit?: (rowIndex: number) => void;
 }
 
@@ -26,6 +28,7 @@ export function VoucherEntriesTable({
   entries,
   total,
   mode,
+  allAccounts,
   onAmountCommit,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
@@ -102,14 +105,63 @@ export function VoucherEntriesTable({
         <tbody>
           {fields.map((field, index) => (
             <tr key={field.id} className="border-t hover-elevate">
-              <td className="p-3">
-                <div className="text-sm" data-testid={`text-account-${index}`}>
-                  {entries[index]?.accountName || (
-                    <span className="text-muted-foreground italic">
-                      Click an account in the sidebar →
-                    </span>
+              <td className="p-2">
+                <FormField
+                  control={form.control}
+                  name={`entries.${index}.accountId`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <AccountAutocomplete
+                          value={
+                            entries[index]?.accountId > 0
+                              ? {
+                                  type: entries[index].accountType,
+                                  id: entries[index].accountId,
+                                  name: entries[index].accountName,
+                                }
+                              : null
+                          }
+                          onChange={(type, id, name) => {
+                            form.setValue(`entries.${index}.accountType`, type);
+                            form.setValue(`entries.${index}.accountId`, id);
+                            form.setValue(`entries.${index}.accountName`, name);
+                          }}
+                          onTabPressed={() => {
+                            setTimeout(() => {
+                              const amountInput = document.querySelector(`[data-testid="input-amount-${index}"]`) as HTMLInputElement;
+                              if (amountInput) {
+                                amountInput.focus();
+                                amountInput.select();
+                              }
+                            }, 50);
+                          }}
+                          onArrowUp={() => {
+                            if (index > 0) {
+                              setTimeout(() => {
+                                const prevAccountInput = document.querySelector(`[data-testid="input-account-${index - 1}"]`) as HTMLInputElement;
+                                if (prevAccountInput) prevAccountInput.focus();
+                              }, 50);
+                            }
+                          }}
+                          onArrowDown={() => {
+                            if (index < entries.length - 1) {
+                              setTimeout(() => {
+                                const nextAccountInput = document.querySelector(`[data-testid="input-account-${index + 1}"]`) as HTMLInputElement;
+                                if (nextAccountInput) nextAccountInput.focus();
+                              }, 50);
+                            }
+                          }}
+                          allAccounts={allAccounts}
+                          rowIndex={index}
+                          placeholder="Type account name..."
+                          testId={`input-account-${index}`}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </div>
+                />
               </td>
               <td className="p-2">
                 <FormField

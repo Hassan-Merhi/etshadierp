@@ -11,6 +11,13 @@ export interface Account {
   balance?: number;
 }
 
+export interface VoucherEntry {
+  accountType: string;
+  accountId: number;
+  accountName: string;
+  amount: string;
+}
+
 interface AccountSidebarProps {
   accounts: Account[];
   onSelectAccount: (account: Account) => void;
@@ -20,7 +27,11 @@ interface AccountSidebarProps {
   selectedAccountType: string | null;
   highlightedIndex: number;
   onHighlightedIndexChange: (index: number) => void;
-  // Removed: activeTab, onTabChange, mostUsedAccounts - no longer needed without tabs
+  entries?: VoucherEntry[];
+  mode?: "payment" | "receipt";
+  paymentAccountId?: number;
+  paymentAccountType?: string;
+  voucherTotal?: number;
 }
 
 export default function AccountSidebar({
@@ -32,9 +43,47 @@ export default function AccountSidebar({
   selectedAccountType,
   highlightedIndex,
   onHighlightedIndexChange,
+  entries = [],
+  mode = "payment",
+  paymentAccountId = 0,
+  paymentAccountType = "",
+  voucherTotal = 0,
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Calculate projected balances based on voucher entries
+  const getProjectedBalance = (account: Account): number => {
+    const currentBalance = account.balance ?? 0;
+    let adjustment = 0;
+    
+    // Check if this is the payment/receipt account
+    if (account.id === paymentAccountId && account.type === paymentAccountType && voucherTotal > 0) {
+      // For payment vouchers, the payment account balance decreases
+      // For receipt vouchers, the receipt account balance increases
+      adjustment = mode === "payment" ? -voucherTotal : voucherTotal;
+    }
+    
+    // Also sum all amounts for this account in the entries
+    const entryAmount = entries
+      .filter(
+        (entry) =>
+          entry.accountId === account.id &&
+          entry.accountType === account.type &&
+          entry.amount &&
+          !isNaN(Number(entry.amount))
+      )
+      .reduce((sum, entry) => sum + Number(entry.amount), 0);
+    
+    // Entry amounts always decrease the account balance for both payment and receipt:
+    // - Payment: we settle liabilities (supplier balance decreases)
+    // - Receipt: we collect receivables (customer balance decreases, they owe less)
+    if (entryAmount > 0) {
+      adjustment -= entryAmount;
+    }
+    
+    return currentBalance + adjustment;
+  };
 
   // Filter and sort all accounts alphabetically by name
   const filteredAccounts = accounts
@@ -104,6 +153,8 @@ export default function AccountSidebar({
             filteredAccounts.map((account, idx) => {
               const isSelected = account.id === selectedAccountId && account.type === selectedAccountType;
               const isHighlighted = idx === highlightedIndex;
+              const projectedBalance = getProjectedBalance(account);
+              const hasProjection = projectedBalance !== (account.balance ?? 0);
               
               return (
                 <button
@@ -119,8 +170,15 @@ export default function AccountSidebar({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
                     </div>
-                    <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(account.balance)}`}>
-                      {formatBalance(account.balance)}
+                    <div className="flex flex-col items-end gap-0.5">
+                      {hasProjection && (
+                        <div className="text-xs text-muted-foreground font-mono line-through">
+                          {formatBalance(account.balance)}
+                        </div>
+                      )}
+                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance)}`}>
+                        {formatBalance(projectedBalance)}
+                      </div>
                     </div>
                   </div>
                 </button>

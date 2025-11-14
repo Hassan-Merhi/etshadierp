@@ -192,6 +192,7 @@ export function PaymentVoucherTab({
                   entries={entries}
                   total={total}
                   mode="payment"
+                  allAccounts={allAccounts}
                   onAmountCommit={handleAmountCommit}
                 />
 
@@ -265,6 +266,11 @@ export function PaymentVoucherTab({
           selectedAccountType={selectedAccountType}
           highlightedIndex={sidebarHighlightedIndex}
           onHighlightedIndexChange={setSidebarHighlightedIndex}
+          entries={entries}
+          mode={activeTab}
+          paymentAccountId={paymentAccountId}
+          paymentAccountType={paymentAccountType}
+          voucherTotal={total}
         />
       </div>
     </div>
