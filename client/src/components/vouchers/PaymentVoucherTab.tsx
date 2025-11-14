@@ -85,7 +85,7 @@ export function PaymentVoucherTab({
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* Header section */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-end gap-6">
                   {/* Left: Payment account selector */}
                   <FormField
                     control={form.control}
@@ -118,7 +118,7 @@ export function PaymentVoucherTab({
                           />
                         </FormControl>
                         {paymentAccountId > 0 && (
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-sm text-muted-foreground mt-1.5">
                             Balance: $
                             {accountBalance.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -132,7 +132,7 @@ export function PaymentVoucherTab({
                   />
 
                   {/* Right: Date picker and print button */}
-                  <div className="flex items-end gap-2">
+                  <div className="flex items-center gap-3">
                     <FormField
                       control={form.control}
                       name="voucherDate"
@@ -145,7 +145,7 @@ export function PaymentVoucherTab({
                                 <Button
                                   variant="outline"
                                   className={cn(
-                                    "w-[200px] justify-start text-left font-normal",
+                                    "w-[180px] justify-start text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                   )}
                                   data-testid="button-date-picker"
@@ -169,16 +169,19 @@ export function PaymentVoucherTab({
                       )}
                     />
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handlePrint}
-                      disabled={paymentAccountId === 0 || entries.filter((e) => e.accountId > 0).length === 0}
-                      data-testid="button-print"
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print
-                    </Button>
+                    <div className="pt-6">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="default"
+                        onClick={handlePrint}
+                        disabled={paymentAccountId === 0 || entries.filter((e) => e.accountId > 0).length === 0}
+                        data-testid="button-print"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -235,9 +238,10 @@ export function PaymentVoucherTab({
                 />
 
                 {/* Submit button */}
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                   <Button
                     type="submit"
+                    size="default"
                     disabled={paymentAccountId === 0 || total === 0}
                     data-testid="button-save-voucher"
                   >

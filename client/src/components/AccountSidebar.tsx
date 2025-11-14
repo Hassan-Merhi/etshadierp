@@ -78,8 +78,8 @@ export default function AccountSidebar({
 
   return (
     <Card className="flex flex-col h-full">
-      <div className="p-3 border-b">
-        <h3 className="text-sm font-semibold mb-3">Select Account</h3>
+      <div className="p-4 border-b">
+        <h3 className="text-base font-semibold mb-3">Select Account</h3>
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -94,8 +94,8 @@ export default function AccountSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2" ref={listRef}>
-        <div className="space-y-0.5">
+      <div className="flex-1 overflow-y-auto p-3" ref={listRef}>
+        <div className="space-y-1">
           {filteredAccounts.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">
               No accounts found
@@ -115,11 +115,11 @@ export default function AccountSidebar({
                   } ${isHighlighted ? "bg-accent" : ""}`}
                   data-testid={`account-${idx}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
                     </div>
-                    <div className={`text-sm font-mono font-medium flex-shrink-0 ${getBalanceColorClass(account.balance)}`}>
+                    <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(account.balance)}`}>
                       {formatBalance(account.balance)}
                     </div>
                   </div>
