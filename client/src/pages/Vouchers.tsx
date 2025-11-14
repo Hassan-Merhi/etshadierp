@@ -518,6 +518,24 @@ export default function Vouchers() {
   const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
+  // Compute filtered accounts based on search (lifted from AccountSidebar)
+  const filteredSidebarAccounts = useMemo(() => {
+    return sidebarAccounts
+      .filter((acc) =>
+        acc.name.toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
+        acc.code.toLowerCase().includes(sidebarSearchValue.toLowerCase())
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sidebarAccounts, sidebarSearchValue]);
+
+  // Clamp highlighted index when filtered list changes
+  useEffect(() => {
+    const maxIndex = Math.max(0, filteredSidebarAccounts.length - 1);
+    if (sidebarHighlightedIndex > maxIndex) {
+      setSidebarHighlightedIndex(Math.min(sidebarHighlightedIndex, maxIndex));
+    }
+  }, [filteredSidebarAccounts.length, sidebarHighlightedIndex]);
+
   // Fetch data
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts"],
@@ -2079,6 +2097,7 @@ export default function Vouchers() {
             accountBalance={accountBalance}
             allAccounts={allAccounts}
             sidebarAccounts={sidebarAccounts}
+            filteredSidebarAccounts={filteredSidebarAccounts}
             sidebarSearchValue={sidebarSearchValue}
             setSidebarSearchValue={setSidebarSearchValue}
             sidebarHighlightedIndex={sidebarHighlightedIndex}

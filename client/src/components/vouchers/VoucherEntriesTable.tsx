@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Plus } from "lucide-react";
+import type { Account } from "@/components/AccountSidebar";
 
 export interface VoucherEntry {
   accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
@@ -19,6 +20,10 @@ interface VoucherEntriesTableProps {
   mode: "payment" | "receipt";
   onAmountCommit?: (rowIndex: number) => void;
   activeRow: number | null;
+  filteredSidebarAccounts: Account[];
+  sidebarHighlightedIndex: number;
+  setSidebarHighlightedIndex: (index: number) => void;
+  handleSidebarAccountSelect: (account: Account) => void;
   onRowFocus: (rowIndex: number, fieldName: string) => void;
   onRowBlur: () => void;
 }
@@ -31,6 +36,10 @@ export function VoucherEntriesTable({
   mode,
   onAmountCommit,
   activeRow,
+  filteredSidebarAccounts,
+  sidebarHighlightedIndex,
+  setSidebarHighlightedIndex,
+  handleSidebarAccountSelect,
   onRowFocus,
   onRowBlur,
 }: VoucherEntriesTableProps) {
@@ -54,7 +63,25 @@ export function VoucherEntriesTable({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleAccountKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const newIndex = Math.min(sidebarHighlightedIndex + 1, filteredSidebarAccounts.length - 1);
+      setSidebarHighlightedIndex(newIndex);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const newIndex = Math.max(sidebarHighlightedIndex - 1, 0);
+      setSidebarHighlightedIndex(newIndex);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
+      if (highlightedAccount) {
+        handleSidebarAccountSelect(highlightedAccount);
+      }
+    }
+  };
+
+  const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
@@ -68,10 +95,10 @@ export function VoucherEntriesTable({
         // Then add a new row
         handleAddRow();
         
-        // Focus the new row's amount input
+        // Focus the new row's account input
         requestAnimationFrame(() => {
           const newRowIndex = entries.length;
-          const newInput = document.querySelector(`[data-testid="input-amount-${newRowIndex}"]`) as HTMLInputElement;
+          const newInput = document.querySelector(`[data-testid="input-account-${newRowIndex}"]`) as HTMLInputElement;
           if (newInput) {
             newInput.focus();
             newInput.select();
@@ -123,6 +150,7 @@ export function VoucherEntriesTable({
                           onFocus={() => {
                             onRowFocus(index, "account");
                           }}
+                          onKeyDown={(e) => handleAccountKeyDown(e, index)}
                           onBlur={() => {
                             setTimeout(() => onRowBlur(), 200);
                           }}
@@ -147,7 +175,7 @@ export function VoucherEntriesTable({
                           placeholder="0.00"
                           className="font-mono"
                           data-testid={`input-amount-${index}`}
-                          onKeyDown={(e) => handleKeyDown(e, index)}
+                          onKeyDown={(e) => handleAmountKeyDown(e, index)}
                           onBlur={() => handleBlur(index)}
                           onFocus={() => onRowFocus(index, "amount")}
                         />

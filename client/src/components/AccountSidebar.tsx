@@ -20,6 +20,7 @@ export interface VoucherEntry {
 
 interface AccountSidebarProps {
   accounts: Account[];
+  filteredAccounts: Account[];
   onSelectAccount: (account: Account) => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -36,6 +37,7 @@ interface AccountSidebarProps {
 
 export default function AccountSidebar({
   accounts,
+  filteredAccounts,
   onSelectAccount,
   searchValue,
   onSearchChange,
@@ -84,24 +86,6 @@ export default function AccountSidebar({
     
     return currentBalance + adjustment;
   };
-
-  // Filter and sort all accounts alphabetically by name
-  const filteredAccounts = accounts
-    .filter((acc) =>
-      acc.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-      acc.code.toLowerCase().includes(searchValue.toLowerCase())
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Clamp highlighted index to filtered list length when list changes
-  useEffect(() => {
-    const maxIndex = Math.max(0, filteredAccounts.length - 1);
-    if (highlightedIndex > maxIndex) {
-      onHighlightedIndexChange(Math.min(highlightedIndex, maxIndex));
-    } else {
-      onHighlightedIndexChange(0);
-    }
-  }, [searchValue, filteredAccounts.length]);
 
   // Scroll highlighted item into view
   useEffect(() => {

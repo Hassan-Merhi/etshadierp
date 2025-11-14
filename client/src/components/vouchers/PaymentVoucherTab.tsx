@@ -36,6 +36,7 @@ interface PaymentVoucherTabProps {
   accountBalance: number;
   allAccounts: CombinedAccount[];
   sidebarAccounts: Account[];
+  filteredSidebarAccounts: Account[];
   sidebarSearchValue: string;
   setSidebarSearchValue: (value: string) => void;
   sidebarHighlightedIndex: number;
@@ -62,6 +63,7 @@ export function PaymentVoucherTab({
   accountBalance,
   allAccounts,
   sidebarAccounts,
+  filteredSidebarAccounts,
   sidebarSearchValue,
   setSidebarSearchValue,
   sidebarHighlightedIndex,
@@ -197,6 +199,10 @@ export function PaymentVoucherTab({
                   mode="payment"
                   onAmountCommit={handleAmountCommit}
                   activeRow={activeRowIndex}
+                  filteredSidebarAccounts={filteredSidebarAccounts}
+                  sidebarHighlightedIndex={sidebarHighlightedIndex}
+                  setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+                  handleSidebarAccountSelect={handleSidebarAccountSelect}
                   onRowFocus={(rowIndex, fieldName) => {
                     if (fieldName === "account") {
                       setActiveRowIndex(rowIndex);
@@ -272,6 +278,7 @@ export function PaymentVoucherTab({
       <div className="sticky top-4 h-fit" style={{ width: "40%", maxHeight: "calc(100vh - 2rem)" }}>
         <AccountSidebar
           accounts={sidebarAccounts}
+          filteredAccounts={filteredSidebarAccounts}
           onSelectAccount={handleSidebarAccountSelect}
           searchValue={sidebarSearchValue}
           onSearchChange={setSidebarSearchValue}
