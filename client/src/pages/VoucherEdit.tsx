@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AccountAutocomplete, CombinedAccount } from "@/components/AccountAutocomplete";
 
 // Types
 interface BankAccount {
@@ -535,7 +536,20 @@ export default function VoucherEdit() {
     queryKey: ["/api/locations"],
   });
 
-  // Determine voucher type and initialize appropriate form
+  // Fetch all accounts with balances
+  interface AccountWithBalance {
+    type: string;
+    id: number;
+    name: string;
+    balance: string;
+    balanceSide?: string;
+  }
+
+  const { data: allAccountsData = [] } = useQuery<AccountWithBalance[]>({
+    queryKey: ["/api/accounts/all"],
+  });
+
+  // Determine voucher type early for form logic
   const voucherType = voucher?.voucherType;
   const isPaymentOrReceipt = voucherType === "Payment" || voucherType === "Receipt";
   const isJournal = voucherType === "Journal";
@@ -544,7 +558,7 @@ export default function VoucherEdit() {
   const isConsumption = voucherType === "Consumption" || voucherType === "Production" || voucherType === "Mixed";
   const isStockTransfer = voucherType === "Stock Transfer";
 
-  // Payment/Receipt Form
+  // Initialize forms first (needed for balance tracking)
   const paymentForm = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
     defaultValues: {
@@ -561,6 +575,122 @@ export default function VoucherEdit() {
     control: paymentForm.control,
     name: "entries",
   });
+
+  // Create unified accounts list with balances for payment/receipt forms
+  const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, number>>({});
+
+  const allAccountsWithBalances: CombinedAccount[] = useMemo(() => {
+    const accounts: CombinedAccount[] = [];
+
+    // Add ledger accounts
+    ledgerAccounts.forEach(ledger => {
+      const accountData = allAccountsData.find(a => a.type === "ledger" && a.id === ledger.id);
+      const baseBalance = parseFloat(accountData?.balance || "0");
+      const adjustment = balanceAdjustments[`ledger-${ledger.id}`] || 0;
+      const adjustedBalance = baseBalance + adjustment;
+
+      accounts.push({
+        type: "ledger",
+        id: ledger.id,
+        name: ledger.name,
+        code: ledger.code,
+        balance: adjustedBalance.toFixed(2),
+      });
+    });
+
+    // Add bank accounts
+    bankAccounts.forEach(bank => {
+      const accountData = allAccountsData.find(a => a.type === "bank" && a.id === bank.id);
+      const baseBalance = parseFloat(accountData?.balance || bank.balance || "0");
+      const adjustment = balanceAdjustments[`bank-${bank.id}`] || 0;
+      const adjustedBalance = baseBalance + adjustment;
+
+      accounts.push({
+        type: "bank",
+        id: bank.id,
+        name: bank.bankName,
+        code: bank.accountNumber,
+        balance: adjustedBalance.toFixed(2),
+      });
+    });
+
+    // Add suppliers
+    suppliers.forEach(supplier => {
+      const accountData = allAccountsData.find(a => a.type === "supplier" && a.id === supplier.id);
+      const baseBalance = parseFloat(accountData?.balance || "0");
+      const adjustment = balanceAdjustments[`supplier-${supplier.id}`] || 0;
+      const adjustedBalance = baseBalance + adjustment;
+
+      accounts.push({
+        type: "supplier",
+        id: supplier.id,
+        name: supplier.legalName,
+        code: supplier.code,
+        balance: adjustedBalance.toFixed(2),
+      });
+    });
+
+    return accounts.sort((a, b) => a.name.localeCompare(b.name));
+  }, [ledgerAccounts, bankAccounts, suppliers, allAccountsData, balanceAdjustments]);
+
+  // Update balance adjustments when payment form entries change
+  useEffect(() => {
+    if (!isPaymentOrReceipt) return;
+
+    // Subscribe to form changes instead of using watch in dependencies
+    const subscription = paymentForm.watch((formValues) => {
+      const newAdjustments: Record<string, number> = {};
+
+      const paymentAccountType = formValues.paymentAccountType || "bank";
+      const paymentAccountId = formValues.paymentAccountId || 0;
+      const paymentKey = `${paymentAccountType}-${paymentAccountId}`;
+
+      // Calculate total from entries
+      const entries = formValues.entries || [];
+      let totalAmount = 0;
+
+      entries.forEach((entry) => {
+        if (!entry) return;
+        const amount = parseFloat(entry.amount || "0");
+        const accountId = entry.accountId || 0;
+        const accountType = entry.accountType || "ledger";
+        
+        if (amount > 0 && accountId > 0) {
+          totalAmount += amount;
+
+          // Adjust counterparty account balances
+          const entryKey = `${accountType}-${accountId}`;
+          
+          // In this system, both Payment and Receipt entries represent the amount
+          // transferred, not DR/CR sides. The sign depends on the voucher type:
+          if (voucherType === "Payment") {
+            // Payment: We're paying out to suppliers/vendors
+            // Their balance (what we owe them) DECREASES
+            newAdjustments[entryKey] = (newAdjustments[entryKey] || 0) - amount;
+          } else if (voucherType === "Receipt") {
+            // Receipt: We're receiving payment from customers  
+            // Their balance (what they owe us) DECREASES (they paid us)
+            newAdjustments[entryKey] = (newAdjustments[entryKey] || 0) - amount;
+          }
+        }
+      });
+
+      // Adjust our payment/receiving account (cash/bank account)
+      if (paymentAccountId > 0 && totalAmount > 0) {
+        if (voucherType === "Payment") {
+          // Payment: Our cash/bank DECREASES (money going out)
+          newAdjustments[paymentKey] = (newAdjustments[paymentKey] || 0) - totalAmount;
+        } else if (voucherType === "Receipt") {
+          // Receipt: Our cash/bank INCREASES (money coming in)
+          newAdjustments[paymentKey] = (newAdjustments[paymentKey] || 0) + totalAmount;
+        }
+      }
+
+      setBalanceAdjustments(newAdjustments);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [isPaymentOrReceipt, voucherType, paymentForm]);
 
   // Journal Form
   const journalForm = useForm<JournalFormData>({
@@ -2490,7 +2620,7 @@ export default function VoucherEdit() {
                           {voucherType === "Payment" ? "Pay From" : "Receive In"}
                         </FormLabel>
                         <FormControl>
-                          <AccountCombobox
+                          <AccountAutocomplete
                             value={
                               paymentForm.watch("paymentAccountId") > 0
                                 ? {
@@ -2501,14 +2631,16 @@ export default function VoucherEdit() {
                                 : null
                             }
                             onChange={(type, id, name) => {
-                              paymentForm.setValue("paymentAccountType", type);
-                              paymentForm.setValue("paymentAccountId", id);
-                              paymentForm.setValue("paymentAccountName", name);
+                              // Only ledger, bank, supplier are allowed in payment forms
+                              if (type === "ledger" || type === "bank" || type === "supplier") {
+                                paymentForm.setValue("paymentAccountType", type);
+                                paymentForm.setValue("paymentAccountId", id);
+                                paymentForm.setValue("paymentAccountName", name);
+                              }
                             }}
-                            ledgerAccounts={ledgerAccounts}
-                            bankAccounts={bankAccounts}
-                            suppliers={suppliers}
+                            allAccounts={allAccountsWithBalances}
                             rowIndex={-1}
+                            testId="input-payment-account"
                           />
                         </FormControl>
                         <FormMessage />
@@ -2574,7 +2706,7 @@ export default function VoucherEdit() {
                               render={({ field: accountField }) => (
                                 <FormItem>
                                   <FormControl>
-                                    <AccountCombobox
+                                    <AccountAutocomplete
                                       value={
                                         paymentForm.watch(`entries.${index}.accountId`) > 0
                                           ? {
@@ -2585,14 +2717,16 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        paymentForm.setValue(`entries.${index}.accountType`, type);
-                                        paymentForm.setValue(`entries.${index}.accountId`, id);
-                                        paymentForm.setValue(`entries.${index}.accountName`, name);
+                                        // Only ledger, bank, supplier are allowed in payment forms
+                                        if (type === "ledger" || type === "bank" || type === "supplier") {
+                                          paymentForm.setValue(`entries.${index}.accountType`, type);
+                                          paymentForm.setValue(`entries.${index}.accountId`, id);
+                                          paymentForm.setValue(`entries.${index}.accountName`, name);
+                                        }
                                       }}
-                                      ledgerAccounts={ledgerAccounts}
-                                      bankAccounts={bankAccounts}
-                                      suppliers={suppliers}
+                                      allAccounts={allAccountsWithBalances}
                                       rowIndex={index}
+                                      testId={`input-account-${index}`}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -2803,7 +2937,7 @@ export default function VoucherEdit() {
                               render={({ field: accountField }) => (
                                 <FormItem>
                                   <FormControl>
-                                    <AccountCombobox
+                                    <AccountAutocomplete
                                       value={
                                         journalForm.watch(`entries.${index}.accountId`) > 0
                                           ? {
@@ -2814,14 +2948,16 @@ export default function VoucherEdit() {
                                           : null
                                       }
                                       onChange={(type, id, name) => {
-                                        journalForm.setValue(`entries.${index}.accountType`, type);
-                                        journalForm.setValue(`entries.${index}.accountId`, id);
-                                        journalForm.setValue(`entries.${index}.accountName`, name);
+                                        // Only ledger, bank, supplier are allowed in journal forms
+                                        if (type === "ledger" || type === "bank" || type === "supplier") {
+                                          journalForm.setValue(`entries.${index}.accountType`, type);
+                                          journalForm.setValue(`entries.${index}.accountId`, id);
+                                          journalForm.setValue(`entries.${index}.accountName`, name);
+                                        }
                                       }}
-                                      ledgerAccounts={ledgerAccounts}
-                                      bankAccounts={bankAccounts}
-                                      suppliers={suppliers}
+                                      allAccounts={allAccountsWithBalances}
                                       rowIndex={index}
+                                      testId={`input-account-${index}`}
                                     />
                                   </FormControl>
                                   <FormMessage />

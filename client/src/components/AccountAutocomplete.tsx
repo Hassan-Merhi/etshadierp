@@ -9,6 +9,7 @@ export type CombinedAccount = {
   name: string;
   code: string;
   openingBalance?: string;
+  balance?: string;
 };
 
 export interface AccountAutocompleteProps {
@@ -225,6 +226,11 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
                   )}
                 />
                 <span className="flex-1">{account.name}</span>
+                {account.balance !== undefined && (
+                  <span className="text-sm text-muted-foreground font-mono">
+                    ${parseFloat(account.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                )}
               </button>
             ))}
           </div>
