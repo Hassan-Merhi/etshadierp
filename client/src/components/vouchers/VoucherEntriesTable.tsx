@@ -23,6 +23,7 @@ interface VoucherEntriesTableProps {
   filteredSidebarAccounts: Account[];
   sidebarHighlightedIndex: number;
   setSidebarHighlightedIndex: (index: number) => void;
+  setSidebarSearchValue: (value: string) => void;
   handleSidebarAccountSelect: (account: Account) => void;
   onRowFocus: (rowIndex: number, fieldName: string) => void;
   onRowBlur: () => void;
@@ -39,6 +40,7 @@ export function VoucherEntriesTable({
   filteredSidebarAccounts,
   sidebarHighlightedIndex,
   setSidebarHighlightedIndex,
+  setSidebarSearchValue,
   handleSidebarAccountSelect,
   onRowFocus,
   onRowBlur,
@@ -66,14 +68,22 @@ export function VoucherEntriesTable({
   const handleAccountKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      const newIndex = Math.min(sidebarHighlightedIndex + 1, filteredSidebarAccounts.length - 1);
+      if (filteredSidebarAccounts.length === 0) return;
+      const newIndex = Math.min(
+        sidebarHighlightedIndex < 0 ? 0 : sidebarHighlightedIndex + 1,
+        filteredSidebarAccounts.length - 1
+      );
       setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      if (filteredSidebarAccounts.length === 0) return;
       const newIndex = Math.max(sidebarHighlightedIndex - 1, 0);
       setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "Enter") {
       e.preventDefault();
+      if (filteredSidebarAccounts.length === 0 || sidebarHighlightedIndex < 0) {
+        return;
+      }
       const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
       if (highlightedAccount) {
         handleSidebarAccountSelect(highlightedAccount);
@@ -147,6 +157,11 @@ export function VoucherEntriesTable({
                           placeholder="Type to search..."
                           className="text-sm"
                           data-testid={`input-account-${index}`}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setSidebarSearchValue(e.target.value);
+                            // Don't reset highlightedIndex here - let the useEffect in Vouchers.tsx handle it
+                          }}
                           onFocus={() => {
                             onRowFocus(index, "account");
                           }}

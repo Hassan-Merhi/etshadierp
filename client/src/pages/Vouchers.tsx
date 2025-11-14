@@ -528,13 +528,46 @@ export default function Vouchers() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [sidebarAccounts, sidebarSearchValue]);
 
-  // Clamp highlighted index when filtered list changes
+  // Track active row's account for sync
+  const activeRowAccountId = activeRowIndex !== null && entries[activeRowIndex] 
+    ? entries[activeRowIndex].accountId 
+    : null;
+  const activeRowAccountType = activeRowIndex !== null && entries[activeRowIndex]
+    ? entries[activeRowIndex].accountType
+    : null;
+
+  // Sync highlighted index only when search changes or active row changes
   useEffect(() => {
-    const maxIndex = Math.max(0, filteredSidebarAccounts.length - 1);
-    if (sidebarHighlightedIndex > maxIndex) {
-      setSidebarHighlightedIndex(Math.min(sidebarHighlightedIndex, maxIndex));
+    if (filteredSidebarAccounts.length === 0) {
+      setSidebarHighlightedIndex(-1);
+      return;
     }
-  }, [filteredSidebarAccounts.length, sidebarHighlightedIndex]);
+    
+    // If there's an active row with an account, try to highlight that account
+    if (activeRowAccountId && activeRowAccountType) {
+      const accountIndex = filteredSidebarAccounts.findIndex(
+        (acc) => acc.id === activeRowAccountId && acc.type === activeRowAccountType
+      );
+      if (accountIndex >= 0) {
+        setSidebarHighlightedIndex(accountIndex);
+        return;
+      }
+    }
+    
+    // Otherwise reset to first item when search changes
+    setSidebarHighlightedIndex(0);
+  }, [sidebarSearchValue, activeRowIndex, activeRowAccountId, activeRowAccountType]);
+
+  // Clamp highlighted index when filtered list length changes (separate effect to avoid re-syncing during navigation)
+  useEffect(() => {
+    if (filteredSidebarAccounts.length === 0) {
+      return; // Already handled in sync effect
+    }
+    const maxIndex = filteredSidebarAccounts.length - 1;
+    if (sidebarHighlightedIndex > maxIndex) {
+      setSidebarHighlightedIndex(maxIndex);
+    }
+  }, [filteredSidebarAccounts.length]);
 
   // Fetch data
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({

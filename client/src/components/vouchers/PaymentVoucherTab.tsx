@@ -202,12 +202,14 @@ export function PaymentVoucherTab({
                   filteredSidebarAccounts={filteredSidebarAccounts}
                   sidebarHighlightedIndex={sidebarHighlightedIndex}
                   setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+                  setSidebarSearchValue={setSidebarSearchValue}
                   handleSidebarAccountSelect={handleSidebarAccountSelect}
                   onRowFocus={(rowIndex, fieldName) => {
                     if (fieldName === "account") {
                       setActiveRowIndex(rowIndex);
-                      setSidebarSearchValue(entries[rowIndex]?.accountName || "");
-                      setSidebarHighlightedIndex(0);
+                      const currentAccountName = entries[rowIndex]?.accountName || "";
+                      setSidebarSearchValue(currentAccountName);
+                      // Don't set highlightedIndex here - let the useEffect in Vouchers.tsx handle it
                     }
                   }}
                   onRowBlur={() => {
