@@ -539,7 +539,8 @@ export default function VoucherEdit() {
   // Fetch all accounts with balances
   interface AccountWithBalance {
     type: string;
-    id: number;
+    id: string;  // Composite ID like "ledger-1", "bank-2", etc.
+    accountId: number;  // The actual numeric account ID
     name: string;
     balance: string;
     balanceSide?: string;
