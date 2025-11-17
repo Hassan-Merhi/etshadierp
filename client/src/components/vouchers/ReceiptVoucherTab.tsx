@@ -98,7 +98,7 @@ export function ReceiptVoucherTab({
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormLabel>
-                          {activeTab === "payment" ? "Pay From" : "Receive In"}
+                          Receive In
                         </FormLabel>
                         <FormControl>
                           <AccountAutocomplete
@@ -118,7 +118,7 @@ export function ReceiptVoucherTab({
                             }}
                             allAccounts={allAccounts}
                             rowIndex={-1}
-                            placeholder={activeTab === "payment" ? "Pay from..." : "Receive in..."}
+                            placeholder="Receive in..."
                             testId="input-receive-in"
                           />
                         </FormControl>
