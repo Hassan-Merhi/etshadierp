@@ -27,6 +27,8 @@ import {
   offloadRequestSchema,
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
   insertUserSchema,
   insertUserCompanyRoleSchema,
   InsertPurchaseOrder,
@@ -10032,6 +10034,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Stock Transfers - PUT endpoint (update)
+  app.put(
+    "/api/stock-transfers/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (!id) {
+          return res.status(400).json({ message: "Transfer ID is required" });
+        }
+
+        // Validate request body using Zod
+        const parseResult = updateStockTransferSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({
+            message: "Invalid request data",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const { destinationLocationId, notes, items } = parseResult.data;
+
+        // Validate that source !== destination for each item
+        const invalidItem = items.find(item => item.sourceLocationId === destinationLocationId);
+        if (invalidItem) {
+          return res.status(400).json({ message: "Source and destination locations must be different for each item" });
+        }
+
+        // Convert numbers back to strings with fixed precision for storage layer
+        const itemsForStorage = items.map(item => ({
+          sourceLocationId: item.sourceLocationId,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity.toFixed(3),
+          rate: item.rate.toFixed(2),
+        }));
+
+        // Update the stock transfer using the storage method
+        const updated = await storage.updateStockTransfer(id, destinationLocationId, notes || "", itemsForStorage);
+        res.json(updated);
+      } catch (error: any) {
+        console.error("[Stock Transfer PUT] Error:", error.message);
+        
+        // Check if this is a legacy transfer validation error (400) vs server error (500)
+        if (error.message && error.message.includes("missing source location data")) {
+          return res.status(400).json({ message: error.message });
+        }
+        
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Stock Adjustments - GET endpoint
   app.get(
     "/api/stock-adjustments",
@@ -10149,6 +10204,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error.message,
           error.stack,
         );
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Stock Adjustments - PUT endpoint (update)
+  app.put(
+    "/api/stock-adjustments/:id",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (!id) {
+          return res.status(400).json({ message: "Adjustment ID is required" });
+        }
+
+        // Validate request body using Zod
+        const parseResult = updateStockAdjustmentSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({
+            message: "Invalid request data",
+            errors: parseResult.error.errors,
+          });
+        }
+
+        const { locationId, adjustmentType, notes, items } = parseResult.data;
+
+        // Convert numbers back to strings with fixed precision for storage layer
+        const itemsForStorage = items.map(item => ({
+          stockItemId: item.stockItemId,
+          quantity: item.quantity.toFixed(3),
+          rate: item.rate.toFixed(2),
+        }));
+
+        // Update the stock adjustment using the storage method
+        const updated = await storage.updateStockAdjustment(id, locationId, adjustmentType, notes || "", itemsForStorage);
+        res.json(updated);
+      } catch (error: any) {
+        console.error("[Stock Adjustment PUT] Error:", error.message);
         res.status(500).json({ message: error.message });
       }
     },

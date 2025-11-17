@@ -230,10 +230,12 @@ export interface IStorage {
   // Stock Transfers
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
   getStockTransferByVoucherId(voucherId: number): Promise<any | null>;
+  updateStockTransfer(id: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 
   // Stock Adjustments
   createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption" | "Mixed", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
   getStockAdjustmentByVoucherId(voucherId: number): Promise<any | null>;
+  updateStockAdjustment(id: number, locationId: number, adjustmentType: "Production" | "Consumption" | "Mixed", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
 
   // Stock Query
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
@@ -2620,10 +2622,11 @@ export class DbStorage implements IStorage {
         const rate = parseFloat(item.rate);
         const totalAmount = quantity * rate;
 
-        // Insert transfer item
+        // Insert transfer item with source location
         const [transferItem] = await tx.insert(schema.stockTransferItems).values({
           transferId: transfer.id,
           stockItemId: item.stockItemId,
+          sourceLocationId: item.sourceLocationId,
           quantity: item.quantity,
           rate: item.rate,
           totalAmount: totalAmount.toFixed(2),
@@ -2874,6 +2877,476 @@ export class DbStorage implements IStorage {
       ...adjustment,
       items,
     };
+  }
+
+  async updateStockTransfer(
+    id: number,
+    destinationLocationId: number,
+    notes: string,
+    items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>
+  ): Promise<any> {
+    console.log('[storage.updateStockTransfer] Starting update for transfer ID:', id);
+    
+    return await db.transaction(async (tx) => {
+      // Step 1: Get the existing stock transfer with its items
+      const [existingTransfer] = await tx
+        .select()
+        .from(schema.stockTransferVouchers)
+        .where(eq(schema.stockTransferVouchers.id, id));
+
+      if (!existingTransfer) {
+        throw new Error(`Stock transfer ${id} not found`);
+      }
+
+      const existingItems = await tx
+        .select()
+        .from(schema.stockTransferItems)
+        .where(eq(schema.stockTransferItems.transferId, id));
+
+      console.log('[storage.updateStockTransfer] Found existing transfer with', existingItems.length, 'items');
+
+      // CRITICAL: Validate that all items have sourceLocationId before allowing edit
+      // Legacy transfers (created before the column was added) cannot be safely edited
+      const itemsWithoutSource = existingItems.filter(item => !item.sourceLocationId);
+      if (itemsWithoutSource.length > 0) {
+        throw new Error(
+          `Cannot edit this stock transfer: ${itemsWithoutSource.length} items missing source location data. ` +
+          `This transfer was created before per-item source locations were tracked. ` +
+          `Please create a new transfer instead to avoid inventory corruption.`
+        );
+      }
+
+      // Step 2: REVERSE inventory changes for each OLD item
+      for (const oldItem of existingItems) {
+        const quantity = parseFloat(oldItem.quantity);
+        const rate = parseFloat(oldItem.rate);
+        const totalAmount = quantity * rate;
+
+        console.log('[storage.updateStockTransfer] Reversing item:', oldItem.stockItemId, 'qty:', quantity);
+
+        // REVERSE: Add back to source location (we previously subtracted)
+        // Use the item's sourceLocationId if available, otherwise fall back to transfer's sourceLocationId
+        const sourceLocationId = oldItem.sourceLocationId || existingTransfer.sourceLocationId;
+
+        const [sourceInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, sourceLocationId),
+            eq(schema.inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (sourceInventory) {
+          // Add back to source (reverse the subtraction)
+          const currentQty = parseFloat(sourceInventory.quantity);
+          const currentValue = parseFloat(sourceInventory.totalValue);
+          
+          const newQty = currentQty + quantity;
+          const newValue = currentValue + totalAmount;
+          const newRate = newQty > 0 ? newValue / newQty : 0;
+
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: newRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, sourceInventory.id));
+        } else {
+          // Create new inventory record at source (it may have been deleted if quantity reached 0)
+          const [sourceLocation] = await tx
+            .select()
+            .from(schema.locations)
+            .where(eq(schema.locations.id, sourceLocationId));
+          
+          if (sourceLocation) {
+            await tx.insert(schema.inventory).values({
+              companyId: sourceLocation.companyId,
+              locationId: sourceLocationId,
+              stockItemId: oldItem.stockItemId,
+              quantity: quantity.toFixed(3),
+              averageRate: rate.toFixed(2),
+              totalValue: totalAmount.toFixed(2),
+              lastUpdated: new Date(),
+            });
+          }
+        }
+
+        // REVERSE: Subtract from destination location (we previously added)
+        const [destInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, existingTransfer.destinationLocationId),
+            eq(schema.inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (destInventory) {
+          // Subtract from destination (reverse the addition)
+          const currentQty = parseFloat(destInventory.quantity);
+          const currentValue = parseFloat(destInventory.totalValue);
+          const currentRate = parseFloat(destInventory.averageRate);
+          
+          const newQty = currentQty - quantity;
+          const newValue = newQty > 0 ? newQty * currentRate : 0;
+
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: currentRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, destInventory.id));
+        }
+      }
+
+      // Step 3: Delete all existing stock transfer items
+      await tx
+        .delete(schema.stockTransferItems)
+        .where(eq(schema.stockTransferItems.transferId, id));
+
+      console.log('[storage.updateStockTransfer] Deleted old items');
+
+      // Step 4: Update the stock transfer record
+      const [updatedTransfer] = await tx
+        .update(schema.stockTransferVouchers)
+        .set({
+          sourceLocationId: items[0].sourceLocationId, // Store first item's source for legacy compatibility
+          destinationLocationId,
+          notes,
+        })
+        .where(eq(schema.stockTransferVouchers.id, id))
+        .returning();
+
+      console.log('[storage.updateStockTransfer] Updated transfer record');
+
+      // Step 5: Create NEW items and apply inventory changes (same logic as createStockTransfer)
+      const transferItems: StockTransferItem[] = [];
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const totalAmount = quantity * rate;
+
+        console.log('[storage.updateStockTransfer] Creating new item:', item.stockItemId, 'qty:', quantity);
+
+        // Insert transfer item with source location
+        const [transferItem] = await tx.insert(schema.stockTransferItems).values({
+          transferId: updatedTransfer.id,
+          stockItemId: item.stockItemId,
+          sourceLocationId: item.sourceLocationId,
+          quantity: item.quantity,
+          rate: item.rate,
+          totalAmount: totalAmount.toFixed(2),
+        }).returning();
+
+        transferItems.push(transferItem);
+
+        // Get current inventory at THIS ITEM's source location
+        const [sourceInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, item.sourceLocationId),
+            eq(schema.inventory.stockItemId, item.stockItemId)
+          ));
+
+        if (sourceInventory) {
+          // Decrease quantity at this item's source location
+          const currentQty = parseFloat(sourceInventory.quantity);
+          const currentValue = parseFloat(sourceInventory.totalValue);
+          const currentRate = parseFloat(sourceInventory.averageRate);
+          
+          const newQty = currentQty - quantity;
+          const newValue = newQty > 0 ? newQty * currentRate : 0;
+          
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: currentRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, sourceInventory.id));
+        } else {
+          throw new Error(`Insufficient inventory at source location ${item.sourceLocationId} for stock item ${item.stockItemId}`);
+        }
+
+        // Get current inventory at destination location
+        const [destInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, destinationLocationId),
+            eq(schema.inventory.stockItemId, item.stockItemId)
+          ));
+
+        if (destInventory) {
+          // Increase quantity at destination location using weighted average
+          const currentQty = parseFloat(destInventory.quantity);
+          const currentValue = parseFloat(destInventory.totalValue);
+          
+          const newQty = currentQty + quantity;
+          const newValue = currentValue + totalAmount;
+          const newRate = newQty > 0 ? newValue / newQty : 0;
+          
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: newRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, destInventory.id));
+        } else {
+          // Create new inventory record at destination
+          const [destLocation] = await tx
+            .select()
+            .from(schema.locations)
+            .where(eq(schema.locations.id, destinationLocationId));
+          
+          if (!destLocation) {
+            throw new Error(`Destination location ${destinationLocationId} not found`);
+          }
+
+          await tx.insert(schema.inventory).values({
+            companyId: destLocation.companyId,
+            locationId: destinationLocationId,
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            averageRate: item.rate,
+            totalValue: totalAmount.toFixed(2),
+            lastUpdated: new Date(),
+          });
+        }
+      }
+
+      console.log('[storage.updateStockTransfer] Transfer updated successfully with', transferItems.length, 'new items');
+
+      return {
+        transfer: updatedTransfer,
+        items: transferItems,
+      };
+    });
+  }
+
+  async updateStockAdjustment(
+    id: number,
+    locationId: number,
+    adjustmentType: "Production" | "Consumption" | "Mixed",
+    notes: string,
+    items: Array<{stockItemId: number, quantity: string, rate: string}>
+  ): Promise<any> {
+    console.log('[storage.updateStockAdjustment] Starting update for adjustment ID:', id);
+    
+    return await db.transaction(async (tx) => {
+      // Step 1: Get the existing stock adjustment with its items
+      const [existingAdjustment] = await tx
+        .select()
+        .from(schema.stockAdjustmentVouchers)
+        .where(eq(schema.stockAdjustmentVouchers.id, id));
+
+      if (!existingAdjustment) {
+        throw new Error(`Stock adjustment ${id} not found`);
+      }
+
+      const existingItems = await tx
+        .select()
+        .from(schema.stockAdjustmentItems)
+        .where(eq(schema.stockAdjustmentItems.adjustmentId, id));
+
+      console.log('[storage.updateStockAdjustment] Found existing adjustment with', existingItems.length, 'items');
+
+      // Get location's companyId
+      const [location] = await tx
+        .select()
+        .from(schema.locations)
+        .where(eq(schema.locations.id, existingAdjustment.locationId));
+      
+      if (!location) {
+        throw new Error(`Location ${existingAdjustment.locationId} not found`);
+      }
+
+      // Step 2: REVERSE inventory changes for each OLD item
+      for (const oldItem of existingItems) {
+        const quantity = parseFloat(oldItem.quantity);
+        const rate = parseFloat(oldItem.rate);
+        const totalAmount = Math.abs(quantity) * rate;
+        const oldAdjustmentType = existingAdjustment.adjustmentType;
+
+        console.log('[storage.updateStockAdjustment] Reversing item:', oldItem.stockItemId, 'qty:', quantity, 'type:', oldAdjustmentType);
+
+        // Get current inventory at location
+        const [currentInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, existingAdjustment.locationId),
+            eq(schema.inventory.stockItemId, oldItem.stockItemId)
+          ));
+
+        if (currentInventory) {
+          const currentQty = parseFloat(currentInventory.quantity);
+          const currentValue = parseFloat(currentInventory.totalValue);
+          const currentRate = parseFloat(currentInventory.averageRate);
+          
+          let newQty: number;
+          let newValue: number;
+          let newRate: number;
+
+          if (oldAdjustmentType === "Production") {
+            // REVERSE Production: Subtract the quantity that was added
+            newQty = currentQty - quantity;
+            newValue = newQty > 0 ? newQty * currentRate : 0;
+            newRate = currentRate;
+          } else {
+            // REVERSE Consumption: Add back the quantity that was subtracted
+            newQty = currentQty + Math.abs(quantity);
+            newValue = currentValue + totalAmount;
+            newRate = newQty > 0 ? newValue / newQty : 0;
+          }
+          
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: newRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, currentInventory.id));
+        } else if (oldAdjustmentType === "Consumption") {
+          // If reversing consumption and no inventory exists, create it
+          await tx.insert(schema.inventory).values({
+            companyId: location.companyId,
+            locationId: existingAdjustment.locationId,
+            stockItemId: oldItem.stockItemId,
+            quantity: Math.abs(quantity).toFixed(3),
+            averageRate: rate.toFixed(2),
+            totalValue: totalAmount.toFixed(2),
+            lastUpdated: new Date(),
+          });
+        }
+      }
+
+      // Step 3: Delete all existing stock adjustment items
+      await tx
+        .delete(schema.stockAdjustmentItems)
+        .where(eq(schema.stockAdjustmentItems.adjustmentId, id));
+
+      console.log('[storage.updateStockAdjustment] Deleted old items');
+
+      // Step 4: Update the stock adjustment record
+      const [updatedAdjustment] = await tx
+        .update(schema.stockAdjustmentVouchers)
+        .set({
+          locationId,
+          adjustmentType,
+          notes,
+        })
+        .where(eq(schema.stockAdjustmentVouchers.id, id))
+        .returning();
+
+      console.log('[storage.updateStockAdjustment] Updated adjustment record');
+
+      // Get new location's companyId if location changed
+      const [newLocation] = await tx
+        .select()
+        .from(schema.locations)
+        .where(eq(schema.locations.id, locationId));
+      
+      if (!newLocation) {
+        throw new Error(`Location ${locationId} not found`);
+      }
+
+      // Step 5: Create NEW items and apply inventory changes (same logic as createStockAdjustment)
+      const adjustmentItems: StockAdjustmentItem[] = [];
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const totalAmount = Math.abs(quantity) * rate;
+
+        console.log('[storage.updateStockAdjustment] Creating new item:', item.stockItemId, 'qty:', quantity);
+
+        // Insert adjustment item
+        const [adjustmentItem] = await tx.insert(schema.stockAdjustmentItems).values({
+          adjustmentId: updatedAdjustment.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: item.rate,
+          totalAmount: totalAmount.toFixed(2),
+        }).returning();
+
+        adjustmentItems.push(adjustmentItem);
+
+        // Get current inventory at location
+        const [currentInventory] = await tx
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, locationId),
+            eq(schema.inventory.stockItemId, item.stockItemId)
+          ));
+
+        if (currentInventory) {
+          // Adjust quantity at location
+          const currentQty = parseFloat(currentInventory.quantity);
+          const currentValue = parseFloat(currentInventory.totalValue);
+          const currentRate = parseFloat(currentInventory.averageRate);
+          
+          let newQty: number;
+          let newValue: number;
+          let newRate: number;
+
+          if (adjustmentType === "Production") {
+            // Positive adjustment - add to inventory
+            newQty = currentQty + quantity;
+            newValue = currentValue + totalAmount;
+            newRate = newQty > 0 ? newValue / newQty : 0;
+          } else {
+            // Consumption - subtract from inventory (use absolute value to ensure reduction)
+            newQty = currentQty - Math.abs(quantity);
+            newValue = newQty > 0 ? newQty * currentRate : 0;
+            newRate = currentRate;
+          }
+          
+          await tx
+            .update(schema.inventory)
+            .set({
+              quantity: newQty.toFixed(3),
+              averageRate: newRate.toFixed(2),
+              totalValue: newValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, currentInventory.id));
+        } else if (adjustmentType === "Production") {
+          // Create new inventory record for production
+          await tx.insert(schema.inventory).values({
+            companyId: newLocation.companyId,
+            locationId,
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            averageRate: item.rate,
+            totalValue: totalAmount.toFixed(2),
+            lastUpdated: new Date(),
+          });
+        } else {
+          throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}`);
+        }
+      }
+
+      console.log('[storage.updateStockAdjustment] Adjustment updated successfully with', adjustmentItems.length, 'new items');
+
+      return {
+        adjustment: updatedAdjustment,
+        items: adjustmentItems,
+      };
+    });
   }
 
   // Stock Query Methods

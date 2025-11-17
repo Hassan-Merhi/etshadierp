@@ -713,6 +713,7 @@ export const stockTransferItems = pgTable("stock_transfer_items", {
   id: serial("id").primaryKey(),
   transferId: integer("transfer_id").notNull(),
   stockItemId: integer("stock_item_id").notNull(),
+  sourceLocationId: integer("source_location_id"),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
@@ -779,6 +780,37 @@ export const insertStockAdjustmentItemSchema = createInsertSchema(stockAdjustmen
 
 export type InsertStockAdjustmentItem = z.infer<typeof insertStockAdjustmentItemSchema>;
 export type StockAdjustmentItem = typeof stockAdjustmentItems.$inferSelect;
+
+// Update schemas for stock transfers and adjustments
+export const updateStockTransferItemSchema = z.object({
+  sourceLocationId: z.coerce.number().int().positive("Source location must be a positive integer"),
+  stockItemId: z.coerce.number().int().positive("Stock item must be a positive integer"),
+  quantity: z.coerce.number().finite("Quantity must be a finite number").refine((val) => val !== 0, "Quantity cannot be zero"),
+  rate: z.coerce.number().nonnegative("Rate must be non-negative").finite("Rate must be a finite number"),
+});
+
+export const updateStockTransferSchema = z.object({
+  destinationLocationId: z.coerce.number().int().positive("Destination location must be a positive integer"),
+  notes: z.string().optional(),
+  items: z.array(updateStockTransferItemSchema).min(1, "At least one item is required"),
+});
+
+export type UpdateStockTransfer = z.infer<typeof updateStockTransferSchema>;
+
+export const updateStockAdjustmentItemSchema = z.object({
+  stockItemId: z.coerce.number().int().positive("Stock item must be a positive integer"),
+  quantity: z.coerce.number().finite("Quantity must be a finite number").refine((val) => val !== 0, "Quantity cannot be zero"),
+  rate: z.coerce.number().nonnegative("Rate must be non-negative").finite("Rate must be a finite number"),
+});
+
+export const updateStockAdjustmentSchema = z.object({
+  locationId: z.coerce.number().int().positive("Location must be a positive integer"),
+  adjustmentType: z.enum(["Production", "Consumption"]),
+  notes: z.string().optional(),
+  items: z.array(updateStockAdjustmentItemSchema).min(1, "At least one item is required"),
+});
+
+export type UpdateStockAdjustment = z.infer<typeof updateStockAdjustmentSchema>;
 
 // Sales Items - tracks item-level details for POS sales
 export const salesItems = pgTable("sales_items", {
