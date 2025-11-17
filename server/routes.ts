@@ -2060,6 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   and(
                     eq(vouchers.companyId, req.session.currentCompanyId!),
                     eq(voucherEntries.ledgerAccountId, employeeAccount.id),
+                    eq(vouchers.optional, false),
                   ),
                 );
 
