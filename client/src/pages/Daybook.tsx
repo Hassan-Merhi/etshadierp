@@ -502,7 +502,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleEdit = (voucher: Voucher) => {
-    // Navigate to vouchers page with edit mode for supported types
+    // Navigate to vouchers page with edit mode for all supported types
     const voucherTypeMap: Record<string, string> = {
       "Payment": "payment",
       "Receipt": "receipt",
@@ -512,6 +512,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       "Consumption": "adjustment",
       "Production": "adjustment",
       "Mixed": "adjustment",
+      "StockTransfer": "transfer",
       "Stock Transfer": "transfer",
     };
     
@@ -519,12 +520,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (tabName) {
       navigate(`/vouchers?edit=${voucher.id}&tab=${tabName}`);
     } else {
-      // For other types, show the generic dialog (temporary fallback)
-      setVoucherToEdit(voucher);
-      setEditDialogOpen(true);
+      // Fallback for unsupported types
       toast({
         title: "Info",
-        description: `Editing ${voucher.voucherType} vouchers is not fully supported yet.`,
+        description: `Editing ${voucher.voucherType} vouchers is not yet supported. Please contact support.`,
+        variant: "destructive",
       });
     }
   };

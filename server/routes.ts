@@ -9897,7 +9897,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stock Transfers
+  // Stock Transfers - GET endpoint
+  app.get(
+    "/api/stock-transfers",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
+        
+        if (!voucherId) {
+          return res.status(400).json({ message: "voucherId query parameter is required" });
+        }
+
+        const transfer = await storage.getStockTransferByVoucherId(voucherId);
+        res.json(transfer);
+      } catch (error: any) {
+        console.error("[Stock Transfer GET] Error:", error.message);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Stock Transfers - POST endpoint
   app.post(
     "/api/stock-transfers",
     requireAuth,
@@ -10010,7 +10032,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Stock Adjustments
+  // Stock Adjustments - GET endpoint
+  app.get(
+    "/api/stock-adjustments",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
+        
+        if (!voucherId) {
+          return res.status(400).json({ message: "voucherId query parameter is required" });
+        }
+
+        const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
+        res.json(adjustment);
+      } catch (error: any) {
+        console.error("[Stock Adjustment GET] Error:", error.message);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Stock Adjustments - POST endpoint
   app.post(
     "/api/stock-adjustments",
     requireAuth,

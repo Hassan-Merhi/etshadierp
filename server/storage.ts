@@ -229,9 +229,11 @@ export interface IStorage {
 
   // Stock Transfers
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+  getStockTransferByVoucherId(voucherId: number): Promise<any | null>;
 
   // Stock Adjustments
   createStockAdjustment(voucherId: number, locationId: number, adjustmentType: "Production" | "Consumption" | "Mixed", notes: string, items: Array<{stockItemId: number, quantity: string, rate: string}>): Promise<any>;
+  getStockAdjustmentByVoucherId(voucherId: number): Promise<any | null>;
 
   // Stock Query
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
@@ -2830,6 +2832,48 @@ export class DbStorage implements IStorage {
         items: adjustmentItems,
       };
     });
+  }
+
+  async getStockTransferByVoucherId(voucherId: number): Promise<any | null> {
+    const [transfer] = await db
+      .select()
+      .from(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, voucherId));
+
+    if (!transfer) {
+      return null;
+    }
+
+    const items = await db
+      .select()
+      .from(schema.stockTransferItems)
+      .where(eq(schema.stockTransferItems.transferId, transfer.id));
+
+    return {
+      ...transfer,
+      items,
+    };
+  }
+
+  async getStockAdjustmentByVoucherId(voucherId: number): Promise<any | null> {
+    const [adjustment] = await db
+      .select()
+      .from(schema.stockAdjustmentVouchers)
+      .where(eq(schema.stockAdjustmentVouchers.voucherId, voucherId));
+
+    if (!adjustment) {
+      return null;
+    }
+
+    const items = await db
+      .select()
+      .from(schema.stockAdjustmentItems)
+      .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustment.id));
+
+    return {
+      ...adjustment,
+      items,
+    };
   }
 
   // Stock Query Methods
