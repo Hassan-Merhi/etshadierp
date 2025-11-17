@@ -22,17 +22,22 @@ if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
 console.log('Database connection endpoint:', connectionString.replace(/:[^:@]*@/, ':***@'));
 
 // Create PostgreSQL connection pool
-// SSL is required for:
-// - Production databases (always)
-// - Replit's managed database (Neon, which always requires SSL even in dev)
-// - When PGSSLMODE is explicitly set to require
-// - When using DATABASE_URL (typically managed hosting)
-// Default to SSL when using Replit's PGHOST unless PGSSLMODE is explicitly "disable"
-const usingReplitDB = process.env.NODE_ENV === "development" && process.env.PGHOST;
-const requiresSSL = process.env.NODE_ENV === "production" || 
-                    (usingReplitDB && process.env.PGSSLMODE !== 'disable') ||
-                    process.env.PGSSLMODE === 'require' ||
-                    process.env.DATABASE_URL !== undefined;
+// SSL Configuration Logic:
+// - DISABLE SSL only for: Replit's local database (host: "helium") OR when PGSSLMODE="disable"
+// - ENABLE SSL for: All other databases (production, Neon, Render, etc.) unless explicitly disabled
+// This ensures external managed databases always use SSL while allowing local dev without SSL
+const isLocalReplitDB = process.env.PGHOST === "helium";
+const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
+const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
+
+// Log SSL configuration for debugging
+if (!requiresSSL && !isLocalReplitDB) {
+  console.warn('⚠️  SSL disabled via PGSSLMODE=disable - ensure this is intentional for your environment');
+} else if (isLocalReplitDB) {
+  console.log('ℹ️  SSL disabled for Replit local database (helium)');
+} else {
+  console.log('✓ SSL enabled for external database connection');
+}
 
 const pool = new Pool({
   connectionString,
