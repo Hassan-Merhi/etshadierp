@@ -502,10 +502,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleEdit = (voucher: Voucher) => {
-    // Navigate to appropriate editing interface based on voucher type
-    const editableTypes = ["Payment", "Receipt", "Journal", "Sales", "Purchase", "Consumption", "Production", "Mixed", "Stock Transfer"];
-    if (editableTypes.includes(voucher.voucherType)) {
-      navigate(`/vouchers/${voucher.id}/edit`);
+    // Navigate to vouchers page with edit mode for supported types
+    const voucherTypeMap: Record<string, string> = {
+      "Payment": "payment",
+      "Receipt": "receipt",
+      "Journal": "journal",
+      "Sales": "adjustment",
+      "Purchase": "adjustment",
+      "Consumption": "adjustment",
+      "Production": "adjustment",
+      "Mixed": "adjustment",
+      "Stock Transfer": "transfer",
+    };
+    
+    const tabName = voucherTypeMap[voucher.voucherType];
+    if (tabName) {
+      navigate(`/vouchers?edit=${voucher.id}&tab=${tabName}`);
     } else {
       // For other types, show the generic dialog (temporary fallback)
       setVoucherToEdit(voucher);

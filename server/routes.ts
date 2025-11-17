@@ -7287,7 +7287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update a voucher (Admin, Owner, or Manager for today's vouchers)
+  // Update a voucher with entries (Admin, Owner, or Manager for today's vouchers)
   app.patch(
     "/api/vouchers/:id",
     requireAuth,
@@ -7342,17 +7342,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Only allow updating certain fields (not amount or company)
-        const allowedUpdates: Partial<any> = {};
-        if (req.body.voucherDate !== undefined)
-          allowedUpdates.voucherDate = req.body.voucherDate;
-        if (req.body.voucherType !== undefined)
-          allowedUpdates.voucherType = req.body.voucherType;
-        if (req.body.description !== undefined)
-          allowedUpdates.description = req.body.description;
+        // Update voucher and entries in a transaction
+        await db.transaction(async (tx) => {
+          // Update voucher header
+          const voucherUpdates: Partial<any> = {};
+          if (req.body.voucherDate !== undefined)
+            voucherUpdates.voucherDate = req.body.voucherDate;
+          if (req.body.description !== undefined)
+            voucherUpdates.description = req.body.description;
+          if (req.body.optional !== undefined)
+            voucherUpdates.optional = req.body.optional;
 
-        const updated = await storage.updateVoucher(id, allowedUpdates);
-        res.json(updated);
+          await tx
+            .update(vouchers)
+            .set(voucherUpdates)
+            .where(eq(vouchers.id, id));
+
+          // Delete all existing entries
+          await tx
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, id));
+
+          // Insert new entries if provided
+          if (req.body.entries && Array.isArray(req.body.entries)) {
+            for (const entry of req.body.entries) {
+              await tx.insert(voucherEntries).values({
+                voucherId: id,
+                ledgerAccountId: entry.ledgerAccountId || null,
+                bankAccountId: entry.bankAccountId || null,
+                supplierId: entry.supplierId || null,
+                employeeId: entry.employeeId || null,
+                fixedAssetId: entry.fixedAssetId || null,
+                debitAmount: entry.debitAmount || "0",
+                creditAmount: entry.creditAmount || "0",
+                narration: entry.narration || "",
+              });
+            }
+          }
+        });
+
+        // Fetch updated voucher with entries
+        const updated = await storage.getVoucherById(id);
+        const entries = await storage.getVoucherEntriesByVoucher(id);
+
+        res.json({ ...updated, entries });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }

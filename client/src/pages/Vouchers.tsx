@@ -502,13 +502,39 @@ const PrintTemplate = ({
 };
 
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">("payment");
-  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const [_location, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
+  
+  // Parse URL parameters for edit mode
+  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  const editParam = searchParams.get('edit');
+  const tabParam = searchParams.get('tab');
+  const voucherIdToEdit = editParam ? parseInt(editParam) : null;
+  
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">(
+    (tabParam as any) || "payment"
+  );
+  const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  // Synchronize activeTab and editVoucherId with URL parameters
+  useEffect(() => {
+    // Update tab: use URL param if present, otherwise reset to default "payment"
+    if (tabParam) {
+      setActiveTab(tabParam as any);
+    } else {
+      setActiveTab("payment");
+    }
+    
+    // Update edit voucher ID: use URL param if present, otherwise clear it
+    if (voucherIdToEdit) {
+      setEditVoucherId(voucherIdToEdit);
+    } else {
+      setEditVoucherId(null);
+    }
+  }, [tabParam, voucherIdToEdit]);
 
   // Sidebar state management
   const [sidebarSearchValue, setSidebarSearchValue] = useState("");
@@ -551,6 +577,17 @@ export default function Vouchers() {
   // Fetch accounts for sidebar (with balances)
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/voucher-sidebar"],
+  });
+
+  // Fetch voucher data for editing if voucherIdToEdit is present
+  const { data: voucherToEdit, isLoading: loadingVoucher } = useQuery({
+    queryKey: ["/api/vouchers", voucherIdToEdit],
+    enabled: !!voucherIdToEdit,
+    queryFn: async () => {
+      const res = await fetch(`/api/vouchers/${voucherIdToEdit}`);
+      if (!res.ok) throw new Error("Failed to fetch voucher");
+      return res.json();
+    },
   });
 
   // Combine all accounts for autocomplete (names only, no codes)
@@ -624,6 +661,98 @@ export default function Vouchers() {
     (sum, entry) => sum + (parseFloat(entry.amount) || 0),
     0
   );
+
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
+      // Find the payment/receipt account from the first entry
+      const firstEntry = voucherToEdit.entries[0];
+      if (!firstEntry) return;
+
+      // Determine account type and ID from the first entry (this is the payment/receipt account)
+      let paymentType: string = "bank";
+      let paymentId = 0;
+      let paymentName = "";
+
+      if (firstEntry.bankAccountId) {
+        paymentType = "bank";
+        paymentId = firstEntry.bankAccountId;
+        const account = bankAccounts.find(b => b.id === paymentId);
+        paymentName = account?.bankName || "";
+      } else if (firstEntry.ledgerAccountId) {
+        paymentType = "ledger";
+        paymentId = firstEntry.ledgerAccountId;
+        const account = ledgerAccounts.find(l => l.id === paymentId);
+        paymentName = account?.name || "";
+      }
+
+      // Convert remaining entries to form format
+      const formEntries = voucherToEdit.entries.slice(1).map((entry: any) => {
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountId = 0;
+        let accountName = "";
+        let amount = "0";
+
+        if (entry.ledgerAccountId) {
+          accountType = "ledger";
+          accountId = entry.ledgerAccountId;
+          const account = ledgerAccounts.find(l => l.id === accountId);
+          accountName = account?.name || "";
+        } else if (entry.bankAccountId) {
+          accountType = "bank";
+          accountId = entry.bankAccountId;
+          const account = bankAccounts.find(b => b.id === accountId);
+          accountName = account?.bankName || "";
+        } else if (entry.supplierId) {
+          accountType = "supplier";
+          accountId = entry.supplierId;
+          const supplier = suppliers.find(s => s.id === accountId);
+          accountName = supplier?.legalName || "";
+        } else if (entry.employeeId) {
+          accountType = "employee";
+          accountId = entry.employeeId;
+          const employee = employees.find(e => e.id === accountId);
+          accountName = employee ? `${employee.firstName} ${employee.lastName}` : "";
+        } else if (entry.fixedAssetId) {
+          accountType = "fixedAsset";
+          accountId = entry.fixedAssetId;
+          const asset = fixedAssets.find(f => f.id === accountId);
+          accountName = asset?.name || "";
+        }
+
+        // For Payment vouchers, the amount is in creditAmount (we pay them)
+        // For Receipt vouchers, the amount is in debitAmount (we receive from them)
+        if (voucherToEdit.voucherType === "Payment") {
+          amount = entry.creditAmount || "0";
+        } else if (voucherToEdit.voucherType === "Receipt") {
+          amount = entry.debitAmount || "0";
+        }
+
+        return {
+          accountType,
+          accountId,
+          accountName,
+          amount,
+        };
+      });
+
+      // Reset form with voucher data
+      form.reset({
+        paymentAccountType: paymentType as any,
+        paymentAccountId: paymentId,
+        paymentAccountName: paymentName,
+        voucherDate: new Date(voucherToEdit.voucherDate),
+        entries: formEntries.length > 0 ? formEntries : [{
+          accountType: "ledger",
+          accountId: 0,
+          accountName: "",
+          amount: "",
+        }],
+        notes: voucherToEdit.description || "",
+        optional: voucherToEdit.optional || false,
+      });
+    }
+  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, form]);
 
   // Compute filtered accounts based on search (lifted from AccountSidebar)
   const filteredSidebarAccounts = useMemo(() => {
@@ -773,118 +902,210 @@ export default function Vouchers() {
     },
   });
 
-  // Save mutation
+  // Save mutation (handles both create and update)
   const saveMutation = useMutation({
     mutationFn: async (formData: VoucherFormData) => {
       const data = formData;
       const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
+      const isEditMode = !!voucherIdToEdit;
       
-      // Create voucher
-      const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        companyId: selectedCompany?.id,
-        voucherNumber: `${voucherType.toUpperCase()}-${Date.now()}`,
-        voucherType,
-        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: `${voucherType} voucher`,
-        totalAmount: total.toString(),
-        optional: data.optional,
-      });
-      const voucher = await voucherRes.json();
-
-      // Create voucher entries
-      for (const entry of data.entries) {
-        const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
-        const narration = `${voucherType} - ${entry.accountName}`;
+      if (isEditMode) {
+        // UPDATE MODE: Use PATCH to update existing voucher with entries
+        const voucherEntries: any[] = [];
         
-        const entryData: any = {
-          voucherId: voucher.id,
-          narration,
-        };
+        // Build entries array for PATCH request
+        for (const entry of data.entries) {
+          const narration = `${voucherType} - ${entry.accountName}`;
+          
+          // Entry for the account being paid/received
+          const entryData: any = { narration };
+          const paymentEntryData: any = { narration };
 
-        const paymentEntryData: any = {
-          voucherId: voucher.id,
-          narration,
-        };
+          if (activeTab === "payment") {
+            // Payment: Debit the expense/asset accounts, Credit the payment account
+            if (entry.accountType === "ledger") {
+              entryData.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryData.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryData.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryData.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryData.fixedAssetId = entry.accountId;
+            }
+            entryData.debitAmount = entry.amount;
+            entryData.creditAmount = "0";
+            voucherEntries.push(entryData);
 
-        if (activeTab === "payment") {
-          // Payment: Debit the expense/asset accounts, Credit the payment account
-          if (entry.accountType === "ledger") {
-            entryData.ledgerAccountId = entry.accountId;
-          } else if (entry.accountType === "bank") {
-            entryData.bankAccountId = entry.accountId;
-          } else if (entry.accountType === "supplier") {
-            entryData.supplierId = entry.accountId;
-          } else if (entry.accountType === "employee") {
-            entryData.employeeId = entry.accountId;
-          } else if (entry.accountType === "fixedAsset") {
-            entryData.fixedAssetId = entry.accountId;
+            // Credit the payment account
+            if (data.paymentAccountType === "ledger") {
+              paymentEntryData.ledgerAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "bank") {
+              paymentEntryData.bankAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "supplier") {
+              paymentEntryData.supplierId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "employee") {
+              paymentEntryData.employeeId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "fixedAsset") {
+              paymentEntryData.fixedAssetId = data.paymentAccountId;
+            }
+            paymentEntryData.debitAmount = "0";
+            paymentEntryData.creditAmount = entry.amount;
+            voucherEntries.push(paymentEntryData);
+          } else {
+            // Receipt: Debit the payment account, Credit the income/liability accounts
+            if (data.paymentAccountType === "ledger") {
+              paymentEntryData.ledgerAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "bank") {
+              paymentEntryData.bankAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "supplier") {
+              paymentEntryData.supplierId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "employee") {
+              paymentEntryData.employeeId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "fixedAsset") {
+              paymentEntryData.fixedAssetId = data.paymentAccountId;
+            }
+            paymentEntryData.debitAmount = entry.amount;
+            paymentEntryData.creditAmount = "0";
+            voucherEntries.push(paymentEntryData);
+
+            // Credit the account
+            if (entry.accountType === "ledger") {
+              entryData.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryData.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryData.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryData.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryData.fixedAssetId = entry.accountId;
+            }
+            entryData.debitAmount = "0";
+            entryData.creditAmount = entry.amount;
+            voucherEntries.push(entryData);
           }
-          entryData.debitAmount = entry.amount;
-          entryData.creditAmount = "0";
-
-          await apiRequest("POST", "/api/voucher-entries", entryData);
-
-          // Credit the payment account
-          if (data.paymentAccountType === "ledger") {
-            paymentEntryData.ledgerAccountId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "bank") {
-            paymentEntryData.bankAccountId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "supplier") {
-            paymentEntryData.supplierId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "employee") {
-            paymentEntryData.employeeId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "fixedAsset") {
-            paymentEntryData.fixedAssetId = data.paymentAccountId;
-          }
-          paymentEntryData.debitAmount = "0";
-          paymentEntryData.creditAmount = entry.amount;
-
-          await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
-        } else {
-          // Receipt: Debit the payment account, Credit the income/liability accounts
-          if (data.paymentAccountType === "ledger") {
-            paymentEntryData.ledgerAccountId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "bank") {
-            paymentEntryData.bankAccountId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "supplier") {
-            paymentEntryData.supplierId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "employee") {
-            paymentEntryData.employeeId = data.paymentAccountId;
-          } else if (data.paymentAccountType === "fixedAsset") {
-            paymentEntryData.fixedAssetId = data.paymentAccountId;
-          }
-          paymentEntryData.debitAmount = entry.amount;
-          paymentEntryData.creditAmount = "0";
-
-          await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
-
-          // Credit the account
-          if (entry.accountType === "ledger") {
-            entryData.ledgerAccountId = entry.accountId;
-          } else if (entry.accountType === "bank") {
-            entryData.bankAccountId = entry.accountId;
-          } else if (entry.accountType === "supplier") {
-            entryData.supplierId = entry.accountId;
-          } else if (entry.accountType === "employee") {
-            entryData.employeeId = entry.accountId;
-          } else if (entry.accountType === "fixedAsset") {
-            entryData.fixedAssetId = entry.accountId;
-          }
-          entryData.debitAmount = "0";
-          entryData.creditAmount = entry.amount;
-
-          await apiRequest("POST", "/api/voucher-entries", entryData);
         }
-      }
+        
+        // Send PATCH request with voucher data and entries
+        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: data.notes || `${voucherType} voucher`,
+          optional: data.optional,
+          entries: voucherEntries,
+        });
+        
+        return await voucherRes.json();
+      } else {
+        // CREATE MODE: Create new voucher
+        const voucherRes = await apiRequest("POST", "/api/vouchers", {
+          companyId: selectedCompany?.id,
+          voucherNumber: `${voucherType.toUpperCase()}-${Date.now()}`,
+          voucherType,
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: data.notes || `${voucherType} voucher`,
+          totalAmount: total.toString(),
+          optional: data.optional,
+        });
+        const voucher = await voucherRes.json();
 
-      return voucher;
+        // Create voucher entries
+        for (const entry of data.entries) {
+          const narration = `${voucherType} - ${entry.accountName}`;
+          
+          const entryData: any = {
+            voucherId: voucher.id,
+            narration,
+          };
+
+          const paymentEntryData: any = {
+            voucherId: voucher.id,
+            narration,
+          };
+
+          if (activeTab === "payment") {
+            // Payment: Debit the expense/asset accounts, Credit the payment account
+            if (entry.accountType === "ledger") {
+              entryData.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryData.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryData.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryData.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryData.fixedAssetId = entry.accountId;
+            }
+            entryData.debitAmount = entry.amount;
+            entryData.creditAmount = "0";
+
+            await apiRequest("POST", "/api/voucher-entries", entryData);
+
+            // Credit the payment account
+            if (data.paymentAccountType === "ledger") {
+              paymentEntryData.ledgerAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "bank") {
+              paymentEntryData.bankAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "supplier") {
+              paymentEntryData.supplierId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "employee") {
+              paymentEntryData.employeeId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "fixedAsset") {
+              paymentEntryData.fixedAssetId = data.paymentAccountId;
+            }
+            paymentEntryData.debitAmount = "0";
+            paymentEntryData.creditAmount = entry.amount;
+
+            await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
+          } else {
+            // Receipt: Debit the payment account, Credit the income/liability accounts
+            if (data.paymentAccountType === "ledger") {
+              paymentEntryData.ledgerAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "bank") {
+              paymentEntryData.bankAccountId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "supplier") {
+              paymentEntryData.supplierId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "employee") {
+              paymentEntryData.employeeId = data.paymentAccountId;
+            } else if (data.paymentAccountType === "fixedAsset") {
+              paymentEntryData.fixedAssetId = data.paymentAccountId;
+            }
+            paymentEntryData.debitAmount = entry.amount;
+            paymentEntryData.creditAmount = "0";
+
+            await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
+
+            // Credit the account
+            if (entry.accountType === "ledger") {
+              entryData.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryData.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryData.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryData.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryData.fixedAssetId = entry.accountId;
+            }
+            entryData.debitAmount = "0";
+            entryData.creditAmount = entry.amount;
+
+            await apiRequest("POST", "/api/voucher-entries", entryData);
+          }
+        }
+
+        return voucher;
+      }
     },
     onSuccess: () => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
-        description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher created successfully`,
+        description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
@@ -893,26 +1114,33 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
-      form.reset({
-        paymentAccountType: "ledger",
-        paymentAccountId: 0,
-        paymentAccountName: "",
-        voucherDate: new Date(),
-        entries: [
-          {
-            accountType: "ledger",
-            accountId: 0,
-            accountName: "",
-            amount: "",
-          },
-        ],
-        notes: "",
-      });
+      
+      // Clear edit mode and navigate back to vouchers
+      if (isEditMode) {
+        setLocation("/vouchers");
+      } else {
+        form.reset({
+          paymentAccountType: "ledger",
+          paymentAccountId: 0,
+          paymentAccountName: "",
+          voucherDate: new Date(),
+          entries: [
+            {
+              accountType: "ledger",
+              accountId: 0,
+              accountName: "",
+              amount: "",
+            },
+          ],
+          notes: "",
+        });
+      }
     },
     onError: (error: any) => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
-        description: error.message || "Failed to create voucher",
+        description: error.message || `Failed to ${isEditMode ? "update" : "create"} voucher`,
         variant: "destructive",
       });
     },
