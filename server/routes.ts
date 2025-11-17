@@ -7395,6 +7395,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Custom error class for validation errors
+  class ValidationError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'ValidationError';
+    }
+  }
+
   // Toggle optional status for a voucher
   app.patch(
     "/api/vouchers/:id/optional",
@@ -7439,29 +7447,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
         }
 
-        // Check if there are stock operations linked to this voucher
-        const hasStockTransfer = await db
-          .select()
-          .from(stockTransferVouchers)
-          .where(eq(stockTransferVouchers.voucherId, id))
-          .limit(1);
-        
-        const hasStockAdjustment = await db
-          .select()
-          .from(stockAdjustmentVouchers)
-          .where(eq(stockAdjustmentVouchers.voucherId, id))
-          .limit(1);
-
         const wasOptional = existingVoucher.optional;
         const willBeOptional = optional;
 
-        // Handle inventory changes when toggling optional status
-        // If changing from false→true: reverse inventory changes
-        // If changing from true→false: apply inventory changes
-        if (wasOptional !== willBeOptional) {
+        // Wrap entire optional toggle in a transaction
+        await db.transaction(async (tx) => {
+          // Check if there are stock operations linked to this voucher
+          const hasStockTransfer = await tx
+            .select()
+            .from(stockTransferVouchers)
+            .where(eq(stockTransferVouchers.voucherId, id))
+            .limit(1);
+          
+          const hasStockAdjustment = await tx
+            .select()
+            .from(stockAdjustmentVouchers)
+            .where(eq(stockAdjustmentVouchers.voucherId, id))
+            .limit(1);
+
+          // Handle inventory changes when toggling optional status
+          // If changing from false→true: reverse inventory changes
+          // If changing from true→false: apply inventory changes
+          if (wasOptional !== willBeOptional) {
           if (hasStockTransfer.length > 0) {
             const transfer = hasStockTransfer[0];
-            const items = await db
+            const items = await tx
               .select()
               .from(stockTransferItems)
               .where(eq(stockTransferItems.transferId, transfer.id));
@@ -7469,12 +7479,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Validate legacy transfers
             const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
             if (itemsWithoutSource.length > 0) {
-              return res.status(400).json({
-                message: `Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data. It was created before per-item source locations were tracked.`
-              });
+              throw new ValidationError(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data. It was created before per-item source locations were tracked.`);
             }
-
-            await db.transaction(async (tx) => {
               for (const item of items) {
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
@@ -7598,17 +7604,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 }
               }
-            });
           }
 
           if (hasStockAdjustment.length > 0) {
             const adjustment = hasStockAdjustment[0];
-            const items = await db
+            const items = await tx
               .select()
               .from(stockAdjustmentItems)
               .where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
 
-            await db.transaction(async (tx) => {
               for (const item of items) {
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
@@ -7683,19 +7687,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 }
               }
-            });
           }
-        }
+          }
 
-        // Update the optional field
-        const updated = await db
-          .update(vouchers)
-          .set({ optional })
-          .where(eq(vouchers.id, id))
-          .returning();
+          // Update the optional field inside transaction
+          await tx
+            .update(vouchers)
+            .set({ optional })
+            .where(eq(vouchers.id, id));
+        });
 
-        res.json(updated[0]);
+        // Fetch updated voucher outside transaction
+        const updated = await storage.getVoucherById(id);
+        res.json(updated);
       } catch (error: any) {
+        if (error.name === 'ValidationError') {
+          return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({ message: error.message });
       }
     },
@@ -10561,11 +10569,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
-      // Get voucher IDs for this company
+      // Get voucher IDs for this company (excluding optional)
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(eq(vouchers.companyId, companyId))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -10628,7 +10636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Get all Sales vouchers for this company
+      // Get all Sales vouchers for this company (excluding optional)
       const salesVouchers = await db
         .select()
         .from(vouchers)
@@ -10636,6 +10644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             eq(vouchers.voucherType, "Sales"),
+            eq(vouchers.optional, false),
           ),
         )
         .execute();
@@ -10972,7 +10981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(vouchers)
           .where(eq(vouchers.companyId, companyId));
 
-        const conditions = [eq(vouchers.companyId, companyId)];
+        const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false)];
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
         }
