@@ -10073,6 +10073,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update the stock transfer using the storage method
         const updated = await storage.updateStockTransfer(id, destinationLocationId, notes || "", itemsForStorage);
+        
+        // Recalculate voucher totalAmount based on updated items
+        const newTotalAmount = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+        await db.update(vouchers)
+          .set({ totalAmount: newTotalAmount.toFixed(2) })
+          .where(eq(vouchers.id, updated.transfer.voucherId));
+        
         res.json(updated);
       } catch (error: any) {
         console.error("[Stock Transfer PUT] Error:", error.message);
@@ -10241,6 +10248,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update the stock adjustment using the storage method
         const updated = await storage.updateStockAdjustment(id, locationId, adjustmentType, notes || "", itemsForStorage);
+        
+        // Recalculate voucher totalAmount based on updated items
+        const newTotalAmount = items.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.rate), 0);
+        await db.update(vouchers)
+          .set({ totalAmount: newTotalAmount.toFixed(2) })
+          .where(eq(vouchers.id, updated.adjustment.voucherId));
+        
         res.json(updated);
       } catch (error: any) {
         console.error("[Stock Adjustment PUT] Error:", error.message);
