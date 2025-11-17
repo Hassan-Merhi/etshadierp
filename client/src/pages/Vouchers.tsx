@@ -689,29 +689,55 @@ export default function Vouchers() {
   // Pre-populate form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
-      // Find the payment/receipt account from the first entry
-      const firstEntry = voucherToEdit.entries[0];
-      if (!firstEntry) return;
+      // For Payment vouchers: payment account is the one with CREDIT
+      // For Receipt vouchers: payment account is the one with DEBIT
+      const paymentEntry = voucherToEdit.entries.find((entry: any) => {
+        if (voucherToEdit.voucherType === "Payment") {
+          return parseFloat(entry.creditAmount || "0") > 0;
+        } else if (voucherToEdit.voucherType === "Receipt") {
+          return parseFloat(entry.debitAmount || "0") > 0;
+        }
+        return false;
+      });
 
-      // Determine account type and ID from the first entry (this is the payment/receipt account)
+      if (!paymentEntry) return;
+
+      // Determine account type and ID from the payment entry
       let paymentType: string = "bank";
       let paymentId = 0;
       let paymentName = "";
 
-      if (firstEntry.bankAccountId) {
+      if (paymentEntry.bankAccountId) {
         paymentType = "bank";
-        paymentId = firstEntry.bankAccountId;
+        paymentId = paymentEntry.bankAccountId;
         const account = bankAccounts.find(b => b.id === paymentId);
         paymentName = account?.bankName || "";
-      } else if (firstEntry.ledgerAccountId) {
+      } else if (paymentEntry.ledgerAccountId) {
         paymentType = "ledger";
-        paymentId = firstEntry.ledgerAccountId;
+        paymentId = paymentEntry.ledgerAccountId;
         const account = ledgerAccounts.find(l => l.id === paymentId);
         paymentName = account?.name || "";
+      } else if (paymentEntry.supplierId) {
+        paymentType = "supplier";
+        paymentId = paymentEntry.supplierId;
+        const supplier = suppliers.find(s => s.id === paymentId);
+        paymentName = supplier?.legalName || "";
+      } else if (paymentEntry.employeeId) {
+        paymentType = "employee";
+        paymentId = paymentEntry.employeeId;
+        const employee = employees.find(e => e.id === paymentId);
+        paymentName = employee ? `${employee.firstName} ${employee.lastName}` : "";
+      } else if (paymentEntry.fixedAssetId) {
+        paymentType = "fixedAsset";
+        paymentId = paymentEntry.fixedAssetId;
+        const asset = fixedAssets.find(f => f.id === paymentId);
+        paymentName = asset?.name || "";
       }
 
-      // Convert remaining entries to form format
-      const formEntries = voucherToEdit.entries.slice(1).map((entry: any) => {
+      // Convert contra entries (all entries except payment entry) to form format
+      const formEntries = voucherToEdit.entries
+        .filter((entry: any) => entry !== paymentEntry)
+        .map((entry: any) => {
         let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
         let accountId = 0;
         let accountName = "";
