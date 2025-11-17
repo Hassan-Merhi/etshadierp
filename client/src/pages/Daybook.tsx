@@ -79,6 +79,13 @@ import { format, parseISO, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { utils, writeFile } from "xlsx";
 
+// Helper function to format amounts without .00 for whole numbers
+const formatAmount = (amount: number | string): string => {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  const formatted = num.toFixed(2);
+  return formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
+};
+
 // Account types
 interface LedgerAccount {
   id: number;
@@ -564,7 +571,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
       "Type": voucher.voucherType,
       "Description": voucher.description || "",
-      "Total Amount": parseFloat(voucher.totalAmount).toFixed(2),
+      "Total Amount": formatAmount(voucher.totalAmount),
       "Optional": voucher.optional ? "Yes" : "No",
     }));
 
@@ -806,7 +813,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {voucher.description || "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
-                        ${parseFloat(voucher.totalAmount).toFixed(2)}
+                        ${formatAmount(voucher.totalAmount)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -922,12 +929,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {parseFloat(entry.debitAmount) > 0
-                                ? `$${parseFloat(entry.debitAmount).toFixed(2)}`
+                                ? `$${formatAmount(entry.debitAmount)}`
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {parseFloat(entry.creditAmount) > 0
-                                ? `$${parseFloat(entry.creditAmount).toFixed(2)}`
+                                ? `$${formatAmount(entry.creditAmount)}`
                                 : "-"}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
@@ -939,14 +946,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         <TableRow className="font-bold bg-muted/50">
                           <TableCell>Total</TableCell>
                           <TableCell className="text-right font-mono">
-                            ${viewVoucherEntries
-                              .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0)
-                              .toFixed(2)}
+                            ${formatAmount(viewVoucherEntries
+                              .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0))}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${viewVoucherEntries
-                              .reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
-                              .toFixed(2)}
+                            ${formatAmount(viewVoucherEntries
+                              .reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0))}
                           </TableCell>
                           <TableCell></TableCell>
                         </TableRow>
@@ -1225,13 +1230,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         <div className="text-right">
                           <span className="text-muted-foreground mr-2">Total Debits:</span>
                           <span className="font-bold">
-                            ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0).toFixed(2)}
+                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0))}
                           </span>
                         </div>
                         <div className="text-right">
                           <span className="text-muted-foreground mr-2">Total Credits:</span>
                           <span className="font-bold">
-                            ${editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0).toFixed(2)}
+                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0))}
                           </span>
                         </div>
                       </div>
