@@ -2928,6 +2928,18 @@ export class DbStorage implements IStorage {
         throw new Error(`Stock transfer ${id} not found`);
       }
 
+      // Check if voucher is optional - if so, skip inventory updates
+      const [voucher] = await tx
+        .select()
+        .from(schema.vouchers)
+        .where(eq(schema.vouchers.id, existingTransfer.voucherId));
+      
+      if (!voucher) {
+        throw new Error(`Voucher ${existingTransfer.voucherId} not found`);
+      }
+      
+      const isOptional = voucher.optional;
+
       const existingItems = await tx
         .select()
         .from(schema.stockTransferItems)
@@ -2946,8 +2958,9 @@ export class DbStorage implements IStorage {
         );
       }
 
-      // Step 2: REVERSE inventory changes for each OLD item
-      for (const oldItem of existingItems) {
+      // Step 2: REVERSE inventory changes for each OLD item (only if not optional)
+      if (!isOptional) {
+        for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
         const totalAmount = quantity * rate;
@@ -3032,6 +3045,7 @@ export class DbStorage implements IStorage {
             })
             .where(eq(schema.inventory.id, destInventory.id));
         }
+        }
       }
 
       // Step 3: Delete all existing stock transfer items
@@ -3054,7 +3068,7 @@ export class DbStorage implements IStorage {
 
       console.log('[storage.updateStockTransfer] Updated transfer record');
 
-      // Step 5: Create NEW items and apply inventory changes (same logic as createStockTransfer)
+      // Step 5: Create NEW items and apply inventory changes (only if not optional)
       const transferItems: StockTransferItem[] = [];
       for (const item of items) {
         const quantity = parseFloat(item.quantity);
@@ -3075,8 +3089,10 @@ export class DbStorage implements IStorage {
 
         transferItems.push(transferItem);
 
-        // Get current inventory at THIS ITEM's source location
-        const [sourceInventory] = await tx
+        // Only update inventory if voucher is NOT optional
+        if (!isOptional) {
+          // Get current inventory at THIS ITEM's source location
+          const [sourceInventory] = await tx
           .select()
           .from(schema.inventory)
           .where(and(
@@ -3154,6 +3170,7 @@ export class DbStorage implements IStorage {
             lastUpdated: new Date(),
           });
         }
+        }
       }
 
       console.log('[storage.updateStockTransfer] Transfer updated successfully with', transferItems.length, 'new items');
@@ -3185,6 +3202,18 @@ export class DbStorage implements IStorage {
         throw new Error(`Stock adjustment ${id} not found`);
       }
 
+      // Check if voucher is optional - if so, skip inventory updates
+      const [voucher] = await tx
+        .select()
+        .from(schema.vouchers)
+        .where(eq(schema.vouchers.id, existingAdjustment.voucherId));
+      
+      if (!voucher) {
+        throw new Error(`Voucher ${existingAdjustment.voucherId} not found`);
+      }
+      
+      const isOptional = voucher.optional;
+
       const existingItems = await tx
         .select()
         .from(schema.stockAdjustmentItems)
@@ -3202,8 +3231,9 @@ export class DbStorage implements IStorage {
         throw new Error(`Location ${existingAdjustment.locationId} not found`);
       }
 
-      // Step 2: REVERSE inventory changes for each OLD item
-      for (const oldItem of existingItems) {
+      // Step 2: REVERSE inventory changes for each OLD item (only if not optional)
+      if (!isOptional) {
+        for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
         const totalAmount = Math.abs(quantity) * rate;
@@ -3262,6 +3292,7 @@ export class DbStorage implements IStorage {
             lastUpdated: new Date(),
           });
         }
+        }
       }
 
       // Step 3: Delete all existing stock adjustment items
@@ -3314,16 +3345,18 @@ export class DbStorage implements IStorage {
 
         adjustmentItems.push(adjustmentItem);
 
-        // Get current inventory at location
-        const [currentInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, locationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
+        // Only update inventory if voucher is NOT optional
+        if (!isOptional) {
+          // Get current inventory at location
+          const [currentInventory] = await tx
+            .select()
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, locationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
 
-        if (currentInventory) {
+          if (currentInventory) {
           // Adjust quantity at location
           const currentQty = parseFloat(currentInventory.quantity);
           const currentValue = parseFloat(currentInventory.totalValue);
@@ -3367,6 +3400,7 @@ export class DbStorage implements IStorage {
           });
         } else {
           throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}`);
+        }
         }
       }
 
