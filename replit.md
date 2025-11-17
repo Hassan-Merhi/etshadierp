@@ -58,6 +58,14 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
   - Full keyboard navigation with arrow keys and Enter to select accounts
   - Real-time optimistic balance updates as amounts are entered
   - Removed duplicate old receipt tab code from Vouchers.tsx
+- **Complete Voucher Editing System (November 17, 2025)**: Implemented full editing support for ALL voucher types with proper data integrity:
+  - **Stock Transfers**: GET/PUT endpoints with per-item source location tracking, atomic transaction-based inventory reversal, legacy transfer protection
+  - **Stock Adjustments**: GET/PUT endpoints with transaction-based quantity adjustments
+  - **Receipt/Payment**: Fixed critical bug where amounts showed as 0.00 when editing - corrected debit/credit mapping for contra entries
+  - **Data Model Enhancement**: Added `source_location_id` column to `stock_transfer_items` table for per-item source tracking
+  - **Validation**: Zod schemas with `.finite()` checks, fixed precision using `.toFixed()` instead of `.toString()`, allow negative quantities for corrections
+  - **Legacy Data Protection**: Runtime validation blocks editing of old stock transfers missing per-item source data, returns 400 with clear error message
+  - **Status**: Stock production/consumption/adjustment editing works perfectly ✓
 
 ## User Preferences
 

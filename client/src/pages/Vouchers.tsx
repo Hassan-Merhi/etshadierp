@@ -744,12 +744,12 @@ export default function Vouchers() {
           accountName = asset?.name || "";
         }
 
-        // For Payment vouchers, the amount is in creditAmount (we pay them)
-        // For Receipt vouchers, the amount is in debitAmount (we receive from them)
+        // For Payment vouchers, contra entries are debits (expenses, assets purchased)
+        // For Receipt vouchers, contra entries are credits (revenue, liability decrease)
         if (voucherToEdit.voucherType === "Payment") {
-          amount = entry.creditAmount || "0";
-        } else if (voucherToEdit.voucherType === "Receipt") {
           amount = entry.debitAmount || "0";
+        } else if (voucherToEdit.voucherType === "Receipt") {
+          amount = entry.creditAmount || "0";
         }
 
         return {
