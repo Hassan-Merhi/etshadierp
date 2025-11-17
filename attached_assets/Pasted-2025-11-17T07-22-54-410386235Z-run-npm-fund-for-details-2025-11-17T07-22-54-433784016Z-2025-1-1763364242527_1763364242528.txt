@@ -1,0 +1,50 @@
+2025-11-17T07:22:54.410386235Z   run `npm fund` for details
+2025-11-17T07:22:54.433784016Z 
+2025-11-17T07:22:54.433809167Z 9 vulnerabilities (3 low, 5 moderate, 1 high)
+2025-11-17T07:22:54.433813247Z 
+2025-11-17T07:22:54.433816857Z To address issues that do not require attention, run:
+2025-11-17T07:22:54.433820208Z   npm audit fix
+2025-11-17T07:22:54.433823368Z 
+2025-11-17T07:22:54.433826728Z To address all issues possible (including breaking changes), run:
+2025-11-17T07:22:54.433830028Z   npm audit fix --force
+2025-11-17T07:22:54.433833068Z 
+2025-11-17T07:22:54.433836478Z Some issues need review, and may require choosing
+2025-11-17T07:22:54.433838948Z a different dependency.
+2025-11-17T07:22:54.433840878Z 
+2025-11-17T07:22:54.433843138Z Run `npm audit` for details.
+2025-11-17T07:22:54.602508837Z 
+2025-11-17T07:22:54.602529838Z > rest-express@1.0.0 build
+2025-11-17T07:22:54.602535408Z > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+2025-11-17T07:22:54.602538748Z 
+2025-11-17T07:22:54.804914193Z vite v5.4.20 building for production...
+2025-11-17T07:22:54.852714962Z transforming...
+2025-11-17T07:22:55.091211736Z Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+2025-11-17T07:22:55.091231546Z   npx update-browserslist-db@latest
+2025-11-17T07:22:55.091234996Z   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2025-11-17T07:22:56.066949368Z 
+2025-11-17T07:22:56.066980719Z A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+2025-11-17T07:22:59.639572935Z ✓ 3523 modules transformed.
+2025-11-17T07:22:59.641191288Z x Build failed in 4.82s
+2025-11-17T07:22:59.641218889Z error during build:
+2025-11-17T07:22:59.641226929Z client/src/App.tsx (10:9): "AppSidebar" is not exported by "client/src/components/AppSidebar.tsx", imported by "client/src/App.tsx".
+2025-11-17T07:22:59.641230249Z file: /opt/render/project/src/client/src/App.tsx:10:9
+2025-11-17T07:22:59.641232299Z 
+2025-11-17T07:22:59.641234729Z  8: import { ThemeToggle } from "@/components/ThemeToggle";
+2025-11-17T07:22:59.641237529Z  9: import { CompanySelector } from "@/components/CompanySelector";
+2025-11-17T07:22:59.641239739Z 10: import { AppSidebar } from "@/components/AppSidebar";
+2025-11-17T07:22:59.641242049Z              ^
+2025-11-17T07:22:59.641244239Z 11: import { LocationProvider } from "@/contexts/LocationContext";
+2025-11-17T07:22:59.6412619Z 12: import { CompanyProvider } from "@/contexts/CompanyContext";
+2025-11-17T07:22:59.64126409Z 
+2025-11-17T07:22:59.64126694Z     at getRollupError (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:396:41)
+2025-11-17T07:22:59.64126919Z     at error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:392:42)
+2025-11-17T07:22:59.64127147Z     at Module.error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:15588:16)
+2025-11-17T07:22:59.64127431Z     at Module.traceVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:16037:29)
+2025-11-17T07:22:59.64127648Z     at ModuleScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:13820:39)
+2025-11-17T07:22:59.64127853Z     at FunctionScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+2025-11-17T07:22:59.64128059Z     at FunctionBodyScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+2025-11-17T07:22:59.6412827Z     at Identifier.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5066:40)
+2025-11-17T07:22:59.64128475Z     at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:2649:28)
+2025-11-17T07:22:59.641286881Z     at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:11284:15)
+2025-11-17T07:22:59.738251845Z ==> Build failed 😞
+2025-11-17T07:22:59.738271506Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys

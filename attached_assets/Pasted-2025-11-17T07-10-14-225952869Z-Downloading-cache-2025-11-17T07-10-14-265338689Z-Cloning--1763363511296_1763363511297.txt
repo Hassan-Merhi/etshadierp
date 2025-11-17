@@ -1,0 +1,48 @@
+2025-11-17T07:10:14.225952869Z ==> Downloading cache...
+2025-11-17T07:10:14.265338689Z ==> Cloning from https://github.com/Hassan-Merhi/etshadierp
+2025-11-17T07:10:15.385224015Z ==> Checking out commit 17eaee5c57ee850863f3489cb8c9bbe726ae1d65 in branch main
+2025-11-17T07:10:20.038185417Z ==> Downloaded 208MB in 1s. Extraction took 3s.
+2025-11-17T07:10:25.51869395Z ==> Using Node.js version 22.16.0 (default)
+2025-11-17T07:10:25.542888401Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2025-11-17T07:10:25.657713819Z ==> Running build command 'npm install --production=false && npm run build && npm run db:push'...
+2025-11-17T07:10:26.8074891Z 
+2025-11-17T07:10:26.808566934Z up to date, audited 502 packages in 1s
+2025-11-17T07:10:26.808600087Z 
+2025-11-17T07:10:26.808609117Z 65 packages are looking for funding
+2025-11-17T07:10:26.808613608Z   run `npm fund` for details
+2025-11-17T07:10:26.82718119Z 
+2025-11-17T07:10:26.827201741Z 9 vulnerabilities (3 low, 5 moderate, 1 high)
+2025-11-17T07:10:26.827204551Z 
+2025-11-17T07:10:26.827207651Z To address issues that do not require attention, run:
+2025-11-17T07:10:26.827210112Z   npm audit fix
+2025-11-17T07:10:26.827213592Z 
+2025-11-17T07:10:26.827218012Z To address all issues possible (including breaking changes), run:
+2025-11-17T07:10:26.827222382Z   npm audit fix --force
+2025-11-17T07:10:26.827225853Z 
+2025-11-17T07:10:26.827229233Z Some issues need review, and may require choosing
+2025-11-17T07:10:26.827232693Z a different dependency.
+2025-11-17T07:10:26.827235603Z 
+2025-11-17T07:10:26.827239654Z Run `npm audit` for details.
+2025-11-17T07:10:26.992528907Z 
+2025-11-17T07:10:26.992546008Z > rest-express@1.0.0 build
+2025-11-17T07:10:26.992549738Z > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+2025-11-17T07:10:26.992554358Z 
+2025-11-17T07:10:27.19084112Z vite v5.4.20 building for production...
+2025-11-17T07:10:27.240868404Z transforming...
+2025-11-17T07:10:27.484279041Z Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+2025-11-17T07:10:27.484298423Z   npx update-browserslist-db@latest
+2025-11-17T07:10:27.484301953Z   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2025-11-17T07:10:28.742048179Z 
+2025-11-17T07:10:28.742082441Z A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+2025-11-17T07:10:30.85852975Z ✓ 1669 modules transformed.
+2025-11-17T07:10:30.863104866Z x Build failed in 3.65s
+2025-11-17T07:10:30.863218043Z error during build:
+2025-11-17T07:10:30.863226544Z [vite:load-fallback] Could not load /opt/render/project/src/client/src/components/vouchers/PaymentVoucherTab (imported by client/src/pages/Vouchers.tsx): ENOENT: no such file or directory, open '/opt/render/project/src/client/src/components/vouchers/PaymentVoucherTab'
+2025-11-17T07:10:30.863229964Z     at async open (node:internal/fs/promises:633:25)
+2025-11-17T07:10:30.863232054Z     at async Object.readFile (node:internal/fs/promises:1237:14)
+2025-11-17T07:10:30.863235095Z     at async Object.load (file:///opt/render/project/src/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65356:25)
+2025-11-17T07:10:30.863238145Z     at async PluginDriver.hookFirstAndGetPlugin (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:20689:28)
+2025-11-17T07:10:30.863260616Z     at async file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:19809:33
+2025-11-17T07:10:30.863264106Z     at async Queue.work (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:20899:32)
+2025-11-17T07:10:30.99409425Z ==> Build failed 😞
+2025-11-17T07:10:30.994114172Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
