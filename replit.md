@@ -59,13 +59,15 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
   - Real-time optimistic balance updates as amounts are entered
   - Removed duplicate old receipt tab code from Vouchers.tsx
 - **Complete Voucher Editing System (November 17, 2025)**: Implemented full editing support for ALL voucher types with proper data integrity:
-  - **Stock Transfers**: GET/PUT endpoints with per-item source location tracking, atomic transaction-based inventory reversal, legacy transfer protection
-  - **Stock Adjustments**: GET/PUT endpoints with transaction-based quantity adjustments
+  - **Stock Transfers**: GET/PUT endpoints with per-item source location tracking, atomic transaction-based inventory reversal, legacy transfer protection, automatic voucher totalAmount recalculation
+  - **Stock Adjustments**: GET/PUT endpoints with transaction-based quantity adjustments, automatic voucher totalAmount recalculation
   - **Receipt/Payment**: Fixed critical bug where amounts showed as 0.00 when editing - corrected debit/credit mapping for contra entries
   - **Data Model Enhancement**: Added `source_location_id` column to `stock_transfer_items` table for per-item source tracking
   - **Validation**: Zod schemas with `.finite()` checks, fixed precision using `.toFixed()` instead of `.toString()`, allow negative quantities for corrections
   - **Legacy Data Protection**: Runtime validation blocks editing of old stock transfers missing per-item source data, returns 400 with clear error message
-  - **Status**: Stock production/consumption/adjustment editing works perfectly ✓
+  - **Real-time Amount Updates**: Daybook amounts now update immediately after editing any voucher type - stock transfers and adjustments recalculate voucher totalAmount on save
+  - **Number Formatting**: Smart formatting removes .00 from whole numbers (displays $5 instead of $5.00) while preserving decimals where needed
+  - **Status**: All voucher types (Payment, Receipt, Journal, Stock Transfer, Production, Consumption) fully editable with complete UI refresh ✓
 
 ## User Preferences
 
