@@ -6265,11 +6265,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assets = await storage.getAllFixedAssets(companyId);
       const suppliers = await storage.getAllSuppliers();
 
-      // Get all voucher entries for this company's vouchers
+      // Get all voucher entries for this company's vouchers (excluding optional)
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(eq(vouchers.companyId, companyId))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -6512,11 +6512,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const suppliers = await storage.getAllSuppliers();
       const employeesData = await storage.getAllEmployees(companyId);
 
-      // Get all voucher entries for this company's vouchers
+      // Get all voucher entries for this company's vouchers (excluding optional)
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(eq(vouchers.companyId, companyId))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -10432,11 +10432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
-      // Get all voucher entries for this company
+      // Get all voucher entries for this company (excluding optional)
       const companyVouchers = await db
         .select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
         .from(vouchers)
-        .where(eq(vouchers.companyId, companyId))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
