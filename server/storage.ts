@@ -393,7 +393,7 @@ export class DbStorage implements IStorage {
   }
 
   async createLocation(location: InsertLocation): Promise<Location> {
-    const [created] = await db.insert(schema.locations).values(location).returning();
+    const [created] = await db.insert(schema.locations).values(location as any).returning();
     return created;
   }
 
@@ -698,7 +698,7 @@ export class DbStorage implements IStorage {
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-    const [created] = await db.insert(schema.suppliers).values(supplier).returning();
+    const [created] = await db.insert(schema.suppliers).values(supplier as any).returning();
     return created;
   }
 
@@ -2966,7 +2966,7 @@ export class DbStorage implements IStorage {
   }
 
   async createCustomer(customer: schema.InsertCustomer): Promise<schema.Customer> {
-    const [newCustomer] = await db.insert(schema.customers).values(customer).returning();
+    const [newCustomer] = await db.insert(schema.customers).values(customer as any).returning();
     return newCustomer;
   }
 

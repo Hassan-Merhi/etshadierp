@@ -69,7 +69,7 @@ type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
-  const { selectedCompany, currentRole } = useCompany();
+  const { selectedCompany } = useCompany();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -941,7 +941,7 @@ export default function Settings() {
         <TabsContent value="fiscal" className="space-y-4">
           <FiscalPeriodTab 
             currentCompanyId={selectedCompany?.id} 
-            userRole={currentRole} 
+            userRole={undefined} 
           />
         </TabsContent>
       </Tabs>

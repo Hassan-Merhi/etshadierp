@@ -247,6 +247,7 @@ export function StockItemCreateDialog({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value ?? ""}
                         type="number"
                         step="0.01"
                         placeholder="0.00"
@@ -267,6 +268,7 @@ export function StockItemCreateDialog({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value ?? ""}
                         type="number"
                         step="0.001"
                         placeholder="0"
@@ -289,6 +291,7 @@ export function StockItemCreateDialog({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value ?? ""}
                         type="number"
                         step="0.001"
                         placeholder="0"
@@ -309,6 +312,7 @@ export function StockItemCreateDialog({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value ?? ""}
                         type="number"
                         step="0.01"
                         placeholder="0.00"
@@ -329,6 +333,7 @@ export function StockItemCreateDialog({
                     <FormControl>
                       <Input
                         {...field}
+                        value={field.value ?? ""}
                         type="number"
                         step="0.01"
                         placeholder="0.00"

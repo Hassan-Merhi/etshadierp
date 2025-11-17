@@ -226,7 +226,7 @@ export default function ContainerDetail() {
         <Link href={backUrl}>
           <Button variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            {containerData?.container?.status === "SOLD" ? "Back to Sold Containers" : "Back to Containers"}
+            Back to Containers
           </Button>
         </Link>
       </div>
