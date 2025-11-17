@@ -507,8 +507,8 @@ export default function Vouchers() {
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   
-  // Parse URL parameters for edit mode
-  const searchParams = new URLSearchParams(location.split('?')[1] || '');
+  // Parse URL parameters for edit mode (use window.location.search since wouter doesn't include query params)
+  const searchParams = new URLSearchParams(window.location.search);
   const editParam = searchParams.get('edit');
   const tabParam = searchParams.get('tab');
   const voucherIdToEdit = editParam ? parseInt(editParam) : null;
@@ -587,6 +587,30 @@ export default function Vouchers() {
       const res = await fetch(`/api/vouchers/${voucherIdToEdit}`);
       if (!res.ok) throw new Error("Failed to fetch voucher");
       return res.json();
+    },
+  });
+
+  // Fetch stock transfer data for editing if voucherIdToEdit is present
+  const { data: stockTransferToEdit } = useQuery({
+    queryKey: ["/api/stock-transfers", voucherIdToEdit],
+    enabled: !!voucherIdToEdit && (tabParam === "transfer" || activeTab === "transfer"),
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-transfers?voucherId=${voucherIdToEdit}`);
+      if (!res.ok) throw new Error("Failed to fetch stock transfer");
+      const data = await res.json();
+      return Array.isArray(data) ? data[0] : data;
+    },
+  });
+
+  // Fetch stock adjustment data for editing if voucherIdToEdit is present
+  const { data: stockAdjustmentToEdit } = useQuery({
+    queryKey: ["/api/stock-adjustments", voucherIdToEdit],
+    enabled: !!voucherIdToEdit && (tabParam === "adjustment" || activeTab === "adjustment"),
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-adjustments?voucherId=${voucherIdToEdit}`);
+      if (!res.ok) throw new Error("Failed to fetch stock adjustment");
+      const data = await res.json();
+      return Array.isArray(data) ? data[0] : data;
     },
   });
 
@@ -1335,13 +1359,130 @@ export default function Vouchers() {
     0
   );
 
-  // Journal save mutation
+  // Pre-populate journal form when editing
+  useEffect(() => {
+    if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
+      const formEntries = voucherToEdit.entries.map((entry: any) => {
+        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" = "ledger";
+        let accountId = 0;
+        let accountName = "";
+        let type: "DR" | "CR" = "DR";
+        let amount = "0";
+
+        // Determine account type and ID
+        if (entry.bankAccountId) {
+          accountType = "bank";
+          accountId = entry.bankAccountId;
+          const account = bankAccounts.find(b => b.id === accountId);
+          accountName = account?.bankName || "";
+        } else if (entry.ledgerAccountId) {
+          accountType = "ledger";
+          accountId = entry.ledgerAccountId;
+          const account = ledgerAccounts.find(l => l.id === accountId);
+          accountName = account?.name || "";
+        } else if (entry.supplierId) {
+          accountType = "supplier";
+          accountId = entry.supplierId;
+          const supplier = suppliers.find(s => s.id === accountId);
+          accountName = supplier?.legalName || "";
+        } else if (entry.employeeId) {
+          accountType = "employee";
+          accountId = entry.employeeId;
+          const employee = employees.find(e => e.id === accountId);
+          accountName = employee ? `${employee.firstName} ${employee.lastName}` : "";
+        } else if (entry.fixedAssetId) {
+          accountType = "fixedAsset";
+          accountId = entry.fixedAssetId;
+          const asset = fixedAssets.find(f => f.id === accountId);
+          accountName = asset?.name || "";
+        }
+
+        // Determine DR/CR and amount
+        const debitAmt = parseFloat(entry.debitAmount || "0");
+        const creditAmt = parseFloat(entry.creditAmount || "0");
+        
+        if (debitAmt > 0) {
+          type = "DR";
+          amount = entry.debitAmount;
+        } else if (creditAmt > 0) {
+          type = "CR";
+          amount = entry.creditAmount;
+        }
+
+        return {
+          type,
+          accountType,
+          accountId,
+          accountName,
+          amount,
+        };
+      });
+
+      journalForm.reset({
+        voucherDate: new Date(voucherToEdit.voucherDate),
+        entries: formEntries.length > 0 ? formEntries : [{
+          type: "DR",
+          accountType: "ledger",
+          accountId: 0,
+          accountName: "",
+          amount: "",
+        }],
+        notes: voucherToEdit.notes || "",
+        optional: voucherToEdit.optional || false,
+      });
+    }
+  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, journalForm]);
+
+  // Journal save mutation (handles both create and update)
   const journalMutation = useMutation({
     mutationFn: async (formData: JournalFormData) => {
       const data = formData;
+      const isEditMode = !!voucherIdToEdit;
       
-      // Create voucher
-      const voucherRes = await apiRequest("POST", "/api/vouchers", {
+      if (isEditMode) {
+        // UPDATE MODE: Use PATCH to update existing voucher with entries
+        const voucherEntries: any[] = [];
+        
+        for (const entry of data.entries) {
+          if (entry.accountId === 0) continue;
+
+          const narration = `Journal Entry - ${entry.accountName}`;
+          const entryData: any = { narration };
+
+          if (entry.accountType === "ledger") {
+            entryData.ledgerAccountId = entry.accountId;
+          } else if (entry.accountType === "bank") {
+            entryData.bankAccountId = entry.accountId;
+          } else if (entry.accountType === "supplier") {
+            entryData.supplierId = entry.accountId;
+          } else if (entry.accountType === "employee") {
+            entryData.employeeId = entry.accountId;
+          } else if (entry.accountType === "fixedAsset") {
+            entryData.fixedAssetId = entry.accountId;
+          }
+
+          if (entry.type === "DR") {
+            entryData.debitAmount = entry.amount;
+            entryData.creditAmount = "0";
+          } else {
+            entryData.debitAmount = "0";
+            entryData.creditAmount = entry.amount;
+          }
+          
+          voucherEntries.push(entryData);
+        }
+        
+        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: data.notes || "Journal voucher",
+          optional: data.optional,
+          entries: voucherEntries,
+        });
+        
+        return await voucherRes.json();
+      } else {
+        // CREATE MODE: Create new voucher
+        const voucherRes = await apiRequest("POST", "/api/vouchers", {
         companyId: selectedCompany?.id,
         voucherNumber: `JOURNAL-${Date.now()}`,
         voucherType: "Journal",
@@ -1388,12 +1529,15 @@ export default function Vouchers() {
       }
 
       return voucher;
-    },
+    }
+  },
     onSuccess: () => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
-        description: "Journal voucher created successfully",
+        description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
@@ -1403,24 +1547,31 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
-      journalForm.reset({
-        voucherDate: new Date(),
-        entries: [
-          {
-            type: "DR",
-            accountType: "ledger",
-            accountId: 0,
-            accountName: "",
-            amount: "",
-          },
-        ],
-        notes: "",
-      });
+      
+      // Clear edit mode and navigate back or reset form
+      if (isEditMode) {
+        setLocation("/vouchers");
+      } else {
+        journalForm.reset({
+          voucherDate: new Date(),
+          entries: [
+            {
+              type: "DR",
+              accountType: "ledger",
+              accountId: 0,
+              accountName: "",
+              amount: "",
+            },
+          ],
+          notes: "",
+        });
+      }
     },
     onError: (error: any) => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
-        description: error.message || "Failed to create journal voucher",
+        description: error.message || `Failed to ${isEditMode ? "update" : "create"} journal voucher`,
         variant: "destructive",
       });
     },
@@ -1531,6 +1682,42 @@ export default function Vouchers() {
     });
   }, [transferEntries.map(e => `${e.sourceLocationId}-${e.stockItemId}`).join(',')]);
 
+  // Pre-populate stock transfer form when editing
+  useEffect(() => {
+    if (stockTransferToEdit && stockTransferToEdit.items && locations.length > 0 && stockItems.length > 0) {
+      // Map stock transfer items to form entries
+      const formEntries = stockTransferToEdit.items.map((item: any) => {
+        const sourceLocation = locations.find(l => l.id === item.sourceLocationId);
+        const stockItem = stockItems.find(s => s.id === item.stockItemId);
+        
+        return {
+          sourceLocationId: item.sourceLocationId || 0,
+          sourceLocationName: sourceLocation?.name || "",
+          stockItemId: item.stockItemId || 0,
+          stockItemName: stockItem?.name || "",
+          quantity: item.quantity || "0",
+          rate: item.rate || "0",
+        };
+      });
+
+      // Reset form with stock transfer data
+      stockTransferForm.reset({
+        voucherDate: voucherToEdit ? new Date(voucherToEdit.voucherDate) : new Date(),
+        destinationLocationId: stockTransferToEdit.destinationLocationId || 0,
+        entries: formEntries.length > 0 ? formEntries : [{
+          sourceLocationId: 0,
+          sourceLocationName: "",
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        }],
+        notes: stockTransferToEdit.notes || "",
+        optional: voucherToEdit?.optional || false,
+      });
+    }
+  }, [stockTransferToEdit, voucherToEdit, locations, stockItems, stockTransferForm]);
+
   // Helper function to lookup account by code
   const lookupAccountByCode = (code: string): { type: "ledger" | "bank" | "supplier"; id: number; name: string } | null => {
     if (!code || code.trim() === "") return null;
@@ -1592,71 +1779,107 @@ export default function Vouchers() {
     return item;
   };
 
-  // Stock Transfer mutation
+  // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
     mutationFn: async (formData: StockTransferFormData) => {
       const data = formData;
+      const isEditMode = !!voucherIdToEdit;
       
       // Get unique source locations for description
       const uniqueSources = Array.from(new Set(data.entries.map(e => e.sourceLocationId)));
       const sourceNames = uniqueSources.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(", ");
       const destName = locations.find(l => l.id === data.destinationLocationId)?.name;
       
-      // Create voucher
-      const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        companyId: selectedCompany?.id,
-        voucherType: "StockTransfer",
-        voucherNumber: `TRANSFER-${Date.now()}`,
-        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: `Stock transfer from ${sourceNames} to ${destName}`,
-        totalAmount: transferTotal.toString(),
-        optional: data.optional,
-      });
-      const voucher = await voucherRes.json();
+      if (isEditMode) {
+        // UPDATE MODE: Use PATCH to update existing voucher and stock transfer
+        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: `Stock transfer from ${sourceNames} to ${destName}`,
+          totalAmount: transferTotal.toString(),
+          optional: data.optional,
+        });
+        
+        // Update stock transfer (assuming stockTransferToEdit has an id)
+        if (stockTransferToEdit?.id) {
+          await apiRequest("PUT", `/api/stock-transfers/${stockTransferToEdit.id}`, {
+            destinationLocationId: data.destinationLocationId,
+            notes: data.notes || "",
+            items: data.entries.map(entry => ({
+              sourceLocationId: entry.sourceLocationId,
+              stockItemId: entry.stockItemId,
+              quantity: entry.quantity,
+              rate: entry.rate,
+            })),
+          });
+        }
+        
+        return await voucherRes.json();
+      } else {
+        // CREATE MODE: Create new voucher and stock transfer
+        const voucherRes = await apiRequest("POST", "/api/vouchers", {
+          companyId: selectedCompany?.id,
+          voucherType: "StockTransfer",
+          voucherNumber: `TRANSFER-${Date.now()}`,
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: `Stock transfer from ${sourceNames} to ${destName}`,
+          totalAmount: transferTotal.toString(),
+          optional: data.optional,
+        });
+        const voucher = await voucherRes.json();
 
-      // Create stock transfer with items (including per-item source locations)
-      await apiRequest("POST", "/api/stock-transfers", {
-        voucherId: voucher.id,
-        destinationLocationId: data.destinationLocationId,
-        notes: data.notes || "",
-        items: data.entries.map(entry => ({
-          sourceLocationId: entry.sourceLocationId,
-          stockItemId: entry.stockItemId,
-          quantity: entry.quantity,
-          rate: entry.rate,
-        })),
-      });
+        // Create stock transfer with items (including per-item source locations)
+        await apiRequest("POST", "/api/stock-transfers", {
+          voucherId: voucher.id,
+          destinationLocationId: data.destinationLocationId,
+          notes: data.notes || "",
+          items: data.entries.map(entry => ({
+            sourceLocationId: entry.sourceLocationId,
+            stockItemId: entry.stockItemId,
+            quantity: entry.quantity,
+            rate: entry.rate,
+          })),
+        });
 
-      return voucher;
+        return voucher;
+      }
     },
     onSuccess: () => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
-        description: "Stock transfer voucher created successfully",
+        description: `Stock transfer voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      stockTransferForm.reset({
-        voucherDate: new Date(),
-        destinationLocationId: 0,
-        entries: [
-          {
-            sourceLocationId: 0,
-            sourceLocationName: "",
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          },
-        ],
-        notes: "",
-      });
+      
+      // Clear edit mode and navigate back or reset form
+      if (isEditMode) {
+        setLocation("/vouchers");
+      } else {
+        stockTransferForm.reset({
+          voucherDate: new Date(),
+          destinationLocationId: 0,
+          entries: [
+            {
+              sourceLocationId: 0,
+              sourceLocationName: "",
+              stockItemId: 0,
+              stockItemName: "",
+              quantity: "",
+              rate: "",
+            },
+          ],
+          notes: "",
+        });
+      }
     },
     onError: (error: any) => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
-        description: error.message || "Failed to create stock transfer",
+        description: error.message || `Failed to ${isEditMode ? "update" : "create"} stock transfer`,
         variant: "destructive",
       });
     },
@@ -1733,10 +1956,49 @@ export default function Vouchers() {
     },
   });
 
-  // Stock Adjustment mutation
+  // Pre-populate stock adjustment form when editing
+  useEffect(() => {
+    if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && stockItems.length > 0) {
+      // Map stock adjustment items to form entries
+      const formEntries = stockAdjustmentToEdit.items.map((item: any) => {
+        const stockItem = stockItems.find(s => s.id === item.stockItemId);
+        const quantity = parseFloat(item.quantity || "0");
+        
+        // Determine type: negative quantities are CONSUME, positive are PRODUCE
+        const type = quantity < 0 ? "CONSUME" : "PRODUCE";
+        const absQuantity = Math.abs(quantity).toString();
+        
+        return {
+          type,
+          stockItemId: item.stockItemId || 0,
+          stockItemName: stockItem?.name || "",
+          quantity: absQuantity,
+          rate: item.rate || "0",
+        };
+      });
+
+      // Reset form with stock adjustment data
+      stockAdjustmentForm.reset({
+        voucherDate: voucherToEdit ? new Date(voucherToEdit.voucherDate) : new Date(),
+        locationId: stockAdjustmentToEdit.locationId || 0,
+        entries: formEntries.length > 0 ? formEntries : [{
+          type: "PRODUCE",
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        }],
+        notes: stockAdjustmentToEdit.notes || "",
+        optional: voucherToEdit?.optional || false,
+      });
+    }
+  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]);
+
+  // Stock Adjustment mutation (handles both create and update)
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (formData: StockAdjustmentFormData) => {
       const data = formData;
+      const isEditMode = !!voucherIdToEdit;
       
       // Determine adjustment type based on entry types
       const hasConsumption = data.entries.some(e => e.type === "CONSUME");
@@ -1758,56 +2020,87 @@ export default function Vouchers() {
 
       const totalAmount = consumptionTotal + productionTotal;
       
-      // Create voucher
-      const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        companyId: selectedCompany?.id,
-        voucherType: adjustmentType,
-        voucherNumber: `${adjustmentType.toUpperCase()}-${Date.now()}`,
-        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
-        totalAmount: totalAmount.toString(),
-        optional: data.optional,
-      });
-      const voucher = await voucherRes.json();
+      if (isEditMode) {
+        // UPDATE MODE: Use PATCH to update existing voucher and stock adjustment
+        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
+          totalAmount: totalAmount.toString(),
+          optional: data.optional,
+        });
+        
+        // Update stock adjustment (assuming stockAdjustmentToEdit has an id)
+        if (stockAdjustmentToEdit?.id) {
+          await apiRequest("PUT", `/api/stock-adjustments/${stockAdjustmentToEdit.id}`, {
+            locationId: data.locationId,
+            adjustmentType: adjustmentType,
+            notes: data.notes || "",
+            items: items,
+          });
+        }
+        
+        return await voucherRes.json();
+      } else {
+        // CREATE MODE: Create new voucher and stock adjustment
+        const voucherRes = await apiRequest("POST", "/api/vouchers", {
+          companyId: selectedCompany?.id,
+          voucherType: adjustmentType,
+          voucherNumber: `${adjustmentType.toUpperCase()}-${Date.now()}`,
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
+          totalAmount: totalAmount.toString(),
+          optional: data.optional,
+        });
+        const voucher = await voucherRes.json();
 
-      // Create stock adjustment
-      await apiRequest("POST", "/api/stock-adjustments", {
-        voucherId: voucher.id,
-        locationId: data.locationId,
-        adjustmentType: adjustmentType,
-        notes: data.notes || "",
-        items: items,
-      });
+        // Create stock adjustment
+        await apiRequest("POST", "/api/stock-adjustments", {
+          voucherId: voucher.id,
+          locationId: data.locationId,
+          adjustmentType: adjustmentType,
+          notes: data.notes || "",
+          items: items,
+        });
 
-      return voucher;
+        return voucher;
+      }
     },
     onSuccess: () => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
-        description: "Production/Consumption voucher created successfully",
+        description: `Production/Consumption voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-adjustments"] });
-      stockAdjustmentForm.reset({
-        voucherDate: new Date(),
-        locationId: 0,
-        entries: [
-          {
-            type: "PRODUCE",
-            stockItemId: 0,
-            stockItemName: "",
-            quantity: "",
-            rate: "",
-          },
-        ],
-        notes: "",
-      });
+      
+      // Clear edit mode and navigate back or reset form
+      if (isEditMode) {
+        setLocation("/vouchers");
+      } else {
+        stockAdjustmentForm.reset({
+          voucherDate: new Date(),
+          locationId: 0,
+          entries: [
+            {
+              type: "PRODUCE",
+              stockItemId: 0,
+              stockItemName: "",
+              quantity: "",
+              rate: "",
+            },
+          ],
+          notes: "",
+        });
+      }
     },
     onError: (error: any) => {
+      const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Error",
-        description: error.message || "Failed to create stock adjustment",
+        description: error.message || `Failed to ${isEditMode ? "update" : "create"} stock adjustment`,
         variant: "destructive",
       });
     },
