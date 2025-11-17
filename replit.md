@@ -52,6 +52,12 @@ This is a comprehensive ERP (Enterprise Resource Planning) and POS (Point of Sal
   - **Affected pages**: Vouchers (Payment/Receipt/Journal/Transfer/Adjustment tabs), VoucherEdit, VoucherEditDialog, Daybook, AccountingCreate
   - **Components updated**: StockItemCombobox, AccountCombobox, LocationAutocomplete, StockItemAutocomplete, AccountAutocomplete
   - **Note**: Management tables (e.g., Stock Items page stock groups) intentionally retain codes for administrative search/filtering purposes
+- **Receipt Voucher Design Update (November 17, 2025)**: Redesigned receipt voucher to match payment voucher layout:
+  - Created dedicated `ReceiptVoucherTab` component with 60/40 layout (form left, sidebar right)
+  - Plain text input fields auto-filter the account sidebar (no dropdowns)
+  - Full keyboard navigation with arrow keys and Enter to select accounts
+  - Real-time optimistic balance updates as amounts are entered
+  - Removed duplicate old receipt tab code from Vouchers.tsx
 
 ## User Preferences
 
