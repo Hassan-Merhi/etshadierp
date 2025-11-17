@@ -2607,6 +2607,18 @@ export class DbStorage implements IStorage {
     items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>
   ): Promise<any> {
     return await db.transaction(async (tx) => {
+      // Check if voucher is optional - if so, skip inventory updates
+      const [voucher] = await tx
+        .select()
+        .from(schema.vouchers)
+        .where(eq(schema.vouchers.id, voucherId));
+      
+      if (!voucher) {
+        throw new Error(`Voucher ${voucherId} not found`);
+      }
+      
+      const isOptional = voucher.optional;
+
       // Create the stock transfer voucher record (note: no global sourceLocationId)
       const [transfer] = await tx.insert(schema.stockTransferVouchers).values({
         voucherId,
@@ -2634,93 +2646,96 @@ export class DbStorage implements IStorage {
 
         transferItems.push(transferItem);
 
-        // Get current inventory at THIS ITEM's source location
-        const [sourceInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, item.sourceLocationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
-
-        if (sourceInventory) {
-          // Decrease quantity at this item's source location
-          const currentQty = parseFloat(sourceInventory.quantity);
-          const currentValue = parseFloat(sourceInventory.totalValue);
-          const currentRate = parseFloat(sourceInventory.averageRate);
-          
-          const newQty = currentQty - quantity;
-          const newValue = newQty > 0 ? newQty * currentRate : 0;
-          
-          // Get location's companyId
-          const [location] = await tx
+        // Only update inventory if voucher is NOT optional
+        if (!isOptional) {
+          // Get current inventory at THIS ITEM's source location
+          const [sourceInventory] = await tx
             .select()
-            .from(schema.locations)
-            .where(eq(schema.locations.id, item.sourceLocationId));
-          
-          if (!location) {
-            throw new Error(`Source location ${item.sourceLocationId} not found`);
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, item.sourceLocationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
+
+          if (sourceInventory) {
+            // Decrease quantity at this item's source location
+            const currentQty = parseFloat(sourceInventory.quantity);
+            const currentValue = parseFloat(sourceInventory.totalValue);
+            const currentRate = parseFloat(sourceInventory.averageRate);
+            
+            const newQty = currentQty - quantity;
+            const newValue = newQty > 0 ? newQty * currentRate : 0;
+            
+            // Get location's companyId
+            const [location] = await tx
+              .select()
+              .from(schema.locations)
+              .where(eq(schema.locations.id, item.sourceLocationId));
+            
+            if (!location) {
+              throw new Error(`Source location ${item.sourceLocationId} not found`);
+            }
+
+            // Update inventory directly in transaction
+            await tx
+              .update(schema.inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: currentRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, sourceInventory.id));
           }
 
-          // Update inventory directly in transaction
-          await tx
-            .update(schema.inventory)
-            .set({
-              quantity: newQty.toFixed(3),
-              averageRate: currentRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
-              lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, sourceInventory.id));
-        }
-
-        // Get current inventory at destination location
-        const [destInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, destinationLocationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
-
-        if (destInventory) {
-          // Increase quantity at destination location using weighted average
-          const currentQty = parseFloat(destInventory.quantity);
-          const currentValue = parseFloat(destInventory.totalValue);
-          
-          const newQty = currentQty + quantity;
-          const newValue = currentValue + totalAmount;
-          const newRate = newQty > 0 ? newValue / newQty : 0;
-          
-          await tx
-            .update(schema.inventory)
-            .set({
-              quantity: newQty.toFixed(3),
-              averageRate: newRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
-              lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, destInventory.id));
-        } else {
-          // Create new inventory record at destination
-          const [destLocation] = await tx
+          // Get current inventory at destination location
+          const [destInventory] = await tx
             .select()
-            .from(schema.locations)
-            .where(eq(schema.locations.id, destinationLocationId));
-          
-          if (!destLocation) {
-            throw new Error(`Destination location ${destinationLocationId} not found`);
-          }
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, destinationLocationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
 
-          await tx.insert(schema.inventory).values({
-            companyId: destLocation.companyId,
-            locationId: destinationLocationId,
-            stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            averageRate: item.rate,
-            totalValue: totalAmount.toFixed(2),
-            lastUpdated: new Date(),
-          });
+          if (destInventory) {
+            // Increase quantity at destination location using weighted average
+            const currentQty = parseFloat(destInventory.quantity);
+            const currentValue = parseFloat(destInventory.totalValue);
+            
+            const newQty = currentQty + quantity;
+            const newValue = currentValue + totalAmount;
+            const newRate = newQty > 0 ? newValue / newQty : 0;
+            
+            await tx
+              .update(schema.inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: newRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, destInventory.id));
+          } else {
+            // Create new inventory record at destination
+            const [destLocation] = await tx
+              .select()
+              .from(schema.locations)
+              .where(eq(schema.locations.id, destinationLocationId));
+            
+            if (!destLocation) {
+              throw new Error(`Destination location ${destinationLocationId} not found`);
+            }
+
+            await tx.insert(schema.inventory).values({
+              companyId: destLocation.companyId,
+              locationId: destinationLocationId,
+              stockItemId: item.stockItemId,
+              quantity: item.quantity,
+              averageRate: item.rate,
+              totalValue: totalAmount.toFixed(2),
+              lastUpdated: new Date(),
+            });
+          }
         }
       }
 
@@ -2740,6 +2755,18 @@ export class DbStorage implements IStorage {
     items: Array<{stockItemId: number, quantity: string, rate: string}>
   ): Promise<any> {
     return await db.transaction(async (tx) => {
+      // Check if voucher is optional - if so, skip inventory updates
+      const [voucher] = await tx
+        .select()
+        .from(schema.vouchers)
+        .where(eq(schema.vouchers.id, voucherId));
+      
+      if (!voucher) {
+        throw new Error(`Voucher ${voucherId} not found`);
+      }
+      
+      const isOptional = voucher.optional;
+
       // Create the stock adjustment voucher record
       const [adjustment] = await tx.insert(schema.stockAdjustmentVouchers).values({
         voucherId,
@@ -2776,57 +2803,60 @@ export class DbStorage implements IStorage {
 
         adjustmentItems.push(adjustmentItem);
 
-        // Get current inventory at location
-        const [currentInventory] = await tx
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, locationId),
-            eq(schema.inventory.stockItemId, item.stockItemId)
-          ));
+        // Only update inventory if voucher is NOT optional
+        if (!isOptional) {
+          // Get current inventory at location
+          const [currentInventory] = await tx
+            .select()
+            .from(schema.inventory)
+            .where(and(
+              eq(schema.inventory.locationId, locationId),
+              eq(schema.inventory.stockItemId, item.stockItemId)
+            ));
 
-        if (currentInventory) {
-          // Adjust quantity at location
-          const currentQty = parseFloat(currentInventory.quantity);
-          const currentValue = parseFloat(currentInventory.totalValue);
-          const currentRate = parseFloat(currentInventory.averageRate);
-          
-          let newQty: number;
-          let newValue: number;
-          let newRate: number;
+          if (currentInventory) {
+            // Adjust quantity at location
+            const currentQty = parseFloat(currentInventory.quantity);
+            const currentValue = parseFloat(currentInventory.totalValue);
+            const currentRate = parseFloat(currentInventory.averageRate);
+            
+            let newQty: number;
+            let newValue: number;
+            let newRate: number;
 
-          if (adjustmentType === "Production") {
-            // Positive adjustment - add to inventory
-            newQty = currentQty + quantity;
-            newValue = currentValue + totalAmount;
-            newRate = newQty > 0 ? newValue / newQty : 0;
-          } else {
-            // Consumption - subtract from inventory (use absolute value to ensure reduction)
-            newQty = currentQty - Math.abs(quantity);
-            newValue = newQty > 0 ? newQty * currentRate : 0;
-            newRate = currentRate;
-          }
-          
-          await tx
-            .update(schema.inventory)
-            .set({
-              quantity: newQty.toFixed(3),
-              averageRate: newRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
+            if (adjustmentType === "Production") {
+              // Positive adjustment - add to inventory
+              newQty = currentQty + quantity;
+              newValue = currentValue + totalAmount;
+              newRate = newQty > 0 ? newValue / newQty : 0;
+            } else {
+              // Consumption - subtract from inventory (use absolute value to ensure reduction)
+              newQty = currentQty - Math.abs(quantity);
+              newValue = newQty > 0 ? newQty * currentRate : 0;
+              newRate = currentRate;
+            }
+            
+            await tx
+              .update(schema.inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: newRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, currentInventory.id));
+          } else if (adjustmentType === "Production") {
+            // Create new inventory record for production
+            await tx.insert(schema.inventory).values({
+              companyId: location.companyId,
+              locationId,
+              stockItemId: item.stockItemId,
+              quantity: item.quantity,
+              averageRate: item.rate,
+              totalValue: totalAmount.toFixed(2),
               lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, currentInventory.id));
-        } else if (adjustmentType === "Production") {
-          // Create new inventory record for production
-          await tx.insert(schema.inventory).values({
-            companyId: location.companyId,
-            locationId,
-            stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            averageRate: item.rate,
-            totalValue: totalAmount.toFixed(2),
-            lastUpdated: new Date(),
-          });
+            });
+          }
         }
       }
 
