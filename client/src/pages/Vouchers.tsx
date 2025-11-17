@@ -1165,9 +1165,9 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
       
-      // Clear edit mode and navigate back to vouchers
+      // Clear edit mode and navigate back to daybook
       if (isEditMode) {
-        setLocation("/vouchers");
+        setLocation("/daybook");
       } else {
         form.reset({
           paymentAccountType: "ledger",
@@ -1574,9 +1574,9 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
       
-      // Clear edit mode and navigate back or reset form
+      // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation("/vouchers");
+        setLocation("/daybook");
       } else {
         journalForm.reset({
           voucherDate: new Date(),
@@ -1880,9 +1880,9 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
       
-      // Clear edit mode and navigate back or reset form
+      // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation("/vouchers");
+        setLocation("/daybook");
       } else {
         stockTransferForm.reset({
           voucherDate: new Date(),
@@ -2102,9 +2102,9 @@ export default function Vouchers() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-adjustments"] });
       
-      // Clear edit mode and navigate back or reset form
+      // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
-        setLocation("/vouchers");
+        setLocation("/daybook");
       } else {
         stockAdjustmentForm.reset({
           voucherDate: new Date(),

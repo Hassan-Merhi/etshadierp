@@ -7356,6 +7356,246 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (req.body.optional !== undefined)
             voucherUpdates.optional = req.body.optional;
 
+          // Handle inventory changes when toggling optional status
+          if (req.body.optional !== undefined && existingVoucher.optional !== req.body.optional) {
+            const wasOptional = existingVoucher.optional;
+            const willBeOptional = req.body.optional;
+
+            // Check if there are stock operations linked to this voucher
+            const hasStockTransfer = await tx
+              .select()
+              .from(stockTransferVouchers)
+              .where(eq(stockTransferVouchers.voucherId, id))
+              .limit(1);
+            
+            const hasStockAdjustment = await tx
+              .select()
+              .from(stockAdjustmentVouchers)
+              .where(eq(stockAdjustmentVouchers.voucherId, id))
+              .limit(1);
+
+            if (hasStockTransfer.length > 0) {
+              const transfer = hasStockTransfer[0];
+              const items = await tx
+                .select()
+                .from(stockTransferItems)
+                .where(eq(stockTransferItems.transferId, transfer.id));
+
+              // Validate legacy transfers
+              const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
+              if (itemsWithoutSource.length > 0) {
+                throw new Error(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data.`);
+              }
+
+              for (const item of items) {
+                const quantity = parseFloat(item.quantity);
+                const rate = parseFloat(item.rate);
+                const totalAmount = quantity * rate;
+
+                if (willBeOptional) {
+                  // Reversing: was active (false), now making optional (true)
+                  // Add back to source, subtract from destination
+                  
+                  // Add back to source
+                  const [sourceInv] = await tx.select().from(inventory)
+                    .where(and(
+                      eq(inventory.locationId, item.sourceLocationId!),
+                      eq(inventory.stockItemId, item.stockItemId)
+                    ));
+
+                  if (sourceInv) {
+                    const currentQty = parseFloat(sourceInv.quantity);
+                    const currentValue = parseFloat(sourceInv.totalValue);
+                    const newQty = currentQty + quantity;
+                    const newValue = currentValue + totalAmount;
+                    const newRate = newQty > 0 ? newValue / newQty : 0;
+
+                    await tx.update(inventory)
+                      .set({
+                        quantity: newQty.toFixed(3),
+                        averageRate: newRate.toFixed(2),
+                        totalValue: newValue.toFixed(2),
+                        lastUpdated: new Date(),
+                      })
+                      .where(eq(inventory.id, sourceInv.id));
+                  }
+
+                  // Subtract from destination
+                  const [destInv] = await tx.select().from(inventory)
+                    .where(and(
+                      eq(inventory.locationId, transfer.destinationLocationId),
+                      eq(inventory.stockItemId, item.stockItemId)
+                    ));
+
+                  if (destInv) {
+                    const currentQty = parseFloat(destInv.quantity);
+                    const currentRate = parseFloat(destInv.averageRate);
+                    const newQty = currentQty - quantity;
+                    const newValue = newQty > 0 ? newQty * currentRate : 0;
+
+                    await tx.update(inventory)
+                      .set({
+                        quantity: newQty.toFixed(3),
+                        averageRate: currentRate.toFixed(2),
+                        totalValue: newValue.toFixed(2),
+                        lastUpdated: new Date(),
+                      })
+                      .where(eq(inventory.id, destInv.id));
+                  }
+                } else {
+                  // Applying: was optional (true), now making active (false)
+                  // Subtract from source, add to destination
+
+                  // Subtract from source
+                  const [sourceInv] = await tx.select().from(inventory)
+                    .where(and(
+                      eq(inventory.locationId, item.sourceLocationId!),
+                      eq(inventory.stockItemId, item.stockItemId)
+                    ));
+
+                  if (sourceInv) {
+                    const currentQty = parseFloat(sourceInv.quantity);
+                    const currentRate = parseFloat(sourceInv.averageRate);
+                    const newQty = currentQty - quantity;
+                    const newValue = newQty > 0 ? newQty * currentRate : 0;
+
+                    await tx.update(inventory)
+                      .set({
+                        quantity: newQty.toFixed(3),
+                        averageRate: currentRate.toFixed(2),
+                        totalValue: newValue.toFixed(2),
+                        lastUpdated: new Date(),
+                      })
+                      .where(eq(inventory.id, sourceInv.id));
+                  }
+
+                  // Add to destination
+                  const [destInv] = await tx.select().from(inventory)
+                    .where(and(
+                      eq(inventory.locationId, transfer.destinationLocationId),
+                      eq(inventory.stockItemId, item.stockItemId)
+                    ));
+
+                  if (destInv) {
+                    const currentQty = parseFloat(destInv.quantity);
+                    const currentValue = parseFloat(destInv.totalValue);
+                    const newQty = currentQty + quantity;
+                    const newValue = currentValue + totalAmount;
+                    const newRate = newQty > 0 ? newValue / newQty : 0;
+
+                    await tx.update(inventory)
+                      .set({
+                        quantity: newQty.toFixed(3),
+                        averageRate: newRate.toFixed(2),
+                        totalValue: newValue.toFixed(2),
+                        lastUpdated: new Date(),
+                      })
+                      .where(eq(inventory.id, destInv.id));
+                  } else {
+                    // Create new inventory at destination
+                    const [destLocation] = await tx.select().from(locations)
+                      .where(eq(locations.id, transfer.destinationLocationId));
+                    
+                    if (destLocation) {
+                      await tx.insert(inventory).values({
+                        companyId: destLocation.companyId,
+                        locationId: transfer.destinationLocationId,
+                        stockItemId: item.stockItemId,
+                        quantity: quantity.toFixed(3),
+                        averageRate: rate.toFixed(2),
+                        totalValue: totalAmount.toFixed(2),
+                        lastUpdated: new Date(),
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
+            if (hasStockAdjustment.length > 0) {
+              const adjustment = hasStockAdjustment[0];
+              const items = await tx
+                .select()
+                .from(stockAdjustmentItems)
+                .where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
+
+              for (const item of items) {
+                const quantity = parseFloat(item.quantity);
+                const rate = parseFloat(item.rate);
+                const totalAmount = Math.abs(quantity) * rate;
+
+                const [currentInv] = await tx.select().from(inventory)
+                  .where(and(
+                    eq(inventory.locationId, adjustment.locationId),
+                    eq(inventory.stockItemId, item.stockItemId)
+                  ));
+
+                if (currentInv) {
+                  const currentQty = parseFloat(currentInv.quantity);
+                  const currentValue = parseFloat(currentInv.totalValue);
+                  const currentRate = parseFloat(currentInv.averageRate);
+                  
+                  let newQty: number;
+                  let newValue: number;
+                  let newRate: number;
+
+                  if (willBeOptional) {
+                    // Reversing the adjustment
+                    if (adjustment.adjustmentType === "Production") {
+                      // Reverse production: subtract what was added
+                      newQty = currentQty - quantity;
+                      newValue = newQty > 0 ? newQty * currentRate : 0;
+                      newRate = currentRate;
+                    } else {
+                      // Reverse consumption: add back what was subtracted
+                      newQty = currentQty + Math.abs(quantity);
+                      newValue = currentValue + totalAmount;
+                      newRate = newQty > 0 ? newValue / newQty : 0;
+                    }
+                  } else {
+                    // Applying the adjustment
+                    if (adjustment.adjustmentType === "Production") {
+                      // Apply production: add to inventory
+                      newQty = currentQty + quantity;
+                      newValue = currentValue + totalAmount;
+                      newRate = newQty > 0 ? newValue / newQty : 0;
+                    } else {
+                      // Apply consumption: subtract from inventory
+                      newQty = currentQty - Math.abs(quantity);
+                      newValue = newQty > 0 ? newQty * currentRate : 0;
+                      newRate = currentRate;
+                    }
+                  }
+
+                  await tx.update(inventory)
+                    .set({
+                      quantity: newQty.toFixed(3),
+                      averageRate: newRate.toFixed(2),
+                      totalValue: newValue.toFixed(2),
+                      lastUpdated: new Date(),
+                    })
+                    .where(eq(inventory.id, currentInv.id));
+                } else if (!willBeOptional && adjustment.adjustmentType === "Production") {
+                  // Creating new inventory for production when making voucher active
+                  const [loc] = await tx.select().from(locations)
+                    .where(eq(locations.id, adjustment.locationId));
+                  
+                  if (loc) {
+                    await tx.insert(inventory).values({
+                      companyId: loc.companyId,
+                      locationId: adjustment.locationId,
+                      stockItemId: item.stockItemId,
+                      quantity: quantity.toFixed(3),
+                      averageRate: rate.toFixed(2),
+                      totalValue: totalAmount.toFixed(2),
+                      lastUpdated: new Date(),
+                    });
+                  }
+                }
+              }
+            }
+          }
+
           await tx
             .update(vouchers)
             .set(voucherUpdates)
