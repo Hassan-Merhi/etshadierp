@@ -1335,6 +1335,19 @@ export default function Accounts() {
                       <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
                         <FormField
                           control={editForm.control}
+                          name="code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Code</FormLabel>
+                              <FormControl>
+                                <Input {...field} readOnly className="bg-muted" data-testid="input-edit-code" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={editForm.control}
                           name="name"
                           render={({ field }) => (
                             <FormItem>

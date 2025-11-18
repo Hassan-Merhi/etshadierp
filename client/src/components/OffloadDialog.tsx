@@ -206,6 +206,10 @@ export function OffloadDialog({
     (account: any) => account.accountType === "Cash" || account.accountType === "Bank"
   );
 
+  const dutiesAndTransportersAccounts = ledgerAccounts.filter(
+    (account: any) => account.accountType === "Duties" || account.accountType === "Transporters"
+  );
+
   const totalCharges =
     parseFloat(duties || "0") +
     parseFloat(officeCharges || "0") +
@@ -352,7 +356,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={dutiesAccountId}
                 onValueChange={setDutiesAccountId}
-                accounts={bankAndCashAccounts}
+                accounts={dutiesAndTransportersAccounts}
                 placeholder="Select account"
                 disabled={parseFloat(duties) === 0}
                 testId="select-duties-account"
@@ -422,7 +426,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={transportAccountId}
                 onValueChange={setTransportAccountId}
-                accounts={bankAndCashAccounts}
+                accounts={dutiesAndTransportersAccounts}
                 placeholder="Select account"
                 disabled={parseFloat(transportFees) === 0}
                 testId="select-transport-account"
