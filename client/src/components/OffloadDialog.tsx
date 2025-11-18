@@ -202,14 +202,6 @@ export function OffloadDialog({
     enabled: open,
   });
 
-  const bankAndCashAccounts = ledgerAccounts.filter(
-    (account: any) => account.accountType === "Cash" || account.accountType === "Bank"
-  );
-
-  const dutiesAndTransportersAccounts = ledgerAccounts.filter(
-    (account: any) => account.accountType === "Duty Agent" || account.accountType === "Transporter Agent"
-  );
-
   const totalCharges =
     parseFloat(duties || "0") +
     parseFloat(officeCharges || "0") +
@@ -356,7 +348,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={dutiesAccountId}
                 onValueChange={setDutiesAccountId}
-                accounts={dutiesAndTransportersAccounts}
+                accounts={ledgerAccounts}
                 placeholder="Select account"
                 disabled={parseFloat(duties) === 0}
                 testId="select-duties-account"
@@ -380,7 +372,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={officeChargesAccountId}
                 onValueChange={setOfficeChargesAccountId}
-                accounts={bankAndCashAccounts}
+                accounts={ledgerAccounts}
                 placeholder="Office account"
                 disabled={parseFloat(officeCharges) === 0}
                 testId="select-office-charges-account"
@@ -388,7 +380,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={officeChargesCashAccountId}
                 onValueChange={setOfficeChargesCashAccountId}
-                accounts={bankAndCashAccounts}
+                accounts={ledgerAccounts}
                 placeholder="Cash account"
                 disabled={parseFloat(officeCharges) === 0}
                 testId="select-office-charges-cash-account"
@@ -426,7 +418,7 @@ export function OffloadDialog({
               <AccountCombobox
                 value={transportAccountId}
                 onValueChange={setTransportAccountId}
-                accounts={dutiesAndTransportersAccounts}
+                accounts={ledgerAccounts}
                 placeholder="Select account"
                 disabled={parseFloat(transportFees) === 0}
                 testId="select-transport-account"
@@ -479,7 +471,7 @@ export function OffloadDialog({
                         onValueChange={(value) =>
                           handleUpdateCharge(charge.id, "ledgerAccountId", value)
                         }
-                        accounts={bankAndCashAccounts}
+                        accounts={ledgerAccounts}
                         placeholder="Select account"
                         testId={`select-charge-account-${charge.id}`}
                       />
