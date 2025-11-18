@@ -17,6 +17,7 @@ import { useVoucherEntries } from "@/hooks/useVoucherEntries";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
 import { PaymentVoucherTab } from "@/components/vouchers/PaymentVoucherTab";
 import { ReceiptVoucherTab } from "@/components/vouchers/ReceiptVoucherTab";
+import { SalesVoucherTab } from "@/components/vouchers/SalesVoucherTab";
 import {
   Card,
   CardContent,
@@ -513,11 +514,17 @@ export default function Vouchers() {
   const tabParam = searchParams.get('tab');
   const voucherIdToEdit = editParam ? parseInt(editParam) : null;
   
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">(
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment" | "sales">(
     (tabParam as any) || "payment"
   );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  // Handle opening voucher for editing
+  const handleEditVoucher = (voucherId: number) => {
+    // Navigate to the full voucher edit page for better editing experience
+    setLocation(`/voucher/${voucherId}`);
+  };
 
   // Synchronize activeTab and editVoucherId with URL parameters
   useEffect(() => {
@@ -2648,7 +2655,7 @@ export default function Vouchers() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "sales")}>
         <TabsList>
           <TabsTrigger value="payment" data-testid="tab-payment">
             Payment
@@ -2664,6 +2671,9 @@ export default function Vouchers() {
           </TabsTrigger>
           <TabsTrigger value="adjustment" data-testid="tab-adjustment">
             Production/Consumption
+          </TabsTrigger>
+          <TabsTrigger value="sales" data-testid="tab-sales">
+            Sales
           </TabsTrigger>
         </TabsList>
 
@@ -3846,6 +3856,10 @@ export default function Vouchers() {
               </Form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="sales" className="space-y-4">
+          <SalesVoucherTab onEditVoucher={handleEditVoucher} />
         </TabsContent>
       </Tabs>
 
