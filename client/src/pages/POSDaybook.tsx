@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2 } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -60,11 +62,22 @@ interface VoucherWithItems extends Voucher {
   salesItems?: SalesItem[];
 }
 
+interface InventoryItem {
+  stockItemId: number;
+  stockItemCode: string;
+  stockItemName: string;
+  quantity: string;
+  averageRate: string;
+  lastSellingPrice: string | null;
+}
+
 export default function POSDaybook() {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
   const [editedNotes, setEditedNotes] = useState("");
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -107,6 +120,12 @@ export default function POSDaybook() {
     enabled: !!selectedVoucher,
   });
 
+  // Fetch inventory for the location when in edit mode
+  const { data: inventory = [] } = useQuery<InventoryItem[]>({
+    queryKey: selectedVoucher?.locationId ? [`/api/locations/${selectedVoucher.locationId}/inventory`] : [],
+    enabled: !!selectedVoucher?.locationId && isEditMode,
+  });
+
   // Populate editedItems when voucher details load (deep clone to avoid mutating cached data)
   useEffect(() => {
     if (voucherDetails?.salesItems && isEditMode) {
@@ -120,11 +139,20 @@ export default function POSDaybook() {
     mutationFn: async () => {
       if (!selectedVoucher) throw new Error("No voucher selected");
 
-      const items = editedItems.map(item => ({
-        stockItemId: item.stockItemId,
-        quantity: item.quantity,
-        sellingPrice: item.sellingPrice,
-      }));
+      const items = editedItems.map(item => {
+        const payload: any = {
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          sellingPrice: item.sellingPrice,
+        };
+        
+        // Only include ID for existing items (positive IDs), not new items (negative IDs)
+        if (item.id > 0) {
+          payload.id = item.id;
+        }
+        
+        return payload;
+      });
 
       return await apiRequest("PUT", `/api/vouchers/${selectedVoucher.id}/sales`, {
         description: editedNotes,
@@ -181,6 +209,30 @@ export default function POSDaybook() {
     newItems[index].totalCost = (qty * cost).toFixed(2);
     newItems[index].profit = (qty * (price - cost)).toFixed(2);
     
+    setEditedItems(newItems);
+  };
+
+  const handleAddItem = (item: InventoryItem) => {
+    // Create new sales item with current inventory cost and default price
+    const newItem: SalesItem = {
+      id: -Date.now(), // Temporary negative ID for new items
+      stockItemId: item.stockItemId,
+      stockItemName: item.stockItemName,
+      quantity: "1",
+      sellingPrice: item.lastSellingPrice || item.averageRate,
+      costPrice: item.averageRate, // Use current cost for new items
+      totalSales: item.lastSellingPrice || item.averageRate,
+      totalCost: item.averageRate,
+      profit: ((parseFloat(item.lastSellingPrice || item.averageRate) - parseFloat(item.averageRate)) * 1).toFixed(2),
+    };
+    
+    setEditedItems([...editedItems, newItem]);
+    setAddItemOpen(false);
+    setItemSearch("");
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = editedItems.filter((_, i) => i !== index);
     setEditedItems(newItems);
   };
 
@@ -367,7 +419,59 @@ export default function POSDaybook() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Items Sold</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
+                    <Popover open={addItemOpen} onOpenChange={setAddItemOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid="button-add-item"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Item
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="end">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search items..."
+                            value={itemSearch}
+                            onValueChange={setItemSearch}
+                            data-testid="input-item-search"
+                          />
+                          <CommandList>
+                            <CommandEmpty>No items found.</CommandEmpty>
+                            <CommandGroup>
+                              {inventory
+                                .filter(item => 
+                                  item.stockItemName.toLowerCase().includes(itemSearch.toLowerCase()) ||
+                                  item.stockItemCode.toLowerCase().includes(itemSearch.toLowerCase())
+                                )
+                                .map((item) => (
+                                  <CommandItem
+                                    key={item.stockItemId}
+                                    value={item.stockItemName}
+                                    onSelect={() => handleAddItem(item)}
+                                    data-testid={`item-${item.stockItemId}`}
+                                  >
+                                    <div className="flex justify-between w-full">
+                                      <div>
+                                        <div className="font-medium">{item.stockItemName}</div>
+                                        <div className="text-xs text-muted-foreground">{item.stockItemCode}</div>
+                                      </div>
+                                      <div className="text-sm font-mono">
+                                        ${parseFloat(item.lastSellingPrice || item.averageRate).toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -377,6 +481,7 @@ export default function POSDaybook() {
                         <TableHead className="text-right">Cost</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Profit</TableHead>
+                        <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -419,6 +524,17 @@ export default function POSDaybook() {
                             </TableCell>
                             <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               ${profit.toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveItem(idx)}
+                                data-testid={`button-remove-${idx}`}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );

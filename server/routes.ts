@@ -10447,9 +10447,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(salesItems)
         .where(eq(salesItems.voucherId, voucherId));
 
-      // Create map of old items by stockItemId for cost preservation
+      // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
       const oldItemsMap = new Map(
-        oldSalesItems.map(item => [item.stockItemId, item])
+        oldSalesItems.map(item => [item.id, item])
       );
 
       // Get existing voucher entries to recreate them
@@ -10494,7 +10494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new sales items and apply new inventory movements
         let grandTotal = 0;
         for (const item of items) {
-          const { stockItemId, quantity, sellingPrice } = item;
+          const { id, stockItemId, quantity, sellingPrice } = item;
 
           // Get inventory record for validation and deduction
           const [inventoryRecord] = await tx
@@ -10519,8 +10519,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error(`Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`);
           }
 
-          // Preserve historical cost from old sale item if same item, otherwise use current cost
-          const oldItem = oldItemsMap.get(stockItemId);
+          // Preserve historical cost from old sale line if it exists (by line ID), otherwise use current cost
+          // Items with id field are existing items, items without id are new items
+          const oldItem = id !== undefined && id > 0 ? oldItemsMap.get(id) : null;
           const costPrice = oldItem 
             ? parseFloat(oldItem.costPrice || "0")
             : parseFloat(inventoryRecord.averageRate || "0");
