@@ -1254,8 +1254,8 @@ export default function Accounts() {
                       </div>
                     ) : (
                       filteredAccountsForEdit.map((account) => {
-                        const isLedger = account.type === "Ledger";
-                        const isBank = account.type === "Bank";
+                        const isLedger = account.type === "ledger";
+                        const isBank = account.type === "bank";
                         const isEditable = isLedger || isBank;
                         const isLedgerSelected = accountToEdit?.id === account.accountId && isLedger;
                         const isBankSelected = bankToEdit?.id === account.accountId && isBank;
