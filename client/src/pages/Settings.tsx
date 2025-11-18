@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -811,36 +812,62 @@ export default function Settings() {
                                     return (
                                       <div
                                         key={role.id}
-                                        className="flex items-center justify-between p-3 bg-background rounded-md border"
+                                        className="p-3 bg-background rounded-md border space-y-3"
                                         data-testid={`role-assignment-${role.id}`}
                                       >
-                                        <div className="flex items-center gap-3">
-                                          <div>
-                                            <div className="font-medium">{company?.name || "Unknown Company"}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                              <Badge variant="outline" className="mr-2">{role.role}</Badge>
-                                              {location && <span className="text-xs">Location: {location.name}</span>}
-                                              {role.posStation && <span className="text-xs ml-2">Station: {role.posStation}</span>}
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <div>
+                                              <div className="font-medium">{company?.name || "Unknown Company"}</div>
+                                              <div className="text-sm text-muted-foreground">
+                                                <Badge variant="outline" className="mr-2">{role.role}</Badge>
+                                                {location && <span className="text-xs">Location: {location.name}</span>}
+                                                {role.posStation && <span className="text-xs ml-2">Station: {role.posStation}</span>}
+                                              </div>
                                             </div>
                                           </div>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => handleEditRole(role)}
+                                              data-testid={`button-edit-role-${role.id}`}
+                                            >
+                                              <Edit className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => handleDeleteRole(role.id, user.id)}
+                                              data-testid={`button-delete-role-${role.id}`}
+                                            >
+                                              <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                          </div>
                                         </div>
-                                        <div className="flex gap-1">
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleEditRole(role)}
-                                            data-testid={`button-edit-role-${role.id}`}
-                                          >
-                                            <Edit className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleDeleteRole(role.id, user.id)}
-                                            data-testid={`button-delete-role-${role.id}`}
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
+                                        <div className="flex gap-6 pl-1">
+                                          <div className="flex items-center gap-2">
+                                            <Switch
+                                              checked={role.role === "Admin" ? true : role.canSellNegativeStock}
+                                              onCheckedChange={(checked) =>
+                                                handlePermissionToggle(role.id, user.id, role.companyId, "canSellNegativeStock", checked)
+                                              }
+                                              disabled={updatePermissionMutation.isPending || role.role === "Admin"}
+                                              data-testid={`toggle-can-sell-${role.id}`}
+                                            />
+                                            <Label className="text-sm cursor-pointer">Can Sell</Label>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Switch
+                                              checked={role.canEditDaybook}
+                                              onCheckedChange={(checked) =>
+                                                handlePermissionToggle(role.id, user.id, role.companyId, "canEditDaybook", checked)
+                                              }
+                                              disabled={updatePermissionMutation.isPending}
+                                              data-testid={`toggle-can-edit-daybook-${role.id}`}
+                                            />
+                                            <Label className="text-sm cursor-pointer">Can Edit Daybook</Label>
+                                          </div>
                                         </div>
                                       </div>
                                     );
