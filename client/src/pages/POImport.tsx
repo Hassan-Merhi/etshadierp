@@ -3,14 +3,86 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Supplier } from "@shared/schema";
+
+interface SupplierComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  suppliers: Supplier[];
+  placeholder?: string;
+  testId?: string;
+}
+
+function SupplierCombobox({ value, onValueChange, suppliers, placeholder = "Select supplier", testId }: SupplierComboboxProps) {
+  const [open, setOpen] = useState(false);
+  
+  const selectedSupplier = suppliers.find((supplier) => supplier.id.toString() === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          data-testid={testId}
+        >
+          {selectedSupplier ? selectedSupplier.legalName : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search suppliers..." />
+          <CommandList>
+            <CommandEmpty>No supplier found.</CommandEmpty>
+            <CommandGroup>
+              {suppliers.map((supplier) => (
+                <CommandItem
+                  key={supplier.id}
+                  value={supplier.legalName}
+                  onSelect={() => {
+                    onValueChange(supplier.id.toString());
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === supplier.id.toString() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {supplier.legalName}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function POImport() {
   const [_location, navigate] = useLocation();
@@ -303,18 +375,13 @@ export default function POImport() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="supplier">Supplier *</Label>
-                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                      <SelectTrigger id="supplier" data-testid="select-supplier">
-                        <SelectValue placeholder="Select supplier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((supplier: any) => (
-                          <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                            {supplier.legalName} ({supplier.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SupplierCombobox
+                      value={selectedSupplier}
+                      onValueChange={setSelectedSupplier}
+                      suppliers={suppliers}
+                      placeholder="Select supplier"
+                      testId="select-supplier"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -418,7 +485,7 @@ export default function POImport() {
                         <TableRow key={itemIdx}>
                           <TableCell>{item.poNumber}</TableCell>
                           <TableCell>{item.itemName}</TableCell>
-                          <TableCell className="text-right">{item.quantity.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}</TableCell>
                           <TableCell className="text-right">{item.rate.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-medium">{item.lineTotal.toFixed(2)}</TableCell>
                         </TableRow>
