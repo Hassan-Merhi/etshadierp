@@ -207,7 +207,7 @@ export function OffloadDialog({
   );
 
   const dutiesAndTransportersAccounts = ledgerAccounts.filter(
-    (account: any) => account.accountType === "Duties" || account.accountType === "Transporters"
+    (account: any) => account.accountType === "Duty Agent" || account.accountType === "Transporter Agent"
   );
 
   const totalCharges =
