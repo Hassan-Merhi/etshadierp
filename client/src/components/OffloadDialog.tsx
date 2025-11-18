@@ -114,6 +114,65 @@ function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select
   );
 }
 
+interface LocationComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  locations: Location[];
+  placeholder?: string;
+  testId?: string;
+}
+
+function LocationCombobox({ value, onValueChange, locations, placeholder = "Select location", testId }: LocationComboboxProps) {
+  const [open, setOpen] = useState(false);
+  
+  const selectedLocation = locations.find((location) => location.id.toString() === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          data-testid={testId}
+        >
+          {selectedLocation ? selectedLocation.name : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search locations..." />
+          <CommandList>
+            <CommandEmpty>No location found.</CommandEmpty>
+            <CommandGroup>
+              {locations.map((location) => (
+                <CommandItem
+                  key={location.id}
+                  value={location.name}
+                  onSelect={() => {
+                    onValueChange(location.id.toString());
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === location.id.toString() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {location.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function OffloadDialog({
   open,
   onOpenChange,
@@ -440,25 +499,13 @@ export function OffloadDialog({
           {/* Destination Location */}
           <div className="space-y-2 pt-2 border-t">
             <Label htmlFor="location">Destination Location</Label>
-            <Select
-              value={locationId?.toString()}
+            <LocationCombobox
+              value={locationId?.toString() || ""}
               onValueChange={(value) => setLocationId(parseInt(value))}
-            >
-              <SelectTrigger data-testid="select-location">
-                <SelectValue placeholder="Select a location" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((location) => (
-                  <SelectItem
-                    key={location.id}
-                    value={location.id.toString()}
-                    data-testid={`select-location-${location.id}`}
-                  >
-                    {location.name} ({location.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              locations={locations}
+              placeholder="Select a location"
+              testId="select-location"
+            />
           </div>
 
           {/* Calculation Summary */}
