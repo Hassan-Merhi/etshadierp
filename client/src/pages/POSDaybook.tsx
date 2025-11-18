@@ -285,31 +285,58 @@ export default function POSDaybook() {
                         <TableHead>Item</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
                         <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Profit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {voucherDetails.salesItems.map((item: any, idx: number) => (
-                        <TableRow key={item.id || idx}>
-                          <TableCell className="font-medium">
-                            {item.stockItemName || `Item ${item.stockItemId}`}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(item.quantity).toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            ${parseFloat(item.sellingPrice).toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-semibold">
-                            ${parseFloat(item.totalSales).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {voucherDetails.salesItems.map((item: any, idx: number) => {
+                        const profit = parseFloat(item.profit || "0");
+                        const isPositiveProfit = profit >= 0;
+                        
+                        return (
+                          <TableRow key={item.id || idx}>
+                            <TableCell className="font-medium">
+                              {item.stockItemName || `Item ${item.stockItemId}`}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(item.quantity).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${parseFloat(item.sellingPrice).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">
+                              ${parseFloat(item.costPrice || "0").toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              ${parseFloat(item.totalSales).toFixed(2)}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              ${profit.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
 
-                <div className="border-t pt-4 flex justify-end">
+                <div className="border-t pt-4 flex justify-between">
+                  <div className="space-y-1">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Total Cost: </span>
+                      <span className="font-mono font-semibold">
+                        ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Total Profit: </span>
+                      <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
