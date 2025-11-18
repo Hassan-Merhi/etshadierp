@@ -66,7 +66,7 @@ import {
   salaryAdvanceDeductions,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -10380,6 +10380,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       // Return appropriate status codes for different error types
+      if (error.message.includes("Inventory not found")) {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("Insufficient stock")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update existing sales voucher
+  app.put("/api/vouchers/:id/sales", requireAuth, async (req, res) => {
+    try {
+      const voucherId = parseInt(req.params.id);
+      if (isNaN(voucherId)) {
+        return res.status(400).json({ message: "Invalid voucher ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { description, items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Validate all items have positive quantities and prices
+      for (const item of items) {
+        const qty = parseFloat(item.quantity);
+        const price = parseFloat(item.sellingPrice);
+        
+        if (isNaN(qty) || qty <= 0) {
+          throw new Error(`Invalid quantity: ${item.quantity}. Must be greater than 0.`);
+        }
+        if (isNaN(price) || price <= 0) {
+          throw new Error(`Invalid price: ${item.sellingPrice}. Must be greater than 0.`);
+        }
+      }
+
+      // Get existing voucher to validate it's a Sales voucher in the current company
+      const [existingVoucher] = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.id, voucherId),
+            eq(vouchers.companyId, req.session.currentCompanyId)
+          )
+        )
+        .limit(1);
+
+      if (!existingVoucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (existingVoucher.voucherType !== "Sales") {
+        return res.status(400).json({ message: "Only Sales vouchers can be updated with this endpoint" });
+      }
+
+      // Get old sales items to reverse inventory and preserve historical cost
+      const oldSalesItems = await db
+        .select()
+        .from(salesItems)
+        .where(eq(salesItems.voucherId, voucherId));
+
+      // Create map of old items by stockItemId for cost preservation
+      const oldItemsMap = new Map(
+        oldSalesItems.map(item => [item.stockItemId, item])
+      );
+
+      // Get existing voucher entries to recreate them
+      const oldEntries = await db
+        .select()
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, voucherId));
+
+      // Begin transaction
+      await db.transaction(async (tx) => {
+        // Reverse old inventory movements
+        for (const oldItem of oldSalesItems) {
+          const oldQty = parseFloat(oldItem.quantity);
+          
+          // Add back the old quantity to inventory
+          const [existingInventory] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.locationId, existingVoucher.locationId!),
+                eq(inventory.stockItemId, oldItem.stockItemId)
+              )
+            )
+            .limit(1);
+
+          if (existingInventory) {
+            const currentQty = parseFloat(existingInventory.quantity);
+            const newQty = currentQty + oldQty; // Add back what was sold
+            
+            await tx
+              .update(inventory)
+              .set({ quantity: newQty.toString() })
+              .where(eq(inventory.id, existingInventory.id));
+          }
+        }
+
+        // Delete old sales items and voucher entries
+        await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
+        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+
+        // Create new sales items and apply new inventory movements
+        let grandTotal = 0;
+        for (const item of items) {
+          const { stockItemId, quantity, sellingPrice } = item;
+
+          // Get inventory record for validation and deduction
+          const [inventoryRecord] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.locationId, existingVoucher.locationId!),
+                eq(inventory.stockItemId, stockItemId)
+              )
+            )
+            .limit(1);
+
+          if (!inventoryRecord) {
+            throw new Error(`Inventory not found for stock item ${stockItemId}`);
+          }
+
+          const currentQty = parseFloat(inventoryRecord.quantity);
+          const sellQty = parseFloat(quantity);
+
+          if (currentQty < sellQty) {
+            throw new Error(`Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`);
+          }
+
+          // Preserve historical cost from old sale item if same item, otherwise use current cost
+          const oldItem = oldItemsMap.get(stockItemId);
+          const costPrice = oldItem 
+            ? parseFloat(oldItem.costPrice || "0")
+            : parseFloat(inventoryRecord.averageRate || "0");
+          
+          const totalSales = sellQty * parseFloat(sellingPrice);
+          const totalCost = sellQty * costPrice;
+          const profit = totalSales - totalCost;
+
+          // Create new sales item
+          await tx.insert(salesItems).values({
+            voucherId,
+            stockItemId,
+            quantity: quantity,
+            sellingPrice: sellingPrice,
+            costPrice: costPrice.toString(),
+            totalSales: totalSales.toString(),
+            totalCost: totalCost.toString(),
+            profit: profit.toString(),
+          });
+
+          // Deduct from inventory
+          const newQty = currentQty - sellQty;
+          await tx
+            .update(inventory)
+            .set({ quantity: newQty.toString() })
+            .where(eq(inventory.id, inventoryRecord.id));
+
+          grandTotal += totalSales;
+        }
+
+        // Update voucher description and total amount
+        await tx
+          .update(vouchers)
+          .set({
+            description: description || null,
+            totalAmount: grandTotal.toString(),
+          })
+          .where(eq(vouchers.id, voucherId));
+
+        // Recreate voucher entries with new total
+        // Preserve the original payment account information from old entries
+        const paymentEntry = oldEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+        const revenueEntry = oldEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
+
+        if (!paymentEntry || !revenueEntry) {
+          throw new Error("Original voucher entries not found");
+        }
+
+        // Create new debit entry (payment account)
+        await tx.insert(voucherEntries).values({
+          voucherId,
+          ledgerAccountId: paymentEntry.ledgerAccountId,
+          bankAccountId: paymentEntry.bankAccountId,
+          supplierId: paymentEntry.supplierId,
+          employeeId: paymentEntry.employeeId,
+          fixedAssetId: paymentEntry.fixedAssetId,
+          debitAmount: grandTotal.toString(),
+          creditAmount: "0",
+          narration: paymentEntry.narration || "",
+        });
+
+        // Create new credit entry (sales revenue)
+        await tx.insert(voucherEntries).values({
+          voucherId,
+          ledgerAccountId: revenueEntry.ledgerAccountId,
+          bankAccountId: revenueEntry.bankAccountId,
+          supplierId: revenueEntry.supplierId,
+          employeeId: revenueEntry.employeeId,
+          fixedAssetId: revenueEntry.fixedAssetId,
+          debitAmount: "0",
+          creditAmount: grandTotal.toString(),
+          narration: revenueEntry.narration || "",
+        });
+      });
+
+      res.json({ message: "Sales voucher updated successfully" });
+    } catch (error: any) {
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
       }

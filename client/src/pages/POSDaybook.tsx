@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -25,8 +27,10 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, DollarSign, Package, Eye, Lock } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface Voucher {
   id: number;
@@ -58,7 +62,11 @@ interface VoucherWithItems extends Voucher {
 
 export default function POSDaybook() {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
+  const [editedNotes, setEditedNotes] = useState("");
   const [_location, navigate] = useLocation();
+  const { toast } = useToast();
 
   // Get today's date range
   const today = new Date();
@@ -98,6 +106,83 @@ export default function POSDaybook() {
     queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}`] : [],
     enabled: !!selectedVoucher,
   });
+
+  // Populate editedItems when voucher details load (deep clone to avoid mutating cached data)
+  useEffect(() => {
+    if (voucherDetails?.salesItems && isEditMode) {
+      setEditedItems(JSON.parse(JSON.stringify(voucherDetails.salesItems)));
+      setEditedNotes(voucherDetails.description || "");
+    }
+  }, [voucherDetails, isEditMode]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedVoucher) throw new Error("No voucher selected");
+
+      const items = editedItems.map(item => ({
+        stockItemId: item.stockItemId,
+        quantity: item.quantity,
+        sellingPrice: item.sellingPrice,
+      }));
+
+      return await apiRequest("PUT", `/api/vouchers/${selectedVoucher.id}/sales`, {
+        description: editedNotes,
+        items,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Transaction updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${selectedVoucher?.id}`] });
+      setIsEditMode(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = () => {
+    if (voucherDetails?.salesItems) {
+      // Deep clone to avoid mutating cached query data
+      setEditedItems(JSON.parse(JSON.stringify(voucherDetails.salesItems)));
+      setEditedNotes(voucherDetails.description || "");
+      setIsEditMode(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditedItems([]);
+    setEditedNotes("");
+  };
+
+  const handleSave = () => {
+    saveMutation.mutate();
+  };
+
+  const handleItemChange = (index: number, field: keyof SalesItem, value: string) => {
+    const newItems = [...editedItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    // Recalculate totals
+    const qty = parseFloat(newItems[index].quantity) || 0;
+    const price = parseFloat(newItems[index].sellingPrice) || 0;
+    const cost = parseFloat(newItems[index].costPrice) || 0;
+    
+    newItems[index].totalSales = (qty * price).toFixed(2);
+    newItems[index].totalCost = (qty * cost).toFixed(2);
+    newItems[index].profit = (qty * (price - cost)).toFixed(2);
+    
+    setEditedItems(newItems);
+  };
 
   const totalSales = salesVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount), 0);
   const transactionCount = salesVouchers.length;
@@ -268,6 +353,103 @@ export default function POSDaybook() {
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
+            ) : isEditMode ? (
+              <div className="space-y-4">
+                <div className="border-b pb-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Notes</p>
+                  <Textarea
+                    value={editedNotes}
+                    onChange={(e) => setEditedNotes(e.target.value)}
+                    placeholder="Add notes..."
+                    className="min-h-[60px]"
+                    data-testid="input-notes"
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Items Sold</p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Profit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {editedItems.map((item, idx) => {
+                        const profit = parseFloat(item.profit || "0");
+                        const isPositiveProfit = profit >= 0;
+                        
+                        return (
+                          <TableRow key={item.id || idx}>
+                            <TableCell className="font-medium">
+                              {item.stockItemName || `Item ${item.stockItemId}`}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={item.quantity}
+                                onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
+                                className="text-right font-mono w-24"
+                                data-testid={`input-quantity-${idx}`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={item.sellingPrice}
+                                onChange={(e) => handleItemChange(idx, "sellingPrice", e.target.value)}
+                                className="text-right font-mono w-24"
+                                data-testid={`input-price-${idx}`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">
+                              ${parseFloat(item.costPrice || "0").toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              ${parseFloat(item.totalSales).toFixed(2)}
+                            </TableCell>
+                            <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              ${profit.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="border-t pt-4 flex justify-between">
+                  <div className="space-y-1">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Total Cost: </span>
+                      <span className="font-mono font-semibold">
+                        ${editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Total Profit: </span>
+                      <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        ${editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Total Sales: </span>
+                    <span className="font-mono font-semibold">
+                      ${editedItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             ) : voucherDetails?.salesItems && voucherDetails.salesItems.length > 0 ? (
               <div className="space-y-4">
                 {voucherDetails?.description && (
@@ -353,36 +535,56 @@ export default function POSDaybook() {
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setSelectedVoucher(null)} data-testid="button-close">
-              Close
-            </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Button
-                      onClick={() => {
-                        if (canEditDaybook) {
-                          setSelectedVoucher(null);
-                          navigate(`/pos?edit=${selectedVoucher?.id}`);
-                        }
-                      }}
-                      disabled={!canEditDaybook}
-                      className={!canEditDaybook ? "opacity-50 cursor-not-allowed" : ""}
-                      data-testid="button-edit-transaction"
-                    >
-                      {!canEditDaybook && <Lock className="h-4 w-4 mr-2" />}
-                      Edit Transaction
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                {!canEditDaybook && (
-                  <TooltipContent>
-                    <p>You don't have permission to edit daybook transactions</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+            {isEditMode ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancelEdit}
+                  disabled={saveMutation.isPending}
+                  data-testid="button-cancel-edit"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSave}
+                  disabled={saveMutation.isPending}
+                  data-testid="button-save"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setSelectedVoucher(null)} data-testid="button-close">
+                  Close
+                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Button
+                          onClick={handleEdit}
+                          disabled={!canEditDaybook}
+                          className={!canEditDaybook ? "opacity-50 cursor-not-allowed" : ""}
+                          data-testid="button-edit-transaction"
+                        >
+                          {!canEditDaybook && <Lock className="h-4 w-4 mr-2" />}
+                          {canEditDaybook && <Pencil className="h-4 w-4 mr-2" />}
+                          Edit Transaction
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    {!canEditDaybook && (
+                      <TooltipContent>
+                        <p>You don't have permission to edit daybook transactions</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
