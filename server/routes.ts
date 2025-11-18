@@ -9956,9 +9956,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isCreditSale,
       } = req.body;
 
-      // Support both old (cashAccountId) and new (paymentAccountType/paymentAccountId) parameters
-      const accountType = paymentAccountType || "bank";
-      const accountId = paymentAccountId || cashAccountId;
+      // Determine account type and ID by validating against actual database records
+      let accountType: string;
+      let accountId: number;
+
+      if (isCreditSale) {
+        // Credit sales must use a customer receivable ledger account (Asset type)
+        if (!paymentAccountId) {
+          return res.status(400).json({
+            message: "Customer account is required for credit sales",
+          });
+        }
+
+        const [customerAccount] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, paymentAccountId),
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
+            )
+          )
+          .limit(1);
+
+        if (!customerAccount) {
+          return res.status(400).json({
+            message: "Invalid customer account - account not found or does not belong to this company",
+          });
+        }
+
+        if (customerAccount.accountType !== "Asset") {
+          return res.status(400).json({
+            message: `Invalid customer account type: ${customerAccount.accountType}. Credit sales require Asset-type accounts (customer receivables).`,
+          });
+        }
+
+        accountType = "credit";
+        accountId = paymentAccountId;
+      } else if (cashAccountId) {
+        // Legacy: cashAccountId parameter - validate it's a cash ledger account in current company
+        const [cashLedger] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, cashAccountId),
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
+            )
+          )
+          .limit(1);
+
+        if (!cashLedger) {
+          return res.status(400).json({
+            message: "Invalid cash account - account not found or does not belong to this company",
+          });
+        }
+
+        if (cashLedger.accountType !== "Cash") {
+          return res.status(400).json({
+            message: `Invalid cash account type: ${cashLedger.accountType}. The cashAccountId parameter must refer to a Cash-type ledger account.`,
+          });
+        }
+
+        accountType = "cash";
+        accountId = cashAccountId;
+      } else if (paymentAccountId) {
+        // Infer account type by checking if ID exists in ledger accounts or bank accounts
+        // IMPORTANT: Scope by company to prevent cross-tenant access
+        const [ledgerAccount] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, paymentAccountId),
+              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
+            )
+          )
+          .limit(1);
+
+        if (ledgerAccount) {
+          // It's a ledger account - validate it's appropriate for POS sales
+          if (ledgerAccount.accountType === "Cash") {
+            accountType = "cash";
+            accountId = paymentAccountId;
+          } else if (ledgerAccount.accountType === "Asset") {
+            // Asset accounts are customer receivables - should only be used for credit sales
+            return res.status(400).json({
+              message: "Asset accounts (customer receivables) can only be used for credit sales. Please enable 'Credit Sale' or select a Cash/Bank account.",
+            });
+          } else {
+            // Other ledger account types (Expense, Liability, etc.) are not valid for POS sales
+            return res.status(400).json({
+              message: `Invalid payment account type: ${ledgerAccount.accountType}. POS sales require Cash accounts or Bank accounts for cash/bank payments, or Asset accounts for credit sales.`,
+            });
+          }
+        } else {
+          // Check if it's a bank account
+          const [bankAccount] = await db
+            .select()
+            .from(bankAccounts)
+            .where(
+              and(
+                eq(bankAccounts.id, paymentAccountId),
+                eq(bankAccounts.companyId, req.session.currentCompanyId!)
+              )
+            )
+            .limit(1);
+
+          if (bankAccount) {
+            accountType = "bank";
+            accountId = paymentAccountId;
+          } else {
+            return res.status(400).json({
+              message: "Invalid payment account ID - account not found or does not belong to this company",
+            });
+          }
+        }
+      } else {
+        return res.status(400).json({
+          message: "Payment account is required",
+        });
+      }
+
+      console.log("[POS Sale] Payment info:", {
+        provided: { paymentAccountType, paymentAccountId, cashAccountId, isCreditSale },
+        resolved: { accountType, accountId },
+      });
 
       // Validate required fields
       if (!locationId) {
@@ -10115,11 +10238,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ) {
           // For credit sales and cash accounts, use ledgerAccountId
           debitEntry.ledgerAccountId = accountId;
+          console.log("[POS Sale] Using ledgerAccountId for cash/credit:", accountId);
         } else {
           // For bank accounts, use bankAccountId
           debitEntry.bankAccountId = accountId;
+          console.log("[POS Sale] Using bankAccountId for bank:", accountId);
         }
 
+        console.log("[POS Sale] Debit entry:", debitEntry);
         await db.insert(voucherEntries).values(debitEntry);
 
         // Credit: Sales Account (Revenue increases)
