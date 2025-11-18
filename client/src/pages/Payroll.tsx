@@ -1158,8 +1158,118 @@ export default function Payroll() {
         </TabsContent>
 
         <TabsContent value="workers">
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-lg font-semibold">Shop Floor Staff (Workers)</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Workers are paid on a monthly basis through bulk payments
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setNewWorkerDialogOpen(true)}
+                  data-testid="button-create-worker"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create Workers
+                </Button>
+              </div>
+
+              {/* Worker Groups Management */}
+              <Collapsible open={groupsExpanded} onOpenChange={setGroupsExpanded}>
+                <Card className="border-dashed">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="w-full flex items-center justify-between p-4 hover-elevate"
+                      data-testid="button-toggle-worker-groups"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">Worker Groups ({employeeGroups.length})</span>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          groupsExpanded && "rotate-180"
+                        )}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-muted-foreground">
+                          Organize workers into groups for easier management
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => setCreateGroupDialogOpen(true)}
+                          data-testid="button-create-worker-group"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Create Group
+                        </Button>
+                      </div>
+                      
+                      {employeeGroups.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <p className="text-sm">No groups created yet</p>
+                        </div>
+                      ) : (
+                        <div className="border rounded-md">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead data-testid="header-worker-group-name">Group Name</TableHead>
+                                <TableHead data-testid="header-worker-group-description">Description</TableHead>
+                                <TableHead data-testid="header-worker-group-actions" className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {employeeGroups.map((group: any) => (
+                                <TableRow key={group.id} data-testid={`row-worker-group-${group.id}`}>
+                                  <TableCell data-testid={`cell-worker-group-name-${group.id}`}>
+                                    {group.name}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-worker-group-description-${group.id}`} className="text-muted-foreground">
+                                    {group.description || "—"}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-worker-group-actions-${group.id}`} className="text-right">
+                                    <ConfirmationDialog
+                                      trigger={
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          data-testid={`button-delete-worker-group-${group.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-1" />
+                                          Delete
+                                        </Button>
+                                      }
+                                      title="Delete Worker Group"
+                                      description={`Are you sure you want to delete the group "${group.name}"? This will remove all worker assignments to this group.`}
+                                      onConfirm={() => deleteGroupMutation.mutate(group.id)}
+                                      confirmText="Delete"
+                                      cancelText="Cancel"
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            </div>
+          </Card>
+
           {/* Worker Payment Summary */}
-          <Card className="p-6 mb-4">
+          <Card className="p-6 mb-4 mt-4">
             <h3 className="text-lg font-semibold mb-4">Worker Payment Summary</h3>
             {workerPaymentSummary ? (
               <div className="space-y-4">
@@ -1201,7 +1311,7 @@ export default function Payroll() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">Shop Floor Staff (Workers)</h2>
+                  <h2 className="text-lg font-semibold">Bulk Worker Payments</h2>
                   <p className="text-sm text-muted-foreground">
                     Select workers and adjust amounts to process bulk salary payments
                   </p>
