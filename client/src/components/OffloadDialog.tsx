@@ -19,9 +19,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Location } from "@shared/schema";
 
 interface OffloadDialogProps {
@@ -37,6 +51,67 @@ interface AdditionalCharge {
   description: string;
   amount: string;
   ledgerAccountId: string;
+}
+
+interface AccountComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  accounts: any[];
+  placeholder?: string;
+  disabled?: boolean;
+  testId?: string;
+}
+
+function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
+  const [open, setOpen] = useState(false);
+  
+  const selectedAccount = accounts.find((account) => account.id.toString() === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+          data-testid={testId}
+        >
+          {selectedAccount ? selectedAccount.name : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search accounts..." />
+          <CommandList>
+            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandGroup>
+              {accounts.map((account) => (
+                <CommandItem
+                  key={account.id}
+                  value={account.name}
+                  onSelect={() => {
+                    onValueChange(account.id.toString());
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === account.id.toString() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {account.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function OffloadDialog({
@@ -67,6 +142,10 @@ export function OffloadDialog({
     queryKey: ["/api/ledger-accounts"],
     enabled: open,
   });
+
+  const bankAndCashAccounts = ledgerAccounts.filter(
+    (account: any) => account.accountType === "Cash" || account.accountType === "Bank"
+  );
 
   const totalCharges =
     parseFloat(duties || "0") +
@@ -211,22 +290,14 @@ export function OffloadDialog({
                 onChange={(e) => setDuties(e.target.value)}
                 data-testid="input-duties"
               />
-              <Select
+              <AccountCombobox
                 value={dutiesAccountId}
                 onValueChange={setDutiesAccountId}
+                accounts={bankAndCashAccounts}
+                placeholder="Select account"
                 disabled={parseFloat(duties) === 0}
-              >
-                <SelectTrigger data-testid="select-duties-account">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts.map((account: any) => (
-                    <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} ({account.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                testId="select-duties-account"
+              />
             </div>
           </div>
 
@@ -243,38 +314,22 @@ export function OffloadDialog({
                 onChange={(e) => setOfficeCharges(e.target.value)}
                 data-testid="input-office-charges"
               />
-              <Select
+              <AccountCombobox
                 value={officeChargesAccountId}
                 onValueChange={setOfficeChargesAccountId}
+                accounts={bankAndCashAccounts}
+                placeholder="Office account"
                 disabled={parseFloat(officeCharges) === 0}
-              >
-                <SelectTrigger data-testid="select-office-charges-account">
-                  <SelectValue placeholder="Office account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts.map((account: any) => (
-                    <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} ({account.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
+                testId="select-office-charges-account"
+              />
+              <AccountCombobox
                 value={officeChargesCashAccountId}
                 onValueChange={setOfficeChargesCashAccountId}
+                accounts={bankAndCashAccounts}
+                placeholder="Cash account"
                 disabled={parseFloat(officeCharges) === 0}
-              >
-                <SelectTrigger data-testid="select-office-charges-cash-account">
-                  <SelectValue placeholder="Cash account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts.filter((account: any) => account.accountType === "Cash" || account.accountType === "Bank").map((account: any) => (
-                    <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} ({account.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                testId="select-office-charges-cash-account"
+              />
             </div>
           </div>
 
@@ -305,22 +360,14 @@ export function OffloadDialog({
                 onChange={(e) => setTransportFees(e.target.value)}
                 data-testid="input-transport-fees"
               />
-              <Select
+              <AccountCombobox
                 value={transportAccountId}
                 onValueChange={setTransportAccountId}
+                accounts={bankAndCashAccounts}
+                placeholder="Select account"
                 disabled={parseFloat(transportFees) === 0}
-              >
-                <SelectTrigger data-testid="select-transport-account">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts.map((account: any) => (
-                    <SelectItem key={account.id} value={account.id.toString()}>
-                      {account.name} ({account.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                testId="select-transport-account"
+              />
             </div>
           </div>
 
@@ -364,23 +411,15 @@ export function OffloadDialog({
                       data-testid={`input-charge-amount-${charge.id}`}
                     />
                     <div className="col-span-4">
-                      <Select
+                      <AccountCombobox
                         value={charge.ledgerAccountId}
                         onValueChange={(value) =>
                           handleUpdateCharge(charge.id, "ledgerAccountId", value)
                         }
-                      >
-                        <SelectTrigger data-testid={`select-charge-account-${charge.id}`}>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ledgerAccounts.map((account: any) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name} ({account.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        accounts={bankAndCashAccounts}
+                        placeholder="Select account"
+                        testId={`select-charge-account-${charge.id}`}
+                      />
                     </div>
                     <Button
                       type="button"
