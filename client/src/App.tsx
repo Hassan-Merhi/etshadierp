@@ -93,6 +93,7 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/sales-report" component={SalesReport} />
+      <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/bales" component={Bales} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
