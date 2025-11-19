@@ -135,8 +135,9 @@ export default function StockItemDetail() {
 
   const handleEditInDaybook = () => {
     if (voucherDetails) {
-      const voucherDate = voucherDetails.voucherDate;
-      navigate(`/pos-daybook?date=${voucherDate}`);
+      // Normalize date to YYYY-MM-DD format (remove time if present)
+      const voucherDate = voucherDetails.voucherDate.split(' ')[0];
+      navigate(`/pos-daybook?date=${voucherDate}&voucherId=${voucherDetails.id}`);
     }
   };
 

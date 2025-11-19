@@ -30,7 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2 } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -81,10 +81,21 @@ export default function POSDaybook() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
 
-  // Get today's date range
-  const today = new Date();
-  const startDate = format(startOfDay(today), "yyyy-MM-dd");
-  const endDate = format(endOfDay(today), "yyyy-MM-dd");
+  // Check for date and voucherId in URL query parameters (from stock item voucher history)
+  const urlParams = new URLSearchParams(window.location.search);
+  const voucherIdParam = urlParams.get('voucherId');
+  const dateParam = urlParams.get('date');
+
+  // Get date range - use URL param if provided and valid, otherwise default to today
+  let targetDate = new Date();
+  if (dateParam) {
+    const parsedDate = parseISO(dateParam);
+    if (isValid(parsedDate)) {
+      targetDate = parsedDate;
+    }
+  }
+  const startDate = format(startOfDay(targetDate), "yyyy-MM-dd");
+  const endDate = format(endOfDay(targetDate), "yyyy-MM-dd");
 
   // Fetch user permissions
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
@@ -104,9 +115,15 @@ export default function POSDaybook() {
   });
 
   // Filter to show only Sales vouchers from the user's assigned location
+  // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
+  const bypassLocationFilter = voucherIdParam && (currentUser?.role === "Admin" || currentUser?.role === "Owner");
+  
   const salesVouchers = vouchers.filter((v) => {
     // Must be a Sales voucher
     if (v.voucherType !== "Sales") return false;
+    
+    // Bypass location filter when viewing specific historical voucher
+    if (bypassLocationFilter) return true;
     
     // If user has an assigned location (POS users), only show transactions from that location
     if (currentUser?.assignedLocationId !== undefined && currentUser?.assignedLocationId !== null) {
@@ -136,6 +153,32 @@ export default function POSDaybook() {
       setEditedNotes(voucherDetails.description || "");
     }
   }, [voucherDetails, isEditMode]);
+
+  // Auto-select voucher from URL parameter
+  useEffect(() => {
+    if (voucherIdParam && vouchers.length > 0 && !selectedVoucher) {
+      const voucherId = parseInt(voucherIdParam);
+      const voucherToSelect = vouchers.find(v => v.id === voucherId);
+      
+      // Clear the voucherId parameter from URL
+      const newParams = new URLSearchParams(window.location.search);
+      newParams.delete('voucherId');
+      const newSearch = newParams.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+      window.history.replaceState({}, '', newUrl);
+
+      if (voucherToSelect) {
+        setSelectedVoucher(voucherToSelect);
+      } else {
+        // Voucher not found - show feedback
+        toast({
+          variant: "destructive",
+          title: "Voucher not found",
+          description: "The requested sales transaction could not be found for this date.",
+        });
+      }
+    }
+  }, [voucherIdParam, vouchers, selectedVoucher, toast]);
 
   // Save mutation
   const saveMutation = useMutation({
@@ -250,7 +293,7 @@ export default function POSDaybook() {
             POS Daybook
           </h1>
           <p className="text-muted-foreground mt-1">
-            Today's sales transactions - {format(today, "MMMM dd, yyyy")}
+            Sales transactions - {format(targetDate, "MMMM dd, yyyy")}
           </p>
         </div>
       </div>
