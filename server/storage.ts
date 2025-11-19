@@ -2002,7 +2002,7 @@ export class DbStorage implements IStorage {
   }
 
   async getStockItemTransactions(stockItemId: number, companyId: number, startDate?: string, endDate?: string): Promise<any[]> {
-    const conditions: any[] = [eq(schema.vouchers.companyId, companyId)];
+    const conditions: any[] = [eq(schema.vouchers.companyId, companyId), eq(schema.vouchers.optional, false)];
     
     if (startDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
@@ -2011,6 +2011,24 @@ export class DbStorage implements IStorage {
     if (endDate) {
       conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
     }
+
+    // Get sales items for this stock item
+    const salesItems = await db
+      .select({
+        id: schema.salesItems.id,
+        type: sql<string>`'sales'`.as('type'),
+        voucherId: schema.salesItems.voucherId,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherDate: schema.vouchers.voucherDate,
+        quantity: schema.salesItems.quantity,
+        rate: schema.salesItems.sellingPrice,
+        totalAmount: schema.salesItems.totalSales,
+        stockItemId: schema.salesItems.stockItemId,
+        notes: schema.vouchers.description,
+      })
+      .from(schema.salesItems)
+      .leftJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(eq(schema.salesItems.stockItemId, stockItemId), ...conditions));
 
     // Get stock transfer items for this stock item
     const transferItems = await db
@@ -2051,7 +2069,7 @@ export class DbStorage implements IStorage {
       .where(and(eq(schema.stockAdjustmentItems.stockItemId, stockItemId), ...conditions));
 
     // Combine and sort by date
-    const allTransactions = [...transferItems, ...adjustmentItems].sort((a, b) => {
+    const allTransactions = [...salesItems, ...transferItems, ...adjustmentItems].sort((a, b) => {
       if (!a.voucherDate || !b.voucherDate) return 0;
       return new Date(b.voucherDate).getTime() - new Date(a.voucherDate).getTime();
     });
