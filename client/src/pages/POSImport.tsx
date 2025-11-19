@@ -335,7 +335,7 @@ export default function POSImport() {
                     .filter((account) => account.accountType === "Cash")
                     .map((account) => (
                       <SelectItem key={account.id} value={account.id.toString()}>
-                        {account.name} ({account.code})
+                        {account.name}
                       </SelectItem>
                     ))}
                 </SelectContent>
