@@ -3531,7 +3531,7 @@ export class DbStorage implements IStorage {
 
   async getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]> {
     // Get all voucher transactions for this item from various sources
-    // Sales
+    // Sales (exclude optional/draft vouchers)
     const sales = await db
       .select({
         voucherId: schema.vouchers.id,
@@ -3551,10 +3551,11 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
       .where(and(
         eq(schema.salesItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId)
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.optional, false)
       ));
 
-    // Stock Transfers (as source location - outward)
+    // Stock Transfers (as source location - outward, exclude optional/draft vouchers)
     const transfersOut = await db
       .select({
         voucherId: schema.vouchers.id,
@@ -3575,10 +3576,11 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.locations, eq(schema.stockTransferItems.sourceLocationId, schema.locations.id))
       .where(and(
         eq(schema.stockTransferItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId)
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.optional, false)
       ));
 
-    // Stock Transfers (as destination location - inward)
+    // Stock Transfers (as destination location - inward, exclude optional/draft vouchers)
     const transfersIn = await db
       .select({
         voucherId: schema.vouchers.id,
@@ -3599,10 +3601,11 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.locations, eq(schema.stockTransferVouchers.destinationLocationId, schema.locations.id))
       .where(and(
         eq(schema.stockTransferItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId)
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.optional, false)
       ));
 
-    // Stock Adjustments (Production/Consumption)
+    // Stock Adjustments (Production/Consumption, exclude optional/draft vouchers)
     const adjustments = await db
       .select({
         voucherId: schema.vouchers.id,
@@ -3623,7 +3626,8 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.locations, eq(schema.stockAdjustmentVouchers.locationId, schema.locations.id))
       .where(and(
         eq(schema.stockAdjustmentItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId)
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.optional, false)
       ));
 
     // Combine all transactions and sort by date
