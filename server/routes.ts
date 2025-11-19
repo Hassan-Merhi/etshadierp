@@ -7157,6 +7157,545 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Create Payment or Receipt voucher with all entries in one batch
+  app.post(
+    "/api/vouchers/payment-receipt",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const {
+          voucherType, // "Payment" or "Receipt"
+          voucherDate,
+          paymentAccountType, // "ledger", "bank", "supplier", "employee", "fixedAsset"
+          paymentAccountId,
+          paymentAccountName,
+          entries, // Array of { accountType, accountId, accountName, amount }
+          notes,
+          optional,
+        } = req.body;
+
+        // Validate required fields
+        if (!voucherType || !voucherDate || !paymentAccountId || !entries || !Array.isArray(entries) || entries.length === 0) {
+          return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        if (voucherType !== "Payment" && voucherType !== "Receipt") {
+          return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
+        }
+
+        // Calculate total amount
+        const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
+
+        // Generate voucher number
+        const voucherNumber = `${voucherType.toUpperCase()}-${Date.now()}`;
+
+        // Use database transaction for atomic operation
+        const result = await db.transaction(async (tx) => {
+          // Create voucher
+          const [createdVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId!,
+              voucherNumber,
+              voucherType,
+              voucherDate,
+              description: notes || null,
+              totalAmount: total.toFixed(2),
+              optional: optional ?? false,
+            })
+            .returning();
+
+          const voucherEntriesToCreate = [];
+
+          // Create entries based on voucher type
+          for (const entry of entries) {
+            const amount = entry.amount;
+            const narration = `${voucherType} - ${entry.accountName}`;
+
+            // Determine account field for entry account
+            const entryAccountField: any = {};
+            if (entry.accountType === "ledger") {
+              entryAccountField.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryAccountField.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryAccountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryAccountField.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryAccountField.fixedAssetId = entry.accountId;
+            }
+
+            // Determine account field for payment account
+            const paymentAccountField: any = {};
+            if (paymentAccountType === "ledger") {
+              paymentAccountField.ledgerAccountId = paymentAccountId;
+            } else if (paymentAccountType === "bank") {
+              paymentAccountField.bankAccountId = paymentAccountId;
+            } else if (paymentAccountType === "supplier") {
+              paymentAccountField.supplierId = paymentAccountId;
+            } else if (paymentAccountType === "employee") {
+              paymentAccountField.employeeId = paymentAccountId;
+            } else if (paymentAccountType === "fixedAsset") {
+              paymentAccountField.fixedAssetId = paymentAccountId;
+            }
+
+            if (voucherType === "Payment") {
+              // Payment: Debit the expense/asset accounts
+              voucherEntriesToCreate.push({
+                voucherId: createdVoucher.id,
+                ...entryAccountField,
+                debitAmount: amount,
+                creditAmount: "0",
+                narration,
+              });
+
+              // Credit the payment account
+              voucherEntriesToCreate.push({
+                voucherId: createdVoucher.id,
+                ...paymentAccountField,
+                debitAmount: "0",
+                creditAmount: amount,
+                narration,
+              });
+            } else {
+              // Receipt: Debit the payment account
+              voucherEntriesToCreate.push({
+                voucherId: createdVoucher.id,
+                ...paymentAccountField,
+                debitAmount: amount,
+                creditAmount: "0",
+                narration,
+              });
+
+              // Credit the income/liability accounts
+              voucherEntriesToCreate.push({
+                voucherId: createdVoucher.id,
+                ...entryAccountField,
+                debitAmount: "0",
+                creditAmount: amount,
+                narration,
+              });
+            }
+          }
+
+          // Batch insert all voucher entries
+          const createdEntries = await tx
+            .insert(voucherEntries)
+            .values(voucherEntriesToCreate)
+            .returning();
+
+          return { voucher: createdVoucher, entries: createdEntries };
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Error creating payment/receipt voucher:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Update Payment or Receipt voucher with all entries in one batch
+  app.patch(
+    "/api/vouchers/:id/payment-receipt",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const voucherId = parseInt(req.params.id);
+        if (isNaN(voucherId)) {
+          return res.status(400).json({ message: "Invalid voucher ID" });
+        }
+
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const {
+          voucherType, // "Payment" or "Receipt"
+          voucherDate,
+          paymentAccountType,
+          paymentAccountId,
+          paymentAccountName,
+          entries,
+          notes,
+          optional,
+        } = req.body;
+
+        // Validate required fields
+        if (!voucherType || !voucherDate || !paymentAccountId || !entries || !Array.isArray(entries) || entries.length === 0) {
+          return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        if (voucherType !== "Payment" && voucherType !== "Receipt") {
+          return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
+        }
+
+        // Calculate total amount
+        const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
+
+        // Use database transaction for atomic operation
+        const result = await db.transaction(async (tx) => {
+          // Verify voucher exists and belongs to current company
+          const [existingVoucher] = await tx
+            .select()
+            .from(vouchers)
+            .where(eq(vouchers.id, voucherId));
+
+          if (!existingVoucher) {
+            throw new Error("Voucher not found");
+          }
+
+          if (existingVoucher.companyId !== req.session.currentCompanyId) {
+            throw new Error("Access denied: Voucher belongs to a different company");
+          }
+
+          // Update voucher
+          const [updatedVoucher] = await tx
+            .update(vouchers)
+            .set({
+              voucherType,
+              voucherDate,
+              description: notes || null,
+              totalAmount: total.toFixed(2),
+              optional: optional ?? false,
+            })
+            .where(eq(vouchers.id, voucherId))
+            .returning();
+
+          // Delete existing voucher entries
+          await tx
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucherId));
+
+          const voucherEntriesToCreate = [];
+
+          // Create new entries based on voucher type
+          for (const entry of entries) {
+            const amount = entry.amount;
+            const narration = `${voucherType} - ${entry.accountName}`;
+
+            // Determine account field for entry account
+            const entryAccountField: any = {};
+            if (entry.accountType === "ledger") {
+              entryAccountField.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              entryAccountField.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              entryAccountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              entryAccountField.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              entryAccountField.fixedAssetId = entry.accountId;
+            }
+
+            // Determine account field for payment account
+            const paymentAccountField: any = {};
+            if (paymentAccountType === "ledger") {
+              paymentAccountField.ledgerAccountId = paymentAccountId;
+            } else if (paymentAccountType === "bank") {
+              paymentAccountField.bankAccountId = paymentAccountId;
+            } else if (paymentAccountType === "supplier") {
+              paymentAccountField.supplierId = paymentAccountId;
+            } else if (paymentAccountType === "employee") {
+              paymentAccountField.employeeId = paymentAccountId;
+            } else if (paymentAccountType === "fixedAsset") {
+              paymentAccountField.fixedAssetId = paymentAccountId;
+            }
+
+            if (voucherType === "Payment") {
+              // Payment: Debit the expense/asset accounts
+              voucherEntriesToCreate.push({
+                voucherId: updatedVoucher.id,
+                ...entryAccountField,
+                debitAmount: amount,
+                creditAmount: "0",
+                narration,
+              });
+
+              // Credit the payment account
+              voucherEntriesToCreate.push({
+                voucherId: updatedVoucher.id,
+                ...paymentAccountField,
+                debitAmount: "0",
+                creditAmount: amount,
+                narration,
+              });
+            } else {
+              // Receipt: Debit the payment account
+              voucherEntriesToCreate.push({
+                voucherId: updatedVoucher.id,
+                ...paymentAccountField,
+                debitAmount: amount,
+                creditAmount: "0",
+                narration,
+              });
+
+              // Credit the income/liability accounts
+              voucherEntriesToCreate.push({
+                voucherId: updatedVoucher.id,
+                ...entryAccountField,
+                debitAmount: "0",
+                creditAmount: amount,
+                narration,
+              });
+            }
+          }
+
+          // Batch insert all new voucher entries
+          const createdEntries = await tx
+            .insert(voucherEntries)
+            .values(voucherEntriesToCreate)
+            .returning();
+
+          return { voucher: updatedVoucher, entries: createdEntries };
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Error updating payment/receipt voucher:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Create Journal voucher with all entries in one batch
+  app.post(
+    "/api/vouchers/journal",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const {
+          voucherDate,
+          entries, // Array of { type: "DR" | "CR", accountType, accountId, accountName, amount }
+          notes,
+          optional,
+        } = req.body;
+
+        // Validate required fields
+        if (!voucherDate || !entries || !Array.isArray(entries) || entries.length === 0) {
+          return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        // Calculate total debits and credits
+        let totalDebits = 0;
+        let totalCredits = 0;
+        entries.forEach((entry: any) => {
+          const amount = parseFloat(entry.amount || "0");
+          if (entry.type === "DR") {
+            totalDebits += amount;
+          } else if (entry.type === "CR") {
+            totalCredits += amount;
+          }
+        });
+
+        // Validate debits equal credits (for non-optional vouchers)
+        if (!optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
+          return res.status(400).json({ message: "Total debits must equal total credits" });
+        }
+
+        // Generate voucher number
+        const voucherNumber = `JOURNAL-${Date.now()}`;
+
+        // Use database transaction for atomic operation
+        const result = await db.transaction(async (tx) => {
+          // Create voucher
+          const [createdVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId!,
+              voucherNumber,
+              voucherType: "Journal",
+              voucherDate,
+              description: notes || null,
+              totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+              optional: optional ?? false,
+            })
+            .returning();
+
+          const voucherEntriesToCreate = [];
+
+          // Create entries
+          for (const entry of entries) {
+            const amount = entry.amount;
+            const narration = `Journal - ${entry.accountName}`;
+
+            // Determine account field
+            const accountField: any = {};
+            if (entry.accountType === "ledger") {
+              accountField.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              accountField.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              accountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              accountField.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              accountField.fixedAssetId = entry.accountId;
+            }
+
+            voucherEntriesToCreate.push({
+              voucherId: createdVoucher.id,
+              ...accountField,
+              debitAmount: entry.type === "DR" ? amount : "0",
+              creditAmount: entry.type === "CR" ? amount : "0",
+              narration,
+            });
+          }
+
+          // Batch insert all voucher entries
+          const createdEntries = await tx
+            .insert(voucherEntries)
+            .values(voucherEntriesToCreate)
+            .returning();
+
+          return { voucher: createdVoucher, entries: createdEntries };
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Error creating journal voucher:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Update Journal voucher with all entries in one batch
+  app.patch(
+    "/api/vouchers/:id/journal",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const voucherId = parseInt(req.params.id);
+        if (isNaN(voucherId)) {
+          return res.status(400).json({ message: "Invalid voucher ID" });
+        }
+
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const {
+          voucherDate,
+          entries,
+          notes,
+          optional,
+        } = req.body;
+
+        // Validate required fields
+        if (!voucherDate || !entries || !Array.isArray(entries) || entries.length === 0) {
+          return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        // Calculate total debits and credits
+        let totalDebits = 0;
+        let totalCredits = 0;
+        entries.forEach((entry: any) => {
+          const amount = parseFloat(entry.amount || "0");
+          if (entry.type === "DR") {
+            totalDebits += amount;
+          } else if (entry.type === "CR") {
+            totalCredits += amount;
+          }
+        });
+
+        // Validate debits equal credits (for non-optional vouchers)
+        if (!optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
+          return res.status(400).json({ message: "Total debits must equal total credits" });
+        }
+
+        // Use database transaction for atomic operation
+        const result = await db.transaction(async (tx) => {
+          // Verify voucher exists and belongs to current company
+          const [existingVoucher] = await tx
+            .select()
+            .from(vouchers)
+            .where(eq(vouchers.id, voucherId));
+
+          if (!existingVoucher) {
+            throw new Error("Voucher not found");
+          }
+
+          if (existingVoucher.companyId !== req.session.currentCompanyId) {
+            throw new Error("Access denied: Voucher belongs to a different company");
+          }
+
+          // Update voucher
+          const [updatedVoucher] = await tx
+            .update(vouchers)
+            .set({
+              voucherDate,
+              description: notes || null,
+              totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+              optional: optional ?? false,
+            })
+            .where(eq(vouchers.id, voucherId))
+            .returning();
+
+          // Delete existing voucher entries
+          await tx
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucherId));
+
+          const voucherEntriesToCreate = [];
+
+          // Create new entries
+          for (const entry of entries) {
+            const amount = entry.amount;
+            const narration = `Journal - ${entry.accountName}`;
+
+            // Determine account field
+            const accountField: any = {};
+            if (entry.accountType === "ledger") {
+              accountField.ledgerAccountId = entry.accountId;
+            } else if (entry.accountType === "bank") {
+              accountField.bankAccountId = entry.accountId;
+            } else if (entry.accountType === "supplier") {
+              accountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "employee") {
+              accountField.employeeId = entry.accountId;
+            } else if (entry.accountType === "fixedAsset") {
+              accountField.fixedAssetId = entry.accountId;
+            }
+
+            voucherEntriesToCreate.push({
+              voucherId: updatedVoucher.id,
+              ...accountField,
+              debitAmount: entry.type === "DR" ? amount : "0",
+              creditAmount: entry.type === "CR" ? amount : "0",
+              narration,
+            });
+          }
+
+          // Batch insert all new voucher entries
+          const createdEntries = await tx
+            .insert(voucherEntries)
+            .values(voucherEntriesToCreate)
+            .returning();
+
+          return { voucher: updatedVoucher, entries: createdEntries };
+        });
+
+        res.json(result);
+      } catch (error: any) {
+        console.error("Error updating journal voucher:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {

@@ -958,218 +958,54 @@ export default function Vouchers() {
     },
   });
 
-  // Save mutation (handles both create and update)
+  // Save mutation (handles both create and update) - OPTIMIZED to use batch endpoint
   const saveMutation = useMutation({
     mutationFn: async (formData: VoucherFormData) => {
       const data = formData;
       const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
       const isEditMode = !!voucherIdToEdit;
-      
+
+      // Prepare request payload
+      const payload = {
+        voucherType,
+        voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+        paymentAccountType: data.paymentAccountType,
+        paymentAccountId: data.paymentAccountId,
+        paymentAccountName: data.paymentAccountName,
+        entries: data.entries,
+        notes: data.notes,
+        optional: data.optional,
+      };
+
+      // Use batch endpoint for both create and update
       if (isEditMode) {
-        // UPDATE MODE: Use PATCH to update existing voucher with entries
-        const voucherEntries: any[] = [];
-        
-        // Build entries array for PATCH request
-        for (const entry of data.entries) {
-          const narration = `${voucherType} - ${entry.accountName}`;
-          
-          // Entry for the account being paid/received
-          const entryData: any = { narration };
-          const paymentEntryData: any = { narration };
-
-          if (activeTab === "payment") {
-            // Payment: Debit the expense/asset accounts, Credit the payment account
-            if (entry.accountType === "ledger") {
-              entryData.ledgerAccountId = entry.accountId;
-            } else if (entry.accountType === "bank") {
-              entryData.bankAccountId = entry.accountId;
-            } else if (entry.accountType === "supplier") {
-              entryData.supplierId = entry.accountId;
-            } else if (entry.accountType === "employee") {
-              entryData.employeeId = entry.accountId;
-            } else if (entry.accountType === "fixedAsset") {
-              entryData.fixedAssetId = entry.accountId;
-            }
-            entryData.debitAmount = entry.amount;
-            entryData.creditAmount = "0";
-            voucherEntries.push(entryData);
-
-            // Credit the payment account
-            if (data.paymentAccountType === "ledger") {
-              paymentEntryData.ledgerAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "bank") {
-              paymentEntryData.bankAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "supplier") {
-              paymentEntryData.supplierId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "employee") {
-              paymentEntryData.employeeId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "fixedAsset") {
-              paymentEntryData.fixedAssetId = data.paymentAccountId;
-            }
-            paymentEntryData.debitAmount = "0";
-            paymentEntryData.creditAmount = entry.amount;
-            voucherEntries.push(paymentEntryData);
-          } else {
-            // Receipt: Debit the payment account, Credit the income/liability accounts
-            if (data.paymentAccountType === "ledger") {
-              paymentEntryData.ledgerAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "bank") {
-              paymentEntryData.bankAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "supplier") {
-              paymentEntryData.supplierId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "employee") {
-              paymentEntryData.employeeId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "fixedAsset") {
-              paymentEntryData.fixedAssetId = data.paymentAccountId;
-            }
-            paymentEntryData.debitAmount = entry.amount;
-            paymentEntryData.creditAmount = "0";
-            voucherEntries.push(paymentEntryData);
-
-            // Credit the account
-            if (entry.accountType === "ledger") {
-              entryData.ledgerAccountId = entry.accountId;
-            } else if (entry.accountType === "bank") {
-              entryData.bankAccountId = entry.accountId;
-            } else if (entry.accountType === "supplier") {
-              entryData.supplierId = entry.accountId;
-            } else if (entry.accountType === "employee") {
-              entryData.employeeId = entry.accountId;
-            } else if (entry.accountType === "fixedAsset") {
-              entryData.fixedAssetId = entry.accountId;
-            }
-            entryData.debitAmount = "0";
-            entryData.creditAmount = entry.amount;
-            voucherEntries.push(entryData);
-          }
-        }
-        
-        // Send PATCH request with voucher data and entries
-        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
-          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-          description: data.notes || `${voucherType} voucher`,
-          optional: data.optional,
-          entries: voucherEntries,
-        });
-        
-        return await voucherRes.json();
+        const res = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/payment-receipt`, payload);
+        return await res.json();
       } else {
-        // CREATE MODE: Create new voucher
-        const voucherRes = await apiRequest("POST", "/api/vouchers", {
-          companyId: selectedCompany?.id,
-          voucherNumber: `${voucherType.toUpperCase()}-${Date.now()}`,
-          voucherType,
-          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-          description: data.notes || `${voucherType} voucher`,
-          totalAmount: total.toString(),
-          optional: data.optional,
-        });
-        const voucher = await voucherRes.json();
-
-        // Create voucher entries
-        for (const entry of data.entries) {
-          const narration = `${voucherType} - ${entry.accountName}`;
-          
-          const entryData: any = {
-            voucherId: voucher.id,
-            narration,
-          };
-
-          const paymentEntryData: any = {
-            voucherId: voucher.id,
-            narration,
-          };
-
-          if (activeTab === "payment") {
-            // Payment: Debit the expense/asset accounts, Credit the payment account
-            if (entry.accountType === "ledger") {
-              entryData.ledgerAccountId = entry.accountId;
-            } else if (entry.accountType === "bank") {
-              entryData.bankAccountId = entry.accountId;
-            } else if (entry.accountType === "supplier") {
-              entryData.supplierId = entry.accountId;
-            } else if (entry.accountType === "employee") {
-              entryData.employeeId = entry.accountId;
-            } else if (entry.accountType === "fixedAsset") {
-              entryData.fixedAssetId = entry.accountId;
-            }
-            entryData.debitAmount = entry.amount;
-            entryData.creditAmount = "0";
-
-            await apiRequest("POST", "/api/voucher-entries", entryData);
-
-            // Credit the payment account
-            if (data.paymentAccountType === "ledger") {
-              paymentEntryData.ledgerAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "bank") {
-              paymentEntryData.bankAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "supplier") {
-              paymentEntryData.supplierId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "employee") {
-              paymentEntryData.employeeId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "fixedAsset") {
-              paymentEntryData.fixedAssetId = data.paymentAccountId;
-            }
-            paymentEntryData.debitAmount = "0";
-            paymentEntryData.creditAmount = entry.amount;
-
-            await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
-          } else {
-            // Receipt: Debit the payment account, Credit the income/liability accounts
-            if (data.paymentAccountType === "ledger") {
-              paymentEntryData.ledgerAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "bank") {
-              paymentEntryData.bankAccountId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "supplier") {
-              paymentEntryData.supplierId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "employee") {
-              paymentEntryData.employeeId = data.paymentAccountId;
-            } else if (data.paymentAccountType === "fixedAsset") {
-              paymentEntryData.fixedAssetId = data.paymentAccountId;
-            }
-            paymentEntryData.debitAmount = entry.amount;
-            paymentEntryData.creditAmount = "0";
-
-            await apiRequest("POST", "/api/voucher-entries", paymentEntryData);
-
-            // Credit the account
-            if (entry.accountType === "ledger") {
-              entryData.ledgerAccountId = entry.accountId;
-            } else if (entry.accountType === "bank") {
-              entryData.bankAccountId = entry.accountId;
-            } else if (entry.accountType === "supplier") {
-              entryData.supplierId = entry.accountId;
-            } else if (entry.accountType === "employee") {
-              entryData.employeeId = entry.accountId;
-            } else if (entry.accountType === "fixedAsset") {
-              entryData.fixedAssetId = entry.accountId;
-            }
-            entryData.debitAmount = "0";
-            entryData.creditAmount = entry.amount;
-
-            await apiRequest("POST", "/api/voucher-entries", entryData);
-          }
-        }
-
-        return voucher;
+        const res = await apiRequest("POST", "/api/vouchers/payment-receipt", payload);
+        return await res.json();
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
+      
+      // Refetch all affected data immediately
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["/api/vouchers"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/daybook"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/accounts/all"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/bank-accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/ledger-accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/suppliers"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/employees"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/fixed-assets"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+      ]);
       
       // Clear edit mode and navigate back to daybook
       if (isEditMode) {
@@ -1189,6 +1025,7 @@ export default function Vouchers() {
             },
           ],
           notes: "",
+          optional: false,
         });
       }
     },
@@ -1465,120 +1302,52 @@ export default function Vouchers() {
     }
   }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, journalForm]);
 
-  // Journal save mutation (handles both create and update)
+  // Journal save mutation (handles both create and update) - OPTIMIZED to use batch endpoint
   const journalMutation = useMutation({
     mutationFn: async (formData: JournalFormData) => {
       const data = formData;
       const isEditMode = !!voucherIdToEdit;
-      
-      if (isEditMode) {
-        // UPDATE MODE: Use PATCH to update existing voucher with entries
-        const voucherEntries: any[] = [];
-        
-        for (const entry of data.entries) {
-          if (entry.accountId === 0) continue;
 
-          const narration = `Journal Entry - ${entry.accountName}`;
-          const entryData: any = { narration };
+      // Filter out empty entries
+      const validEntries = data.entries.filter((entry) => entry.accountId > 0);
 
-          if (entry.accountType === "ledger") {
-            entryData.ledgerAccountId = entry.accountId;
-          } else if (entry.accountType === "bank") {
-            entryData.bankAccountId = entry.accountId;
-          } else if (entry.accountType === "supplier") {
-            entryData.supplierId = entry.accountId;
-          } else if (entry.accountType === "employee") {
-            entryData.employeeId = entry.accountId;
-          } else if (entry.accountType === "fixedAsset") {
-            entryData.fixedAssetId = entry.accountId;
-          }
-
-          if (entry.type === "DR") {
-            entryData.debitAmount = entry.amount;
-            entryData.creditAmount = "0";
-          } else {
-            entryData.debitAmount = "0";
-            entryData.creditAmount = entry.amount;
-          }
-          
-          voucherEntries.push(entryData);
-        }
-        
-        const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
-          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-          description: data.notes || "Journal voucher",
-          optional: data.optional,
-          entries: voucherEntries,
-        });
-        
-        return await voucherRes.json();
-      } else {
-        // CREATE MODE: Create new voucher
-        const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        companyId: selectedCompany?.id,
-        voucherNumber: `JOURNAL-${Date.now()}`,
-        voucherType: "Journal",
+      // Prepare request payload
+      const payload = {
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-        description: "Journal voucher",
-        notes: data.notes || "",
-        totalAmount: totalDebit.toString(),
+        entries: validEntries,
+        notes: data.notes,
         optional: data.optional,
-      });
-      const voucher = await voucherRes.json();
+      };
 
-      // Create voucher entries
-      for (const entry of data.entries) {
-        if (entry.accountId === 0) continue;
-
-        const narration = `Journal Entry - ${entry.accountName}`;
-        const entryData: any = {
-          voucherId: voucher.id,
-          narration,
-        };
-
-        if (entry.accountType === "ledger") {
-          entryData.ledgerAccountId = entry.accountId;
-        } else if (entry.accountType === "bank") {
-          entryData.bankAccountId = entry.accountId;
-        } else if (entry.accountType === "supplier") {
-          entryData.supplierId = entry.accountId;
-        } else if (entry.accountType === "employee") {
-          entryData.employeeId = entry.accountId;
-        } else if (entry.accountType === "fixedAsset") {
-          entryData.fixedAssetId = entry.accountId;
-        }
-
-        // Set debit or credit based on type
-        if (entry.type === "DR") {
-          entryData.debitAmount = entry.amount;
-          entryData.creditAmount = "0";
-        } else {
-          entryData.debitAmount = "0";
-          entryData.creditAmount = entry.amount;
-        }
-
-        await apiRequest("POST", "/api/voucher-entries", entryData);
+      // Use batch endpoint for both create and update
+      if (isEditMode) {
+        const res = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/journal`, payload);
+        return await res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/vouchers/journal", payload);
+        return await res.json();
       }
-
-      return voucher;
-    }
-  },
-    onSuccess: () => {
+    },
+    onSuccess: async () => {
       const isEditMode = !!voucherIdToEdit;
       toast({
         title: "Success",
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }); // Invalidate all account balance queries
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] });
+      
+      // Refetch all affected data immediately
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["/api/daybook"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/vouchers"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/accounts/all"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/bank-accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/ledger-accounts"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/suppliers"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/employees"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/fixed-assets"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+      ]);
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {
@@ -1596,6 +1365,7 @@ export default function Vouchers() {
             },
           ],
           notes: "",
+          optional: false,
         });
       }
     },
