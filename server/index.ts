@@ -84,13 +84,20 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
   const connectionString = process.env.DATABASE_URL || 
     `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
   
+  // Match SSL configuration with main database connection
+  const isLocalReplitDB = process.env.PGHOST === "helium";
+  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
+  const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
+  
   sessionConfig.store = new PgSession({
     conObject: {
       connectionString,
-      ssl: { rejectUnauthorized: false }, // Required for managed PostgreSQL (Neon/Render)
+      ssl: requiresSSL ? { rejectUnauthorized: false } : false,
     },
     createTableIfMissing: true,
   });
+  
+  console.log(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? 'enabled' : 'disabled'})`);
 }
 
 app.use(session(sessionConfig));
