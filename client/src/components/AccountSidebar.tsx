@@ -59,29 +59,33 @@ export default function AccountSidebar({
     const currentBalance = account.balance ?? 0;
     let adjustment = 0;
     
+    const isPaymentAccount = account.id === paymentAccountId && account.type === paymentAccountType;
+    
     // Check if this is the payment/receipt account
-    if (account.id === paymentAccountId && account.type === paymentAccountType && voucherTotal > 0) {
+    if (isPaymentAccount && voucherTotal > 0) {
       // For payment vouchers, the payment account balance decreases
       // For receipt vouchers, the receipt account balance increases
       adjustment = mode === "payment" ? -voucherTotal : voucherTotal;
     }
     
-    // Also sum all amounts for this account in the entries
-    const entryAmount = entries
-      .filter(
-        (entry) =>
-          entry.accountId === account.id &&
-          entry.accountType === account.type &&
-          entry.amount &&
-          !isNaN(Number(entry.amount))
-      )
-      .reduce((sum, entry) => sum + Number(entry.amount), 0);
-    
-    // Entry amounts always decrease the account balance for both payment and receipt:
-    // - Payment: we settle liabilities (supplier balance decreases)
-    // - Receipt: we collect receivables (customer balance decreases, they owe less)
-    if (entryAmount > 0) {
-      adjustment -= entryAmount;
+    // For non-payment accounts, check if they appear in the entries
+    if (!isPaymentAccount) {
+      const entryAmount = entries
+        .filter(
+          (entry) =>
+            entry.accountId === account.id &&
+            entry.accountType === account.type &&
+            entry.amount &&
+            !isNaN(Number(entry.amount))
+        )
+        .reduce((sum, entry) => sum + Number(entry.amount), 0);
+      
+      // Entry amounts affect balance differently for payment vs receipt:
+      // - Payment: entry accounts increase (we spend/owe more)
+      // - Receipt: entry accounts decrease (they owe us less)
+      if (entryAmount > 0) {
+        adjustment += mode === "payment" ? entryAmount : -entryAmount;
+      }
     }
     
     return currentBalance + adjustment;
