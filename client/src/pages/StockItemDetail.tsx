@@ -239,7 +239,7 @@ export default function StockItemDetail() {
                           data-testid={`row-sale-${idx}`}
                         >
                           <TableCell>{format(new Date(sale.saleDate), "MMM dd, yyyy")}</TableCell>
-                          <TableCell>{sale.locationName || "N/A"}</TableCell>
+                          <TableCell>{sale.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
                           <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>
                           <TableCell className="text-right font-mono">${parseFloat(sale.totalSales).toFixed(2)}</TableCell>
