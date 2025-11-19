@@ -3506,6 +3506,7 @@ export class DbStorage implements IStorage {
   async getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]> {
     const results = await db
       .select({
+        voucherId: schema.vouchers.id,
         voucherNumber: schema.vouchers.voucherNumber,
         saleDate: schema.vouchers.voucherDate,
         locationName: schema.locations.name,
@@ -3518,7 +3519,8 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
       .where(and(
         eq(schema.salesItems.stockItemId, stockItemId),
-        eq(schema.vouchers.companyId, companyId)
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.optional, false)
       ))
       .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
 
