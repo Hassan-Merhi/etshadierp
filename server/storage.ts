@@ -243,6 +243,7 @@ export interface IStorage {
   getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]>;
   getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]>;
   getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
+  getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]>;
 
   // Customers
   getAllCustomers(companyId: number): Promise<schema.Customer[]>;
@@ -3526,6 +3527,110 @@ export class DbStorage implements IStorage {
       .orderBy(schema.locations.name);
 
     return results;
+  }
+
+  async getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]> {
+    // Get all voucher transactions for this item from various sources
+    // Sales
+    const sales = await db
+      .select({
+        voucherId: schema.vouchers.id,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        locationId: schema.vouchers.locationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        quantityOut: schema.salesItems.quantity,
+        quantityIn: sql<string>`'0'`,
+        rate: schema.salesItems.sellingPrice,
+        amount: schema.salesItems.totalSales,
+      })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.vouchers.locationId, schema.locations.id))
+      .where(and(
+        eq(schema.salesItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ));
+
+    // Stock Transfers (as source location - outward)
+    const transfersOut = await db
+      .select({
+        voucherId: schema.vouchers.id,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        locationId: schema.stockTransferItems.sourceLocationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        quantityOut: schema.stockTransferItems.quantity,
+        quantityIn: sql<string>`'0'`,
+        rate: schema.stockTransferItems.rate,
+        amount: sql<string>`(${schema.stockTransferItems.quantity}::numeric * ${schema.stockTransferItems.rate}::numeric)::text`,
+      })
+      .from(schema.stockTransferItems)
+      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.stockTransferVoucherId, schema.stockTransferVouchers.id))
+      .innerJoin(schema.vouchers, eq(schema.stockTransferVouchers.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.stockTransferItems.sourceLocationId, schema.locations.id))
+      .where(and(
+        eq(schema.stockTransferItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ));
+
+    // Stock Transfers (as destination location - inward)
+    const transfersIn = await db
+      .select({
+        voucherId: schema.vouchers.id,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        locationId: schema.stockTransferVouchers.destinationLocationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        quantityOut: sql<string>`'0'`,
+        quantityIn: schema.stockTransferItems.quantity,
+        rate: schema.stockTransferItems.rate,
+        amount: sql<string>`(${schema.stockTransferItems.quantity}::numeric * ${schema.stockTransferItems.rate}::numeric)::text`,
+      })
+      .from(schema.stockTransferItems)
+      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.stockTransferVoucherId, schema.stockTransferVouchers.id))
+      .innerJoin(schema.vouchers, eq(schema.stockTransferVouchers.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.stockTransferVouchers.destinationLocationId, schema.locations.id))
+      .where(and(
+        eq(schema.stockTransferItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ));
+
+    // Stock Adjustments (Production/Consumption)
+    const adjustments = await db
+      .select({
+        voucherId: schema.vouchers.id,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        locationId: schema.stockAdjustmentVouchers.locationId,
+        locationName: schema.locations.name,
+        locationCode: schema.locations.code,
+        quantityOut: sql<string>`CASE WHEN ${schema.stockAdjustmentItems.quantity}::numeric < 0 THEN ABS(${schema.stockAdjustmentItems.quantity}::numeric)::text ELSE '0' END`,
+        quantityIn: sql<string>`CASE WHEN ${schema.stockAdjustmentItems.quantity}::numeric > 0 THEN ${schema.stockAdjustmentItems.quantity} ELSE '0' END`,
+        rate: schema.stockAdjustmentItems.rate,
+        amount: sql<string>`(${schema.stockAdjustmentItems.quantity}::numeric * ${schema.stockAdjustmentItems.rate}::numeric)::text`,
+      })
+      .from(schema.stockAdjustmentItems)
+      .innerJoin(schema.stockAdjustmentVouchers, eq(schema.stockAdjustmentItems.stockAdjustmentVoucherId, schema.stockAdjustmentVouchers.id))
+      .innerJoin(schema.vouchers, eq(schema.stockAdjustmentVouchers.voucherId, schema.vouchers.id))
+      .leftJoin(schema.locations, eq(schema.stockAdjustmentVouchers.locationId, schema.locations.id))
+      .where(and(
+        eq(schema.stockAdjustmentItems.stockItemId, stockItemId),
+        eq(schema.vouchers.companyId, companyId)
+      ));
+
+    // Combine all transactions and sort by date
+    const allTransactions = [...sales, ...transfersOut, ...transfersIn, ...adjustments];
+    allTransactions.sort((a, b) => new Date(b.voucherDate).getTime() - new Date(a.voucherDate).getTime());
+
+    return allTransactions;
   }
 
   // Customer Methods

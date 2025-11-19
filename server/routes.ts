@@ -3628,6 +3628,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get voucher history for a stock item (all transactions - sales, transfers, consumption, production)
+  app.get("/api/stock-items/:id/voucher-history", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const existingItem = await storage.getStockItemById(stockItemId);
+      if (!existingItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      if (existingItem.companyId !== req.session.currentCompanyId) {
+        return res
+          .status(403)
+          .json({
+            message: "Access denied: Stock item belongs to a different company",
+          });
+      }
+
+      // Get all voucher transactions for this item
+      const voucherHistory = await storage.getVoucherHistoryForItem(stockItemId, req.session.currentCompanyId);
+
+      res.json(voucherHistory);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Item Code Aliases
   // Get all code aliases for a stock item
   app.get(
