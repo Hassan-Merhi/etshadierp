@@ -93,6 +93,9 @@ export default function POSDaybook() {
 
   // Only allow editing if explicitly permitted - defaults to false for safety
   const canEditDaybook = currentUser?.canEditDaybook === true;
+  
+  // Check if user can see profit/cost (Admin or Owner only)
+  const canSeeProfitCost = currentUser?.role === "Admin" || currentUser?.role === "Owner";
 
   // Fetch today's sales vouchers (only fetch after user is loaded)
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
