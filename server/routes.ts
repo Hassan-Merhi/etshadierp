@@ -5005,13 +5005,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const errors: string[] = [];
+      const warnings: string[] = [];
       const validatedItems: any[] = [];
 
       // Validate location exists
       const location = await storage.getLocationById(locationId);
       if (!location) {
         errors.push("Selected location not found");
-        return res.json({ errors, validatedItems });
+        return res.json({ errors, warnings, validatedItems });
       }
 
       // Get all stock items for validation
@@ -5051,10 +5052,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
-          // Get cost price for profit calculation (allow negative stock for POS imports)
+          // Get cost price for profit calculation and check inventory levels
           if (inventoryItem.length > 0) {
             validatedItem.costPrice = parseFloat(
               inventoryItem[0].averageRate || "0",
+            );
+            const currentQty = parseFloat(inventoryItem[0].quantity || "0");
+            const saleQty = parseFloat(item.quantity);
+            const remainingQty = currentQty - saleQty;
+            
+            validatedItem.currentStock = currentQty;
+            validatedItem.remainingStock = remainingQty;
+
+            // Add warnings for low or negative stock
+            if (remainingQty < 0) {
+              validatedItem.warning = `Stock will go negative (${remainingQty.toFixed(2)} ${stockItem.uom})`;
+              warnings.push(
+                `${stockItem.name}: Stock will go negative (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)}, Remaining: ${remainingQty.toFixed(2)} ${stockItem.uom})`
+              );
+            } else if (remainingQty === 0) {
+              validatedItem.warning = `Stock will reach zero`;
+              warnings.push(
+                `${stockItem.name}: Stock will reach zero (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)} ${stockItem.uom})`
+              );
+            }
+          } else {
+            // No inventory at this location
+            validatedItem.currentStock = 0;
+            validatedItem.remainingStock = -parseFloat(item.quantity);
+            validatedItem.warning = `No stock at this location, will go negative`;
+            warnings.push(
+              `${stockItem.name}: No stock at this location (Selling: ${item.quantity} ${stockItem.uom})`
             );
           }
         }
@@ -5064,6 +5092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         errors,
+        warnings,
         validatedItems,
       });
     } catch (error: any) {

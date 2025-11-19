@@ -9,7 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Location {
   id: number;
@@ -32,6 +42,7 @@ export default function POSImport() {
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
   const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -182,6 +193,15 @@ export default function POSImport() {
     });
   };
 
+  const doImport = () => {
+    importMutation.mutate({
+      locationId: parseInt(selectedLocation),
+      cashAccountId: parseInt(selectedCashAccount),
+      saleDate,
+      items: validationResult.validatedItems,
+    });
+  };
+
   const handleImport = () => {
     if (!selectedLocation) {
       toast({
@@ -237,12 +257,21 @@ export default function POSImport() {
       return;
     }
 
-    importMutation.mutate({
-      locationId: parseInt(selectedLocation),
-      cashAccountId: parseInt(selectedCashAccount),
-      saleDate,
-      items: validationResult.validatedItems,
-    });
+    // Check if there are inventory warnings
+    const hasWarnings = validationResult?.warnings && validationResult.warnings.length > 0;
+    
+    if (hasWarnings) {
+      // Show confirmation dialog
+      setShowWarningDialog(true);
+    } else {
+      // No warnings, proceed with import
+      doImport();
+    }
+  };
+
+  const handleConfirmImport = () => {
+    setShowWarningDialog(false);
+    doImport();
   };
 
   const downloadTemplate = () => {
@@ -444,6 +473,11 @@ export default function POSImport() {
                                 <XCircle className="h-4 w-4" />
                                 <span className="text-sm">{validation.error}</span>
                               </div>
+                            ) : validation.warning ? (
+                              <div className="flex items-center gap-1 text-amber-600">
+                                <AlertTriangle className="h-4 w-4" />
+                                <span className="text-sm">{validation.warning}</span>
+                              </div>
                             ) : (
                               <div className="flex items-center gap-1 text-green-600">
                                 <CheckCircle className="h-4 w-4" />
@@ -463,6 +497,40 @@ export default function POSImport() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Inventory Warnings
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>The following items will have inventory issues after this import:</p>
+              <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-md border border-amber-200 dark:border-amber-800 max-h-60 overflow-y-auto">
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  {validationResult?.warnings?.map((warning: string, index: number) => (
+                    <li key={index} className="text-amber-900 dark:text-amber-100">
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="mt-3 font-semibold">Are you sure you want to proceed with the import?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-import">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmImport} 
+              data-testid="button-confirm-import"
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Proceed Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
