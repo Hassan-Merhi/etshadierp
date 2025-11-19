@@ -41,30 +41,6 @@ export default function POSImport() {
     queryKey: ["/api/ledger-accounts"],
   });
 
-  const [locationCashMapping, setLocationCashMapping] = useState<Record<number, number>>({});
-
-  const backfillMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/sales-import/backfill", data);
-      return await res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Backfill completed",
-        description: `${data.backfilledCount} sales vouchers updated. ${data.skippedCount} skipped.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Backfill error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const parseMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const res = await fetch("/api/pos-import/parse", {
@@ -273,31 +249,6 @@ export default function POSImport() {
     window.open("/api/pos-import/template", "_blank");
   };
 
-  const handleBackfill = () => {
-    // Check that all locations have a cash account mapped
-    const unmappedLocations = locations.filter(loc => !locationCashMapping[loc.id]);
-    
-    if (unmappedLocations.length > 0) {
-      toast({
-        title: "Missing cash account mappings",
-        description: `Please select a cash account for: ${unmappedLocations.map(l => l.name).join(", ")}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    backfillMutation.mutate({
-      locationCashAccountMap: locationCashMapping,
-    });
-  };
-
-  const handleLocationCashAccountChange = (locationId: number, cashAccountId: string) => {
-    setLocationCashMapping(prev => ({
-      ...prev,
-      [locationId]: parseInt(cashAccountId),
-    }));
-  };
-
   const isValidated = validationResult !== null;
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
 
@@ -381,7 +332,7 @@ export default function POSImport() {
                 </SelectTrigger>
                 <SelectContent>
                   {ledgerAccounts
-                    .filter((account) => account.accountType === "Asset" || account.accountType === "Cash")
+                    .filter((account) => account.accountType === "Cash")
                     .map((account) => (
                       <SelectItem key={account.id} value={account.id.toString()}>
                         {account.name} ({account.code})
@@ -427,61 +378,6 @@ export default function POSImport() {
               {importMutation.isPending ? "Importing..." : "Import"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Fix Existing Sales Data
-          </CardTitle>
-          <CardDescription>
-            Map each location to its cash account, then click to fix all existing sales vouchers and correct profit calculations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <Label>Location to Cash Account Mapping</Label>
-            {locations.map((location) => (
-              <div key={location.id} className="grid grid-cols-2 gap-2 items-center">
-                <Label htmlFor={`loc-${location.id}`} className="text-sm font-normal">
-                  {location.name}
-                </Label>
-                <Select 
-                  value={locationCashMapping[location.id]?.toString() || ""} 
-                  onValueChange={(value) => handleLocationCashAccountChange(location.id, value)}
-                >
-                  <SelectTrigger id={`loc-${location.id}`} data-testid={`select-cash-${location.id}`}>
-                    <SelectValue placeholder="Select cash account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ledgerAccounts
-                      .filter((account) => account.accountType === "Asset" || account.accountType === "Cash")
-                      .map((account) => (
-                        <SelectItem key={account.id} value={account.id.toString()}>
-                          {account.name} ({account.code})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-
-          <Button
-            onClick={handleBackfill}
-            disabled={locations.some(loc => !locationCashMapping[loc.id]) || backfillMutation.isPending}
-            variant="default"
-            data-testid="button-backfill"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {backfillMutation.isPending ? "Fixing Sales Data..." : "Fix All Existing Sales"}
-          </Button>
-
-          <p className="text-sm text-muted-foreground">
-            This will update all existing sales vouchers to use the correct cash account for each location, fixing your profit calculations.
-          </p>
         </CardContent>
       </Card>
 
