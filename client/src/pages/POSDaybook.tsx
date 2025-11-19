@@ -481,9 +481,9 @@ export default function POSDaybook() {
                         <TableHead>Item</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Cost</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
                         <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Profit</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -519,15 +519,19 @@ export default function POSDaybook() {
                                 data-testid={`input-price-${idx}`}
                               />
                             </TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground">
-                              ${parseFloat(item.costPrice || "0").toFixed(2)}
-                            </TableCell>
+                            {canSeeProfitCost && (
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                ${parseFloat(item.costPrice || "0").toFixed(2)}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-mono font-semibold">
                               ${parseFloat(item.totalSales).toFixed(2)}
                             </TableCell>
-                            <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              ${profit.toFixed(2)}
-                            </TableCell>
+                            {canSeeProfitCost && (
+                              <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                ${profit.toFixed(2)}
+                              </TableCell>
+                            )}
                             <TableCell>
                               <Button
                                 variant="ghost"
@@ -547,20 +551,22 @@ export default function POSDaybook() {
                 </div>
 
                 <div className="border-t pt-4 flex justify-between">
-                  <div className="space-y-1">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Total Cost: </span>
-                      <span className="font-mono font-semibold">
-                        ${editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
-                      </span>
+                  {canSeeProfitCost && (
+                    <div className="space-y-1">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total Cost: </span>
+                        <span className="font-mono font-semibold">
+                          ${editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total Profit: </span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          ${editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Total Profit: </span>
-                      <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                        ${editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
@@ -586,9 +592,9 @@ export default function POSDaybook() {
                         <TableHead>Item</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Cost</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
                         <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Profit</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -607,15 +613,19 @@ export default function POSDaybook() {
                             <TableCell className="text-right font-mono">
                               ${parseFloat(item.sellingPrice).toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground">
-                              ${parseFloat(item.costPrice || "0").toFixed(2)}
-                            </TableCell>
+                            {canSeeProfitCost && (
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                ${parseFloat(item.costPrice || "0").toFixed(2)}
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-mono font-semibold">
                               ${parseFloat(item.totalSales).toFixed(2)}
                             </TableCell>
-                            <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              ${profit.toFixed(2)}
-                            </TableCell>
+                            {canSeeProfitCost && (
+                              <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                ${profit.toFixed(2)}
+                              </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -624,20 +634,22 @@ export default function POSDaybook() {
                 </div>
 
                 <div className="border-t pt-4 flex justify-between">
-                  <div className="space-y-1">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Total Cost: </span>
-                      <span className="font-mono font-semibold">
-                        ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
-                      </span>
+                  {canSeeProfitCost && (
+                    <div className="space-y-1">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total Cost: </span>
+                        <span className="font-mono font-semibold">
+                          ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total Profit: </span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Total Profit: </span>
-                      <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                        ${voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                   <div className="text-sm">
                     <span className="text-muted-foreground">Total Sales: </span>
                     <span className="font-mono font-semibold">
