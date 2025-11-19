@@ -1030,7 +1030,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
               <SelectContent>
                 {customerAccounts.map((acc: any) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name} ({acc.code})
+                    {acc.name}
                   </SelectItem>
                 ))}
               </SelectContent>
