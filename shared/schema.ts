@@ -103,7 +103,7 @@ export const ledgerAccounts = pgTable("ledger_accounts", {
   accountType: text("account_type").notNull(),
   subType: text("sub_type"),
   parentId: integer("parent_id"),
-  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
+  openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
   openingBalanceSide: text("opening_balance_side"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -519,7 +519,7 @@ export const inventory = pgTable("inventory", {
   locationId: integer("location_id").notNull(),
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
-  averageRate: decimal("average_rate", { precision: 15, scale: 2 }).notNull().default("0"),
+  averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull().default("0"),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 });
