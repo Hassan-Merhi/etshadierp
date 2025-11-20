@@ -424,7 +424,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   supplierId: integer("supplier_id").notNull(),
   voucherId: integer("voucher_id"),
   currency: text("currency").notNull().default("USD"),
-  itemsTotal: decimal("items_total", { precision: 15, scale: 2 }).default("0"),
+  itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -449,7 +449,7 @@ export const poLineItems = pgTable("po_line_items", {
   itemName: text("item_name").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
-  lineTotal: decimal("line_total", { precision: 15, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 20, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -546,7 +546,7 @@ export const containerOffloads = pgTable("container_offloads", {
   officeCharges: decimal("office_charges", { precision: 15, scale: 2 }).notNull().default("0"),
   transferCharges: decimal("transfer_charges", { precision: 15, scale: 2 }).notNull().default("0"),
   transportFees: decimal("transport_fees", { precision: 15, scale: 2 }).notNull().default("0"),
-  totalCharges: decimal("total_charges", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalCharges: decimal("total_charges", { precision: 20, scale: 2 }).notNull().default("0"),
   totalBales: decimal("total_bales", { precision: 15, scale: 3 }).notNull(),
   additionalCostPerBale: decimal("additional_cost_per_bale", { precision: 15, scale: 2 }).notNull(),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
