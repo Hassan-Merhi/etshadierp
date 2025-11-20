@@ -13227,6 +13227,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mix Batches API Routes
+  app.get("/api/mix-batches", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const batches = await storage.getAllMixBatches(companyId);
+      res.json(batches);
+    } catch (error: any) {
+      console.error("Error fetching mix batches:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/mix-batches/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid mix batch ID" });
+      }
+      
+      const batch = await storage.getMixBatchById(id, companyId);
+      
+      if (!batch) {
+        return res.status(404).json({ message: "Mix batch not found" });
+      }
+
+      res.json(batch);
+    } catch (error: any) {
+      console.error("Error fetching mix batch:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/mix-batches", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
+      
+      if (!companyId || !userId) {
+        return res.status(400).json({ message: "No company or user session" });
+      }
+
+      const { insertMixBatchSchema } = await import("@shared/schema");
+      const data = insertMixBatchSchema.parse({ 
+        ...req.body, 
+        companyId,
+        createdBy: userId 
+      });
+
+      const batch = await storage.createMixBatch(data);
+      res.json(batch);
+    } catch (error: any) {
+      console.error("Error creating mix batch:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/mix-batches/:id/sources", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid mix batch ID" });
+      }
+      
+      const sources = await storage.getMixBatchSources(id, companyId);
+      res.json(sources);
+    } catch (error: any) {
+      console.error("Error fetching mix batch sources:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/mix-batches/:id/sources", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const mixBatchId = parseInt(req.params.id);
+      if (isNaN(mixBatchId)) {
+        return res.status(400).json({ message: "Invalid mix batch ID" });
+      }
+      
+      // Verify the mix batch belongs to this company
+      const batch = await storage.getMixBatchById(mixBatchId, companyId);
+      if (!batch) {
+        return res.status(404).json({ message: "Mix batch not found" });
+      }
+      
+      const { insertMixBatchSourceSchema } = await import("@shared/schema");
+      const data = insertMixBatchSourceSchema.parse({ 
+        ...req.body, 
+        mixBatchId 
+      });
+
+      const source = await storage.addMixBatchSource(data);
+      res.json(source);
+    } catch (error: any) {
+      console.error("Error adding mix batch source:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Production Bales API Routes
+  app.get("/api/production-bales", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const filters: any = {};
+      if (req.query.mixBatchId) filters.mixBatchId = parseInt(req.query.mixBatchId as string);
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.category) filters.category = req.query.category as string;
+      if (req.query.grade) filters.grade = req.query.grade as string;
+
+      const bales = await storage.getAllProductionBales(companyId, filters);
+      res.json(bales);
+    } catch (error: any) {
+      console.error("Error fetching production bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/production-bales/barcode/:barcode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const bale = await storage.getProductionBaleByBarcode(req.params.barcode, companyId);
+      
+      if (!bale) {
+        return res.status(404).json({ message: "Bale not found" });
+      }
+
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error fetching bale by barcode:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-bales", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertProductionBaleSchema } = await import("@shared/schema");
+      const data = insertProductionBaleSchema.parse({ ...req.body, companyId });
+
+      const bale = await storage.createProductionBale(data);
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error creating production bale:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-bales/bulk", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertProductionBaleSchema } = await import("@shared/schema");
+      const balesData = req.body.bales || [];
+
+      if (!Array.isArray(balesData)) {
+        return res.status(400).json({ message: "Invalid data format" });
+      }
+
+      const validatedBales = balesData.map((b: any) => 
+        insertProductionBaleSchema.parse({ ...b, companyId })
+      );
+
+      const created = await storage.bulkCreateProductionBales(validatedBales);
+      res.json({ success: true, count: created.length, bales: created });
+    } catch (error: any) {
+      console.error("Error bulk creating bales:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-bales/scan", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { barcodeValue, weightKg, category, grade, warehouseLocation } = req.body;
+
+      if (!barcodeValue || !weightKg || !category || !grade) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const bale = await storage.updateProductionBaleFromScan(
+        barcodeValue,
+        companyId,
+        { weightKg, category, grade, warehouseLocation }
+      );
+
+      res.json(bale);
+    } catch (error: any) {
+      console.error("Error updating bale from scan:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/production-bales/import-excel", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Parse Excel file
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet);
+
+      const { insertProductionBaleSchema } = await import("@shared/schema");
+      const mixBatchId = req.body.mixBatchId ? parseInt(req.body.mixBatchId) : undefined;
+
+      // Map Excel rows to bale data
+      const balesData = rows.map((row: any) => {
+        return insertProductionBaleSchema.parse({
+          companyId,
+          mixBatchId,
+          baleCode: row.bale_code || row.baleCode || "",
+          barcodeValue: row.barcode_value || row.barcodeValue || row.barcode || row.bale_code || row.baleCode || "",
+          category: row.category || "",
+          grade: row.grade || "",
+          weightKg: row.weight_kg?.toString() || row.weightKg?.toString() || row.weight?.toString() || "0",
+          costPerKg: row.cost_per_kg?.toString() || row.costPerKg?.toString() || "0",
+          totalCost: row.total_cost?.toString() || row.totalCost?.toString() || "0",
+          warehouseLocation: row.warehouse_location || row.warehouseLocation || "",
+          status: row.status || "LABEL_PRINTED",
+        });
+      });
+
+      const created = await storage.bulkCreateProductionBales(balesData);
+      res.json({ success: true, count: created.length, bales: created });
+    } catch (error: any) {
+      console.error("Error importing Excel:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

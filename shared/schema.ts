@@ -1134,3 +1134,109 @@ export const insertBaleSchema = createInsertSchema(bales).omit({
 
 export type InsertBale = z.infer<typeof insertBaleSchema>;
 export type Bale = typeof bales.$inferSelect;
+
+// Mix Batches - combines containers into batches for bale production
+export const mixBatches = pgTable("mix_batches", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  batchCode: varchar("batch_code", { length: 50 }).notNull(),
+  targetCategory: text("target_category"),
+  targetGrade: text("target_grade"),
+  totalPlannedWeight: decimal("total_planned_weight", { precision: 15, scale: 3 }).notNull(),
+  totalActualWeight: decimal("total_actual_weight", { precision: 15, scale: 3 }).default("0"),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  status: text("status").notNull().default("PLANNING"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyBatchCode: uniqueIndex("mix_batches_company_batch_code_unique").on(t.companyId, t.batchCode),
+}));
+
+export const insertMixBatchSchema = createInsertSchema(mixBatches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  batchCode: z.string().min(1, "Batch code is required"),
+  targetCategory: z.string().optional(),
+  targetGrade: z.string().optional(),
+  totalPlannedWeight: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total weight must be positive"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  status: z.enum(["PLANNING", "IN_PROGRESS", "COMPLETED"]).optional(),
+  createdBy: z.string().min(1, "Creator is required"),
+});
+
+export type InsertMixBatch = z.infer<typeof insertMixBatchSchema>;
+export type MixBatch = typeof mixBatches.$inferSelect;
+
+// Mix Batch Sources - tracks which containers contribute to a mix batch
+export const mixBatchSources = pgTable("mix_batch_sources", {
+  id: serial("id").primaryKey(),
+  mixBatchId: integer("mix_batch_id").notNull(),
+  containerId: integer("container_id").notNull(),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMixBatchSourceSchema = createInsertSchema(mixBatchSources).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  mixBatchId: z.number().min(1, "Mix batch is required"),
+  containerId: z.number().min(1, "Container is required"),
+  weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+});
+
+export type InsertMixBatchSource = z.infer<typeof insertMixBatchSourceSchema>;
+export type MixBatchSource = typeof mixBatchSources.$inferSelect;
+
+// Production Bales - extends the concept with mix batch tracking
+export const productionBales = pgTable("production_bales", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  mixBatchId: integer("mix_batch_id"),
+  baleCode: varchar("bale_code", { length: 50 }).notNull(),
+  barcodeValue: varchar("barcode_value", { length: 100 }).notNull(),
+  category: text("category").notNull(),
+  grade: text("grade").notNull(),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  warehouseLocation: text("warehouse_location"),
+  status: text("status").notNull().default("LABEL_PRINTED"),
+  pressedAt: timestamp("pressed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyBarcodeValue: uniqueIndex("production_bales_company_barcode_unique").on(t.companyId, t.barcodeValue),
+}));
+
+export const insertProductionBaleSchema = createInsertSchema(productionBales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  mixBatchId: z.number().optional(),
+  baleCode: z.string().min(1, "Bale code is required"),
+  barcodeValue: z.string().min(1, "Barcode value is required"),
+  category: z.string().min(1, "Category is required"),
+  grade: z.string().min(1, "Grade is required"),
+  weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+  warehouseLocation: z.string().optional(),
+  status: z.enum(["LABEL_PRINTED", "PRESSED", "IN_STOCK", "RESERVED", "SOLD"]).optional(),
+  pressedAt: z.string().optional(),
+});
+
+export type InsertProductionBale = z.infer<typeof insertProductionBaleSchema>;
+export type ProductionBale = typeof productionBales.$inferSelect;

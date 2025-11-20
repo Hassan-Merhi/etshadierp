@@ -4028,6 +4028,209 @@ export class DbStorage implements IStorage {
       .values(bales)
       .returning();
   }
+
+  // Mix Batches
+  async getAllMixBatches(companyId: number): Promise<schema.MixBatch[]> {
+    return await db
+      .select()
+      .from(schema.mixBatches)
+      .where(eq(schema.mixBatches.companyId, companyId))
+      .orderBy(desc(schema.mixBatches.createdAt));
+  }
+
+  async getMixBatchById(id: number, companyId: number): Promise<schema.MixBatch | undefined> {
+    const [batch] = await db
+      .select()
+      .from(schema.mixBatches)
+      .where(and(
+        eq(schema.mixBatches.id, id),
+        eq(schema.mixBatches.companyId, companyId)
+      ));
+    return batch;
+  }
+
+  async createMixBatch(batch: schema.InsertMixBatch): Promise<schema.MixBatch> {
+    const [created] = await db
+      .insert(schema.mixBatches)
+      .values(batch)
+      .returning();
+    return created;
+  }
+
+  async updateMixBatch(id: number, updates: Partial<schema.InsertMixBatch>): Promise<schema.MixBatch> {
+    const [updated] = await db
+      .update(schema.mixBatches)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.mixBatches.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Mix Batch Sources
+  async getMixBatchSources(mixBatchId: number, companyId: number): Promise<schema.MixBatchSource[]> {
+    // First verify the mix batch belongs to this company
+    const batch = await this.getMixBatchById(mixBatchId, companyId);
+    if (!batch) {
+      return [];
+    }
+    
+    return await db
+      .select()
+      .from(schema.mixBatchSources)
+      .where(eq(schema.mixBatchSources.mixBatchId, mixBatchId));
+  }
+
+  async addMixBatchSource(source: schema.InsertMixBatchSource): Promise<schema.MixBatchSource> {
+    const [created] = await db
+      .insert(schema.mixBatchSources)
+      .values(source)
+      .returning();
+    return created;
+  }
+
+  // Production Bales
+  async getAllProductionBales(companyId: number, filters?: {
+    mixBatchId?: number;
+    status?: string;
+    category?: string;
+    grade?: string;
+  }): Promise<schema.ProductionBale[]> {
+    let conditions = [eq(schema.productionBales.companyId, companyId)];
+    
+    if (filters?.mixBatchId) {
+      conditions.push(eq(schema.productionBales.mixBatchId, filters.mixBatchId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(schema.productionBales.status, filters.status));
+    }
+    if (filters?.category) {
+      conditions.push(eq(schema.productionBales.category, filters.category));
+    }
+    if (filters?.grade) {
+      conditions.push(eq(schema.productionBales.grade, filters.grade));
+    }
+
+    return await db
+      .select()
+      .from(schema.productionBales)
+      .where(and(...conditions))
+      .orderBy(desc(schema.productionBales.createdAt));
+  }
+
+  async getProductionBaleById(id: number): Promise<schema.ProductionBale | undefined> {
+    const [bale] = await db
+      .select()
+      .from(schema.productionBales)
+      .where(eq(schema.productionBales.id, id));
+    return bale;
+  }
+
+  async getProductionBaleByBarcode(barcodeValue: string, companyId: number): Promise<schema.ProductionBale | undefined> {
+    const [bale] = await db
+      .select()
+      .from(schema.productionBales)
+      .where(and(
+        eq(schema.productionBales.barcodeValue, barcodeValue),
+        eq(schema.productionBales.companyId, companyId)
+      ));
+    return bale;
+  }
+
+  async createProductionBale(bale: schema.InsertProductionBale): Promise<schema.ProductionBale> {
+    // Convert pressedAt string to Date if provided
+    const baleData: any = { ...bale };
+    if (bale.pressedAt) {
+      baleData.pressedAt = new Date(bale.pressedAt);
+    }
+    
+    const [created] = await db
+      .insert(schema.productionBales)
+      .values(baleData)
+      .returning();
+    return created;
+  }
+
+  async updateProductionBale(id: number, updates: Partial<schema.InsertProductionBale>): Promise<schema.ProductionBale> {
+    // Convert pressedAt string to Date if provided
+    const updateData: any = { ...updates, updatedAt: sql`now()` };
+    if (updates.pressedAt) {
+      updateData.pressedAt = new Date(updates.pressedAt);
+    }
+    
+    const [updated] = await db
+      .update(schema.productionBales)
+      .set(updateData)
+      .where(eq(schema.productionBales.id, id))
+      .returning();
+    return updated;
+  }
+
+  async bulkCreateProductionBales(bales: schema.InsertProductionBale[]): Promise<schema.ProductionBale[]> {
+    if (bales.length === 0) return [];
+    
+    // Convert pressedAt strings to Dates
+    const balesData = bales.map(bale => {
+      const data: any = { ...bale };
+      if (bale.pressedAt) {
+        data.pressedAt = new Date(bale.pressedAt);
+      }
+      return data;
+    });
+    
+    return await db
+      .insert(schema.productionBales)
+      .values(balesData)
+      .returning();
+  }
+
+  // Update bale from scan (for factory floor scanning)
+  async updateProductionBaleFromScan(
+    barcodeValue: string,
+    companyId: number,
+    updates: {
+      weightKg: string;
+      category: string;
+      grade: string;
+      warehouseLocation?: string;
+    }
+  ): Promise<schema.ProductionBale> {
+    const bale = await this.getProductionBaleByBarcode(barcodeValue, companyId);
+    if (!bale) {
+      throw new Error(`Bale with barcode ${barcodeValue} not found`);
+    }
+
+    // Get mix batch to calculate cost
+    let costPerKg = "0";
+    let totalCost = "0";
+
+    if (bale.mixBatchId) {
+      const batch = await this.getMixBatchById(bale.mixBatchId, companyId);
+      if (batch) {
+        costPerKg = batch.costPerKg;
+        const weight = parseFloat(updates.weightKg);
+        const cost = parseFloat(costPerKg);
+        totalCost = (weight * cost).toFixed(2);
+      }
+    }
+
+    const [updated] = await db
+      .update(schema.productionBales)
+      .set({
+        weightKg: updates.weightKg,
+        category: updates.category,
+        grade: updates.grade,
+        warehouseLocation: updates.warehouseLocation,
+        costPerKg,
+        totalCost,
+        status: "PRESSED",
+        pressedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(schema.productionBales.id, bale.id))
+      .returning();
+
+    return updated;
+  }
 }
 
 export const storage = new DbStorage();
