@@ -1497,7 +1497,12 @@ export class DbStorage implements IStorage {
         
         // Safety check for division by zero
         if (newQty === 0) {
-          throw new Error(`New quantity is zero for stock item ${stockItemId}`);
+          throw new Error(`New quantity is zero for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. This indicates corrupt inventory data.`);
+        }
+        
+        // Safety check for negative quantity
+        if (newQty < 0) {
+          throw new Error(`New quantity is negative for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. Cannot have negative inventory.`);
         }
         
         const weightedAvgRate = ((existingQty * existingRate) + (data.totalQuantity * newRate)) / newQty;
