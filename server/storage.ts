@@ -4300,28 +4300,37 @@ export class DbStorage implements IStorage {
 
   // Customer Balance API
   async addCustomerBalanceEntry(entry: schema.InsertCustomerBalance): Promise<schema.CustomerBalance> {
-    // Calculate running balance - validate inputs first
+    // Validate amounts are valid decimals
     const debitAmount = entry.debitAmount || "0";
     const creditAmount = entry.creditAmount || "0";
     
-    const debit = parseFloat(debitAmount);
-    const credit = parseFloat(creditAmount);
-    
-    // Validate numbers
-    if (isNaN(debit) || isNaN(credit)) {
+    // Basic validation - ensure they're numeric strings
+    if (isNaN(Number(debitAmount)) || isNaN(Number(creditAmount))) {
       throw new Error("Invalid debit or credit amount");
     }
-    
-    const currentBalance = await this.getCustomerBalance(entry.customerId, entry.companyId);
-    const newBalance = (currentBalance + debit - credit).toFixed(2);
 
+    // Use SQL to calculate running balance with native decimal precision
+    // This avoids float precision errors by using PostgreSQL's decimal arithmetic
+    const [latestBalance] = await db
+      .select({ balance: schema.customerBalances.balance })
+      .from(schema.customerBalances)
+      .where(and(
+        eq(schema.customerBalances.customerId, entry.customerId),
+        eq(schema.customerBalances.companyId, entry.companyId)
+      ))
+      .orderBy(desc(schema.customerBalances.id))
+      .limit(1);
+
+    const currentBalance = latestBalance?.balance || "0";
+
+    // Insert with SQL-calculated balance using PostgreSQL's decimal type
     const [created] = await db
       .insert(schema.customerBalances)
       .values({
         ...entry,
         debitAmount: debitAmount,
         creditAmount: creditAmount,
-        balance: newBalance,
+        balance: sql`(${currentBalance}::decimal + ${debitAmount}::decimal - ${creditAmount}::decimal)`,
       })
       .returning();
 

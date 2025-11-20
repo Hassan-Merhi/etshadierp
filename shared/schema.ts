@@ -947,7 +947,9 @@ export const containerSales = pgTable("container_sales", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqueCompanyContainer: uniqueIndex("container_sales_company_container_unique").on(t.companyId, t.containerId),
+}));
 
 export const insertContainerSaleSchema = createInsertSchema(containerSales).omit({
   id: true,

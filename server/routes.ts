@@ -2635,52 +2635,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
           commissionAccountId = commissionRevenueAccount.id;
         }
 
-        // Create voucher for the container sale
-        const voucherNumber = `CS-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Sales",
-            voucherDate: parsed.saleDate,
-            description:
-              parsed.notes ||
-              `Container sale - ${container.containerNumber} to ${customer.legalName}`,
-            totalAmount: parsed.totalAmount,
-            optional: false,
-          })
-          .returning();
+        // Execute all operations in a single transaction for atomicity
+        const sale = await db.transaction(async (tx) => {
+          // Create voucher for the container sale
+          const voucherNumber = `CS-${Date.now()}`;
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId,
+              voucherNumber,
+              voucherType: "Sales",
+              voucherDate: parsed.saleDate,
+              description:
+                parsed.notes ||
+                `Container sale - ${container.containerNumber} to ${customer.legalName}`,
+              totalAmount: parsed.totalAmount,
+              optional: false,
+            })
+            .returning();
 
-        // Create voucher entries (double-entry)
-        // Debit: Customer Account (they owe us)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: customer.ledgerAccountId,
-          debitAmount: parsed.totalAmount,
-          creditAmount: "0",
-          narration: `Container sale - ${voucherNumber}`,
-        });
+          // Create voucher entries (double-entry)
+          // Debit: Customer Account (they owe us)
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: customer.ledgerAccountId,
+            debitAmount: parsed.totalAmount,
+            creditAmount: "0",
+            narration: `Container sale - ${voucherNumber}`,
+          });
 
-        // Credit: Commission Revenue Account
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: commissionAccountId,
-          debitAmount: "0",
-          creditAmount: parsed.totalAmount,
-          narration: `Container sale commission - ${voucherNumber}`,
-        });
+          // Credit: Commission Revenue Account
+          await tx.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: commissionAccountId,
+            debitAmount: "0",
+            creditAmount: parsed.totalAmount,
+            narration: `Container sale commission - ${voucherNumber}`,
+          });
 
-        // Create container sale record with voucher reference
-        const sale = await storage.createContainerSale({
-          ...parsed,
-          commissionAccountId,
-          voucherId: voucher.id,
-        });
+          // Create container sale record with voucher reference
+          const [createdSale] = await tx
+            .insert(containerSales)
+            .values({
+              ...parsed,
+              commissionAccountId,
+              voucherId: voucher.id,
+            })
+            .returning();
 
-        // Update container status to SOLD
-        await storage.updateContainer(parsed.containerId, {
-          status: "SOLD",
+          // Update container status to SOLD
+          await tx
+            .update(containers)
+            .set({ status: "SOLD" })
+            .where(eq(containers.id, parsed.containerId));
+
+          return createdSale;
         });
 
         res.status(201).json(sale);
