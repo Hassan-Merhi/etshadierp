@@ -472,7 +472,7 @@ export const containerCharges = pgTable("container_charges", {
   id: serial("id").primaryKey(),
   containerId: integer("container_id").notNull(),
   chargeType: text("charge_type").notNull(),
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
   ledgerAccountId: integer("ledger_account_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -542,13 +542,13 @@ export const containerOffloads = pgTable("container_offloads", {
   id: serial("id").primaryKey(),
   containerId: integer("container_id").notNull(),
   locationId: integer("location_id").notNull(),
-  duties: decimal("duties", { precision: 15, scale: 2 }).notNull().default("0"),
-  officeCharges: decimal("office_charges", { precision: 15, scale: 2 }).notNull().default("0"),
-  transferCharges: decimal("transfer_charges", { precision: 15, scale: 2 }).notNull().default("0"),
-  transportFees: decimal("transport_fees", { precision: 15, scale: 2 }).notNull().default("0"),
+  duties: decimal("duties", { precision: 20, scale: 2 }).notNull().default("0"),
+  officeCharges: decimal("office_charges", { precision: 20, scale: 2 }).notNull().default("0"),
+  transferCharges: decimal("transfer_charges", { precision: 20, scale: 2 }).notNull().default("0"),
+  transportFees: decimal("transport_fees", { precision: 20, scale: 2 }).notNull().default("0"),
   totalCharges: decimal("total_charges", { precision: 20, scale: 2 }).notNull().default("0"),
   totalBales: decimal("total_bales", { precision: 15, scale: 3 }).notNull(),
-  additionalCostPerBale: decimal("additional_cost_per_bale", { precision: 15, scale: 2 }).notNull(),
+  additionalCostPerBale: decimal("additional_cost_per_bale", { precision: 20, scale: 2 }).notNull(),
   offloadedAt: timestamp("offloaded_at").notNull().defaultNow(),
 });
 
@@ -593,7 +593,7 @@ export const vouchers = pgTable("vouchers", {
   voucherType: text("voucher_type").notNull(),
   voucherDate: date("voucher_date").notNull(),
   description: text("description"),
-  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull(),
   optional: boolean("optional").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -622,8 +622,8 @@ export const voucherEntries = pgTable("voucher_entries", {
   fixedAssetId: integer("fixed_asset_id"),
   supplierId: integer("supplier_id"),
   employeeId: integer("employee_id"),
-  debitAmount: decimal("debit_amount", { precision: 15, scale: 2 }).default("0"),
-  creditAmount: decimal("credit_amount", { precision: 15, scale: 2 }).default("0"),
+  debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).default("0"),
+  creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).default("0"),
   narration: text("narration"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
