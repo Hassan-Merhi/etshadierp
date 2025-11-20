@@ -1455,8 +1455,19 @@ export class DbStorage implements IStorage {
 
     // Add inventory to destination location with weighted average cost
     for (const [stockItemId, data] of Array.from(itemsMap.entries())) {
+      // Safety check for division by zero
+      if (data.totalQuantity === 0) {
+        console.error("Skipping item with zero quantity:", stockItemId);
+        continue;
+      }
+      
       const averageOriginalRate = data.weightedRateSum / data.totalQuantity;
       const newRate = averageOriginalRate + additionalCostPerBale;
+      
+      // Safety check for infinity
+      if (!isFinite(newRate)) {
+        throw new Error(`Calculated rate is infinite for stock item ${stockItemId}. averageRate=${averageOriginalRate}, additionalCost=${additionalCostPerBale}`);
+      }
       
       // Check if inventory exists
       const [existing] = await db
@@ -1472,7 +1483,19 @@ export class DbStorage implements IStorage {
         const existingQty = parseFloat(existing.quantity);
         const existingRate = parseFloat(existing.averageRate);
         const newQty = existingQty + data.totalQuantity;
+        
+        // Safety check for division by zero
+        if (newQty === 0) {
+          throw new Error(`New quantity is zero for stock item ${stockItemId}`);
+        }
+        
         const weightedAvgRate = ((existingQty * existingRate) + (data.totalQuantity * newRate)) / newQty;
+        
+        // Safety check for infinity
+        if (!isFinite(weightedAvgRate)) {
+          throw new Error(`Calculated weighted average rate is infinite for stock item ${stockItemId}. existingQty=${existingQty}, existingRate=${existingRate}, newQty=${newQty}, newRate=${newRate}`);
+        }
+        
         const newTotalValue = newQty * weightedAvgRate;
 
         await db
