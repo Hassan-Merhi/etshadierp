@@ -397,9 +397,9 @@ export const containers = pgTable("containers", {
   supplierId: integer("supplier_id").notNull(),
   status: text("status").notNull().default("OTW"),
   importDate: date("import_date").notNull(),
-  itemsTotal: decimal("items_total", { precision: 15, scale: 2 }).default("0"),
-  chargesTotal: decimal("charges_total", { precision: 15, scale: 2 }).default("0"),
-  grandTotal: decimal("grand_total", { precision: 15, scale: 2 }).default("0"),
+  itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
+  chargesTotal: decimal("charges_total", { precision: 20, scale: 2 }).default("0"),
+  grandTotal: decimal("grand_total", { precision: 20, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
