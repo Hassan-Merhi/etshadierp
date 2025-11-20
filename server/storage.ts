@@ -3738,34 +3738,6 @@ export class DbStorage implements IStorage {
     return customer;
   }
 
-  // Container Sales Methods
-  async getAllContainerSales(companyId: number): Promise<schema.ContainerSale[]> {
-    return await db.select().from(schema.containerSales)
-      .where(eq(schema.containerSales.companyId, companyId))
-      .orderBy(sql`${schema.containerSales.saleDate} DESC`);
-  }
-
-  async getContainerSaleById(id: number): Promise<schema.ContainerSale | undefined> {
-    const [sale] = await db.select().from(schema.containerSales).where(eq(schema.containerSales.id, id));
-    return sale;
-  }
-
-  async getContainerSalesByCustomer(customerId: number): Promise<schema.ContainerSale[]> {
-    return await db.select().from(schema.containerSales)
-      .where(eq(schema.containerSales.customerId, customerId))
-      .orderBy(sql`${schema.containerSales.saleDate} DESC`);
-  }
-
-  async getContainerSalesByContainer(containerId: number): Promise<schema.ContainerSale | undefined> {
-    const [sale] = await db.select().from(schema.containerSales)
-      .where(eq(schema.containerSales.containerId, containerId));
-    return sale;
-  }
-
-  async createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale> {
-    const [newSale] = await db.insert(schema.containerSales).values(sale).returning();
-    return newSale;
-  }
 
   // Inter-Company Transfer Methods
   async getAllInterCompanyTransfers(companyId?: number): Promise<schema.InterCompanyTransfer[]> {
@@ -4230,6 +4202,130 @@ export class DbStorage implements IStorage {
       .returning();
 
     return updated;
+  }
+
+  // Container Sales API
+  async createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale> {
+    const [created] = await db
+      .insert(schema.containerSales)
+      .values(sale)
+      .returning();
+    
+    // Create customer balance entry
+    await this.addCustomerBalanceEntry({
+      companyId: sale.companyId,
+      customerId: sale.customerId,
+      transactionDate: sale.saleDate,
+      transactionType: "SALE",
+      referenceId: created.id,
+      referenceType: "CONTAINER_SALE",
+      debitAmount: sale.totalAmount,
+      creditAmount: "0",
+      balance: sale.totalAmount,
+      currency: sale.currency || "USD",
+      description: `Container sale - Invoice ${sale.invoiceNumber || created.id}`,
+    });
+    
+    return created;
+  }
+
+  async getContainerSales(companyId: number): Promise<schema.ContainerSale[]> {
+    return await db
+      .select()
+      .from(schema.containerSales)
+      .where(eq(schema.containerSales.companyId, companyId))
+      .orderBy(desc(schema.containerSales.saleDate));
+  }
+
+  async getContainerSaleById(id: number, companyId: number): Promise<schema.ContainerSale | undefined> {
+    const [sale] = await db
+      .select()
+      .from(schema.containerSales)
+      .where(and(
+        eq(schema.containerSales.id, id),
+        eq(schema.containerSales.companyId, companyId)
+      ));
+    return sale;
+  }
+
+  async updateContainerSalePayment(
+    id: number,
+    companyId: number,
+    paidAmount: string,
+    paymentStatus: "PENDING" | "PARTIAL" | "PAID"
+  ): Promise<schema.ContainerSale> {
+    const [updated] = await db
+      .update(schema.containerSales)
+      .set({
+        paidAmount,
+        paymentStatus,
+        updatedAt: sql`now()`,
+      })
+      .where(and(
+        eq(schema.containerSales.id, id),
+        eq(schema.containerSales.companyId, companyId)
+      ))
+      .returning();
+
+    return updated;
+  }
+
+  // Customer Balance API
+  async addCustomerBalanceEntry(entry: schema.InsertCustomerBalance): Promise<schema.CustomerBalance> {
+    // Calculate running balance
+    const currentBalance = await this.getCustomerBalance(entry.customerId, entry.companyId);
+    const debit = parseFloat(entry.debitAmount || "0");
+    const credit = parseFloat(entry.creditAmount || "0");
+    const newBalance = (currentBalance + debit - credit).toFixed(2);
+
+    const [created] = await db
+      .insert(schema.customerBalances)
+      .values({
+        ...entry,
+        balance: newBalance,
+      })
+      .returning();
+
+    return created;
+  }
+
+  async getCustomerBalance(customerId: number, companyId: number): Promise<number> {
+    const [result] = await db
+      .select({ balance: schema.customerBalances.balance })
+      .from(schema.customerBalances)
+      .where(and(
+        eq(schema.customerBalances.customerId, customerId),
+        eq(schema.customerBalances.companyId, companyId)
+      ))
+      .orderBy(desc(schema.customerBalances.createdAt))
+      .limit(1);
+
+    return result ? parseFloat(result.balance) : 0;
+  }
+
+  async getCustomerStatement(
+    customerId: number,
+    companyId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<schema.CustomerBalance[]> {
+    const conditions = [
+      eq(schema.customerBalances.customerId, customerId),
+      eq(schema.customerBalances.companyId, companyId),
+    ];
+
+    if (startDate) {
+      conditions.push(sql`${schema.customerBalances.transactionDate} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${schema.customerBalances.transactionDate} <= ${endDate}`);
+    }
+
+    return await db
+      .select()
+      .from(schema.customerBalances)
+      .where(and(...conditions))
+      .orderBy(schema.customerBalances.transactionDate);
   }
 }
 

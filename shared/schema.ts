@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -939,14 +939,20 @@ export const containerSales = pgTable("container_sales", {
   commission: decimal("commission", { precision: 15, scale: 2 }).notNull(),
   commissionAccountId: integer("commission_account_id"),
   totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  paymentStatus: text("payment_status").notNull().default("PENDING"),
+  paidAmount: decimal("paid_amount", { precision: 20, scale: 2 }).notNull().default("0"),
   voucherId: integer("voucher_id"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertContainerSaleSchema = createInsertSchema(containerSales).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   containerId: z.number().min(1, "Container is required"),
@@ -956,6 +962,11 @@ export const insertContainerSaleSchema = createInsertSchema(containerSales).omit
   commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
   commissionAccountId: z.number().optional(),
   totalAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Total amount must be positive"),
+  currency: z.string().min(1).default("USD"),
+  invoiceNumber: z.string().optional(),
+  paymentStatus: z.enum(["PENDING", "PARTIAL", "PAID"]).optional(),
+  paidAmount: z.string().optional(),
+  voucherId: z.number().optional(),
 });
 
 export type InsertContainerSale = z.infer<typeof insertContainerSaleSchema>;
@@ -1240,3 +1251,43 @@ export const insertProductionBaleSchema = createInsertSchema(productionBales).om
 
 export type InsertProductionBale = z.infer<typeof insertProductionBaleSchema>;
 export type ProductionBale = typeof productionBales.$inferSelect;
+
+
+// Customer Balances - ledger of customer transactions
+export const customerBalances = pgTable("customer_balances", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  customerId: integer("customer_id").notNull(),
+  transactionDate: date("transaction_date").notNull(),
+  transactionType: text("transaction_type").notNull(),
+  referenceId: integer("reference_id"),
+  referenceType: text("reference_type"),
+  debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).notNull().default("0"),
+  balance: decimal("balance", { precision: 20, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  customerCompanyIdx: index("customer_balances_customer_company_idx").on(t.customerId, t.companyId),
+}));
+
+export const insertCustomerBalanceSchema = createInsertSchema(customerBalances).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  customerId: z.number().min(1, "Customer is required"),
+  transactionDate: z.string().min(1, "Transaction date is required"),
+  transactionType: z.enum(["SALE", "PAYMENT", "ADJUSTMENT"]),
+  referenceId: z.number().optional(),
+  referenceType: z.string().optional(),
+  debitAmount: z.string().optional(),
+  creditAmount: z.string().optional(),
+  balance: z.string().refine((val) => !isNaN(parseFloat(val)), "Balance must be a valid number"),
+  currency: z.string().min(1).default("USD"),
+  description: z.string().optional(),
+});
+
+export type InsertCustomerBalance = z.infer<typeof insertCustomerBalanceSchema>;
+export type CustomerBalance = typeof customerBalances.$inferSelect;
