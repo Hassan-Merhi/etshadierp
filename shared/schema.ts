@@ -520,7 +520,7 @@ export const inventory = pgTable("inventory", {
   stockItemId: integer("stock_item_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
   averageRate: decimal("average_rate", { precision: 15, scale: 2 }).notNull().default("0"),
-  totalValue: decimal("total_value", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 });
 
