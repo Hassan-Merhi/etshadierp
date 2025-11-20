@@ -253,11 +253,15 @@ export interface IStorage {
   updateCustomer(id: number, updates: Partial<schema.InsertCustomer>): Promise<schema.Customer>;
 
   // Container Sales
-  getAllContainerSales(companyId: number): Promise<schema.ContainerSale[]>;
-  getContainerSaleById(id: number): Promise<schema.ContainerSale | undefined>;
-  getContainerSalesByCustomer(customerId: number): Promise<schema.ContainerSale[]>;
-  getContainerSalesByContainer(containerId: number): Promise<schema.ContainerSale | undefined>;
   createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale>;
+  getContainerSales(companyId: number): Promise<schema.ContainerSale[]>;
+  getContainerSaleById(id: number, companyId: number): Promise<schema.ContainerSale | undefined>;
+  updateContainerSalePayment(id: number, companyId: number, paidAmount: string, paymentStatus: "PENDING" | "PARTIAL" | "PAID"): Promise<schema.ContainerSale>;
+  
+  // Customer Balances
+  addCustomerBalanceEntry(entry: schema.InsertCustomerBalance): Promise<schema.CustomerBalance>;
+  getCustomerBalance(customerId: number, companyId: number): Promise<number>;
+  getCustomerStatement(customerId: number, companyId: number, startDate?: string, endDate?: string): Promise<schema.CustomerBalance[]>;
 
   // Inter-Company Transfers
   getAllInterCompanyTransfers(companyId?: number): Promise<schema.InterCompanyTransfer[]>;
