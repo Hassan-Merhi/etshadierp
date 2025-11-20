@@ -2532,8 +2532,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid customer ID" });
         }
 
-        // TODO: Implement getContainerSalesByCustomer with company scoping
-        res.json([]);
+        const sales = await storage.getContainerSalesByCustomer(
+          customerId,
+          req.session.currentCompanyId!
+        );
+        res.json(sales);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
@@ -2580,8 +2583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Container belongs to a different company" });
         }
 
-        // Check if container is already sold (TODO: Re-implement with company scoping)
-        const existingSale = null; // Temporarily disabled - need to implement getContainerSalesByContainer with company scoping
+        // Check if container is already sold
+        const existingSale = await storage.getContainerSaleByContainerId(
+          parsed.containerId,
+          req.session.currentCompanyId
+        );
         if (existingSale) {
           return res
             .status(400)

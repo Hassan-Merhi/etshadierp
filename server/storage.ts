@@ -256,6 +256,8 @@ export interface IStorage {
   createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale>;
   getContainerSales(companyId: number): Promise<schema.ContainerSale[]>;
   getContainerSaleById(id: number, companyId: number): Promise<schema.ContainerSale | undefined>;
+  getContainerSaleByContainerId(containerId: number, companyId: number): Promise<schema.ContainerSale | undefined>;
+  getContainerSalesByCustomer(customerId: number, companyId: number): Promise<schema.ContainerSale[]>;
   updateContainerSalePayment(id: number, companyId: number, paidAmount: string, paymentStatus: "PENDING" | "PARTIAL" | "PAID"): Promise<schema.ContainerSale>;
   
   // Customer Balances
@@ -4274,18 +4276,51 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
+  async getContainerSaleByContainerId(containerId: number, companyId: number): Promise<schema.ContainerSale | undefined> {
+    const [sale] = await db
+      .select()
+      .from(schema.containerSales)
+      .where(and(
+        eq(schema.containerSales.containerId, containerId),
+        eq(schema.containerSales.companyId, companyId)
+      ));
+    return sale;
+  }
+
+  async getContainerSalesByCustomer(customerId: number, companyId: number): Promise<schema.ContainerSale[]> {
+    return await db
+      .select()
+      .from(schema.containerSales)
+      .where(and(
+        eq(schema.containerSales.customerId, customerId),
+        eq(schema.containerSales.companyId, companyId)
+      ))
+      .orderBy(desc(schema.containerSales.saleDate));
+  }
+
   // Customer Balance API
   async addCustomerBalanceEntry(entry: schema.InsertCustomerBalance): Promise<schema.CustomerBalance> {
-    // Calculate running balance
+    // Calculate running balance - validate inputs first
+    const debitAmount = entry.debitAmount || "0";
+    const creditAmount = entry.creditAmount || "0";
+    
+    const debit = parseFloat(debitAmount);
+    const credit = parseFloat(creditAmount);
+    
+    // Validate numbers
+    if (isNaN(debit) || isNaN(credit)) {
+      throw new Error("Invalid debit or credit amount");
+    }
+    
     const currentBalance = await this.getCustomerBalance(entry.customerId, entry.companyId);
-    const debit = parseFloat(entry.debitAmount || "0");
-    const credit = parseFloat(entry.creditAmount || "0");
     const newBalance = (currentBalance + debit - credit).toFixed(2);
 
     const [created] = await db
       .insert(schema.customerBalances)
       .values({
         ...entry,
+        debitAmount: debitAmount,
+        creditAmount: creditAmount,
         balance: newBalance,
       })
       .returning();
