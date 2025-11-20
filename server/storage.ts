@@ -1411,8 +1411,12 @@ export class DbStorage implements IStorage {
       allLineItems.push(...items);
     }
 
-    // Calculate total bales (sum of all quantities)
+    // Calculate total bales (sum of all quantities) - exclude invalid items
     const totalBales = allLineItems.reduce((sum, item) => {
+      // Skip invalid line items
+      if (!item.stockItemId || item.stockItemId === 0) {
+        return sum;
+      }
       return sum + parseFloat(item.quantity);
     }, 0);
 
@@ -1437,6 +1441,13 @@ export class DbStorage implements IStorage {
 
     for (const item of allLineItems) {
       const stockItemId = item.stockItemId;
+      
+      // Skip invalid line items with stockItemId = 0 or null
+      if (!stockItemId || stockItemId === 0) {
+        console.warn(`Skipping line item ${item.id} - invalid stock item ID: ${stockItemId}`);
+        continue;
+      }
+      
       const quantity = parseFloat(item.quantity);
       const rate = parseFloat(item.rate);
       
