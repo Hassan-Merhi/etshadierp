@@ -1493,16 +1493,30 @@ export class DbStorage implements IStorage {
         // Add to existing inventory with weighted average rate
         const existingQty = parseFloat(existing.quantity);
         const existingRate = parseFloat(existing.averageRate);
+        
+        // Handle corrupt negative inventory - replace instead of add
+        if (existingQty < 0) {
+          console.warn(`Detected corrupt negative inventory for stock item ${stockItemId} at location ${locationId}. Existing qty: ${existingQty}. Replacing with new qty: ${data.totalQuantity}`);
+          
+          const newTotalValue = data.totalQuantity * newRate;
+          
+          await db
+            .update(schema.inventory)
+            .set({
+              quantity: data.totalQuantity.toString(),
+              averageRate: newRate.toFixed(2),
+              totalValue: newTotalValue.toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, existing.id));
+          continue;
+        }
+        
         const newQty = existingQty + data.totalQuantity;
         
         // Safety check for division by zero
-        if (newQty === 0) {
-          throw new Error(`New quantity is zero for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. This indicates corrupt inventory data.`);
-        }
-        
-        // Safety check for negative quantity
-        if (newQty < 0) {
-          throw new Error(`New quantity is negative for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. Cannot have negative inventory.`);
+        if (newQty <= 0) {
+          throw new Error(`New quantity is ${newQty} for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. This indicates corrupt inventory data.`);
         }
         
         const weightedAvgRate = ((existingQty * existingRate) + (data.totalQuantity * newRate)) / newQty;
