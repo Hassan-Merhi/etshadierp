@@ -5413,7 +5413,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: req.session.currentCompanyId,
       });
 
+      // Extract manual container cost data from request body (not in base schema)
+      const itemName = req.body.itemName?.trim();
+      const ratePerKg = req.body.ratePerKg ? parseFloat(req.body.ratePerKg) : 0;
+      const totalKg = req.body.totalKg ? parseFloat(req.body.totalKg) : 0;
+      const hasManualCostData = itemName && ratePerKg > 0 && totalKg > 0;
+
+      // Validate supplier required for manual containers with cost data
+      if (hasManualCostData && !data.supplierId) {
+        return res.status(400).json({ 
+          message: "Supplier is required for manual containers with cost information" 
+        });
+      }
+
       const container = await storage.createContainer(data);
+
+      // If this is a manual container with cost information, create a purchase voucher
+      if (hasManualCostData) {
+        try {
+          const totalAmount = ratePerKg * totalKg;
+          const voucherDate = data.importDate || new Date().toISOString().split('T')[0];
+
+          // Get or create PURCHASES ledger account
+          let purchasesAccount = await storage.getLedgerAccountByCode(
+            "PURCHASES",
+            req.session.currentCompanyId,
+          );
+          if (!purchasesAccount) {
+            purchasesAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: "PURCHASES",
+              name: "Purchases",
+              accountType: "Expense",
+              openingBalance: "0",
+              openingBalanceSide: "Dr",
+              active: true,
+            });
+          }
+
+          // Create purchase voucher
+          const voucher = await storage.createVoucher({
+            companyId: req.session.currentCompanyId,
+            voucherNumber: `CONT-${container.containerNumber}-${Date.now()}`,
+            voucherType: "Purchase",
+            voucherDate: voucherDate,
+            description: `Container ${container.containerNumber} - ${itemName}`,
+            totalAmount: totalAmount.toFixed(2),
+            optional: false,
+          });
+
+          // Debit: Purchases account (Expense increases)
+          await storage.createVoucherEntry({
+            voucherId: voucher.id,
+            ledgerAccountId: purchasesAccount.id,
+            debitAmount: totalAmount.toFixed(2),
+            creditAmount: "0",
+            narration: `Container ${container.containerNumber} - ${itemName} (${totalKg}kg @ $${ratePerKg}/kg)`,
+          });
+
+          // Credit: Supplier account (Accounts Payable increases)
+          await storage.createVoucherEntry({
+            voucherId: voucher.id,
+            supplierId: data.supplierId,
+            debitAmount: "0",
+            creditAmount: totalAmount.toFixed(2),
+            narration: `Container ${container.containerNumber} - ${itemName} (${totalKg}kg @ $${ratePerKg}/kg)`,
+          });
+        } catch (voucherError: any) {
+          // Rollback: Delete container if voucher creation fails
+          await storage.deleteContainer(container.id);
+          throw new Error(`Failed to create purchase voucher: ${voucherError.message}`);
+        }
+      }
+
       res.status(201).json(container);
     } catch (error: any) {
       if (error.name === "ZodError") {
