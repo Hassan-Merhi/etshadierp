@@ -13291,13 +13291,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { insertMixBatchSchema } = await import("@shared/schema");
+      const { sources, ...batchData } = req.body;
+      
       const data = insertMixBatchSchema.parse({ 
-        ...req.body, 
+        ...batchData, 
         companyId,
         createdBy: userId 
       });
 
+      // Create batch and sources atomically
       const batch = await storage.createMixBatch(data);
+      
+      // If sources provided, create them
+      if (sources && Array.isArray(sources) && sources.length > 0) {
+        const { insertMixBatchSourceSchema } = await import("@shared/schema");
+        
+        for (const source of sources) {
+          const sourceData = insertMixBatchSourceSchema.parse({
+            ...source,
+            mixBatchId: batch.id,
+          });
+          
+          // Verify container belongs to this company
+          const container = await storage.getContainerById(sourceData.containerId);
+          if (!container || container.companyId !== companyId) {
+            throw new Error(`Container ${sourceData.containerId} not found or doesn't belong to this company`);
+          }
+          
+          await storage.addMixBatchSource(sourceData);
+        }
+      }
+      
       res.json(batch);
     } catch (error: any) {
       console.error("Error creating mix batch:", error);
