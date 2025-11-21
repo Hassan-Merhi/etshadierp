@@ -110,12 +110,9 @@ export function CreateBaleDialog({
         });
       }
 
-      const response = await apiRequest("/api/production-bales/bulk", {
-        method: "POST",
-        body: JSON.stringify({ bales }),
-      });
-
-      return response.bales;
+      const response = await apiRequest("POST", "/api/production-bales/bulk", { bales });
+      const result = await response.json();
+      return result.bales;
     },
     onSuccess: (bales) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
