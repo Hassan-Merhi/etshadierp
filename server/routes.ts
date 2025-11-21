@@ -13690,6 +13690,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/production-bales/create-batch", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { mixBatchId, productId, locationId, quantity, weightPerBale } = req.body;
+
+      if (!mixBatchId || !productId || !locationId || !quantity || !weightPerBale) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const numBales = parseInt(quantity);
+      const weight = parseFloat(weightPerBale);
+
+      if (isNaN(numBales) || numBales < 1 || numBales > 1000) {
+        return res.status(400).json({ message: "Quantity must be between 1 and 1000" });
+      }
+
+      if (isNaN(weight) || weight <= 0 || weight > 500) {
+        return res.status(400).json({ message: "Weight must be between 1 and 500 kg" });
+      }
+
+      // Get mix batch to verify and get cost info
+      const batch = await storage.getMixBatchById(mixBatchId, companyId);
+      if (!batch) {
+        return res.status(404).json({ message: "Mix batch not found" });
+      }
+
+      // Get product for bale code
+      const { baleProducts } = await import("@shared/schema");
+      const [product] = await db.select().from(baleProducts).where(eq(baleProducts.id, productId));
+      if (!product || product.companyId !== companyId) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const totalWeight = weight * numBales;
+      const costPerKg = parseFloat(batch.costPerKg);
+      const totalCostPerBale = (weight * costPerKg).toFixed(2);
+
+      // Wrap everything in a transaction for atomicity
+      const bales = await db.transaction(async (tx) => {
+        const createdBales = [];
+        const { baleSequences, productionBales, mixBatches } = await import("@shared/schema");
+        
+        // Create bales with unique barcodes (all within transaction)
+        for (let i = 0; i < numBales; i++) {
+          // Generate unique barcode within transaction
+          const [sequence] = await tx
+            .select()
+            .from(baleSequences)
+            .where(eq(baleSequences.companyId, companyId))
+            .for('update'); // Lock the row
+
+          let barcode: string;
+          if (!sequence) {
+            // Create new sequence
+            const [newSeq] = await tx
+              .insert(baleSequences)
+              .values({ companyId, nextNumber: 2 })
+              .returning();
+            barcode = `HD${String(newSeq.nextNumber - 1).padStart(5, '0')}`;
+          } else {
+            // Increment and use
+            barcode = `HD${String(sequence.nextNumber).padStart(5, '0')}`;
+            await tx
+              .update(baleSequences)
+              .set({ nextNumber: sequence.nextNumber + 1 })
+              .where(eq(baleSequences.id, sequence.id));
+          }
+
+          // Create bale within transaction
+          const baleData = {
+            companyId,
+            mixBatchId,
+            productId,
+            locationId,
+            baleCode: product.code,
+            barcodeValue: barcode,
+            quantity: 1,
+            weightKg: weight.toString(),
+            costPerKg: batch.costPerKg,
+            totalCost: totalCostPerBale,
+            status: "IN_STOCK" as const,
+            pressedAt: new Date(),
+          };
+          
+          const [bale] = await tx
+            .insert(productionBales)
+            .values(baleData)
+            .returning();
+          createdBales.push(bale);
+        }
+
+        // Update mix batch actual weight atomically within transaction
+        await tx
+          .update(mixBatches)
+          .set({
+            totalActualWeight: sql`COALESCE(${mixBatches.totalActualWeight}, 0) + ${totalWeight}`,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(mixBatches.id, mixBatchId));
+
+        return createdBales;
+      });
+
+      res.json({ bales, success: true, count: bales.length });
+    } catch (error: any) {
+      console.error("Error creating production bales:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/production-bales", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;

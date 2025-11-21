@@ -92,78 +92,38 @@ export function CreateBaleDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const batch = activeBatches?.find(
-        (b) => b.id.toString() === data.mixBatchId
-      );
-      if (!batch) throw new Error("Mix batch not found");
-
       const product = activeProducts?.find(
         (p) => p.id.toString() === data.productId
       );
       if (!product) throw new Error("Product not found");
 
-      const location = activeLocations?.find(
-        (l) => l.id.toString() === data.locationId
-      );
-      if (!location) throw new Error("Location not found");
-
-      const quantity = parseInt(data.quantity);
-      const weightPerBale = parseFloat(data.weightPerBale);
-      const totalWeight = weightPerBale * quantity;
-      const costPerKg = parseFloat(batch.costPerKg);
-      const totalCost = (totalWeight * costPerKg).toFixed(2);
-
-      // Get unique barcode for this bale record
-      const barcodeResponse = await fetch("/api/production-bales/next-barcode");
-      if (!barcodeResponse.ok) {
-        throw new Error("Failed to generate barcode");
-      }
-      const { barcode } = await barcodeResponse.json();
-
-      // Create ONE record with quantity and unique barcode
       const baleData = {
         mixBatchId: parseInt(data.mixBatchId),
         productId: parseInt(data.productId),
         locationId: parseInt(data.locationId),
-        baleCode: product.code,
-        barcodeValue: barcode,
-        quantity: quantity,
-        weightKg: totalWeight.toString(),
-        costPerKg: batch.costPerKg,
-        totalCost,
-        status: "IN_STOCK",
-        pressedAt: new Date().toISOString(),
+        quantity: data.quantity,
+        weightPerBale: data.weightPerBale,
       };
 
-      const response = await apiRequest("POST", "/api/production-bales", baleData);
-      const result = await response.json();
-
-      // Update mix batch actual weight
-      const currentActualWeight = batch.totalActualWeight ? parseFloat(batch.totalActualWeight) : 0;
-      const batchUpdateResponse = await apiRequest("PATCH", `/api/mix-batches/${batch.id}`, {
-        totalActualWeight: (currentActualWeight + totalWeight).toString(),
-      });
-      if (!batchUpdateResponse.ok) {
-        throw new Error("Failed to update mix batch quantity");
+      const response = await apiRequest("POST", "/api/production-bales/create-batch", baleData);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create bales");
       }
 
-      return [result]; // Return as array for compatibility
+      const result = await response.json();
+      return { bales: result.bales, product };
     },
-    onSuccess: async (bales) => {
+    onSuccess: async ({ bales, product }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
       
-      // Auto-print labels immediately
-      const bale = bales[0];
-      const product = activeProducts?.find(p => p.id === bale.productId);
-      
-      if (product) {
-        await printBaleLabels(product, bale.quantity);
-      }
+      // Auto-print labels with unique barcodes
+      await printBaleLabels(product, bales);
       
       toast({
         title: "Success",
-        description: `Created entry for ${bale.quantity} bale(s) and sent to printer`,
+        description: `Created ${bales.length} bale(s) and sent to printer`,
       });
       
       handleClose();
@@ -177,22 +137,9 @@ export function CreateBaleDialog({
     },
   });
 
-  const printBaleLabels = async (product: BaleProduct, quantity: number) => {
+  const printBaleLabels = async (product: BaleProduct, bales: any[]) => {
     try {
-      // Generate barcode using bwip-js
       const bwipjs = await import('bwip-js');
-      const canvas = document.createElement('canvas');
-      
-      bwipjs.toCanvas(canvas, {
-        bcid: 'code128',
-        text: product.code,
-        scale: 3,
-        height: 10,
-        includetext: true,
-        textxalign: 'center',
-      });
-
-      const barcodeDataUrl = canvas.toDataURL();
 
       // Create printable content with multiple labels (one per bale)
       const printWindow = window.open('', '_blank');
@@ -205,9 +152,21 @@ export function CreateBaleDialog({
         return;
       }
 
-      // Generate HTML for all labels
+      // Generate HTML for all labels with unique barcodes
       let labelsHtml = '';
-      for (let i = 0; i < quantity; i++) {
+      for (const bale of bales) {
+        // Generate unique barcode for each bale
+        const canvas = document.createElement('canvas');
+        bwipjs.toCanvas(canvas, {
+          bcid: 'code128',
+          text: bale.barcodeValue,
+          scale: 3,
+          height: 10,
+          includetext: true,
+          textxalign: 'center',
+        });
+        const barcodeDataUrl = canvas.toDataURL();
+
         labelsHtml += `
           <div class="label">
             <div class="product-name">${product.name}</div>
@@ -215,6 +174,7 @@ export function CreateBaleDialog({
             <div class="barcode">
               <img src="${barcodeDataUrl}" alt="Barcode" />
             </div>
+            <div class="barcode-text">${bale.barcodeValue}</div>
           </div>
         `;
       }
@@ -256,6 +216,13 @@ export function CreateBaleDialog({
               }
               .barcode {
                 margin: 15px 0;
+              }
+              .barcode-text {
+                font-size: 16px;
+                font-weight: bold;
+                font-family: monospace;
+                margin-top: 10px;
+                color: #000;
               }
             </style>
           </head>
