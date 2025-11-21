@@ -24,6 +24,7 @@ import {
   HandCoins,
   ArrowLeftRight,
   Package2,
+  Layers,
 } from "lucide-react";
 import {
   Sidebar,
@@ -85,6 +86,11 @@ const menuItems = [
     title: "Factory Bales",
     url: "/bales",
     icon: Package2,
+  },
+  {
+    title: "Mix Batches",
+    url: "/mix-batches",
+    icon: Layers,
   },
   {
     title: "Analytics",
