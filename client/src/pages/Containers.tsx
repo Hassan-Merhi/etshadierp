@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCompany } from "@/contexts/CompanyContext";
+import { AddContainerDialog } from "../components/AddContainerDialog";
 import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
@@ -18,6 +19,7 @@ export default function Containers() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
   
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
@@ -80,12 +82,23 @@ export default function Containers() {
             Track containers and manage offloading
           </p>
         </div>
-        <Link href="/po-import">
-          <Button className="gap-2" data-testid="button-import-po">
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setAddDialogOpen(true)}
+            variant="outline"
+            className="gap-2"
+            data-testid="button-add-container"
+          >
             <Plus className="h-4 w-4" />
-            Import PO
+            Add Container
           </Button>
-        </Link>
+          <Link href="/po-import">
+            <Button className="gap-2" data-testid="button-import-po">
+              <Plus className="h-4 w-4" />
+              Import PO
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -229,6 +242,11 @@ export default function Containers() {
           </CardContent>
         </Card>
       )}
+
+      <AddContainerDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+      />
     </div>
   );
 }
