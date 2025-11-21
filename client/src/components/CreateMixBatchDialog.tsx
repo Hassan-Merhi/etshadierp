@@ -486,7 +486,11 @@ export function CreateMixBatchDialog({
               <Button
                 type="submit"
                 disabled={createMutation.isPending || selectedContainers.length === 0}
-                onClick={() => console.log("Create Batch button clicked, containers:", selectedContainers.length)}
+                onClick={(e) => {
+                  console.log("Create Batch button clicked, containers:", selectedContainers.length);
+                  console.log("Form values:", form.getValues());
+                  console.log("Form errors:", form.formState.errors);
+                }}
                 data-testid="button-submit"
               >
                 {createMutation.isPending ? "Creating..." : "Create Batch"}
