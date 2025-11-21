@@ -169,8 +169,6 @@ export function CreateBaleDialog({
 
         labelsHtml += `
           <div class="label">
-            <div class="product-name">${product.name}</div>
-            <div class="product-code">${product.code}</div>
             <div class="barcode">
               <img src="${barcodeDataUrl}" alt="Barcode" />
             </div>
@@ -202,17 +200,6 @@ export function CreateBaleDialog({
                 text-align: center;
                 page-break-after: always;
                 width: 8cm;
-              }
-              .product-name {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 10px;
-              }
-              .product-code {
-                font-size: 24px;
-                font-weight: bold;
-                margin-bottom: 15px;
-                font-family: monospace;
               }
               .barcode {
                 margin: 15px 0;
