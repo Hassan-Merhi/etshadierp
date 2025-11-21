@@ -43,6 +43,7 @@ import Customers from "@/pages/Customers";
 import SoldContainers from "@/pages/SoldContainers";
 import Bales from "@/pages/Bales";
 import MixBatches from "@/pages/MixBatches";
+import ProductionBales from "@/pages/ProductionBales";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -98,6 +99,7 @@ function Router({ user }: { user: any }) {
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/bales" component={Bales} />
       <Route path="/mix-batches" component={MixBatches} />
+      <Route path="/production-bales" component={ProductionBales} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>

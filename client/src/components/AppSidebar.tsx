@@ -25,6 +25,7 @@ import {
   ArrowLeftRight,
   Package2,
   Layers,
+  Barcode,
 } from "lucide-react";
 import {
   Sidebar,
@@ -91,6 +92,11 @@ const menuItems = [
     title: "Mix Batches",
     url: "/mix-batches",
     icon: Layers,
+  },
+  {
+    title: "Production Bales",
+    url: "/production-bales",
+    icon: Barcode,
   },
   {
     title: "Analytics",
