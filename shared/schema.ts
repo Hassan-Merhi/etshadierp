@@ -400,6 +400,9 @@ export const containers = pgTable("containers", {
   itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
   chargesTotal: decimal("charges_total", { precision: 20, scale: 2 }).default("0"),
   grandTotal: decimal("grand_total", { precision: 20, scale: 2 }).default("0"),
+  itemName: text("item_name"),
+  ratePerKg: decimal("rate_per_kg", { precision: 10, scale: 2 }),
+  totalKg: decimal("total_kg", { precision: 15, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

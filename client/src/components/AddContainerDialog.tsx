@@ -42,6 +42,9 @@ const formSchema = insertContainerSchema.pick({
   importDate: true,
 }).extend({
   status: z.string().default("AVAILABLE"),
+  itemName: z.string().min(1, "Item name is required"),
+  ratePerKg: z.coerce.number().positive("Rate must be positive"),
+  totalKg: z.coerce.number().positive("Weight must be positive"),
 });
 
 export function AddContainerDialog({
@@ -62,15 +65,24 @@ export function AddContainerDialog({
       supplierId: 0,
       status: "AVAILABLE",
       importDate: new Date().toISOString().split("T")[0],
+      itemName: "",
+      ratePerKg: 0,
+      totalKg: 0,
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
+      const payload = {
+        ...data,
+        ratePerKg: data.ratePerKg.toString(),
+        totalKg: data.totalKg.toString(),
+      };
+      
       const response = await fetch("/api/containers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -162,6 +174,66 @@ export function AddContainerDialog({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="itemName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Item Name *</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="e.g., Used Clothing Mix"
+                      data-testid="input-item-name"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="ratePerKg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rate ($/kg) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        step="0.01"
+                        placeholder="0.36"
+                        data-testid="input-rate-per-kg"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="totalKg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Weight (kg) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        step="0.01"
+                        placeholder="20000"
+                        data-testid="input-total-kg"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

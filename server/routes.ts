@@ -24,6 +24,7 @@ import {
   insertStockItemCodeAliasSchema,
   insertBankAccountSchema,
   insertFixedAssetSchema,
+  insertContainerSchema,
   offloadRequestSchema,
   insertStockTransferVoucherSchema,
   insertStockAdjustmentVoucherSchema,
@@ -5396,6 +5397,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(soldContainers);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a manual container
+  app.post("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const data = insertContainerSchema.parse({
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      });
+
+      const container = await storage.createContainer(data);
+      res.status(201).json(container);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: error.errors 
+        });
+      }
       res.status(500).json({ message: error.message });
     }
   });
