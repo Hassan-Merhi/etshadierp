@@ -13443,16 +13443,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { insertBaleProductSchema } = await import("@shared/schema");
 
-      // Map Excel rows to product data
+      // Map Excel rows to product data - force companyId from authenticated session
       const productsData = rows.map((row: any) => {
         return insertBaleProductSchema.parse({
-          companyId,
+          companyId, // Always use authenticated company
           code: row.code || row.Code || row.product_code || "",
           name: row.name || row.Name || row.product_name || "",
           description: row.description || row.Description || "",
           active: row.active === undefined ? true : Boolean(row.active),
         });
       });
+
+      // Check for existing codes in the database for this company
+      const codes = productsData.map(p => p.code);
+      for (const code of codes) {
+        const existing = await storage.getBaleProductByCode(code, companyId);
+        if (existing) {
+          return res.status(409).json({ 
+            message: `Product code "${code}" already exists in your company` 
+          });
+        }
+      }
 
       const created = await storage.bulkCreateBaleProducts(productsData);
       res.json({ success: true, count: created.length, products: created });

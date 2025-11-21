@@ -4071,6 +4071,20 @@ export class DbStorage implements IStorage {
 
   async bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]> {
     if (products.length === 0) return [];
+    
+    // Validate all products have the same companyId
+    const companyIds = new Set(products.map(p => p.companyId));
+    if (companyIds.size > 1) {
+      throw new Error("All products must belong to the same company");
+    }
+    
+    // Check for duplicate codes within the batch
+    const codes = products.map(p => p.code);
+    const duplicates = codes.filter((code, index) => codes.indexOf(code) !== index);
+    if (duplicates.length > 0) {
+      throw new Error(`Duplicate product codes in import: ${duplicates.join(", ")}`);
+    }
+    
     return await db
       .insert(schema.baleProducts)
       .values(products)
