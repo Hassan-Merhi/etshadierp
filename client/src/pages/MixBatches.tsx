@@ -123,20 +123,19 @@ export default function MixBatches() {
                 {filteredBatches.map((batch) => (
                   <TableRow
                     key={batch.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => setSelectedBatch(batch)}
+                    className="hover-elevate"
                     data-testid={`row-batch-${batch.id}`}
                   >
                     <TableCell className="font-medium" data-testid={`text-batch-code-${batch.id}`}>
                       {batch.batchCode}
                     </TableCell>
-                    <TableCell>{batch.targetCategory || "—"}</TableCell>
-                    <TableCell>{batch.targetGrade || "—"}</TableCell>
+                    <TableCell>{batch.targetCategory ?? "—"}</TableCell>
+                    <TableCell>{batch.targetGrade ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {parseFloat(batch.totalPlannedWeight).toLocaleString()}
+                      {parseFloat(batch.totalPlannedWeight || "0").toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {parseFloat(batch.totalActualWeight).toLocaleString()}
+                      {parseFloat(batch.totalActualWeight || "0").toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       ${parseFloat(batch.totalCost).toLocaleString(undefined, {
