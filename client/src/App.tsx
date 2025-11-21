@@ -42,6 +42,7 @@ import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
 import SoldContainers from "@/pages/SoldContainers";
 import Bales from "@/pages/Bales";
+import MixBatches from "@/pages/MixBatches";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -96,6 +97,7 @@ function Router({ user }: { user: any }) {
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/bales" component={Bales} />
+      <Route path="/mix-batches" component={MixBatches} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       <Route component={NotFound} />
     </Switch>
