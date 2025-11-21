@@ -1214,6 +1214,35 @@ export const insertMixBatchSourceSchema = createInsertSchema(mixBatchSources).om
 export type InsertMixBatchSource = z.infer<typeof insertMixBatchSourceSchema>;
 export type MixBatchSource = typeof mixBatchSources.$inferSelect;
 
+// Bale Products - master list of product types with codes
+export const baleProducts = pgTable("bale_products", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyCode: uniqueIndex("bale_products_company_code_unique").on(t.companyId, t.code),
+}));
+
+export const insertBaleProductSchema = createInsertSchema(baleProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  code: z.string().min(1, "Product code is required"),
+  name: z.string().min(1, "Product name is required"),
+  description: z.string().optional(),
+  active: z.boolean().optional(),
+});
+
+export type InsertBaleProduct = z.infer<typeof insertBaleProductSchema>;
+export type BaleProduct = typeof baleProducts.$inferSelect;
+
 // Bale Sequences - tracks next barcode number per company
 export const baleSequences = pgTable("bale_sequences", {
   id: serial("id").primaryKey(),
@@ -1231,10 +1260,11 @@ export const productionBales = pgTable("production_bales", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   mixBatchId: integer("mix_batch_id"),
+  productId: integer("product_id"),
   baleCode: varchar("bale_code", { length: 50 }).notNull(),
   barcodeValue: varchar("barcode_value", { length: 100 }).notNull(),
-  category: text("category").notNull(),
-  grade: text("grade").notNull(),
+  category: text("category"),
+  grade: text("grade"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
   costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
   totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
@@ -1254,10 +1284,11 @@ export const insertProductionBaleSchema = createInsertSchema(productionBales).om
 }).extend({
   companyId: z.number().min(1, "Company is required"),
   mixBatchId: z.number().optional(),
+  productId: z.number().optional(),
   baleCode: z.string().min(1, "Bale code is required"),
   barcodeValue: z.string().min(1, "Barcode value is required"),
-  category: z.string().min(1, "Category is required"),
-  grade: z.string().min(1, "Grade is required"),
+  category: z.string().optional(),
+  grade: z.string().optional(),
   weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
   costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
   totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
