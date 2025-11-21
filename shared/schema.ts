@@ -1214,6 +1214,18 @@ export const insertMixBatchSourceSchema = createInsertSchema(mixBatchSources).om
 export type InsertMixBatchSource = z.infer<typeof insertMixBatchSourceSchema>;
 export type MixBatchSource = typeof mixBatchSources.$inferSelect;
 
+// Bale Sequences - tracks next barcode number per company
+export const baleSequences = pgTable("bale_sequences", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id),
+  nextNumber: integer("next_number").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyId: uniqueIndex("bale_sequences_company_unique").on(t.companyId),
+}));
+
+export type BaleSequence = typeof baleSequences.$inferSelect;
+
 // Production Bales - extends the concept with mix batch tracking
 export const productionBales = pgTable("production_bales", {
   id: serial("id").primaryKey(),
