@@ -30,10 +30,11 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { MixBatch } from "@shared/schema";
+import type { MixBatch, BaleProduct } from "@shared/schema";
 
 const formSchema = z.object({
   mixBatchId: z.string().min(1, "Please select a mix batch"),
+  productId: z.string().min(1, "Please select a product"),
   quantity: z.string().refine((val) => {
     const num = parseInt(val);
     return !isNaN(num) && num > 0 && num <= 100;
@@ -42,8 +43,6 @@ const formSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num > 0 && num <= 500;
   }, "Weight must be between 1 and 500 kg"),
-  category: z.string().min(1, "Category is required"),
-  grade: z.string().min(1, "Grade is required"),
 });
 
 interface CreateBaleDialogProps {
@@ -64,18 +63,24 @@ export function CreateBaleDialog({
     enabled: open,
   });
 
+  const { data: baleProducts } = useQuery<BaleProduct[]>({
+    queryKey: ["/api/bale-products"],
+    enabled: open,
+  });
+
   const activeBatches = mixBatches?.filter(
     (b) => b.status === "IN_PROGRESS" || b.status === "PLANNING"
   );
+
+  const activeProducts = baleProducts?.filter((p) => p.active);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       mixBatchId: "",
+      productId: "",
       quantity: "1",
       targetWeight: "25",
-      category: "",
-      grade: "",
     },
   });
 
@@ -85,6 +90,11 @@ export function CreateBaleDialog({
         (b) => b.id.toString() === data.mixBatchId
       );
       if (!batch) throw new Error("Mix batch not found");
+
+      const product = activeProducts?.find(
+        (p) => p.id.toString() === data.productId
+      );
+      if (!product) throw new Error("Product not found");
 
       const quantity = parseInt(data.quantity);
       const weightKg = parseFloat(data.targetWeight);
@@ -98,10 +108,9 @@ export function CreateBaleDialog({
 
         bales.push({
           mixBatchId: parseInt(data.mixBatchId),
+          productId: parseInt(data.productId),
           baleCode: barcode,
           barcodeValue: barcode,
-          category: data.category,
-          grade: data.grade,
           weightKg: weightKg.toString(),
           costPerKg: batch.costPerKg,
           totalCost,
@@ -286,43 +295,36 @@ export function CreateBaleDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category *</FormLabel>
+              <FormField
+                control={form.control}
+                name="productId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product Type *</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="e.g., Mixed Clothing"
-                          data-testid="input-category"
-                        />
+                        <SelectTrigger data-testid="select-product">
+                          <SelectValue placeholder="Select product type" />
+                        </SelectTrigger>
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="grade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Grade *</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="e.g., A, B, C"
-                          data-testid="input-grade"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <SelectContent>
+                        {activeProducts?.map((product) => (
+                          <SelectItem
+                            key={product.id}
+                            value={product.id.toString()}
+                          >
+                            {product.code} - {product.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end gap-2">
                 <Button

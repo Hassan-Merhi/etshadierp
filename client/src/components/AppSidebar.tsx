@@ -19,13 +19,13 @@ import {
   FileSpreadsheet,
   Search,
   PieChart,
-  Tags,
   Ship,
   HandCoins,
   ArrowLeftRight,
   Package2,
   Layers,
   Barcode,
+  Tags,
 } from "lucide-react";
 import {
   Sidebar,
@@ -97,6 +97,11 @@ const menuItems = [
     title: "Production Bales",
     url: "/production-bales",
     icon: Barcode,
+  },
+  {
+    title: "Bale Products",
+    url: "/bale-products",
+    icon: Tags,
   },
   {
     title: "Analytics",

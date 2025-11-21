@@ -13304,6 +13304,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bale Products API Routes
+  app.get("/api/bale-products", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const products = await storage.getAllBaleProducts(companyId);
+      res.json(products);
+    } catch (error: any) {
+      console.error("Error fetching bale products:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bale-products/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid product ID" });
+      }
+
+      const product = await storage.getBaleProductById(id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      res.json(product);
+    } catch (error: any) {
+      console.error("Error fetching bale product:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bale-products", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { insertBaleProductSchema } = await import("@shared/schema");
+      const data = insertBaleProductSchema.parse({ ...req.body, companyId });
+
+      // Check for duplicate code
+      const existing = await storage.getBaleProductByCode(data.code, companyId);
+      if (existing) {
+        return res.status(409).json({ message: "Product code already exists" });
+      }
+
+      const product = await storage.createBaleProduct(data);
+      res.json(product);
+    } catch (error: any) {
+      console.error("Error creating bale product:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/bale-products/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid product ID" });
+      }
+
+      const existing = await storage.getBaleProductById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (existing.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { insertBaleProductSchema } = await import("@shared/schema");
+      const data = insertBaleProductSchema.partial().parse(req.body);
+
+      const product = await storage.updateBaleProduct(id, data);
+      res.json(product);
+    } catch (error: any) {
+      console.error("Error updating bale product:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/bale-products/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid product ID" });
+      }
+
+      const existing = await storage.getBaleProductById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      if (existing.companyId !== companyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteBaleProduct(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting bale product:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bale-products/import-excel", requireAuth, upload.single("file"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Parse Excel file
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet);
+
+      const { insertBaleProductSchema } = await import("@shared/schema");
+
+      // Map Excel rows to product data
+      const productsData = rows.map((row: any) => {
+        return insertBaleProductSchema.parse({
+          companyId,
+          code: row.code || row.Code || row.product_code || "",
+          name: row.name || row.Name || row.product_name || "",
+          description: row.description || row.Description || "",
+          active: row.active === undefined ? true : Boolean(row.active),
+        });
+      });
+
+      const created = await storage.bulkCreateBaleProducts(productsData);
+      res.json({ success: true, count: created.length, products: created });
+    } catch (error: any) {
+      console.error("Error importing bale products from Excel:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Company Settings API Routes
   app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {
