@@ -4142,7 +4142,7 @@ export class DbStorage implements IStorage {
     status?: string;
     category?: string;
     grade?: string;
-  }): Promise<schema.ProductionBale[]> {
+  }): Promise<any[]> {
     let conditions = [eq(schema.productionBales.companyId, companyId)];
     
     if (filters?.mixBatchId) {
@@ -4159,8 +4159,12 @@ export class DbStorage implements IStorage {
     }
 
     return await db
-      .select()
+      .select({
+        bale: schema.productionBales,
+        product: schema.baleProducts,
+      })
       .from(schema.productionBales)
+      .leftJoin(schema.baleProducts, eq(schema.productionBales.productId, schema.baleProducts.id))
       .where(and(...conditions))
       .orderBy(desc(schema.productionBales.createdAt));
   }

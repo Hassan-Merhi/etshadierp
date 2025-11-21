@@ -21,17 +21,22 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateBaleDialog } from "../components/CreateBaleDialog";
-import type { ProductionBale } from "@shared/schema";
+import type { ProductionBale, BaleProduct } from "@shared/schema";
+
+type BaleWithProduct = {
+  bale: ProductionBale;
+  product: BaleProduct | null;
+};
 
 export default function ProductionBales() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const { data: bales, isLoading } = useQuery<ProductionBale[]>({
+  const { data: bales, isLoading } = useQuery<BaleWithProduct[]>({
     queryKey: ["/api/production-bales"],
   });
 
-  const filteredBales = bales?.filter((bale) => {
+  const filteredBales = bales?.filter(({ bale }) => {
     if (statusFilter === "all") return true;
     return bale.status === statusFilter;
   });
@@ -103,8 +108,7 @@ export default function ProductionBales() {
                 <TableRow>
                   <TableHead>Barcode</TableHead>
                   <TableHead>Bale Code</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Grade</TableHead>
+                  <TableHead>Product</TableHead>
                   <TableHead className="text-right">Weight (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
@@ -113,7 +117,7 @@ export default function ProductionBales() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBales.map((bale) => (
+                {filteredBales.map(({ bale, product }) => (
                   <TableRow
                     key={bale.id}
                     data-testid={`row-bale-${bale.id}`}
@@ -125,8 +129,20 @@ export default function ProductionBales() {
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">{bale.baleCode}</TableCell>
-                    <TableCell>{bale.category}</TableCell>
-                    <TableCell>{bale.grade}</TableCell>
+                    <TableCell>
+                      {product ? (
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground font-mono">
+                            {product.code}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground">
+                          {bale.category} - {bale.grade}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {parseFloat(bale.weightKg).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
