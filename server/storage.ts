@@ -4210,6 +4210,33 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
+  // Barcode generation for production bales
+  async getNextBaleBarcode(companyId: number): Promise<string> {
+    // Get or create sequence
+    const [sequence] = await db
+      .select()
+      .from(schema.baleSequences)
+      .where(eq(schema.baleSequences.companyId, companyId));
+
+    if (!sequence) {
+      // Create new sequence starting at 1
+      const [newSeq] = await db
+        .insert(schema.baleSequences)
+        .values({ companyId, nextNumber: 2 })
+        .returning();
+      return `HD${String(newSeq.nextNumber - 1).padStart(5, '0')}`;
+    }
+
+    // Increment and get next number
+    const nextNum = sequence.nextNumber;
+    await db
+      .update(schema.baleSequences)
+      .set({ nextNumber: nextNum + 1 })
+      .where(eq(schema.baleSequences.id, sequence.id));
+
+    return `HD${String(nextNum).padStart(5, '0')}`;
+  }
+
   // Container Sales API
   async createContainerSale(sale: schema.InsertContainerSale): Promise<schema.ContainerSale> {
     const [created] = await db

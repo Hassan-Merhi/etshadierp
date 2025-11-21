@@ -13565,6 +13565,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/production-bales/next-barcode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const barcode = await storage.getNextBaleBarcode(companyId);
+      res.json({ barcode });
+    } catch (error: any) {
+      console.error("Error generating barcode:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/production-bales/scan", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
