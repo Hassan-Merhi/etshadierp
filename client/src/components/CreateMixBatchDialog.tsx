@@ -40,7 +40,10 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { insertMixBatchSchema } from "@shared/schema";
 
-const formSchema = insertMixBatchSchema.extend({
+const formSchema = insertMixBatchSchema.omit({
+  companyId: true,
+  createdBy: true,
+}).extend({
   targetCategory: z.string().optional(),
   targetGrade: z.string().optional(),
 });
@@ -87,7 +90,6 @@ export function CreateMixBatchDialog({
       totalCost: "0",
       costPerKg: "0",
       status: "PLANNING",
-      createdBy: user?.username || "unknown",
     },
   });
 
@@ -245,10 +247,7 @@ export function CreateMixBatchDialog({
       return;
     }
 
-    createMutation.mutate({
-      ...data,
-      createdBy: user?.username || "unknown",
-    });
+    createMutation.mutate(data);
   };
 
   return (
