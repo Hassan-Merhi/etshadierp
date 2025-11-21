@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Package, Barcode } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Plus, Package, Barcode, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,21 +20,70 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CreateBaleDialog } from "../components/CreateBaleDialog";
-import type { ProductionBale, BaleProduct } from "@shared/schema";
+import type { ProductionBale, BaleProduct, Location } from "@shared/schema";
 
 type BaleWithProduct = {
   bale: ProductionBale;
   product: BaleProduct | null;
+  location: Location | null;
 };
 
 export default function ProductionBales() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [baleToDelete, setBaleToDelete] = useState<ProductionBale | null>(null);
+  const { toast } = useToast();
 
   const { data: bales, isLoading } = useQuery<BaleWithProduct[]>({
     queryKey: ["/api/production-bales"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/production-bales/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      toast({
+        title: "Success",
+        description: "Bale deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setBaleToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (bale: ProductionBale) => {
+    setBaleToDelete(bale);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (baleToDelete) {
+      deleteMutation.mutate(baleToDelete.id);
+    }
+  };
 
   const filteredBales = bales?.filter(({ bale }) => {
     if (statusFilter === "all") return true;
@@ -114,10 +163,11 @@ export default function ProductionBales() {
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBales.map(({ bale, product }) => (
+                {filteredBales.map(({ bale, product, location }) => (
                   <TableRow
                     key={bale.id}
                     data-testid={`row-bale-${bale.id}`}
@@ -158,14 +208,26 @@ export default function ProductionBales() {
                       ${parseFloat(bale.totalCost).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {bale.warehouseLocation || "-"}
-                      </Badge>
+                      {location ? (
+                        <Badge variant="outline">{location.name}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(bale.status)}>
                         {bale.status.replace("_", " ")}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteClick(bale)}
+                        data-testid={`button-delete-${bale.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -189,6 +251,33 @@ export default function ProductionBales() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Bale Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this bale record? This action cannot be undone.
+              {baleToDelete && (
+                <div className="mt-2 font-mono text-sm">
+                  Barcode: {baleToDelete.barcodeValue} ({baleToDelete.quantity} bales)
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

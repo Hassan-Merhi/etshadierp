@@ -113,13 +113,20 @@ export function CreateBaleDialog({
       const costPerKg = parseFloat(batch.costPerKg);
       const totalCost = (totalWeight * costPerKg).toFixed(2);
 
-      // Create ONE record with quantity, using product code as barcode
+      // Get unique barcode for this bale record
+      const barcodeResponse = await fetch("/api/production-bales/next-barcode");
+      if (!barcodeResponse.ok) {
+        throw new Error("Failed to generate barcode");
+      }
+      const { barcode } = await barcodeResponse.json();
+
+      // Create ONE record with quantity and unique barcode
       const baleData = {
         mixBatchId: parseInt(data.mixBatchId),
         productId: parseInt(data.productId),
         locationId: parseInt(data.locationId),
         baleCode: product.code,
-        barcodeValue: product.code,
+        barcodeValue: barcode,
         quantity: quantity,
         weightKg: totalWeight.toString(),
         costPerKg: batch.costPerKg,
@@ -130,10 +137,21 @@ export function CreateBaleDialog({
 
       const response = await apiRequest("POST", "/api/production-bales", baleData);
       const result = await response.json();
+
+      // Update mix batch actual weight
+      const currentActualWeight = batch.totalActualWeight ? parseFloat(batch.totalActualWeight) : 0;
+      const batchUpdateResponse = await apiRequest("PATCH", `/api/mix-batches/${batch.id}`, {
+        totalActualWeight: (currentActualWeight + totalWeight).toString(),
+      });
+      if (!batchUpdateResponse.ok) {
+        throw new Error("Failed to update mix batch quantity");
+      }
+
       return [result]; // Return as array for compatibility
     },
     onSuccess: async (bales) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mix-batches"] });
       
       // Auto-print labels immediately
       const bale = bales[0];

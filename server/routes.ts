@@ -13775,6 +13775,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/production-bales/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const id = parseInt(req.params.id);
+      await storage.deleteProductionBale(id, companyId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting production bale:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/production-bales/import-excel", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;

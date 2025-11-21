@@ -4176,9 +4176,11 @@ export class DbStorage implements IStorage {
       .select({
         bale: schema.productionBales,
         product: schema.baleProducts,
+        location: schema.locations,
       })
       .from(schema.productionBales)
       .leftJoin(schema.baleProducts, eq(schema.productionBales.productId, schema.baleProducts.id))
+      .leftJoin(schema.locations, eq(schema.productionBales.locationId, schema.locations.id))
       .where(and(...conditions))
       .orderBy(desc(schema.productionBales.createdAt));
   }
@@ -4229,6 +4231,15 @@ export class DbStorage implements IStorage {
       .where(eq(schema.productionBales.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteProductionBale(id: number, companyId: number): Promise<void> {
+    await db
+      .delete(schema.productionBales)
+      .where(and(
+        eq(schema.productionBales.id, id),
+        eq(schema.productionBales.companyId, companyId)
+      ));
   }
 
   async bulkCreateProductionBales(bales: schema.InsertProductionBale[]): Promise<schema.ProductionBale[]> {
