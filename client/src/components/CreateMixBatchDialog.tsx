@@ -146,6 +146,16 @@ export function CreateMixBatchDialog({
       !selectedContainers.some((s) => s.containerId === c.id)
   );
 
+  const handleContainerSelect = (containerId: string) => {
+    setSelectedContainerId(containerId);
+    
+    // Auto-populate cost/kg from container if available
+    const container = containers?.find((c) => c.id.toString() === containerId);
+    if (container?.ratePerKg) {
+      setCostPerKgInput(container.ratePerKg);
+    }
+  };
+
   const handleAddContainer = () => {
     if (!selectedContainerId || !weightInput || !costPerKgInput) {
       toast({
@@ -336,7 +346,7 @@ export function CreateMixBatchDialog({
               <div className="grid grid-cols-4 gap-2">
                 <Select
                   value={selectedContainerId}
-                  onValueChange={setSelectedContainerId}
+                  onValueChange={handleContainerSelect}
                 >
                   <SelectTrigger className="col-span-1" data-testid="select-container">
                     <SelectValue placeholder="Select container" />
