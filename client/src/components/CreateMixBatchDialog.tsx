@@ -232,6 +232,10 @@ export function CreateMixBatchDialog({
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
+    console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
+    console.log("Selected containers:", selectedContainers);
+    
     if (selectedContainers.length === 0) {
       toast({
         title: "No containers selected",
@@ -482,6 +486,7 @@ export function CreateMixBatchDialog({
               <Button
                 type="submit"
                 disabled={createMutation.isPending || selectedContainers.length === 0}
+                onClick={() => console.log("Create Batch button clicked, containers:", selectedContainers.length)}
                 data-testid="button-submit"
               >
                 {createMutation.isPending ? "Creating..." : "Create Batch"}
