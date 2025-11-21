@@ -107,9 +107,9 @@ export default function ProductionBales() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Barcode</TableHead>
-                  <TableHead>Bale Code</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Weight (kg)</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Total Weight (kg)</TableHead>
                   <TableHead className="text-right">Cost/kg</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead>Location</TableHead>
@@ -128,7 +128,6 @@ export default function ProductionBales() {
                         {bale.barcodeValue}
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{bale.baleCode}</TableCell>
                     <TableCell>
                       {product ? (
                         <div>
@@ -143,6 +142,9 @@ export default function ProductionBales() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {bale.quantity.toLocaleString()} bales
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {parseFloat(bale.weightKg).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
@@ -155,7 +157,11 @@ export default function ProductionBales() {
                     <TableCell className="text-right font-mono">
                       ${parseFloat(bale.totalCost).toFixed(2)}
                     </TableCell>
-                    <TableCell>{bale.warehouseLocation || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {bale.warehouseLocation || "-"}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(bale.status)}>
                         {bale.status.replace("_", " ")}

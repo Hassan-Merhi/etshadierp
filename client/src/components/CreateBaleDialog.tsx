@@ -30,16 +30,17 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { MixBatch, BaleProduct } from "@shared/schema";
+import type { MixBatch, BaleProduct, Location } from "@shared/schema";
 
 const formSchema = z.object({
   mixBatchId: z.string().min(1, "Please select a mix batch"),
   productId: z.string().min(1, "Please select a product"),
+  locationId: z.string().min(1, "Please select a location"),
   quantity: z.string().refine((val) => {
     const num = parseInt(val);
-    return !isNaN(num) && num > 0 && num <= 100;
-  }, "Quantity must be between 1 and 100"),
-  targetWeight: z.string().refine((val) => {
+    return !isNaN(num) && num > 0 && num <= 1000;
+  }, "Quantity must be between 1 and 1000"),
+  weightPerBale: z.string().refine((val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0 && num <= 500;
   }, "Weight must be between 1 and 500 kg"),
@@ -68,19 +69,26 @@ export function CreateBaleDialog({
     enabled: open,
   });
 
+  const { data: locations } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+    enabled: open,
+  });
+
   const activeBatches = mixBatches?.filter(
     (b) => b.status === "IN_PROGRESS" || b.status === "PLANNING"
   );
 
   const activeProducts = baleProducts?.filter((p) => p.active);
+  const activeLocations = locations?.filter((l) => l.active);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       mixBatchId: "",
       productId: "",
-      quantity: "1",
-      targetWeight: "25",
+      locationId: "",
+      quantity: "100",
+      weightPerBale: "25",
     },
   });
 
@@ -96,32 +104,35 @@ export function CreateBaleDialog({
       );
       if (!product) throw new Error("Product not found");
 
+      const location = activeLocations?.find(
+        (l) => l.id.toString() === data.locationId
+      );
+      if (!location) throw new Error("Location not found");
+
       const quantity = parseInt(data.quantity);
-      const weightKg = parseFloat(data.targetWeight);
+      const weightPerBale = parseFloat(data.weightPerBale);
+      const totalWeight = weightPerBale * quantity;
       const costPerKg = parseFloat(batch.costPerKg);
-      const totalCost = (weightKg * costPerKg).toFixed(2);
+      const totalCost = (totalWeight * costPerKg).toFixed(2);
 
-      const bales = [];
-      for (let i = 0; i < quantity; i++) {
-        const barcodeResponse = await fetch("/api/production-bales/next-barcode");
-        const { barcode } = await barcodeResponse.json();
+      // Create ONE record with quantity, using product code as barcode
+      const baleData = {
+        mixBatchId: parseInt(data.mixBatchId),
+        productId: parseInt(data.productId),
+        locationId: parseInt(data.locationId),
+        baleCode: product.code,
+        barcodeValue: product.code,
+        quantity: quantity,
+        weightKg: totalWeight.toString(),
+        costPerKg: batch.costPerKg,
+        totalCost,
+        status: "IN_STOCK",
+        pressedAt: new Date().toISOString(),
+      };
 
-        bales.push({
-          mixBatchId: parseInt(data.mixBatchId),
-          productId: parseInt(data.productId),
-          baleCode: barcode,
-          barcodeValue: barcode,
-          weightKg: weightKg.toString(),
-          costPerKg: batch.costPerKg,
-          totalCost,
-          status: "LABEL_PRINTED",
-          pressedAt: new Date().toISOString(),
-        });
-      }
-
-      const response = await apiRequest("POST", "/api/production-bales/bulk", { bales });
+      const response = await apiRequest("POST", "/api/production-bales", baleData);
       const result = await response.json();
-      return result.bales;
+      return [result]; // Return as array for compatibility
     },
     onSuccess: (bales) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
@@ -129,7 +140,7 @@ export function CreateBaleDialog({
       setShowPrintPrompt(true);
       toast({
         title: "Success",
-        description: `Created ${bales.length} bale(s) successfully`,
+        description: `Created entry for ${bales[0].quantity} bale(s) successfully`,
       });
     },
     onError: (error: Error) => {
@@ -141,11 +152,123 @@ export function CreateBaleDialog({
     },
   });
 
-  const handlePrintLabels = () => {
-    toast({
-      title: "Print Labels",
-      description: "Label printing feature coming soon",
-    });
+  const handlePrintLabels = async () => {
+    if (createdBales.length === 0) return;
+    
+    try {
+      const bale = createdBales[0];
+      const product = activeProducts?.find(p => p.id === bale.productId);
+      
+      if (!product) {
+        toast({
+          title: "Error",
+          description: "Product information not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Generate barcode using bwip-js
+      const bwipjs = await import('bwip-js');
+      const canvas = document.createElement('canvas');
+      
+      bwipjs.toCanvas(canvas, {
+        bcid: 'code128',
+        text: product.code,
+        scale: 3,
+        height: 10,
+        includetext: true,
+        textxalign: 'center',
+      });
+
+      // Create printable content
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description: "Please allow pop-ups to print labels",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print Barcode Label - ${product.code}</title>
+            <style>
+              @media print {
+                @page { margin: 0; }
+                body { margin: 1cm; }
+              }
+              body {
+                font-family: Arial, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 20px;
+              }
+              .label {
+                border: 2px solid #000;
+                padding: 20px;
+                margin: 10px;
+                text-align: center;
+                page-break-after: always;
+              }
+              .product-name {
+                font-size: 18px;
+                font-weight: bold;
+                margin-bottom: 10px;
+              }
+              .product-code {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 15px;
+                font-family: monospace;
+              }
+              .barcode {
+                margin: 15px 0;
+              }
+              .quantity {
+                font-size: 16px;
+                margin-top: 10px;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="label">
+              <div class="product-name">${product.name}</div>
+              <div class="product-code">${product.code}</div>
+              <div class="barcode">
+                <img src="${canvas.toDataURL()}" alt="Barcode" />
+              </div>
+              <div class="quantity">Quantity: ${bale.quantity} bales</div>
+            </div>
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Auto-print after a short delay
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+
+      toast({
+        title: "Print Ready",
+        description: "Label is ready to print",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate barcode",
+        variant: "destructive",
+      });
+    }
+    
     handleClose();
   };
 
@@ -250,51 +373,6 @@ export function CreateBaleDialog({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Number of Bales *</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          placeholder="1"
-                          min="1"
-                          max="100"
-                          data-testid="input-quantity"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="targetWeight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Target Weight (kg) *</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          placeholder="25"
-                          step="0.01"
-                          min="1"
-                          max="500"
-                          data-testid="input-target-weight"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
                 control={form.control}
                 name="productId"
@@ -325,6 +403,82 @@ export function CreateBaleDialog({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="locationId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Warehouse Location *</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-location">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeLocations?.map((location) => (
+                          <SelectItem
+                            key={location.id}
+                            value={location.id.toString()}
+                          >
+                            {location.code} - {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity (Number of Bales) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          placeholder="100"
+                          min="1"
+                          max="1000"
+                          data-testid="input-quantity"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="weightPerBale"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Weight per Bale (kg) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          placeholder="25"
+                          step="0.01"
+                          min="1"
+                          max="500"
+                          data-testid="input-weight-per-bale"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="flex justify-end gap-2">
                 <Button
