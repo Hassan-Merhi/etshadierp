@@ -301,6 +301,15 @@ export interface IStorage {
   updateBale(id: number, updates: Partial<schema.InsertBale>): Promise<schema.Bale>;
   deleteBale(id: number): Promise<void>;
   bulkCreateBales(bales: schema.InsertBale[]): Promise<schema.Bale[]>;
+
+  // Bale Products
+  getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]>;
+  getBaleProductById(id: number): Promise<schema.BaleProduct | undefined>;
+  getBaleProductByCode(code: string, companyId: number): Promise<schema.BaleProduct | undefined>;
+  createBaleProduct(product: schema.InsertBaleProduct): Promise<schema.BaleProduct>;
+  updateBaleProduct(id: number, updates: Partial<schema.InsertBaleProduct>): Promise<schema.BaleProduct>;
+  deleteBaleProduct(id: number): Promise<void>;
+  bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -4004,6 +4013,67 @@ export class DbStorage implements IStorage {
     return await db
       .insert(schema.bales)
       .values(bales)
+      .returning();
+  }
+
+  // Bale Products
+  async getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]> {
+    return await db
+      .select()
+      .from(schema.baleProducts)
+      .where(eq(schema.baleProducts.companyId, companyId))
+      .orderBy(schema.baleProducts.code);
+  }
+
+  async getBaleProductById(id: number): Promise<schema.BaleProduct | undefined> {
+    const [product] = await db
+      .select()
+      .from(schema.baleProducts)
+      .where(eq(schema.baleProducts.id, id));
+    return product;
+  }
+
+  async getBaleProductByCode(code: string, companyId: number): Promise<schema.BaleProduct | undefined> {
+    const [product] = await db
+      .select()
+      .from(schema.baleProducts)
+      .where(
+        and(
+          eq(schema.baleProducts.code, code),
+          eq(schema.baleProducts.companyId, companyId)
+        )
+      );
+    return product;
+  }
+
+  async createBaleProduct(product: schema.InsertBaleProduct): Promise<schema.BaleProduct> {
+    const [created] = await db
+      .insert(schema.baleProducts)
+      .values(product)
+      .returning();
+    return created;
+  }
+
+  async updateBaleProduct(id: number, updates: Partial<schema.InsertBaleProduct>): Promise<schema.BaleProduct> {
+    const [updated] = await db
+      .update(schema.baleProducts)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.baleProducts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBaleProduct(id: number): Promise<void> {
+    await db
+      .delete(schema.baleProducts)
+      .where(eq(schema.baleProducts.id, id));
+  }
+
+  async bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]> {
+    if (products.length === 0) return [];
+    return await db
+      .insert(schema.baleProducts)
+      .values(products)
       .returning();
   }
 
