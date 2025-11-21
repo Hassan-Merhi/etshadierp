@@ -56,8 +56,6 @@ export function CreateBaleDialog({
   onOpenChange,
 }: CreateBaleDialogProps) {
   const { toast } = useToast();
-  const [createdBales, setCreatedBales] = useState<any[]>([]);
-  const [showPrintPrompt, setShowPrintPrompt] = useState(false);
 
   const { data: mixBatches } = useQuery<MixBatch[]>({
     queryKey: ["/api/mix-batches"],
@@ -134,14 +132,23 @@ export function CreateBaleDialog({
       const result = await response.json();
       return [result]; // Return as array for compatibility
     },
-    onSuccess: (bales) => {
+    onSuccess: async (bales) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-bales"] });
-      setCreatedBales(bales);
-      setShowPrintPrompt(true);
+      
+      // Auto-print labels immediately
+      const bale = bales[0];
+      const product = activeProducts?.find(p => p.id === bale.productId);
+      
+      if (product) {
+        await printBaleLabels(product, bale.quantity);
+      }
+      
       toast({
         title: "Success",
-        description: `Created entry for ${bales[0].quantity} bale(s) successfully`,
+        description: `Created entry for ${bale.quantity} bale(s) and sent to printer`,
       });
+      
+      handleClose();
     },
     onError: (error: Error) => {
       toast({
@@ -152,22 +159,8 @@ export function CreateBaleDialog({
     },
   });
 
-  const handlePrintLabels = async () => {
-    if (createdBales.length === 0) return;
-    
+  const printBaleLabels = async (product: BaleProduct, quantity: number) => {
     try {
-      const bale = createdBales[0];
-      const product = activeProducts?.find(p => p.id === bale.productId);
-      
-      if (!product) {
-        toast({
-          title: "Error",
-          description: "Product information not found",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // Generate barcode using bwip-js
       const bwipjs = await import('bwip-js');
       const canvas = document.createElement('canvas');
@@ -181,7 +174,9 @@ export function CreateBaleDialog({
         textxalign: 'center',
       });
 
-      // Create printable content
+      const barcodeDataUrl = canvas.toDataURL();
+
+      // Create printable content with multiple labels (one per bale)
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast({
@@ -192,10 +187,24 @@ export function CreateBaleDialog({
         return;
       }
 
+      // Generate HTML for all labels
+      let labelsHtml = '';
+      for (let i = 0; i < quantity; i++) {
+        labelsHtml += `
+          <div class="label">
+            <div class="product-name">${product.name}</div>
+            <div class="product-code">${product.code}</div>
+            <div class="barcode">
+              <img src="${barcodeDataUrl}" alt="Barcode" />
+            </div>
+          </div>
+        `;
+      }
+
       printWindow.document.write(`
         <html>
           <head>
-            <title>Print Barcode Label - ${product.code}</title>
+            <title>Print Barcode Labels - ${product.code}</title>
             <style>
               @media print {
                 @page { margin: 0; }
@@ -214,6 +223,7 @@ export function CreateBaleDialog({
                 margin: 10px;
                 text-align: center;
                 page-break-after: always;
+                width: 8cm;
               }
               .product-name {
                 font-size: 18px;
@@ -229,22 +239,10 @@ export function CreateBaleDialog({
               .barcode {
                 margin: 15px 0;
               }
-              .quantity {
-                font-size: 16px;
-                margin-top: 10px;
-                font-weight: bold;
-              }
             </style>
           </head>
           <body>
-            <div class="label">
-              <div class="product-name">${product.name}</div>
-              <div class="product-code">${product.code}</div>
-              <div class="barcode">
-                <img src="${canvas.toDataURL()}" alt="Barcode" />
-              </div>
-              <div class="quantity">Quantity: ${bale.quantity} bales</div>
-            </div>
+            ${labelsHtml}
           </body>
         </html>
       `);
@@ -256,11 +254,6 @@ export function CreateBaleDialog({
       setTimeout(() => {
         printWindow.print();
       }, 250);
-
-      toast({
-        title: "Print Ready",
-        description: "Label is ready to print",
-      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -268,21 +261,11 @@ export function CreateBaleDialog({
         variant: "destructive",
       });
     }
-    
-    handleClose();
-  };
-
-  const handleContinue = () => {
-    setCreatedBales([]);
-    setShowPrintPrompt(false);
-    form.reset();
   };
 
   const handleClose = () => {
-    onOpenChange(false);
-    setCreatedBales([]);
-    setShowPrintPrompt(false);
     form.reset();
+    onOpenChange(false);
   };
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
@@ -299,48 +282,7 @@ export function CreateBaleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {showPrintPrompt ? (
-          <div className="space-y-6">
-            <div className="bg-muted p-4 rounded-md">
-              <h3 className="font-semibold mb-2">
-                Created {createdBales.length} bale(s)
-              </h3>
-              <div className="space-y-1">
-                {createdBales.slice(0, 5).map((bale: any) => (
-                  <div key={bale.id} className="flex items-center gap-2 text-sm font-mono">
-                    <Barcode className="h-4 w-4" />
-                    {bale.barcodeValue}
-                  </div>
-                ))}
-                {createdBales.length > 5 && (
-                  <p className="text-sm text-muted-foreground">
-                    ...and {createdBales.length - 5} more
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleContinue}
-                data-testid="button-continue"
-              >
-                Create More Bales
-              </Button>
-              <Button
-                type="button"
-                onClick={handlePrintLabels}
-                data-testid="button-print-labels"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Print Labels
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Form {...form}>
+        <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
@@ -498,8 +440,7 @@ export function CreateBaleDialog({
                 </Button>
               </div>
             </form>
-          </Form>
-        )}
+        </Form>
       </DialogContent>
     </Dialog>
   );
