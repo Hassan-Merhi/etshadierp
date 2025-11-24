@@ -1,0 +1,39 @@
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Build failed 😞
+    at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:11284:15)
+    at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:2649:28)
+    at Identifier.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5066:40)
+    at FunctionBodyScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+    at FunctionScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+    at ModuleScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:13820:39)
+    at Module.traceVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:16037:29)
+    at Module.error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:15588:16)
+    at error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:392:42)
+    at getRollupError (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:396:41)
+17: import type { BaleProduct } from "@shared/schema";
+             ^
+16: import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
+15: import { Skeleton } from "@/components/ui/skeleton";
+14: } from "@/components/ui/table";
+file: /opt/render/project/src/client/src/pages/BaleProducts.tsx:16:9
+client/src/pages/BaleProducts.tsx (16:9): "CreateBaleProductDialog" is not exported by "client/src/components/CreateBaleProductDialog.tsx", imported by "client/src/pages/BaleProducts.tsx".
+error during build:
+x Build failed in 5.04s
+✓ 3533 modules transformed.
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+  npx update-browserslist-db@latest
+Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+transforming...
+vite v5.4.20 building for production...
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+> rest-express@1.0.0 build
+Run `npm audit` for details.
+a different dependency.
+Some issues need review, and may require choosing
+  npm audit fix --force
+To address all issues possible (including breaking changes), run:
+  npm audit fix
+To address issues that do not require attention, run:
+10 vulnerabilities (3 low, 5 moderate, 2 high)
+  run `npm fund` for details
