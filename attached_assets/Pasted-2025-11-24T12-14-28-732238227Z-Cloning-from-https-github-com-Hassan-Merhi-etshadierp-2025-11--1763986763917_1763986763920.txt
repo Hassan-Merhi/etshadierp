@@ -1,0 +1,58 @@
+2025-11-24T12:14:28.732238227Z ==> Cloning from https://github.com/Hassan-Merhi/etshadierp
+2025-11-24T12:14:30.117092332Z ==> Checking out commit d60e40fd38ec6340ad9dd54ba3a8023a06e2fb96 in branch main
+2025-11-24T12:14:32.42539691Z ==> Using Node.js version 22.16.0 (default)
+2025-11-24T12:14:32.449616187Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2025-11-24T12:14:34.480380944Z ==> Running build command 'npm install --production=false && npm run build && npm run db:push'...
+2025-11-24T12:14:43.804561978Z 
+2025-11-24T12:14:43.804589368Z added 501 packages, and audited 502 packages in 9s
+2025-11-24T12:14:43.804599729Z 
+2025-11-24T12:14:43.80464957Z 65 packages are looking for funding
+2025-11-24T12:14:43.80466218Z   run `npm fund` for details
+2025-11-24T12:14:43.827889905Z 
+2025-11-24T12:14:43.827908625Z 10 vulnerabilities (3 low, 5 moderate, 2 high)
+2025-11-24T12:14:43.827912955Z 
+2025-11-24T12:14:43.827917495Z To address issues that do not require attention, run:
+2025-11-24T12:14:43.827921015Z   npm audit fix
+2025-11-24T12:14:43.827924446Z 
+2025-11-24T12:14:43.827928336Z To address all issues possible (including breaking changes), run:
+2025-11-24T12:14:43.827932536Z   npm audit fix --force
+2025-11-24T12:14:43.827935846Z 
+2025-11-24T12:14:43.827939236Z Some issues need review, and may require choosing
+2025-11-24T12:14:43.827942996Z a different dependency.
+2025-11-24T12:14:43.827946256Z 
+2025-11-24T12:14:43.827950276Z Run `npm audit` for details.
+2025-11-24T12:14:44.194230561Z 
+2025-11-24T12:14:44.194243731Z > rest-express@1.0.0 build
+2025-11-24T12:14:44.194247321Z > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+2025-11-24T12:14:44.194253371Z 
+2025-11-24T12:14:44.558769256Z vite v5.4.20 building for production...
+2025-11-24T12:14:44.636663286Z transforming...
+2025-11-24T12:14:44.973740301Z Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+2025-11-24T12:14:44.973762881Z   npx update-browserslist-db@latest
+2025-11-24T12:14:44.973768301Z   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2025-11-24T12:14:46.1609166Z 
+2025-11-24T12:14:46.160944571Z A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+2025-11-24T12:14:50.510954973Z ✓ 3533 modules transformed.
+2025-11-24T12:14:50.512577359Z x Build failed in 5.92s
+2025-11-24T12:14:50.512638681Z error during build:
+2025-11-24T12:14:50.512644991Z client/src/pages/BaleProducts.tsx (16:9): "CreateBaleProductDialog" is not exported by "client/src/components/CreateBaleProductDialog.tsx", imported by "client/src/pages/BaleProducts.tsx".
+2025-11-24T12:14:50.512649721Z file: /opt/render/project/src/client/src/pages/BaleProducts.tsx:16:9
+2025-11-24T12:14:50.512653141Z 
+2025-11-24T12:14:50.512657121Z 14: } from "@/components/ui/table";
+2025-11-24T12:14:50.512661531Z 15: import { Skeleton } from "@/components/ui/skeleton";
+2025-11-24T12:14:50.512665591Z 16: import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
+2025-11-24T12:14:50.512681392Z              ^
+2025-11-24T12:14:50.512684002Z 17: import type { BaleProduct } from "@shared/schema";
+2025-11-24T12:14:50.512685972Z 
+2025-11-24T12:14:50.512688612Z     at getRollupError (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:396:41)
+2025-11-24T12:14:50.512690762Z     at error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:392:42)
+2025-11-24T12:14:50.512692782Z     at Module.error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:15588:16)
+2025-11-24T12:14:50.512695512Z     at Module.traceVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:16037:29)
+2025-11-24T12:14:50.512697692Z     at ModuleScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:13820:39)
+2025-11-24T12:14:50.512699762Z     at FunctionScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+2025-11-24T12:14:50.512701842Z     at FunctionBodyScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+2025-11-24T12:14:50.512703842Z     at Identifier.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5066:40)
+2025-11-24T12:14:50.512705892Z     at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:2649:28)
+2025-11-24T12:14:50.512707972Z     at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:11284:15)
+2025-11-24T12:14:50.658582698Z ==> Build failed 😞
+2025-11-24T12:14:50.658597458Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
