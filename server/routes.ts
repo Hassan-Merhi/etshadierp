@@ -3466,6 +3466,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updates.stockGroupId = req.body.stockGroupId;
         }
 
+        if (req.body.sellingPrice !== undefined) {
+          updates.sellingPrice = req.body.sellingPrice ? String(req.body.sellingPrice) : "0";
+        }
+
         if (req.body.active !== undefined) {
           updates.active = req.body.active;
         }
