@@ -13893,6 +13893,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/generate-barcode", requireAuth, async (req, res) => {
+    try {
+      const { text } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ message: "Barcode text is required" });
+      }
+
+      const bwipjs = await import("bwip-js");
+      
+      // Render to PNG buffer
+      const png = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: text,
+        scale: 3,
+        height: 10,
+        includetext: true,
+        textxalign: "center",
+      });
+
+      // Convert to base64 data URL
+      const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
+      res.json({ dataUrl });
+    } catch (error: any) {
+      console.error("Error generating barcode:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/production-bales/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;

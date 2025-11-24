@@ -139,8 +139,6 @@ export function CreateBaleDialog({
 
   const printBaleLabels = async (product: BaleProduct, bales: any[]) => {
     try {
-      const bwipjs = await import('bwip-js');
-
       // Create printable content with multiple labels (one per bale)
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
@@ -155,22 +153,21 @@ export function CreateBaleDialog({
       // Generate HTML for all labels with unique barcodes
       let labelsHtml = '';
       for (const bale of bales) {
-        // Generate unique barcode for each bale
-        const canvas = document.createElement('canvas');
-        bwipjs.toCanvas(canvas, {
-          bcid: 'code128',
+        // Get barcode image from backend
+        const response = await apiRequest("POST", "/api/generate-barcode", {
           text: bale.barcodeValue,
-          scale: 3,
-          height: 10,
-          includetext: true,
-          textxalign: 'center',
         });
-        const barcodeDataUrl = canvas.toDataURL();
+        
+        if (!response.ok) {
+          throw new Error("Failed to generate barcode");
+        }
+        
+        const { dataUrl } = await response.json();
 
         labelsHtml += `
           <div class="label">
             <div class="barcode">
-              <img src="${barcodeDataUrl}" alt="Barcode" />
+              <img src="${dataUrl}" alt="Barcode" />
             </div>
             <div class="barcode-text">${bale.barcodeValue}</div>
           </div>
