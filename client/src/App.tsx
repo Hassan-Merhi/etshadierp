@@ -45,6 +45,7 @@ import Bales from "@/pages/Bales";
 import MixBatches from "@/pages/MixBatches";
 import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
+import BaleTransfer from "@/pages/bale-transfer";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -65,6 +66,7 @@ function Router({ user }: { user: any }) {
         <Route path="/">{() => <POS posUser={user} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
+        <Route path="/bale-transfer" component={BaleTransfer} />
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -199,6 +201,14 @@ function AuthenticatedApp() {
             >
               <MapPin className="h-4 w-4 mr-2" />
               Location Inventory
+            </Button>
+            <Button
+              variant={currentLocation === "/bale-transfer" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setLocation("/bale-transfer")}
+              data-testid="button-bale-transfer-tab"
+            >
+              Transfer Bales
             </Button>
           </div>
         </header>

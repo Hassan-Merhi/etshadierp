@@ -310,6 +310,20 @@ export interface IStorage {
   updateBaleProduct(id: number, updates: Partial<schema.InsertBaleProduct>): Promise<schema.BaleProduct>;
   deleteBaleProduct(id: number): Promise<void>;
   bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]>;
+
+  // Bale Transfers
+  getAllBaleTransfers(companyId: number): Promise<schema.BaleTransfer[]>;
+  getBaleTransferById(id: number): Promise<schema.BaleTransfer | undefined>;
+  createBaleTransfer(transfer: schema.InsertBaleTransfer): Promise<schema.BaleTransfer>;
+  updateBaleTransfer(id: number, updates: Partial<schema.InsertBaleTransfer>): Promise<schema.BaleTransfer>;
+  deleteBaleTransfer(id: number): Promise<void>;
+  
+  // Bale Transfer Items
+  getBaleTransferItems(transferId: number): Promise<schema.BaleTransferItem[]>;
+  createBaleTransferItem(item: schema.InsertBaleTransferItem): Promise<schema.BaleTransferItem>;
+  updateBaleTransferItem(id: number, updates: Partial<schema.InsertBaleTransferItem>): Promise<schema.BaleTransferItem>;
+  deleteBaleTransferItem(id: number): Promise<void>;
+  getProductionBalesByLocation(companyId: number, locationId: number): Promise<schema.ProductionBale[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -4089,6 +4103,83 @@ export class DbStorage implements IStorage {
       .insert(schema.baleProducts)
       .values(products)
       .returning();
+  }
+
+  // Bale Transfers
+  async getAllBaleTransfers(companyId: number): Promise<schema.BaleTransfer[]> {
+    return await db
+      .select()
+      .from(schema.baleTransfers)
+      .where(eq(schema.baleTransfers.companyId, companyId))
+      .orderBy(desc(schema.baleTransfers.createdAt));
+  }
+
+  async getBaleTransferById(id: number): Promise<schema.BaleTransfer | undefined> {
+    const [transfer] = await db
+      .select()
+      .from(schema.baleTransfers)
+      .where(eq(schema.baleTransfers.id, id));
+    return transfer;
+  }
+
+  async createBaleTransfer(transfer: schema.InsertBaleTransfer): Promise<schema.BaleTransfer> {
+    const [created] = await db
+      .insert(schema.baleTransfers)
+      .values(transfer)
+      .returning();
+    return created;
+  }
+
+  async updateBaleTransfer(id: number, updates: Partial<schema.InsertBaleTransfer>): Promise<schema.BaleTransfer> {
+    const [updated] = await db
+      .update(schema.baleTransfers)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.baleTransfers.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBaleTransfer(id: number): Promise<void> {
+    await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.id, id));
+  }
+
+  async getBaleTransferItems(transferId: number): Promise<schema.BaleTransferItem[]> {
+    return await db
+      .select()
+      .from(schema.baleTransferItems)
+      .where(eq(schema.baleTransferItems.transferId, transferId));
+  }
+
+  async createBaleTransferItem(item: schema.InsertBaleTransferItem): Promise<schema.BaleTransferItem> {
+    const [created] = await db
+      .insert(schema.baleTransferItems)
+      .values(item)
+      .returning();
+    return created;
+  }
+
+  async updateBaleTransferItem(id: number, updates: Partial<schema.InsertBaleTransferItem>): Promise<schema.BaleTransferItem> {
+    const [updated] = await db
+      .update(schema.baleTransferItems)
+      .set({ ...updates, updatedAt: sql`now()` })
+      .where(eq(schema.baleTransferItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBaleTransferItem(id: number): Promise<void> {
+    await db.delete(schema.baleTransferItems).where(eq(schema.baleTransferItems.id, id));
+  }
+
+  async getProductionBalesByLocation(companyId: number, locationId: number): Promise<schema.ProductionBale[]> {
+    return await db
+      .select()
+      .from(schema.productionBales)
+      .where(and(
+        eq(schema.productionBales.companyId, companyId),
+        eq(schema.productionBales.locationId, locationId),
+        eq(schema.productionBales.status, "IN_STOCK")
+      ));
   }
 
   // Mix Batches

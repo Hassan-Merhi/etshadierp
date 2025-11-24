@@ -13994,6 +13994,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bale Transfer Routes
+  app.get("/api/bale-transfers", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const transfers = await storage.getAllBaleTransfers(companyId);
+      res.json(transfers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bale-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const transfer = await storage.getBaleTransferById(parseInt(req.params.id));
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+      const items = await storage.getBaleTransferItems(transfer.id);
+      res.json({ ...transfer, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/bale-transfers", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const { sourceLocationId, destinationLocationId, transferDate, notes, items } = req.body;
+      
+      const transfer = await storage.createBaleTransfer({
+        companyId,
+        sourceLocationId,
+        destinationLocationId,
+        transferDate,
+        notes,
+        createdBy: req.session.userId!,
+        status: "PENDING"
+      });
+
+      for (const item of items) {
+        await storage.createBaleTransferItem({
+          transferId: transfer.id,
+          productionBaleId: item.productionBaleId,
+          quantity: item.quantity,
+          weightKg: item.weightKg.toString(),
+          costPerKg: item.costPerKg.toString(),
+          totalCost: item.totalCost.toString()
+        });
+      }
+
+      res.json({ success: true, transferId: transfer.id });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/bale-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const { items, status, notes } = req.body;
+      const transferId = parseInt(req.params.id);
+      
+      await storage.updateBaleTransfer(transferId, {
+        status,
+        notes,
+        updatedBy: req.session.userId!
+      });
+
+      if (items) {
+        for (const item of items) {
+          if (item.id) {
+            await storage.updateBaleTransferItem(item.id, {
+              weightKg: item.weightKg.toString(),
+              costPerKg: item.costPerKg.toString(),
+              totalCost: item.totalCost.toString()
+            });
+          } else {
+            await storage.createBaleTransferItem({
+              transferId,
+              productionBaleId: item.productionBaleId,
+              quantity: item.quantity,
+              weightKg: item.weightKg.toString(),
+              costPerKg: item.costPerKg.toString(),
+              totalCost: item.totalCost.toString()
+            });
+          }
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/bales-by-location/:locationId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const bales = await storage.getProductionBalesByLocation(companyId, parseInt(req.params.locationId));
+      res.json(bales.map(b => ({
+        id: b.id,
+        baleCode: b.baleCode,
+        category: b.category,
+        grade: b.grade,
+        weightKg: b.weightKg,
+        costPerKg: b.costPerKg,
+        totalCost: b.totalCost
+      })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

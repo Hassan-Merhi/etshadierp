@@ -1302,6 +1302,65 @@ export const insertProductionBaleSchema = createInsertSchema(productionBales).om
 export type InsertProductionBale = z.infer<typeof insertProductionBaleSchema>;
 export type ProductionBale = typeof productionBales.$inferSelect;
 
+// Bale Transfers - tracks bale movements between locations
+export const baleTransfers = pgTable("bale_transfers", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  sourceLocationId: integer("source_location_id").notNull(),
+  destinationLocationId: integer("destination_location_id").notNull(),
+  transferDate: date("transfer_date").notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").notNull(),
+  updatedBy: varchar("updated_by"),
+  status: text("status").notNull().default("PENDING"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertBaleTransferSchema = createInsertSchema(baleTransfers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  sourceLocationId: z.number().min(1, "Source location is required"),
+  destinationLocationId: z.number().min(1, "Destination location is required"),
+  transferDate: z.string().min(1, "Transfer date is required"),
+  notes: z.string().optional(),
+  createdBy: z.string().min(1, "Creator is required"),
+  updatedBy: z.string().optional(),
+  status: z.enum(["PENDING", "COMPLETED"]).optional(),
+});
+
+export type InsertBaleTransfer = z.infer<typeof insertBaleTransferSchema>;
+export type BaleTransfer = typeof baleTransfers.$inferSelect;
+
+// Bale Transfer Items - individual bales being transferred
+export const baleTransferItems = pgTable("bale_transfer_items", {
+  id: serial("id").primaryKey(),
+  transferId: integer("transfer_id").notNull(),
+  productionBaleId: integer("production_bale_id").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull(),
+  costPerKg: decimal("cost_per_kg", { precision: 20, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBaleTransferItemSchema = createInsertSchema(baleTransferItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  transferId: z.number().min(1, "Transfer is required"),
+  productionBaleId: z.number().min(1, "Bale is required"),
+  quantity: z.number().min(1, "Quantity must be at least 1"),
+  weightKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Weight must be positive"),
+  costPerKg: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Cost per kg must be non-negative"),
+  totalCost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Total cost must be non-negative"),
+});
+
+export type InsertBaleTransferItem = z.infer<typeof insertBaleTransferItemSchema>;
+export type BaleTransferItem = typeof baleTransferItems.$inferSelect;
 
 // Customer Balances - ledger of customer transactions
 export const customerBalances = pgTable("customer_balances", {
