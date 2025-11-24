@@ -11004,7 +11004,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(stockItems.id, item.stockItemId));
 
           const qty = parseFloat(item.quantity);
-          const sellingPrice = parseFloat(item.rate);
+          // Use configured selling price if available, otherwise use entered rate
+          const configuredPrice = stockItem?.sellingPrice ? parseFloat(stockItem.sellingPrice) : 0;
+          const sellingPrice = configuredPrice > 0 ? configuredPrice : parseFloat(item.rate);
           const costPrice = currentRate;
           const totalSales = qty * sellingPrice;
           const totalCost = qty * costPrice;
@@ -11244,7 +11246,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? parseFloat(oldItem.costPrice || "0")
             : parseFloat(inventoryRecord.averageRate || "0");
           
-          const totalSales = sellQty * parseFloat(sellingPrice);
+          // Get stock item to check for configured selling price
+          const [stockItemData] = await tx
+            .select()
+            .from(stockItems)
+            .where(eq(stockItems.id, stockItemId))
+            .limit(1);
+          
+          // Use configured selling price if available, otherwise use entered price
+          const configuredPrice = stockItemData?.sellingPrice ? parseFloat(stockItemData.sellingPrice) : 0;
+          const effectiveSellingPrice = configuredPrice > 0 ? configuredPrice : parseFloat(sellingPrice);
+          
+          const totalSales = sellQty * effectiveSellingPrice;
           const totalCost = sellQty * costPrice;
           const profit = totalSales - totalCost;
 
@@ -11253,11 +11266,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherId,
             stockItemId,
             quantity: quantity,
-            sellingPrice: sellingPrice,
+            sellingPrice: effectiveSellingPrice.toFixed(2),
             costPrice: costPrice.toString(),
-            totalSales: totalSales.toString(),
-            totalCost: totalCost.toString(),
-            profit: profit.toString(),
+            totalSales: totalSales.toFixed(2),
+            totalCost: totalCost.toFixed(2),
+            profit: profit.toFixed(2),
           });
 
           // Deduct from inventory

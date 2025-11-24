@@ -1,5 +1,12 @@
 # ERP POS System
 
+## Recent Changes (Nov 24, 2025)
+
+- **Fixed Configured Selling Price**: Sales reports now use the configured selling price from stock items when available. If a stock item has a configured price, sales will use that price instead of the manually entered rate.
+- **Fixed Error Handler**: Removed `throw err` from Express error handler to prevent process crashes
+- **Fixed Barcode Generation**: Moved barcode generation from frontend (bwip-js) to backend API endpoint (`/api/generate-barcode`) to fix production builds
+- **Added Barcode API**: New `/api/generate-barcode` POST endpoint generates PNG barcodes server-side for printing
+
 ## Overview
 
 This project is a comprehensive ERP and POS system designed for multi-company warehouse management. It provides robust inventory tracking across multiple locations, streamlines purchase order management, enables container tracking, and offers full financial accounting and reporting capabilities. Built as a full-stack TypeScript application, its primary purpose is to optimize operations and provide strong financial oversight for businesses managing bulk inventory with complex supply chains, including international container shipments. The system is designed to support multi-entity businesses by ensuring isolated data for each company while providing a unified platform.
