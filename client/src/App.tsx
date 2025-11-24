@@ -11,7 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -46,6 +46,7 @@ import MixBatches from "@/pages/MixBatches";
 import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
+import StockTransfer from "@/pages/stock-transfer";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -67,6 +68,7 @@ function Router({ user }: { user: any }) {
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/bale-transfer" component={BaleTransfer} />
+        <Route path="/stock-transfer" component={StockTransfer} />
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -209,6 +211,15 @@ function AuthenticatedApp() {
               data-testid="button-bale-transfer-tab"
             >
               Transfer Bales
+            </Button>
+            <Button
+              variant={currentLocation === "/stock-transfer" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setLocation("/stock-transfer")}
+              data-testid="button-stock-transfer-tab"
+            >
+              <Package className="h-4 w-4 mr-2" />
+              Stock Transfer
             </Button>
           </div>
         </header>

@@ -14040,6 +14040,253 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Transfer Routes for POS Users
+  app.get("/api/stock-transfers", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const transfers = await db
+        .select({
+          id: stockTransferVouchers.id,
+          voucherId: stockTransferVouchers.voucherId,
+          sourceLocationId: stockTransferVouchers.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+          notes: stockTransferVouchers.notes,
+          createdAt: stockTransferVouchers.createdAt,
+        })
+        .from(stockTransferVouchers)
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(eq(vouchers.companyId, companyId))
+        .orderBy(sql`${stockTransferVouchers.createdAt} DESC`);
+      
+      res.json(transfers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/stock-transfers/:id", requireAuth, async (req, res) => {
+    try {
+      const transferId = parseInt(req.params.id);
+      if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
+      
+      const [transfer] = await db
+        .select()
+        .from(stockTransferVouchers)
+        .where(eq(stockTransferVouchers.id, transferId))
+        .limit(1);
+      
+      if (!transfer) return res.status(404).json({ message: "Transfer not found" });
+      
+      const items = await db
+        .select({
+          id: stockTransferItems.id,
+          stockItemId: stockTransferItems.stockItemId,
+          quantity: stockTransferItems.quantity,
+          rate: stockTransferItems.rate,
+          totalAmount: stockTransferItems.totalAmount,
+          stockItemName: stockItems.name,
+          stockItemCode: stockItems.code,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
+        .where(eq(stockTransferItems.transferId, transferId));
+      
+      res.json({ ...transfer, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/stock-transfers", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const { sourceLocationId, destinationLocationId, items, notes } = req.body;
+      
+      if (!sourceLocationId || !destinationLocationId || !items || items.length === 0) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Create Stock Transfer voucher
+      const voucherNumber = `ST-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId,
+          voucherType: "Stock Transfer",
+          voucherNumber,
+          voucherDate: format(new Date(), "yyyy-MM-dd"),
+          status: "POSTED",
+          createdByUserId: req.session.userId!,
+          description: notes || null,
+          totalAmount: "0",
+        })
+        .returning();
+      
+      // Create Stock Transfer voucher link
+      let totalAmount = 0;
+      const transferItems = [];
+      
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const totalItemAmount = quantity * rate;
+        totalAmount += totalItemAmount;
+        
+        const [insertedItem] = await db
+          .insert(stockTransferItems)
+          .values({
+            transferId: 0, // Will set after creating transfer record
+            stockItemId: item.stockItemId,
+            sourceLocationId: sourceLocationId,
+            quantity: quantity.toString(),
+            rate: rate.toFixed(2),
+            totalAmount: totalItemAmount.toFixed(2),
+          })
+          .returning();
+        
+        transferItems.push(insertedItem);
+      }
+      
+      // Create the stock transfer record
+      const [transfer] = await db
+        .insert(stockTransferVouchers)
+        .values({
+          voucherId: voucher.id,
+          sourceLocationId,
+          destinationLocationId,
+          notes: notes || null,
+        })
+        .returning();
+      
+      // Update transfer_id for all items
+      for (const item of transferItems) {
+        await db
+          .update(stockTransferItems)
+          .set({ transferId: transfer.id })
+          .where(eq(stockTransferItems.id, item.id));
+      }
+      
+      // Update voucher total amount
+      await db
+        .update(vouchers)
+        .set({ totalAmount: totalAmount.toFixed(2) })
+        .where(eq(vouchers.id, voucher.id));
+      
+      // Deduct from source inventory and add to destination
+      for (const item of items) {
+        const quantity = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        
+        // Deduct from source
+        const [sourceInv] = await db
+          .select()
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.locationId, sourceLocationId),
+              eq(inventory.stockItemId, item.stockItemId)
+            )
+          )
+          .limit(1);
+        
+        if (sourceInv) {
+          const newQty = parseFloat(sourceInv.quantity) - quantity;
+          if (newQty < 0) {
+            throw new Error(`Insufficient stock for item ${item.stockItemId}`);
+          }
+          
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQty.toString(),
+              lastUpdated: new Date(),
+            })
+            .where(eq(inventory.id, sourceInv.id));
+        }
+        
+        // Add to destination
+        const [destInv] = await db
+          .select()
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.locationId, destinationLocationId),
+              eq(inventory.stockItemId, item.stockItemId)
+            )
+          )
+          .limit(1);
+        
+        if (destInv) {
+          const currentQty = parseFloat(destInv.quantity);
+          const newQty = currentQty + quantity;
+          const newAvgRate = (parseFloat(destInv.averageRate || "0") * currentQty + rate * quantity) / newQty;
+          
+          await db
+            .update(inventory)
+            .set({
+              quantity: newQty.toString(),
+              averageRate: newAvgRate.toFixed(2),
+              totalValue: (newQty * newAvgRate).toFixed(2),
+              lastUpdated: new Date(),
+            })
+            .where(eq(inventory.id, destInv.id));
+        } else {
+          // Create new inventory record if it doesn't exist
+          await db
+            .insert(inventory)
+            .values({
+              locationId: destinationLocationId,
+              stockItemId: item.stockItemId,
+              quantity: quantity.toString(),
+              averageRate: rate.toFixed(2),
+              totalValue: (quantity * rate).toFixed(2),
+              lastUpdated: new Date(),
+            });
+        }
+      }
+      
+      res.json({ success: true, transferId: transfer.id });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/inventory-by-location/:locationId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+      
+      const items = await db
+        .select({
+          id: inventory.id,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          stockItemName: stockItems.name,
+          stockItemCode: stockItems.code,
+        })
+        .from(inventory)
+        .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .where(
+          and(
+            eq(inventory.locationId, locationId),
+            sql`CAST(${inventory.quantity} AS NUMERIC) > 0`
+          )
+        );
+      
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bale Transfer Routes
   app.get("/api/bale-transfers", requireAuth, async (req, res) => {
     try {

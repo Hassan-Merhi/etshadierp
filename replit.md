@@ -2,6 +2,11 @@
 
 ## Recent Changes (Nov 24, 2025)
 
+- **Added Stock Transfer for POS**: POS users can now transfer stock between locations via `/stock-transfer` page
+  - Shows only item names and quantities (cost prices hidden)
+  - Automatically updates inventory at source and destination
+  - Creates vouchers for accounting records
+  - API endpoints: GET/POST `/api/stock-transfers`, GET `/api/inventory-by-location/:id`
 - **Fixed Configured Selling Price**: Sales reports now use the configured selling price from stock items when available. If a stock item has a configured price, sales will use that price instead of the manually entered rate.
 - **Fixed Error Handler**: Removed `throw err` from Express error handler to prevent process crashes
 - **Fixed Barcode Generation**: Moved barcode generation from frontend (bwip-js) to backend API endpoint (`/api/generate-barcode`) to fix production builds
