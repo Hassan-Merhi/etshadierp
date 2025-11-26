@@ -1677,13 +1677,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     // Filter valid items and proceed with import
     const validItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
     
+    // Close confirmation dialog first
+    setImportConfirmDialogOpen(false);
+    
     if (validItems.length === 0) {
+      // Close the import dialog and reset all state
+      setImportDialogOpen(false);
+      setImportFile(null);
+      setImportPreview(null);
+      setImportValidationResult(null);
+      setImportDestLocation("");
+      setImportDate(new Date().toISOString().split("T")[0]);
+      setImportNotes("");
+      // Show informational message
       toast({
-        title: "No valid items",
-        description: "All items have validation errors. Nothing to import.",
-        variant: "destructive",
+        title: "No items imported",
+        description: "All items had validation errors. No transfer was created. You can try again with a different file.",
       });
-      setImportConfirmDialogOpen(false);
       return;
     }
     
@@ -1693,7 +1703,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       notes: importNotes,
       items: validItems,
     });
-    setImportConfirmDialogOpen(false);
   };
 
   const downloadImportTemplate = () => {
@@ -4144,7 +4153,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             <AlertDialogCancel data-testid="button-import-cancel">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmedImport}
-              disabled={importValidItemsCount === 0}
               data-testid="button-import-confirm"
             >
               {importValidItemsCount === 0 ? "OK" : `Import ${importValidItemsCount} Item(s)`}

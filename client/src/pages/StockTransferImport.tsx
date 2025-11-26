@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ArrowRightLeft } from "lucide-react";
@@ -228,15 +238,6 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       return;
     }
 
-    if (hasValidationErrors) {
-      toast({
-        title: "Validation errors present",
-        description: "Please fix validation errors before importing",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!validationResult?.validatedItems) {
       toast({
         title: "Validation data missing",
@@ -246,12 +247,52 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       return;
     }
 
+    // If there are validation errors, show confirmation dialog
+    if (hasValidationErrors) {
+      setConfirmDialogOpen(true);
+      return;
+    }
+
+    // No errors - proceed directly with valid items
+    const itemsToImport = validationResult.validatedItems.filter((item: any) => !item.error);
     importMutation.mutate({
       sourceLocationId: parseInt(selectedSourceLocation),
       destinationLocationId: parseInt(selectedDestLocation),
       transferDate,
       notes,
-      items: validationResult.validatedItems,
+      items: itemsToImport,
+    });
+  };
+  
+  const handleConfirmedImport = () => {
+    // Filter valid items and proceed with import
+    const itemsToImport = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+    
+    // Close confirmation dialog first
+    setConfirmDialogOpen(false);
+    
+    if (itemsToImport.length === 0) {
+      // Reset all state for a fresh start
+      setFile(null);
+      setPreview(null);
+      setValidationResult(null);
+      setSelectedDestLocation("");
+      setTransferDate(new Date().toISOString().split("T")[0]);
+      setNotes("");
+      // Show informational message
+      toast({
+        title: "No items imported",
+        description: "All items had validation errors. No transfer was created. You can try again with a different file.",
+      });
+      return;
+    }
+    
+    importMutation.mutate({
+      sourceLocationId: parseInt(selectedSourceLocation),
+      destinationLocationId: parseInt(selectedDestLocation),
+      transferDate,
+      notes,
+      items: itemsToImport,
     });
   };
 
@@ -261,6 +302,14 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
   const isValidated = validationResult !== null;
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
+  
+  // Calculate valid items (items without errors)
+  const validItems = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+  const validItemsCount = validItems.length;
+  const totalItemsCount = validationResult?.validatedItems?.length || 0;
+  
+  // Confirmation dialog state
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const sourceLocationName = locations.find(l => l.id === parseInt(selectedSourceLocation))?.name;
 
@@ -400,11 +449,11 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
             <Button
               onClick={handleImport}
-              disabled={!isValidated || hasValidationErrors || importMutation.isPending}
+              disabled={!isValidated || importMutation.isPending}
               data-testid="button-import"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {importMutation.isPending ? "Importing..." : "Import Transfer"}
+              {importMutation.isPending ? "Importing..." : hasValidationErrors ? `Import Transfer (${validItemsCount} valid)` : "Import Transfer"}
             </Button>
           </div>
         </CardContent>
@@ -487,6 +536,35 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
           </CardContent>
         </Card>
       )}
+
+      {/* Import Confirmation Dialog */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import with Validation Errors?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {validItemsCount === 0 ? (
+                <>All {totalItemsCount} items have validation errors. Nothing will be imported.</>
+              ) : (
+                <>
+                  {totalItemsCount - validItemsCount} of {totalItemsCount} items have validation errors and will be skipped.
+                  <br /><br />
+                  <strong>{validItemsCount} valid item(s)</strong> will be transferred.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-import-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmedImport}
+              data-testid="button-import-confirm"
+            >
+              {validItemsCount === 0 ? "OK" : `Import ${validItemsCount} Item(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
