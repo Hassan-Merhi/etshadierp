@@ -24,9 +24,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Upload } from "lucide-react";
+import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload } from "lucide-react";
 import { Link } from "wouter";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 
@@ -39,7 +39,6 @@ interface TransferEntry {
   stockItemName: string;
   quantity: string;
   availableQty: number;
-  sourceLocationId: number;
 }
 
 interface InventoryItem {
@@ -64,7 +63,6 @@ interface StockTransferVoucher {
     stockItemId: number;
     stockItemName?: string;
     quantity: string;
-    sourceLocationId?: number;
   }>;
 }
 
@@ -76,17 +74,22 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   // For POS users, always use their assigned location as source
   const posSourceLocation = isPOS ? posUser?.assignedLocationId : null;
   
+  const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(posSourceLocation);
   const [selectedDestLocation, setSelectedDestLocation] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [entries, setEntries] = useState<TransferEntry[]>([
-    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0, sourceLocationId: posSourceLocation || 0 }
+    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }
   ]);
-  
-  // Cache for inventory by location (for non-POS users)
-  const [inventoryCache, setInventoryCache] = useState<Record<number, InventoryItem[]>>({});
   
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTransfer, setViewingTransfer] = useState<StockTransferVoucher | null>(null);
+
+  // Ensure POS source location is set when posUser changes
+  useEffect(() => {
+    if (isPOS && posUser?.assignedLocationId) {
+      setSelectedSourceLocation(posUser.assignedLocationId);
+    }
+  }, [isPOS, posUser?.assignedLocationId]);
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -96,34 +99,22 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/stock-items"],
   });
 
-  // For POS users, load their assigned location's inventory
-  const { data: posInventory = [], isLoading: posInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory-by-location", posSourceLocation],
+  // Determine the active source location for inventory query
+  const activeSourceLocation = isPOS ? (posUser?.assignedLocationId || selectedSourceLocation) : selectedSourceLocation;
+
+  const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: ["/api/inventory-by-location", activeSourceLocation],
     queryFn: async () => {
-      if (!posSourceLocation) return [];
-      const res = await fetch(`/api/inventory-by-location/${posSourceLocation}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
+      if (!activeSourceLocation || activeSourceLocation <= 0) return [];
+      const res = await fetch(`/api/inventory-by-location/${activeSourceLocation}`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to fetch inventory");
+      }
       return res.json();
     },
-    enabled: isPOS && posSourceLocation !== null && posSourceLocation > 0,
+    enabled: activeSourceLocation !== null && activeSourceLocation > 0,
   });
-
-  // Fetch inventory for a specific location (for non-POS)
-  const fetchInventoryForLocation = useCallback(async (locationId: number): Promise<InventoryItem[]> => {
-    if (inventoryCache[locationId]) {
-      return inventoryCache[locationId];
-    }
-    try {
-      const res = await fetch(`/api/inventory-by-location/${locationId}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
-      const data = await res.json();
-      setInventoryCache(prev => ({ ...prev, [locationId]: data }));
-      return data;
-    } catch (error) {
-      console.error("Failed to fetch inventory:", error);
-      return [];
-    }
-  }, [inventoryCache]);
 
   const { data: vouchers = [] } = useQuery<any[]>({
     queryKey: ["/api/vouchers"],
@@ -136,12 +127,12 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const createTransferMutation = useMutation({
     mutationFn: async (data: { notes: string; items: TransferEntry[] }) => {
       const response = await apiRequest("POST", "/api/stock-transfers", {
+        sourceLocationId: activeSourceLocation,
         destinationLocationId: selectedDestLocation,
         notes: data.notes || "",
         items: data.items.map((item) => ({
           stockItemId: item.stockItemId,
           quantity: item.quantity,
-          sourceLocationId: item.sourceLocationId,
         })),
       });
       return response.json();
@@ -151,7 +142,6 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      setInventoryCache({});
       resetForm();
     },
     onError: (error: any) => {
@@ -162,53 +152,24 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const resetForm = () => {
     setSelectedDestLocation(null);
     setNotes("");
-    setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0, sourceLocationId: posSourceLocation || 0 }]);
+    setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
+    if (!isPOS) {
+      setSelectedSourceLocation(null);
+    }
   };
 
-  const getAvailableQtyForLocation = (stockItemId: number, locationId: number): number => {
-    if (isPOS) {
-      const invItem = posInventory.find(i => i.stockItemId === stockItemId);
-      return invItem ? parseFloat(invItem.quantity) : 0;
-    }
-    const locationInventory = inventoryCache[locationId] || [];
-    const invItem = locationInventory.find(i => i.stockItemId === stockItemId);
+  const getAvailableQty = (stockItemId: number): number => {
+    const invItem = inventoryItems.find(i => i.stockItemId === stockItemId);
     return invItem ? parseFloat(invItem.quantity) : 0;
   };
 
-  const handleSourceLocationChange = async (index: number, locationId: number) => {
-    const newEntries = [...entries];
-    newEntries[index] = {
-      ...newEntries[index],
-      sourceLocationId: locationId,
-      stockItemId: 0,
-      stockItemName: "",
-      availableQty: 0,
-    };
-    setEntries(newEntries);
-    
-    // Pre-fetch inventory for the new location
-    if (!isPOS && locationId > 0) {
-      await fetchInventoryForLocation(locationId);
-    }
-  };
-
-  const handleItemChange = async (index: number, stockItemId: number, stockItemName: string) => {
-    const entry = entries[index];
-    const locationId = entry.sourceLocationId;
-    
-    // Ensure we have inventory for this location
-    if (!isPOS && locationId > 0 && !inventoryCache[locationId]) {
-      await fetchInventoryForLocation(locationId);
-    }
-    
-    const availableQty = getAvailableQtyForLocation(stockItemId, locationId);
-    
+  const handleItemChange = (index: number, stockItemId: number, stockItemName: string) => {
     const newEntries = [...entries];
     newEntries[index] = {
       ...newEntries[index],
       stockItemId,
       stockItemName,
-      availableQty,
+      availableQty: getAvailableQty(stockItemId),
     };
     setEntries(newEntries);
   };
@@ -220,9 +181,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const addNewRow = () => {
-    // For POS, use the assigned location; for non-POS, use 0 (must select)
-    const defaultLocationId = isPOS ? posSourceLocation || 0 : 0;
-    setEntries([...entries, { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0, sourceLocationId: defaultLocationId }]);
+    setEntries([...entries, { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
   };
 
   const removeRow = (index: number) => {
@@ -232,25 +191,22 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const handleSubmit = () => {
-    if (!selectedDestLocation) {
-      toast({ title: "Error", description: "Please select a destination location", variant: "destructive" });
+    if (!activeSourceLocation || !selectedDestLocation) {
+      toast({ title: "Error", description: "Please select source and destination locations", variant: "destructive" });
+      return;
+    }
+
+    if (activeSourceLocation === selectedDestLocation) {
+      toast({ title: "Error", description: "Source and destination must be different", variant: "destructive" });
       return;
     }
 
     // Filter to only valid entries with stockItemId > 0 and quantity > 0
-    const validEntries = entries.filter(e => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0 && e.sourceLocationId > 0);
+    const validEntries = entries.filter(e => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0);
     
     if (validEntries.length === 0) {
-      toast({ title: "Error", description: "Please add at least one item with source location and quantity", variant: "destructive" });
+      toast({ title: "Error", description: "Please add at least one item with quantity", variant: "destructive" });
       return;
-    }
-
-    // Check that no item's source location matches the destination
-    for (const entry of validEntries) {
-      if (entry.sourceLocationId === selectedDestLocation) {
-        toast({ title: "Error", description: `Source and destination cannot be the same for ${entry.stockItemName}`, variant: "destructive" });
-        return;
-      }
     }
 
     for (const entry of validEntries) {
@@ -265,7 +221,11 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       }
     }
 
-    createTransferMutation.mutate({ notes, items: validEntries });
+    // Only submit valid entries to the backend
+    createTransferMutation.mutate({
+      notes,
+      items: validEntries,
+    });
   };
 
   const handleViewTransfer = async (voucher: any) => {
@@ -280,7 +240,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         
         setViewingTransfer({
           ...voucher,
-          sourceLocationName: sourceLocation?.name || 'Multiple Sources',
+          sourceLocationName: sourceLocation?.name || 'Unknown',
           destinationLocationName: destLocation?.name || 'Unknown',
           items: transfer?.items || [],
         });
@@ -291,25 +251,12 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
-  const sourceLocationName = isPOS ? locations.find((l: any) => l.id === posSourceLocation)?.name : null;
+  const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
 
-  // Get available stock items for a specific source location
-  const getAvailableStockItemsForLocation = (locationId: number) => {
-    if (isPOS) {
-      return stockItems.filter((item: any) => {
-        const invItem = posInventory.find(i => i.stockItemId === item.id);
-        return invItem && parseFloat(invItem.quantity) > 0;
-      });
-    }
-    const locationInventory = inventoryCache[locationId] || [];
-    return stockItems.filter((item: any) => {
-      const invItem = locationInventory.find(i => i.stockItemId === item.id);
-      return invItem && parseFloat(invItem.quantity) > 0;
-    });
-  };
-
-  // Check if we can show items table (POS always can, non-POS needs at least one entry with source location)
-  const canShowItemsTable = isPOS || entries.some(e => e.sourceLocationId > 0) || true;
+  const availableStockItems = stockItems.filter((item: any) => {
+    const invItem = inventoryItems.find(i => i.stockItemId === item.id);
+    return invItem && parseFloat(invItem.quantity) > 0;
+  });
 
   return (
     <div className="space-y-6">
@@ -317,7 +264,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-stock-transfer">Stock Transfer</h1>
           <p className="text-muted-foreground">
-            {isPOS ? `Transfer stock from your location to another` : `Transfer stock from multiple locations to a destination`}
+            {isPOS ? `Transfer stock from your location to another` : `Transfer stock between locations`}
           </p>
         </div>
         <Link href="/stock-transfer-import">
@@ -333,93 +280,88 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
           <CardTitle>New Transfer</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* For POS users, show their fixed source location */}
-          {isPOS && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label data-testid="label-source-location">Source Location</Label>
-              <div className="p-3 bg-muted rounded-md">
-                <span className="font-medium">{sourceLocationName || "Your Location"}</span>
-              </div>
+              {isPOS ? (
+                <div className="p-3 bg-muted rounded-md">
+                  <span className="font-medium">{sourceLocationName || "Your Location"}</span>
+                </div>
+              ) : (
+                <Select 
+                  value={selectedSourceLocation?.toString() || ""} 
+                  onValueChange={(v) => {
+                    setSelectedSourceLocation(parseInt(v));
+                    setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-source-location">
+                    <SelectValue placeholder="Select source location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc: any) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label data-testid="label-dest-location">Destination Location</Label>
-            <Select 
-              value={selectedDestLocation?.toString() || ""} 
-              onValueChange={(v) => setSelectedDestLocation(parseInt(v))}
-            >
-              <SelectTrigger data-testid="select-dest-location">
-                <SelectValue placeholder="Select destination location" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((loc: any) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label data-testid="label-dest-location">Destination Location</Label>
+              <Select 
+                value={selectedDestLocation?.toString() || ""} 
+                onValueChange={(v) => setSelectedDestLocation(parseInt(v))}
+              >
+                <SelectTrigger data-testid="select-dest-location">
+                  <SelectValue placeholder="Select destination location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations
+                    .filter((loc: any) => loc.id !== activeSourceLocation)
+                    .map((loc: any) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Items to Transfer</Label>
-              {isPOS && posInventoryLoading && <Skeleton className="h-4 w-24" />}
-            </div>
-            
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {!isPOS && <TableHead className="w-[180px]">Source Location</TableHead>}
-                    <TableHead className={isPOS ? "w-[50%]" : "w-[35%]"}>Item Name</TableHead>
-                    <TableHead className="text-right w-24">Quantity</TableHead>
-                    <TableHead className="text-right w-24">Available</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {entries.map((entry, index) => {
-                    const availableItems = entry.sourceLocationId > 0 
-                      ? getAvailableStockItemsForLocation(entry.sourceLocationId)
-                      : stockItems;
-                    
-                    return (
+          {activeSourceLocation && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Items to Transfer</Label>
+                {inventoryLoading && <Skeleton className="h-4 w-24" />}
+              </div>
+              
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50%]">Item Name (type to search)</TableHead>
+                      <TableHead className="text-right w-32">Quantity</TableHead>
+                      <TableHead className="text-right w-32">Available</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.map((entry, index) => (
                       <TableRow key={index} data-testid={`transfer-entry-row-${index}`}>
-                        {!isPOS && (
-                          <TableCell>
-                            <Select 
-                              value={entry.sourceLocationId > 0 ? entry.sourceLocationId.toString() : ""} 
-                              onValueChange={(v) => handleSourceLocationChange(index, parseInt(v))}
-                            >
-                              <SelectTrigger data-testid={`select-source-location-${index}`} className="h-9">
-                                <SelectValue placeholder="Select source" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {locations
-                                  .filter((loc: any) => loc.id !== selectedDestLocation)
-                                  .map((loc: any) => (
-                                    <SelectItem key={loc.id} value={loc.id.toString()}>
-                                      {loc.name}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        )}
                         <TableCell>
                           <StockItemAutocomplete
                             value={entry.stockItemId > 0 ? { id: entry.stockItemId, name: entry.stockItemName } : null}
                             onChange={(id, name) => handleItemChange(index, id, name)}
-                            stockItems={availableItems.map((item: any) => ({
+                            stockItems={availableStockItems.map((item: any) => ({
                               id: item.id,
                               name: item.name,
                               code: item.code,
                             }))}
-                            placeholder={!isPOS && entry.sourceLocationId === 0 ? "Select source first..." : "Type item name..."}
+                            placeholder="Type item name..."
                             testId={`input-item-${index}`}
-                            disabled={!isPOS && entry.sourceLocationId === 0}
                           />
                         </TableCell>
                         <TableCell className="text-right">
@@ -429,7 +371,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                             step="0.001"
                             value={entry.quantity}
                             onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            className="w-20 text-right ml-auto"
+                            className="w-24 text-right ml-auto"
                             placeholder="0"
                             data-testid={`input-quantity-${index}`}
                           />
@@ -449,24 +391,24 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addNewRow}
-              className="mt-2"
-              data-testid="button-add-row"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addNewRow}
+                className="mt-2"
+                data-testid="button-add-row"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label data-testid="label-notes">Notes</Label>
@@ -480,7 +422,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
           <Button 
             onClick={handleSubmit} 
-            disabled={createTransferMutation.isPending || !selectedDestLocation} 
+            disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation} 
             className="w-full"
             data-testid="button-submit-transfer"
           >
