@@ -919,8 +919,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <>
                               <TableHead>Item Name</TableHead>
                               <TableHead className="text-right">Qty</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead className="text-right">Total Amount</TableHead>
+                              {user && !user?.role?.startsWith("POS") && (
+                                <>
+                                  <TableHead className="text-right">Amount</TableHead>
+                                  <TableHead className="text-right">Total Amount</TableHead>
+                                </>
+                              )}
                             </>
                           ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
                             <>
@@ -939,6 +943,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       </TableHeader>
                       <TableBody>
                         {(() => {
+                          const isPOSUser = !user || user?.role?.startsWith("POS");
+                          
                           // For Consumption/Production/Stock Transfer, show stock items
                           if (selectedVoucher.voucherType === "Consumption" || 
                               selectedVoucher.voucherType === "Production" || 
@@ -946,8 +952,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               selectedVoucher.voucherType === "StockTransfer") {
                             return viewVoucherEntries.map((entry) => {
                               const qty = parseFloat(entry.quantity || "0");
-                              const rate = parseFloat(entry.rate || "0");
-                              const totalAmount = qty * rate;
+                              const rate = entry.rate != null ? parseFloat(entry.rate) : 0;
+                              const totalAmount = entry.totalAmount != null ? parseFloat(entry.totalAmount) : (qty * rate);
                               return (
                                 <TableRow key={entry.id}>
                                   <TableCell>
@@ -956,12 +962,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableCell className="text-right font-mono">
                                     {Math.abs(qty).toFixed(3)}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono">
-                                    ${rate.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono">
-                                    ${totalAmount.toFixed(2)}
-                                  </TableCell>
+                                  {!isPOSUser && (
+                                    <>
+                                      <TableCell className="text-right font-mono">
+                                        ${rate.toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        ${totalAmount.toFixed(2)}
+                                      </TableCell>
+                                    </>
+                                  )}
                                 </TableRow>
                               );
                             });
@@ -1025,16 +1035,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   .reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0)
                                   .toFixed(3)}
                               </TableCell>
-                              <TableCell></TableCell>
-                              <TableCell className="text-right font-mono">
-                                ${viewVoucherEntries
-                                  .reduce((sum, e) => {
-                                    const qty = Math.abs(parseFloat(e.quantity || "0"));
-                                    const rate = parseFloat(e.rate || "0");
-                                    return sum + (qty * rate);
-                                  }, 0)
-                                  .toFixed(2)}
-                              </TableCell>
+                              {user && !user?.role?.startsWith("POS") && (
+                                <>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    ${viewVoucherEntries
+                                      .reduce((sum, e) => {
+                                        if (e.totalAmount != null) {
+                                          return sum + Math.abs(parseFloat(e.totalAmount));
+                                        }
+                                        const qty = Math.abs(parseFloat(e.quantity || "0"));
+                                        const rate = e.rate != null ? parseFloat(e.rate) : 0;
+                                        return sum + (qty * rate);
+                                      }, 0)
+                                      .toFixed(2)}
+                                  </TableCell>
+                                </>
+                              )}
                             </>
                           ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
                             <>

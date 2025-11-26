@@ -11097,6 +11097,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if user is a POS role (should not see cost prices)
+      const userRole = req.session.currentRole;
+      const isPOSUser = userRole?.startsWith("POS");
+
       // For Production/Consumption vouchers, get stock adjustment items
       if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption") {
         const adjustmentVoucher = await db.query.stockAdjustmentVouchers.findFirst({
@@ -11128,13 +11132,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stockItemName: item.stockItemName || 'Unknown Item',
               stockItemCode: item.stockItemCode || '-',
               quantity: item.quantity,
-              rate: item.rate,
-              debitAmount: isProduction ? item.totalAmount : "0",
-              creditAmount: isProduction ? "0" : item.totalAmount,
-              narration: `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
+              rate: isPOSUser ? null : item.rate,
+              debitAmount: isPOSUser ? "0" : (isProduction ? item.totalAmount : "0"),
+              creditAmount: isPOSUser ? "0" : (isProduction ? "0" : item.totalAmount),
+              narration: isPOSUser 
+                ? `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'}`
+                : `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
               accountName: item.stockItemName || 'Unknown Item',
               accountCode: item.stockItemCode || '-',
               isStockItem: true,
+              totalAmount: isPOSUser ? null : item.totalAmount,
             }));
             return res.json(itemsWithDetails);
           }
@@ -11171,13 +11178,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stockItemName: item.stockItemName || 'Unknown Item',
               stockItemCode: item.stockItemCode || '-',
               quantity: item.quantity,
-              rate: item.rate,
+              rate: isPOSUser ? null : item.rate,
               debitAmount: "0",
-              creditAmount: item.totalAmount,
-              narration: `Transfer of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
+              creditAmount: isPOSUser ? "0" : item.totalAmount,
+              narration: isPOSUser
+                ? `Transfer of ${item.quantity} x ${item.stockItemName || 'Unknown Item'}`
+                : `Transfer of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
               accountName: item.stockItemName || 'Unknown Item',
               accountCode: item.stockItemCode || '-',
               isStockItem: true,
+              totalAmount: isPOSUser ? null : item.totalAmount,
             }));
             return res.json(itemsWithDetails);
           }
