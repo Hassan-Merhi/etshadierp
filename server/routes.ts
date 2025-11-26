@@ -68,6 +68,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne } from "drizzle-orm";
+import { format } from "date-fns";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2643,7 +2644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const [voucher] = await tx
             .insert(vouchers)
             .values({
-              companyId: req.session.currentCompanyId,
+              companyId: req.session.currentCompanyId!,
               voucherNumber,
               voucherType: "Sales",
               voucherDate: parsed.saleDate,
@@ -13965,6 +13966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Barcode text is required" });
       }
 
+      // @ts-ignore - bwip-js types are incomplete
       const bwipjs = await import("bwip-js");
       
       // Render to PNG buffer
@@ -14340,6 +14342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await db
             .insert(inventory)
             .values({
+              companyId,
               locationId: destinationLocationId,
               stockItemId: item.stockItemId,
               quantity: quantity.toString(),
