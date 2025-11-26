@@ -320,11 +320,37 @@ export default function Daybook({ user }: { user?: any } = {}) {
     queryKey: ["/api/fixed-assets"],
   });
 
+  // State for purchase order data (for Purchase vouchers)
+  const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
+
   // Fetch voucher entries when viewing (includes account names and stock items)
-  const { data: viewVoucherEntries = [], isLoading: viewEntriesLoading } = useQuery<any[]>({
+  const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
     queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/view-entries`] : [],
     enabled: !!selectedVoucher && viewDialogOpen,
   });
+  
+  // Handle the response which can be either array (most types) or object with entries/purchaseOrder (Purchase type)
+  const viewVoucherEntries = useMemo(() => {
+    if (!viewVoucherEntriesRaw) return [];
+    if (Array.isArray(viewVoucherEntriesRaw)) {
+      return viewVoucherEntriesRaw;
+    }
+    if (viewVoucherEntriesRaw.entries) {
+      return viewVoucherEntriesRaw.entries;
+    }
+    return [];
+  }, [viewVoucherEntriesRaw]);
+  
+  // Update purchaseOrderData when response changes (avoid setState in useMemo)
+  useEffect(() => {
+    if (!viewVoucherEntriesRaw) {
+      setPurchaseOrderData(null);
+    } else if (!Array.isArray(viewVoucherEntriesRaw) && viewVoucherEntriesRaw.purchaseOrder) {
+      setPurchaseOrderData(viewVoucherEntriesRaw.purchaseOrder);
+    } else {
+      setPurchaseOrderData(null);
+    }
+  }, [viewVoucherEntriesRaw]);
 
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
@@ -515,12 +541,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
       return;
     }
     
+    // Purchase vouchers should be edited via the Containers page
+    if (voucher.voucherType === "Purchase") {
+      // Navigate to containers page - the PO can be edited there
+      navigate(`/containers`);
+      toast({
+        title: "Edit Purchase Order",
+        description: "Please find and edit the purchase order in the container that this voucher is linked to.",
+      });
+      return;
+    }
+    
     // Other voucher types navigate to vouchers page with edit mode
     const voucherTypeMap: Record<string, string> = {
       "Payment": "payment",
       "Receipt": "receipt",
       "Journal": "journal",
-      "Purchase": "adjustment",
       "Consumption": "adjustment",
       "Production": "adjustment",
       "Mixed": "adjustment",
@@ -985,6 +1021,146 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     ${salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales || item.creditAmount || "0"), 0).toFixed(2)}
                                   </TableCell>
                                 </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : selectedVoucher.voucherType === "Purchase" ? (
+                  // Special rendering for Purchase vouchers - show items with supplier info
+                  (() => {
+                    // SECURITY: Hide cost prices for POS users (default to hiding if user is undefined during load)
+                    const isPOSUser = !user || user?.role?.startsWith("POS");
+                    
+                    // Separate ledger entries from purchase items
+                    const ledgerEntries = viewVoucherEntries.filter(e => !e.isPurchaseItem && !e.isStockItem);
+                    const purchaseItems = viewVoucherEntries.filter(e => e.isPurchaseItem || e.isStockItem);
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Purchase Order Info */}
+                        {purchaseOrderData && (
+                          <div className="p-3 bg-muted/50 rounded-md space-y-2">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="font-medium">{purchaseOrderData.supplierName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  PO: {purchaseOrderData.poNumber} | Container: {purchaseOrderData.containerNumber}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                {!isPOSUser && purchaseOrderData.itemsTotal && (
+                                  <div className="font-mono font-bold">
+                                    ${parseFloat(purchaseOrderData.itemsTotal || "0").toFixed(2)}
+                                  </div>
+                                )}
+                                <Badge variant={purchaseOrderData.status === "Closed" ? "secondary" : "default"}>
+                                  {purchaseOrderData.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Purchase Items Table */}
+                        {purchaseItems.length > 0 ? (
+                          <div className="border rounded-md">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item Name</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  {!isPOSUser && (
+                                    <>
+                                      <TableHead className="text-right">Rate</TableHead>
+                                      <TableHead className="text-right">Total</TableHead>
+                                    </>
+                                  )}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {purchaseItems.map((item) => {
+                                  const qty = parseFloat(item.quantity || "0");
+                                  const rate = item.rate != null ? parseFloat(item.rate) : 0;
+                                  const totalAmount = item.totalAmount != null ? parseFloat(item.totalAmount) : 0;
+                                  return (
+                                    <TableRow key={item.id}>
+                                      <TableCell>
+                                        <div className="font-medium">{item.stockItemName || item.accountName}</div>
+                                        {item.stockItemCode && (
+                                          <div className="text-xs text-muted-foreground font-mono">{item.stockItemCode}</div>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {qty.toFixed(3)}
+                                      </TableCell>
+                                      {!isPOSUser && (
+                                        <>
+                                          <TableCell className="text-right font-mono">
+                                            ${rate.toFixed(2)}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            ${totalAmount.toFixed(2)}
+                                          </TableCell>
+                                        </>
+                                      )}
+                                    </TableRow>
+                                  );
+                                })}
+                                {/* Totals Row */}
+                                <TableRow className="font-bold bg-muted/50">
+                                  <TableCell>Total</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {purchaseItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0).toFixed(3)}
+                                  </TableCell>
+                                  {!isPOSUser && (
+                                    <>
+                                      <TableCell></TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        ${purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0).toFixed(2)}
+                                      </TableCell>
+                                    </>
+                                  )}
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          // Fallback to ledger entries if no purchase items found
+                          <div className="border rounded-md">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Account</TableHead>
+                                  {!isPOSUser && (
+                                    <>
+                                      <TableHead className="text-right">Debit</TableHead>
+                                      <TableHead className="text-right">Credit</TableHead>
+                                    </>
+                                  )}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {ledgerEntries.map((entry) => (
+                                  <TableRow key={entry.id}>
+                                    <TableCell>
+                                      <div className="font-medium">{entry.accountName}</div>
+                                      <div className="text-xs text-muted-foreground font-mono">{entry.accountCode}</div>
+                                    </TableCell>
+                                    {!isPOSUser && (
+                                      <>
+                                        <TableCell className="text-right font-mono">
+                                          {parseFloat(entry.debitAmount) > 0 ? `$${formatAmount(entry.debitAmount)}` : "-"}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                          {parseFloat(entry.creditAmount) > 0 ? `$${formatAmount(entry.creditAmount)}` : "-"}
+                                        </TableCell>
+                                      </>
+                                    )}
+                                  </TableRow>
+                                ))}
                               </TableBody>
                             </Table>
                           </div>

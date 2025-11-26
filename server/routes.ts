@@ -11104,6 +11104,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRole = req.session.currentRole;
       const isPOSUser = userRole?.startsWith("POS");
 
+      // For Purchase vouchers, get purchase order line items
+      if (voucher.voucherType === "Purchase") {
+        // Find the purchase order linked to this voucher
+        const allPOs = await storage.getAllPurchaseOrders(voucher.companyId);
+        const purchaseOrder = allPOs.find((po: any) => po.voucherId === id);
+        
+        if (purchaseOrder) {
+          const lineItems = await storage.getLineItemsByPO(purchaseOrder.id);
+          
+          if (lineItems.length > 0) {
+            // Get supplier info
+            const supplier = await storage.getSupplierById(purchaseOrder.supplierId);
+            const supplierName = supplier?.name || 'Unknown Supplier';
+            
+            // Get container info
+            const container = await storage.getContainerById(purchaseOrder.containerId);
+            const containerNumber = container?.containerNumber || '';
+            
+            const itemsWithDetails = lineItems.map((item: any) => ({
+              id: item.id,
+              voucherId: id,
+              purchaseOrderId: purchaseOrder.id,
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || item.itemName || 'Unknown Item',
+              stockItemCode: item.stockItemCode || '-',
+              quantity: item.quantity,
+              // SECURITY: Redact cost prices for POS users
+              rate: isPOSUser ? null : item.rate,
+              totalAmount: isPOSUser ? null : (item.lineTotal || item.totalCost),
+              debitAmount: isPOSUser ? "0" : (item.lineTotal || item.totalCost),
+              creditAmount: "0",
+              narration: isPOSUser 
+                ? `${item.quantity} x ${item.stockItemName || item.itemName}`
+                : `${item.quantity} x ${item.stockItemName || item.itemName} @ $${item.rate}`,
+              accountName: item.stockItemName || item.itemName || 'Unknown Item',
+              accountCode: item.stockItemCode || '-',
+              isStockItem: true,
+              isPurchaseItem: true,
+            }));
+            
+            // SECURITY: Also redact ledger entries for POS users
+            const redactedEntries = isPOSUser 
+              ? entries.map((entry: any) => ({
+                  ...entry,
+                  debitAmount: "0",
+                  creditAmount: "0",
+                  narration: entry.accountName || "Account entry",
+                }))
+              : entries;
+            
+            // Add supplier entry and purchase order metadata
+            const result = [
+              ...redactedEntries,
+              ...itemsWithDetails,
+            ];
+            
+            // Add purchase order metadata to response (hide totals for POS users)
+            return res.json({
+              entries: result,
+              purchaseOrder: {
+                id: purchaseOrder.id,
+                poNumber: purchaseOrder.poNumber,
+                supplierId: purchaseOrder.supplierId,
+                supplierName: supplierName,
+                containerId: purchaseOrder.containerId,
+                containerNumber: containerNumber,
+                currency: purchaseOrder.currency,
+                itemsTotal: isPOSUser ? null : purchaseOrder.itemsTotal,
+                status: purchaseOrder.status,
+              }
+            });
+          }
+        }
+      }
+
       // For Production/Consumption/Mixed vouchers, get stock adjustment items
       if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") {
         const adjustmentVoucher = await db.query.stockAdjustmentVouchers.findFirst({
@@ -11207,6 +11282,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // SECURITY: Final fallback redaction for POS users - ensure no cost data leaks
+      if (isPOSUser) {
+        const redactedFallbackEntries = entries.map((entry: any) => ({
+          ...entry,
+          debitAmount: "0",
+          creditAmount: "0",
+          narration: entry.accountName || "Account entry",
+        }));
+        return res.json(redactedFallbackEntries);
+      }
+      
       res.json(entries);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
