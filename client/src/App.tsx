@@ -68,8 +68,7 @@ function Router({ user }: { user: any }) {
         <Route path="/">{() => <POS posUser={user} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
-        <Route path="/bale-transfer" component={BaleTransfer} />
-        <Route path="/stock-transfer" component={StockTransfer} />
+        <Route path="/stock-transfer">{() => <StockTransfer posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -205,14 +204,6 @@ function AuthenticatedApp() {
             >
               <MapPin className="h-4 w-4 mr-2" />
               Location Inventory
-            </Button>
-            <Button
-              variant={currentLocation === "/bale-transfer" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setLocation("/bale-transfer")}
-              data-testid="button-bale-transfer-tab"
-            >
-              Transfer Bales
             </Button>
             <Button
               variant={currentLocation === "/stock-transfer" ? "default" : "ghost"}
