@@ -39,6 +39,7 @@ interface TransferEntry {
   stockItemName: string;
   quantity: string;
   availableQty: number;
+  sourceLocationId?: number;
 }
 
 interface InventoryItem {
@@ -74,22 +75,15 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   // For POS users, always use their assigned location as source
   const posSourceLocation = isPOS ? posUser?.assignedLocationId : null;
   
-  const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(posSourceLocation);
   const [selectedDestLocation, setSelectedDestLocation] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [entries, setEntries] = useState<TransferEntry[]>([
-    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }
+    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0, sourceLocationId: posSourceLocation || undefined }
   ]);
   
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTransfer, setViewingTransfer] = useState<StockTransferVoucher | null>(null);
 
-  // Ensure POS source location is set when posUser changes
-  useEffect(() => {
-    if (isPOS && posUser?.assignedLocationId) {
-      setSelectedSourceLocation(posUser.assignedLocationId);
-    }
-  }, [isPOS, posUser?.assignedLocationId]);
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -99,22 +93,25 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/stock-items"],
   });
 
-  // Determine the active source location for inventory query
-  const activeSourceLocation = isPOS ? (posUser?.assignedLocationId || selectedSourceLocation) : selectedSourceLocation;
+  // For inventory display, show all locations if non-POS; POS users see only their location
+  const activeSourceLocation = isPOS ? posUser?.assignedLocationId : null;
 
-  const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory-by-location", activeSourceLocation],
+  const { data: inventoryByLocation = {}, isLoading: inventoryLoading } = useQuery<Record<number, InventoryItem[]>>({
+    queryKey: ["/api/inventory-by-locations-multi", activeSourceLocation],
     queryFn: async () => {
-      if (!activeSourceLocation || activeSourceLocation <= 0) return [];
-      const res = await fetch(`/api/inventory-by-location/${activeSourceLocation}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to fetch inventory");
+      if (isPOS && activeSourceLocation) {
+        const res = await fetch(`/api/inventory-by-location/${activeSourceLocation}`);
+        if (!res.ok) throw new Error("Failed to fetch inventory");
+        return { [activeSourceLocation]: await res.json() };
       }
-      return res.json();
+      // For non-POS, load all locations on demand
+      return {};
     },
-    enabled: activeSourceLocation !== null && activeSourceLocation > 0,
+    enabled: isPOS && activeSourceLocation !== null && activeSourceLocation > 0,
   });
+  
+  // Map for showing inventory as POS user types
+  const inventoryItems = activeSourceLocation ? (inventoryByLocation[activeSourceLocation] || []) : [];
 
   const { data: vouchers = [] } = useQuery<any[]>({
     queryKey: ["/api/vouchers"],
