@@ -913,9 +913,15 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Account</TableHead>
-                          <TableHead className="text-right">Debit</TableHead>
-                          <TableHead className="text-right">Credit</TableHead>
-                          <TableHead>Narration</TableHead>
+                          {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                            <TableHead className="text-right">Amount</TableHead>
+                          ) : (
+                            <>
+                              <TableHead className="text-right">Debit</TableHead>
+                              <TableHead className="text-right">Credit</TableHead>
+                              <TableHead>Narration</TableHead>
+                            </>
+                          )}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -927,33 +933,52 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 {entry.accountCode}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {parseFloat(entry.debitAmount) > 0
-                                ? `$${formatAmount(entry.debitAmount)}`
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {parseFloat(entry.creditAmount) > 0
-                                ? `$${formatAmount(entry.creditAmount)}`
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {entry.narration || "-"}
-                            </TableCell>
+                            {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                              <TableCell className="text-right font-mono">
+                                ${formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
+                              </TableCell>
+                            ) : (
+                              <>
+                                <TableCell className="text-right font-mono">
+                                  {parseFloat(entry.debitAmount) > 0
+                                    ? `$${formatAmount(entry.debitAmount)}`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {parseFloat(entry.creditAmount) > 0
+                                    ? `$${formatAmount(entry.creditAmount)}`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {entry.narration || "-"}
+                                </TableCell>
+                              </>
+                            )}
                           </TableRow>
                         ))}
                         {/* Totals Row */}
                         <TableRow className="font-bold bg-muted/50">
                           <TableCell>Total</TableCell>
-                          <TableCell className="text-right font-mono">
-                            ${formatAmount(viewVoucherEntries
-                              .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0))}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            ${formatAmount(viewVoucherEntries
-                              .reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0))}
-                          </TableCell>
-                          <TableCell></TableCell>
+                          {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                            <TableCell className="text-right font-mono">
+                              ${formatAmount(Math.max(
+                                viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0),
+                                viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
+                              ))}
+                            </TableCell>
+                          ) : (
+                            <>
+                              <TableCell className="text-right font-mono">
+                                ${formatAmount(viewVoucherEntries
+                                  .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0))}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                ${formatAmount(viewVoucherEntries
+                                  .reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0))}
+                              </TableCell>
+                              <TableCell></TableCell>
+                            </>
+                          )}
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -1159,87 +1184,132 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         )}
                       />
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={editForm.control}
-                          name={`entries.${index}.debitAmount`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Debit Amount</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="font-mono"
-                                  data-testid={`input-edit-debit-${index}`}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      {(editForm.watch("voucherType") === "Payment" || editForm.watch("voucherType") === "Receipt") ? (
+                        <FormItem>
+                          <FormLabel>Amount</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="font-mono"
+                              data-testid={`input-edit-amount-${index}`}
+                              value={
+                                parseFloat(editForm.watch(`entries.${index}.debitAmount`) || "0") > 0
+                                  ? editForm.watch(`entries.${index}.debitAmount`)
+                                  : editForm.watch(`entries.${index}.creditAmount`) || ""
+                              }
+                              onChange={(e) => {
+                                const voucherType = editForm.watch("voucherType");
+                                if (voucherType === "Payment") {
+                                  editForm.setValue(`entries.${index}.debitAmount`, e.target.value);
+                                  editForm.setValue(`entries.${index}.creditAmount`, "0");
+                                } else {
+                                  editForm.setValue(`entries.${index}.creditAmount`, e.target.value);
+                                  editForm.setValue(`entries.${index}.debitAmount`, "0");
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={editForm.control}
+                              name={`entries.${index}.debitAmount`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Debit Amount</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      className="font-mono"
+                                      data-testid={`input-edit-debit-${index}`}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-                        <FormField
-                          control={editForm.control}
-                          name={`entries.${index}.creditAmount`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Credit Amount</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className="font-mono"
-                                  data-testid={`input-edit-credit-${index}`}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
+                            <FormField
+                              control={editForm.control}
+                              name={`entries.${index}.creditAmount`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Credit Amount</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      className="font-mono"
+                                      data-testid={`input-edit-credit-${index}`}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
 
-                      <FormField
-                        control={editForm.control}
-                        name={`entries.${index}.narration`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Narration (Optional)</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                placeholder="Enter narration"
-                                data-testid={`input-edit-narration-${index}`}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          <FormField
+                            control={editForm.control}
+                            name={`entries.${index}.narration`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Narration (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="Enter narration"
+                                    data-testid={`input-edit-narration-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      )}
                     </div>
                   ))}
 
                   {/* Totals Display */}
                   {editForm.watch("entries") && editForm.watch("entries").length > 0 && (
                     <div className="mt-4 pt-4 border-t">
-                      <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-                        <div className="text-right">
-                          <span className="text-muted-foreground mr-2">Total Debits:</span>
+                      {(editForm.watch("voucherType") === "Payment" || editForm.watch("voucherType") === "Receipt") ? (
+                        <div className="text-right text-sm font-mono">
+                          <span className="text-muted-foreground mr-2">Total:</span>
                           <span className="font-bold">
-                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0))}
+                            ${formatAmount(Math.max(
+                              editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0),
+                              editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0)
+                            ))}
                           </span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-muted-foreground mr-2">Total Credits:</span>
-                          <span className="font-bold">
-                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0))}
-                          </span>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4 text-sm font-mono">
+                          <div className="text-right">
+                            <span className="text-muted-foreground mr-2">Total Debits:</span>
+                            <span className="font-bold">
+                              ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0))}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-muted-foreground mr-2">Total Credits:</span>
+                            <span className="font-bold">
+                              ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0))}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       {editForm.formState.errors.entries && (
                         <p className="text-sm text-destructive mt-2 text-center">
                           {editForm.formState.errors.entries.message}

@@ -463,10 +463,16 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                   <table className="w-full text-sm">
                     <thead className="border-b">
                       <tr>
-                        <th className="text-left py-2 px-2 w-[30%]">Account</th>
-                        <th className="text-right py-2 px-2 w-[15%]">Debit</th>
-                        <th className="text-right py-2 px-2 w-[15%]">Credit</th>
-                        <th className="text-left py-2 px-2 w-[35%]">Narration</th>
+                        <th className="text-left py-2 px-2 w-[60%]">Account</th>
+                        {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                          <th className="text-right py-2 px-2 w-[35%]">Amount</th>
+                        ) : (
+                          <>
+                            <th className="text-right py-2 px-2 w-[15%]">Debit</th>
+                            <th className="text-right py-2 px-2 w-[15%]">Credit</th>
+                            <th className="text-left py-2 px-2 w-[20%]">Narration</th>
+                          </>
+                        )}
                         <th className="text-center py-2 px-2 w-[5%]"></th>
                       </tr>
                     </thead>
@@ -537,44 +543,72 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                               </Select>
                             </div>
                           </td>
-                          <td className="py-2 px-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              {...form.register(`entries.${index}.debitAmount`)}
-                              className="text-right"
-                              data-testid={`input-debit-${index}`}
-                              onKeyDown={(e) => {
-                                if (e.key === "Tab") {
-                                  e.preventDefault();
-                                  const creditInput = document.querySelector(`[data-testid="input-credit-${index}"]`) as HTMLInputElement;
-                                  if (creditInput) creditInput.focus();
+                          {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                            <td className="py-2 px-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={
+                                  parseFloat(form.watch(`entries.${index}.debitAmount`) || "0") > 0
+                                    ? form.watch(`entries.${index}.debitAmount`)
+                                    : form.watch(`entries.${index}.creditAmount`) || ""
                                 }
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              {...form.register(`entries.${index}.creditAmount`)}
-                              className="text-right"
-                              data-testid={`input-credit-${index}`}
-                              onKeyDown={(e) => {
-                                if (e.key === "Tab") {
-                                  e.preventDefault();
-                                  const narrationInput = document.querySelector(`[data-testid="input-narration-${index}"]`) as HTMLInputElement;
-                                  if (narrationInput) narrationInput.focus();
-                                }
-                              }}
-                            />
-                          </td>
-                          <td className="py-2 px-2">
-                            <Input
-                              {...form.register(`entries.${index}.narration`)}
-                              data-testid={`input-narration-${index}`}
-                            />
-                          </td>
+                                onChange={(e) => {
+                                  const voucherType = form.watch("voucherType");
+                                  if (voucherType === "Payment") {
+                                    form.setValue(`entries.${index}.debitAmount`, e.target.value);
+                                    form.setValue(`entries.${index}.creditAmount`, "0");
+                                  } else {
+                                    form.setValue(`entries.${index}.creditAmount`, e.target.value);
+                                    form.setValue(`entries.${index}.debitAmount`, "0");
+                                  }
+                                }}
+                                className="text-right"
+                                data-testid={`input-amount-${index}`}
+                              />
+                            </td>
+                          ) : (
+                            <>
+                              <td className="py-2 px-2">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  {...form.register(`entries.${index}.debitAmount`)}
+                                  className="text-right"
+                                  data-testid={`input-debit-${index}`}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Tab") {
+                                      e.preventDefault();
+                                      const creditInput = document.querySelector(`[data-testid="input-credit-${index}"]`) as HTMLInputElement;
+                                      if (creditInput) creditInput.focus();
+                                    }
+                                  }}
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  {...form.register(`entries.${index}.creditAmount`)}
+                                  className="text-right"
+                                  data-testid={`input-credit-${index}`}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Tab") {
+                                      e.preventDefault();
+                                      const narrationInput = document.querySelector(`[data-testid="input-narration-${index}"]`) as HTMLInputElement;
+                                      if (narrationInput) narrationInput.focus();
+                                    }
+                                  }}
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input
+                                  {...form.register(`entries.${index}.narration`)}
+                                  data-testid={`input-narration-${index}`}
+                                />
+                              </td>
+                            </>
+                          )}
                           <td className="py-2 px-2 text-center">
                             {fields.length > 1 && (
                               <Button
@@ -593,30 +627,41 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                     </tbody>
                     <tfoot className="border-t-2 font-semibold">
                       <tr>
-                        <td className="py-2 px-2 text-right">Totals:</td>
-                        <td className="py-2 px-2 text-right font-mono" data-testid="text-total-debits">
-                          ${totalDebits.toFixed(2)}
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono" data-testid="text-total-credits">
-                          ${totalCredits.toFixed(2)}
-                        </td>
-                        <td colSpan={2} className="py-2 px-2">
-                          {!isBalanced && !isOptional && (
-                            <div className="flex items-center gap-2 text-destructive text-sm">
-                              <AlertTriangle className="h-4 w-4" />
-                              Debits must equal credits
-                            </div>
-                          )}
-                          {!isBalanced && isOptional && showOptionalWarning && (
-                            <div className="flex items-center gap-2 text-amber-500 text-sm">
-                              <AlertTriangle className="h-4 w-4" />
-                              Optional – not posted to ledgers
-                            </div>
-                          )}
-                          {isBalanced && (
-                            <div className="text-sm text-muted-foreground">✓ Balanced</div>
-                          )}
-                        </td>
+                        <td className="py-2 px-2 text-right">Total:</td>
+                        {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                          <>
+                            <td className="py-2 px-2 text-right font-mono" data-testid="text-total-amount">
+                              ${Math.max(totalDebits, totalCredits).toFixed(2)}
+                            </td>
+                            <td className="py-2 px-2"></td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 px-2 text-right font-mono" data-testid="text-total-debits">
+                              ${totalDebits.toFixed(2)}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono" data-testid="text-total-credits">
+                              ${totalCredits.toFixed(2)}
+                            </td>
+                            <td colSpan={2} className="py-2 px-2">
+                              {!isBalanced && !isOptional && (
+                                <div className="flex items-center gap-2 text-destructive text-sm">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Debits must equal credits
+                                </div>
+                              )}
+                              {!isBalanced && isOptional && showOptionalWarning && (
+                                <div className="flex items-center gap-2 text-amber-500 text-sm">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Optional – not posted to ledgers
+                                </div>
+                              )}
+                              {isBalanced && (
+                                <div className="text-sm text-muted-foreground">Balanced</div>
+                              )}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     </tfoot>
                   </table>
