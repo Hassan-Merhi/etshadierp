@@ -5765,6 +5765,503 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Multi-source Stock Transfer Import - Template
+  app.get("/api/stock-transfer-import/template-multi-source", (_req, res) => {
+    try {
+      const sampleData = [
+        {
+          "Source Location": "Warehouse A",
+          Barcode: "BC001",
+          Quantity: 5,
+        },
+        {
+          "Source Location": "Warehouse B",
+          Barcode: "BC002",
+          Quantity: 10,
+        },
+        {
+          "Source Location": "Warehouse A",
+          Barcode: "BC003",
+          Quantity: 15,
+        },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(sampleData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Transfer");
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=Stock_Transfer_Multi_Source_Template.xlsx",
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Template generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Multi-source Stock Transfer Import - Parse Excel
+  app.post(
+    "/api/stock-transfer-import/parse-multi-source",
+    requireAuth,
+    requireNonPOS,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (rawData.length === 0) {
+          return res.status(400).json({ message: "Excel file is empty" });
+        }
+
+        const rows = rawData as any[];
+        const items: any[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+
+          // Expected columns: Source Location, Barcode, Quantity
+          const sourceLocation = row["Source Location"] || row.SourceLocation || row.sourceLocation || row.source || "";
+          const barcode = row.Barcode || row.barcode || row.Code || row.code;
+          const quantity = parseFloat(
+            row.Quantity || row.quantity || row.Qty || row.qty || "0",
+          );
+
+          if (!barcode) {
+            continue; // Skip rows without barcode
+          }
+
+          if (quantity <= 0) {
+            continue; // Skip invalid quantities
+          }
+
+          items.push({
+            rowNum,
+            sourceLocation: sourceLocation.toString().trim(),
+            barcode: barcode.toString().trim(),
+            quantity,
+          });
+        }
+
+        if (items.length === 0) {
+          return res.status(400).json({
+            message: "No valid items found in Excel file. Expected columns: Source Location, Barcode, Quantity",
+          });
+        }
+
+        res.json({
+          success: true,
+          items,
+        });
+      } catch (error: any) {
+        console.error("Stock Transfer Parse error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Multi-source Stock Transfer Import - Validate
+  app.post("/api/stock-transfer-import/validate-multi-source", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { destinationLocationId, items } = req.body;
+
+      if (!destinationLocationId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      const validatedItems: any[] = [];
+
+      // Validate destination location exists
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      if (!destLocation) {
+        errors.push("Destination location not found");
+        return res.json({ errors, warnings, validatedItems });
+      }
+
+      // Get all locations for name lookup
+      const allLocations = await storage.getLocations(req.session.currentCompanyId!);
+      const locationsByName: Record<string, number> = {};
+      allLocations.forEach(loc => {
+        locationsByName[loc.name.toLowerCase().trim()] = loc.id;
+      });
+
+      // Validate each item
+      for (const item of items) {
+        const validatedItem: any = { ...item };
+
+        // Find source location by name
+        const sourceLocationName = item.sourceLocation?.toLowerCase().trim();
+        if (!sourceLocationName) {
+          validatedItem.error = "Source location is required";
+          errors.push(`Row ${item.rowNum}: Source location is required`);
+          validatedItems.push(validatedItem);
+          continue;
+        }
+
+        const sourceLocationId = locationsByName[sourceLocationName];
+        if (!sourceLocationId) {
+          validatedItem.error = `Source location '${item.sourceLocation}' not found`;
+          errors.push(`Row ${item.rowNum}: Source location '${item.sourceLocation}' not found`);
+          validatedItems.push(validatedItem);
+          continue;
+        }
+
+        if (sourceLocationId === destinationLocationId) {
+          validatedItem.error = "Source and destination cannot be the same";
+          errors.push(`Row ${item.rowNum}: Source and destination cannot be the same`);
+          validatedItems.push(validatedItem);
+          continue;
+        }
+
+        validatedItem.sourceLocationId = sourceLocationId;
+
+        // Find stock item by barcode (code or alias)
+        let stockItem = await storage.getStockItemByCodeOrAlias(
+          item.barcode,
+          req.session.currentCompanyId!,
+        );
+
+        if (!stockItem) {
+          validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
+          errors.push(`Row ${item.rowNum}: Barcode '${item.barcode}' not found`);
+        } else {
+          validatedItem.stockItemId = stockItem.id;
+          validatedItem.stockItemName = stockItem.name;
+
+          // Check inventory at source location
+          const inventoryResult = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.companyId, req.session.currentCompanyId!),
+                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.stockItemId, stockItem.id),
+              ),
+            )
+            .limit(1);
+
+          const invRecord = inventoryResult[0];
+          if (!invRecord) {
+            validatedItem.error = `No inventory at source location '${item.sourceLocation}'`;
+            validatedItem.currentStock = 0;
+            errors.push(
+              `Row ${item.rowNum}: '${stockItem.name}' has no inventory at '${item.sourceLocation}'`,
+            );
+          } else {
+            const currentQty = parseFloat(invRecord.quantity);
+            validatedItem.currentStock = currentQty;
+            validatedItem.rate = invRecord.averageRate;
+
+            if (item.quantity > currentQty) {
+              validatedItem.error = `Insufficient quantity (available: ${currentQty.toFixed(2)})`;
+              errors.push(
+                `Row ${item.rowNum}: '${stockItem.name}' - requested ${item.quantity}, available ${currentQty.toFixed(2)}`,
+              );
+            }
+          }
+        }
+
+        validatedItems.push(validatedItem);
+      }
+
+      res.json({
+        success: errors.length === 0,
+        errors,
+        warnings,
+        validatedItems,
+      });
+    } catch (error: any) {
+      console.error("Stock Transfer Validate error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Multi-source Stock Transfer Import - Execute Import
+  app.post("/api/stock-transfer-import/import-multi-source", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { destinationLocationId, transferDate, notes, items } = req.body;
+
+      if (!destinationLocationId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate all items have required fields
+      for (const item of items) {
+        if (!item.stockItemId || !item.sourceLocationId || !item.quantity || item.error) {
+          return res.status(400).json({
+            message: "Some items have validation errors. Please validate and fix before importing.",
+          });
+        }
+      }
+
+      // Get destination location for the name - verify it belongs to this company
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      if (!destLocation || destLocation.companyId !== req.session.currentCompanyId) {
+        return res.status(400).json({ message: "Destination location not found or access denied" });
+      }
+
+      // Get all locations for this company for name lookup and validation
+      const allLocations = await storage.getLocations(req.session.currentCompanyId!);
+      const locationsById: Record<number, string> = {};
+      const validLocationIds = new Set<number>();
+      allLocations.forEach(loc => {
+        locationsById[loc.id] = loc.name;
+        validLocationIds.add(loc.id);
+      });
+
+      // Re-validate items server-side and derive rates from inventory (don't trust client)
+      const processedItems: Array<{
+        stockItemId: number;
+        sourceLocationId: number;
+        quantity: number;
+        rate: number;
+      }> = [];
+
+      for (const item of items) {
+        // Validate source location belongs to this company
+        if (!validLocationIds.has(item.sourceLocationId)) {
+          return res.status(400).json({
+            message: `Source location ${item.sourceLocationId} not found or access denied`,
+          });
+        }
+
+        // Validate stock item exists and belongs to this company
+        const stockItem = await storage.getStockItemById(item.stockItemId);
+        if (!stockItem || stockItem.companyId !== req.session.currentCompanyId) {
+          return res.status(400).json({
+            message: `Stock item ${item.stockItemId} not found or access denied`,
+          });
+        }
+
+        // Validate source != destination
+        if (item.sourceLocationId === destinationLocationId) {
+          return res.status(400).json({
+            message: "Source and destination locations cannot be the same",
+          });
+        }
+
+        // Get inventory at source location to derive rate (don't trust client rate)
+        const sourceInv = await db
+          .select()
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.companyId, req.session.currentCompanyId!),
+              eq(inventory.locationId, item.sourceLocationId),
+              eq(inventory.stockItemId, item.stockItemId),
+            ),
+          )
+          .limit(1);
+
+        if (!sourceInv[0]) {
+          return res.status(400).json({
+            message: `No inventory for item at source location`,
+          });
+        }
+
+        const currentQty = parseFloat(sourceInv[0].quantity);
+        const requestedQty = parseFloat(item.quantity);
+
+        if (requestedQty > currentQty) {
+          return res.status(400).json({
+            message: `Insufficient inventory: requested ${requestedQty}, available ${currentQty}`,
+          });
+        }
+
+        // Use server-derived rate from inventory, not client-provided rate
+        const serverRate = parseFloat(sourceInv[0].averageRate || "0");
+
+        processedItems.push({
+          stockItemId: item.stockItemId,
+          sourceLocationId: item.sourceLocationId,
+          quantity: requestedQty,
+          rate: serverRate,
+        });
+      }
+
+      // Calculate total value using server-derived rates
+      let totalValue = 0;
+      for (const item of processedItems) {
+        totalValue += item.rate * item.quantity;
+      }
+
+      // Create voucher and update inventory in a transaction
+      await db.transaction(async (tx) => {
+        // Get next voucher number
+        const existingVouchers = await tx
+          .select({ voucherNumber: vouchers.voucherNumber })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, req.session.currentCompanyId!),
+              eq(vouchers.voucherType, "Stock Transfer"),
+            ),
+          )
+          .orderBy(desc(vouchers.id))
+          .limit(1);
+
+        let nextNumber = 1;
+        if (existingVouchers.length > 0) {
+          const lastNum = existingVouchers[0].voucherNumber;
+          const numMatch = lastNum.match(/(\d+)$/);
+          if (numMatch) {
+            nextNumber = parseInt(numMatch[1]) + 1;
+          }
+        }
+        const voucherNumber = `STI-${String(nextNumber).padStart(4, "0")}`;
+
+        // Create the voucher
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId!,
+            voucherType: "Stock Transfer",
+            voucherNumber,
+            voucherDate: transferDate || new Date().toISOString().split("T")[0],
+            description: notes || `Multi-source Stock Transfer Import (${processedItems.length} items)`,
+            totalAmount: totalValue.toString(),
+            optional: false,
+            locationId: destinationLocationId,
+            locationName: destLocation.name,
+          })
+          .returning();
+
+        // Process each item - re-fetch inventory inside transaction and update
+        for (const item of processedItems) {
+          const sourceLocationId = item.sourceLocationId;
+          const qty = item.quantity;
+          const rate = item.rate;
+
+          // Create voucher item
+          await tx.insert(voucherItems).values({
+            voucherId: voucher.id,
+            stockItemId: item.stockItemId,
+            quantity: qty.toString(),
+            rate: rate.toString(),
+            sourceLocationId: sourceLocationId,
+          });
+
+          // Re-fetch source inventory inside transaction for consistency
+          const sourceInventory = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.companyId, req.session.currentCompanyId!),
+                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.stockItemId, item.stockItemId),
+              ),
+            )
+            .limit(1);
+
+          if (!sourceInventory[0]) {
+            throw new Error(`Inventory not found for item at source location`);
+          }
+
+          const currentQty = parseFloat(sourceInventory[0].quantity);
+          if (qty > currentQty) {
+            throw new Error(`Insufficient inventory: requested ${qty}, available ${currentQty}`);
+          }
+
+          const currentValue = parseFloat(sourceInventory[0].totalValue);
+          const deductValue = qty * rate;
+          const newQty = currentQty - qty;
+          const newValue = currentValue - deductValue;
+          const newAvgRate = newQty > 0 ? newValue / newQty : 0;
+
+          await tx
+            .update(inventory)
+            .set({
+              quantity: newQty.toString(),
+              averageRate: newAvgRate.toString(),
+              totalValue: newValue.toString(),
+            })
+            .where(eq(inventory.id, sourceInventory[0].id));
+
+          // Add to destination inventory
+          const destInventory = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.companyId, req.session.currentCompanyId!),
+                eq(inventory.locationId, destinationLocationId),
+                eq(inventory.stockItemId, item.stockItemId),
+              ),
+            )
+            .limit(1);
+
+          if (destInventory[0]) {
+            const currentQty = parseFloat(destInventory[0].quantity);
+            const currentValue = parseFloat(destInventory[0].totalValue);
+            const addValue = qty * rate;
+            const newQty = currentQty + qty;
+            const newValue = currentValue + addValue;
+            const newAvgRate = newQty > 0 ? newValue / newQty : rate;
+
+            await tx
+              .update(inventory)
+              .set({
+                quantity: newQty.toString(),
+                averageRate: newAvgRate.toString(),
+                totalValue: newValue.toString(),
+              })
+              .where(eq(inventory.id, destInventory[0].id));
+          } else {
+            // Create new inventory at destination
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId: destinationLocationId,
+              stockItemId: item.stockItemId,
+              quantity: qty.toString(),
+              averageRate: rate.toString(),
+              totalValue: (qty * rate).toString(),
+            });
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        itemsCount: processedItems.length,
+        totalValue: totalValue.toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("Stock Transfer Import error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get containers
   app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {

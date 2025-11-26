@@ -75,7 +75,23 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -1460,6 +1476,183 @@ export default function Vouchers() {
   const [activeTransferRow, setActiveTransferRow] = useState<number | null>(null);
   const [transferInventorySource, setTransferInventorySource] = useState<number | null>(null);
 
+  // Stock Transfer Import state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<any>(null);
+  const [importValidationResult, setImportValidationResult] = useState<any>(null);
+  const [importDestLocation, setImportDestLocation] = useState<string>("");
+  const [importDate, setImportDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [importNotes, setImportNotes] = useState<string>("");
+
+  // Import mutations
+  const importParseMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/stock-transfer-import/parse-multi-source", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to parse file");
+      }
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setImportPreview(data);
+      setImportValidationResult(null);
+      toast({
+        title: "File parsed successfully",
+        description: `Found ${data.items.length} item(s). Click Validate to check the data.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Parse error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importValidateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/stock-transfer-import/validate-multi-source", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setImportValidationResult(data);
+      const errorCount = data.errors?.length || 0;
+      if (errorCount === 0) {
+        toast({
+          title: "Validation passed",
+          description: "All items validated successfully. You can now import the data.",
+        });
+      } else {
+        toast({
+          title: "Validation issues found",
+          description: `Found ${errorCount} issue(s). Please review before importing.`,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Validation error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/stock-transfer-import/import-multi-source", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Import successful",
+        description: `${data.itemsCount} items transferred successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+      // Reset import state
+      setImportDialogOpen(false);
+      setImportFile(null);
+      setImportPreview(null);
+      setImportValidationResult(null);
+      setImportDestLocation("");
+      setImportNotes("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setImportFile(selectedFile);
+      setImportPreview(null);
+      setImportValidationResult(null);
+    }
+  };
+
+  const handleImportParse = () => {
+    if (!importFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select an Excel file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", importFile);
+    importParseMutation.mutate(formData);
+  };
+
+  const handleImportValidate = () => {
+    if (!importDestLocation) {
+      toast({
+        title: "Destination required",
+        description: "Please select a destination location",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!importPreview) {
+      toast({
+        title: "No preview data",
+        description: "Please parse the file first",
+        variant: "destructive",
+      });
+      return;
+    }
+    importValidateMutation.mutate({
+      destinationLocationId: parseInt(importDestLocation),
+      items: importPreview.items,
+    });
+  };
+
+  const handleImportSubmit = () => {
+    if (!importDestLocation || !importPreview || !importValidationResult?.validatedItems) {
+      toast({
+        title: "Cannot import",
+        description: "Please parse, validate, and fix any errors first",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (importValidationResult?.errors?.length > 0) {
+      toast({
+        title: "Validation errors present",
+        description: "Please fix validation errors before importing",
+        variant: "destructive",
+      });
+      return;
+    }
+    importMutation.mutate({
+      destinationLocationId: parseInt(importDestLocation),
+      transferDate: importDate,
+      notes: importNotes,
+      items: importValidationResult.validatedItems,
+    });
+  };
+
+  const downloadImportTemplate = () => {
+    window.open("/api/stock-transfer-import/template-multi-source", "_blank");
+  };
+
+  const importIsValidated = importValidationResult !== null;
+  const importHasErrors = importValidationResult?.errors && importValidationResult.errors.length > 0;
+
   // Fetch inventory for the source location of the active row
   const { data: transferInventory = [] } = useQuery<any[]>({
     queryKey: transferInventorySource ? [`/api/locations/${transferInventorySource}/inventory`] : [],
@@ -2816,8 +3009,17 @@ export default function Vouchers() {
           <div className="flex gap-4">
             {/* Main Form Area */}
             <Card className="flex-1">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <CardTitle>Stock Transfer Voucher</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImportDialogOpen(true)}
+                  data-testid="button-open-import-dialog"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import from Excel
+                </Button>
               </CardHeader>
               <CardContent>
                 <Form {...stockTransferForm}>
@@ -3637,6 +3839,205 @@ export default function Vouchers() {
           }
         }}
       />
+
+      {/* Stock Transfer Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Import Stock Transfer from Excel
+            </DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with columns: Source Location, Barcode, Quantity. Each row can have a different source location.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <Label htmlFor="import-file">Excel File</Label>
+                <Input
+                  id="import-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleImportFileChange}
+                  className="mt-1"
+                  data-testid="input-import-file"
+                />
+                {importFile && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Selected: {importFile.name}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadImportTemplate}
+                className="mt-6"
+                data-testid="button-download-import-template"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Template
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="import-dest-location">Destination Location</Label>
+                <Select value={importDestLocation} onValueChange={setImportDestLocation}>
+                  <SelectTrigger id="import-dest-location" className="mt-1" data-testid="select-import-dest-location">
+                    <SelectValue placeholder="Select destination..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="import-date">Transfer Date</Label>
+                <Input
+                  id="import-date"
+                  type="date"
+                  value={importDate}
+                  onChange={(e) => setImportDate(e.target.value)}
+                  className="mt-1"
+                  data-testid="input-import-date"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="import-notes">Notes (Optional)</Label>
+              <Textarea
+                id="import-notes"
+                value={importNotes}
+                onChange={(e) => setImportNotes(e.target.value)}
+                placeholder="Optional notes for this transfer..."
+                rows={2}
+                className="mt-1"
+                data-testid="input-import-notes"
+              />
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                onClick={handleImportParse}
+                disabled={!importFile || importParseMutation.isPending}
+                variant="outline"
+                data-testid="button-import-parse"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                {importParseMutation.isPending ? "Parsing..." : "Parse File"}
+              </Button>
+
+              <Button
+                onClick={handleImportValidate}
+                disabled={!importPreview || !importDestLocation || importValidateMutation.isPending}
+                variant="outline"
+                data-testid="button-import-validate"
+              >
+                {importIsValidated ? (
+                  importHasErrors ? (
+                    <XCircle className="h-4 w-4 mr-2 text-destructive" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                  )
+                ) : null}
+                {importValidateMutation.isPending ? "Validating..." : "Validate"}
+              </Button>
+
+              <Button
+                onClick={handleImportSubmit}
+                disabled={!importIsValidated || importHasErrors || importMutation.isPending}
+                data-testid="button-import-submit"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {importMutation.isPending ? "Importing..." : "Import Transfer"}
+              </Button>
+            </div>
+
+            {importValidationResult?.errors && importValidationResult.errors.length > 0 && (
+              <div className="p-3 border border-destructive rounded-md bg-destructive/10">
+                <p className="font-medium text-destructive mb-2">Validation Errors:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  {importValidationResult.errors.map((error: string, index: number) => (
+                    <li key={index} className="text-sm text-destructive">
+                      {error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {importPreview && (
+              <div className="border rounded-md">
+                <div className="p-3 border-b bg-muted/50">
+                  <p className="font-medium">Preview ({importPreview.items.length} items)</p>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Source Location</TableHead>
+                        <TableHead>Barcode</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Available</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importPreview.items.map((item: any, index: number) => {
+                        const validation = importValidationResult?.validatedItems?.[index];
+                        const hasError = validation?.error;
+
+                        return (
+                          <TableRow key={index} className={hasError ? "bg-destructive/10" : ""} data-testid={`import-preview-row-${index}`}>
+                            <TableCell>{item.sourceLocation || "-"}</TableCell>
+                            <TableCell className="font-mono">{item.barcode}</TableCell>
+                            <TableCell>
+                              {validation?.stockItemName || (
+                                <span className="text-muted-foreground italic">Unknown</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                              {validation?.currentStock !== undefined ? validation.currentStock.toFixed(2) : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {validation ? (
+                                hasError ? (
+                                  <div className="flex items-center gap-1 text-destructive">
+                                    <XCircle className="h-4 w-4" />
+                                    <span className="text-sm">{validation.error}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-green-600">
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span className="text-sm">OK</span>
+                                  </div>
+                                )
+                              ) : (
+                                <span className="text-sm text-muted-foreground">Not validated</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
