@@ -70,9 +70,10 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const [_location, navigate] = useLocation();
   const isPOS = !!posUser;
   
-  const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(
-    isPOS && posUser?.assignedLocationId ? posUser.assignedLocationId : null
-  );
+  // For POS users, always use their assigned location as source
+  const posSourceLocation = isPOS ? posUser?.assignedLocationId : null;
+  
+  const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(posSourceLocation);
   const [selectedDestLocation, setSelectedDestLocation] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [entries, setEntries] = useState<TransferEntry[]>([
@@ -82,6 +83,13 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTransfer, setViewingTransfer] = useState<StockTransferVoucher | null>(null);
 
+  // Ensure POS source location is set when posUser changes
+  useEffect(() => {
+    if (isPOS && posUser?.assignedLocationId) {
+      setSelectedSourceLocation(posUser.assignedLocationId);
+    }
+  }, [isPOS, posUser?.assignedLocationId]);
+
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
   });
@@ -90,18 +98,21 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/stock-items"],
   });
 
+  // Determine the active source location for inventory query
+  const activeSourceLocation = isPOS ? (posUser?.assignedLocationId || selectedSourceLocation) : selectedSourceLocation;
+
   const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory-by-location", selectedSourceLocation],
+    queryKey: ["/api/inventory-by-location", activeSourceLocation],
     queryFn: async () => {
-      if (!selectedSourceLocation || selectedSourceLocation <= 0) return [];
-      const res = await fetch(`/api/inventory-by-location/${selectedSourceLocation}`);
+      if (!activeSourceLocation || activeSourceLocation <= 0) return [];
+      const res = await fetch(`/api/inventory-by-location/${activeSourceLocation}`);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Failed to fetch inventory");
       }
       return res.json();
     },
-    enabled: selectedSourceLocation !== null && selectedSourceLocation > 0,
+    enabled: activeSourceLocation !== null && activeSourceLocation > 0,
   });
 
   const { data: vouchers = [] } = useQuery<any[]>({
@@ -112,19 +123,13 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     .filter((v: any) => v.voucherType === "Stock Transfer" || v.voucherType === "StockTransfer")
     .slice(0, 20);
 
-  useEffect(() => {
-    if (isPOS && posUser?.assignedLocationId && !selectedSourceLocation) {
-      setSelectedSourceLocation(posUser.assignedLocationId);
-    }
-  }, [isPOS, posUser, selectedSourceLocation]);
-
   const createTransferMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { notes: string; items: TransferEntry[] }) => {
       const response = await apiRequest("POST", "/api/stock-transfers", {
-        sourceLocationId: selectedSourceLocation,
+        sourceLocationId: activeSourceLocation,
         destinationLocationId: selectedDestLocation,
         notes: data.notes || "",
-        items: data.items.map((item: TransferEntry) => ({
+        items: data.items.map((item) => ({
           stockItemId: item.stockItemId,
           quantity: item.quantity,
         })),
@@ -185,16 +190,17 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const handleSubmit = () => {
-    if (!selectedSourceLocation || !selectedDestLocation) {
+    if (!activeSourceLocation || !selectedDestLocation) {
       toast({ title: "Error", description: "Please select source and destination locations", variant: "destructive" });
       return;
     }
 
-    if (selectedSourceLocation === selectedDestLocation) {
+    if (activeSourceLocation === selectedDestLocation) {
       toast({ title: "Error", description: "Source and destination must be different", variant: "destructive" });
       return;
     }
 
+    // Filter to only valid entries with stockItemId > 0 and quantity > 0
     const validEntries = entries.filter(e => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0);
     
     if (validEntries.length === 0) {
@@ -214,6 +220,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       }
     }
 
+    // Only submit valid entries to the backend
     createTransferMutation.mutate({
       notes,
       items: validEntries,
@@ -243,7 +250,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
-  const sourceLocationName = locations.find((l: any) => l.id === selectedSourceLocation)?.name;
+  const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
 
   const availableStockItems = stockItems.filter((item: any) => {
     const invItem = inventoryItems.find(i => i.stockItemId === item.id);
@@ -306,7 +313,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {locations
-                    .filter((loc: any) => loc.id !== selectedSourceLocation)
+                    .filter((loc: any) => loc.id !== activeSourceLocation)
                     .map((loc: any) => (
                       <SelectItem key={loc.id} value={loc.id.toString()}>
                         {loc.name}
@@ -317,7 +324,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
             </div>
           </div>
 
-          {selectedSourceLocation && (
+          {activeSourceLocation && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Items to Transfer</Label>
@@ -408,7 +415,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
           <Button 
             onClick={handleSubmit} 
-            disabled={createTransferMutation.isPending || !selectedSourceLocation || !selectedDestLocation} 
+            disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation} 
             className="w-full"
             data-testid="button-submit-transfer"
           >
