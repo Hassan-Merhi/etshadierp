@@ -478,16 +478,24 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                     </thead>
                     <tbody>
                       {fields.map((field, index) => {
-                        // For Payment/Receipt, hide cash source entries (credit for Payment, debit for Receipt)
+                        // For Payment/Receipt, hide cash source entries and zero-amount entries
                         const voucherType = form.watch("voucherType");
                         const debitAmount = parseFloat(form.watch(`entries.${index}.debitAmount`) || "0");
                         const creditAmount = parseFloat(form.watch(`entries.${index}.creditAmount`) || "0");
                         
-                        if (voucherType === "Payment" && creditAmount > 0 && debitAmount === 0) {
-                          return null; // Hide cash source (credit) entries for Payment
-                        }
-                        if (voucherType === "Receipt" && debitAmount > 0 && creditAmount === 0) {
-                          return null; // Hide cash source (debit) entries for Receipt
+                        if (voucherType === "Payment" || voucherType === "Receipt") {
+                          // Hide entries where both amounts are 0 (empty/removed entries)
+                          if (debitAmount === 0 && creditAmount === 0) {
+                            return null;
+                          }
+                          // Hide cash source entries for Payment (credit entries with no debit)
+                          if (voucherType === "Payment" && creditAmount > 0 && debitAmount === 0) {
+                            return null;
+                          }
+                          // Hide cash source entries for Receipt (debit entries with no credit)
+                          if (voucherType === "Receipt" && debitAmount > 0 && creditAmount === 0) {
+                            return null;
+                          }
                         }
                         
                         return (
