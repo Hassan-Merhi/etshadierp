@@ -517,11 +517,16 @@ const PrintTemplate = ({
   );
 };
 
-export default function Vouchers() {
+interface VouchersProps {
+  posUser?: any;
+}
+
+export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
+  const isPOS = !!posUser;
   
   // Parse URL parameters for edit mode (use window.location.search since wouter doesn't include query params)
   const searchParams = new URLSearchParams(window.location.search);
@@ -2595,46 +2600,50 @@ export default function Vouchers() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold" data-testid="text-page-title">
-          Vouchers
+          {isPOS ? "Stock Transfer" : "Vouchers"}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Create payment and receipt vouchers
+          {isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
         </p>
       </div>
 
       {/* Hidden print template */}
-      <div className="hidden">
-        <div ref={printRef}>
-          <PrintTemplate
-            voucherType={activeTab === "payment" ? "Payment" : "Receipt"}
-            paymentAccountName={paymentAccountName}
-            paymentAccountBalance={accountBalance}
-            date={form.watch("voucherDate")}
-            entries={entries.filter((e) => e.accountId > 0 && e.amount)}
-            notes={form.watch("notes") || ""}
-            total={total}
-          />
+      {!isPOS && (
+        <div className="hidden">
+          <div ref={printRef}>
+            <PrintTemplate
+              voucherType={activeTab === "payment" ? "Payment" : "Receipt"}
+              paymentAccountName={paymentAccountName}
+              paymentAccountBalance={accountBalance}
+              date={form.watch("voucherDate")}
+              entries={entries.filter((e) => e.accountId > 0 && e.amount)}
+              notes={form.watch("notes") || ""}
+              total={total}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
-        <TabsList>
-          <TabsTrigger value="payment" data-testid="tab-payment">
-            Payment
-          </TabsTrigger>
-          <TabsTrigger value="receipt" data-testid="tab-receipt">
-            Receipt
-          </TabsTrigger>
-          <TabsTrigger value="journal" data-testid="tab-journal">
-            Journal
-          </TabsTrigger>
-          <TabsTrigger value="transfer" data-testid="tab-transfer">
-            Stock Transfer
-          </TabsTrigger>
-          <TabsTrigger value="adjustment" data-testid="tab-adjustment">
-            Production/Consumption
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
+        {!isPOS && (
+          <TabsList>
+            <TabsTrigger value="payment" data-testid="tab-payment">
+              Payment
+            </TabsTrigger>
+            <TabsTrigger value="receipt" data-testid="tab-receipt">
+              Receipt
+            </TabsTrigger>
+            <TabsTrigger value="journal" data-testid="tab-journal">
+              Journal
+            </TabsTrigger>
+            <TabsTrigger value="transfer" data-testid="tab-transfer">
+              Stock Transfer
+            </TabsTrigger>
+            <TabsTrigger value="adjustment" data-testid="tab-adjustment">
+              Production/Consumption
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent value="payment" className="space-y-4">
           <PaymentVoucherTab
@@ -3011,15 +3020,17 @@ export default function Vouchers() {
             <Card className="flex-1">
               <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <CardTitle>Stock Transfer Voucher</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setImportDialogOpen(true)}
-                  data-testid="button-open-import-dialog"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import from Excel
-                </Button>
+                {!isPOS && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImportDialogOpen(true)}
+                    data-testid="button-open-import-dialog"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import from Excel
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <Form {...stockTransferForm}>
@@ -3097,11 +3108,11 @@ export default function Vouchers() {
                     <table className="w-full">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left p-3 font-medium w-[25%]">Source Location</th>
-                          <th className="text-left p-3 font-medium w-[30%]">Stock Item</th>
-                          <th className="text-left p-3 font-medium w-[12%]">Quantity</th>
-                          <th className="text-left p-3 font-medium w-[12%]">Rate</th>
-                          <th className="text-left p-3 font-medium w-[16%]">Total</th>
+                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[30%]" : "w-[25%]")}>Source Location</th>
+                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[45%]" : "w-[30%]")}>Stock Item</th>
+                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[20%]" : "w-[12%]")}>Quantity</th>
+                          {!isPOS && <th className="text-left p-3 font-medium w-[12%]">Rate</th>}
+                          {!isPOS && <th className="text-left p-3 font-medium w-[16%]">Total</th>}
                           <th className="w-[5%]"></th>
                         </tr>
                       </thead>
@@ -3293,36 +3304,40 @@ export default function Vouchers() {
                                 )}
                               />
                             </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockTransferForm.control}
-                                name={`entries.${index}.rate`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        data-testid={`input-transfer-rate-${index}`}
-                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "rate")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <div className="text-right font-mono">
-                                ${(parseFloat(transferEntries[index].quantity || "0") * parseFloat(transferEntries[index].rate || "0")).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </div>
-                            </td>
+                            {!isPOS && (
+                              <td className="p-2">
+                                <FormField
+                                  control={stockTransferForm.control}
+                                  name={`entries.${index}.rate`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          className="font-mono"
+                                          data-testid={`input-transfer-rate-${index}`}
+                                          onKeyDown={(e) => handleTransferKeyDown(e, index, "rate")}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                            )}
+                            {!isPOS && (
+                              <td className="p-2">
+                                <div className="text-right font-mono">
+                                  ${(parseFloat(transferEntries[index].quantity || "0") * parseFloat(transferEntries[index].rate || "0")).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </div>
+                              </td>
+                            )}
                             <td className="p-2">
                               {transferFields.length > 1 && (
                                 <Button
@@ -3341,7 +3356,7 @@ export default function Vouchers() {
                       </tbody>
                       <tfoot className="bg-muted/30 border-t-2">
                         <tr>
-                          <td colSpan={4} className="p-3">
+                          <td colSpan={isPOS ? 3 : 4} className="p-3">
                             <Button
                               type="button"
                               variant="outline"
@@ -3362,14 +3377,16 @@ export default function Vouchers() {
                               Add Row
                             </Button>
                           </td>
-                          <td className="p-3">
-                            <div className="text-right font-bold font-mono">
-                              ${transferTotal.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
-                          </td>
+                          {!isPOS && (
+                            <td className="p-3">
+                              <div className="text-right font-bold font-mono">
+                                ${transferTotal.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </div>
+                            </td>
+                          )}
                           <td></td>
                         </tr>
                       </tfoot>
