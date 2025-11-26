@@ -5621,20 +5621,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Create stock transfer record
-        await tx.insert(stockTransfers).values({
+        const [transferRecord] = await tx.insert(stockTransferVouchers).values({
           voucherId: voucher.id,
           sourceLocationId,
           destinationLocationId,
-        });
+        }).returning();
 
         // Process each item
         for (const item of transferItems) {
+          const itemTotal = parseFloat(item.quantity) * parseFloat(item.rate);
+          
           // Create stock transfer item
           await tx.insert(stockTransferItems).values({
-            voucherId: voucher.id,
+            transferId: transferRecord.id,
             stockItemId: item.stockItemId,
             quantity: item.quantity,
             rate: item.rate,
+            totalAmount: itemTotal.toString(),
           });
 
           // Reduce source inventory

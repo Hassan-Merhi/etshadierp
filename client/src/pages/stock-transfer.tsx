@@ -26,7 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Trash2 } from "lucide-react";
+import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload } from "lucide-react";
+import { Link } from "wouter";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 
 interface StockTransferPageProps {
@@ -259,13 +260,19 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-stock-transfer">Stock Transfer</h1>
           <p className="text-muted-foreground">
             {isPOS ? `Transfer stock from your location to another` : `Transfer stock between locations`}
           </p>
         </div>
+        <Link href="/stock-transfer-import">
+          <Button variant="outline" data-testid="button-import-from-excel">
+            <Upload className="h-4 w-4 mr-2" />
+            Import from Excel
+          </Button>
+        </Link>
       </div>
 
       <Card>

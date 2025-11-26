@@ -47,6 +47,7 @@ import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
 import StockTransfer from "@/pages/stock-transfer";
+import StockTransferImport from "@/pages/StockTransferImport";
 import OrphanedRecords from "@/pages/OrphanedRecords";
 import { useEffect } from "react";
 
@@ -69,6 +70,7 @@ function Router({ user }: { user: any }) {
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/stock-transfer">{() => <StockTransfer posUser={user} />}</Route>
+        <Route path="/stock-transfer-import">{() => <StockTransferImport posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
     );
@@ -106,6 +108,8 @@ function Router({ user }: { user: any }) {
       <Route path="/mix-batches" component={MixBatches} />
       <Route path="/production-bales" component={ProductionBales} />
       <Route path="/bale-products" component={BaleProducts} />
+      <Route path="/stock-transfer">{() => <StockTransfer />}</Route>
+      <Route path="/stock-transfer-import">{() => <StockTransferImport />}</Route>
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
       <Route component={NotFound} />
