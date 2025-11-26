@@ -6479,6 +6479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const {
           locationId,
+          offloadDate,
           duties,
           dutiesAccountId,
           officeCharges,
@@ -6572,6 +6573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transportFees,
           transportAccountId,
           additionalCharges,
+          offloadDate,
         );
 
         res.json(offload);
@@ -6767,6 +6769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const {
           locationId,
+          offloadDate,
           duties,
           dutiesAccountId,
           officeCharges,
@@ -6850,6 +6853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               transportFees,
               totalCharges: totalCharges.toString(),
               additionalCostPerBale: additionalCostPerBale.toString(),
+              offloadedAt: offloadDate ? new Date(offloadDate) : currentOffload.offloadedAt,
             })
             .where(eq(containerOffloads.id, currentOffload.id));
 

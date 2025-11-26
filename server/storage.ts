@@ -192,7 +192,8 @@ export interface IStorage {
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
-    additionalCharges?: Array<{ description: string; amount: number; ledgerAccountId: number }>
+    additionalCharges?: Array<{ description: string; amount: number; ledgerAccountId: number }>,
+    offloadDate?: string
   ): Promise<ContainerOffload>;
 
   // Vouchers and Journal Entries
@@ -1428,7 +1429,8 @@ export class DbStorage implements IStorage {
     transferCharges: string, 
     transportFees: string,
     transportAccountId: number | null | undefined,
-    additionalCharges: Array<{ description: string; amount: number; ledgerAccountId: number }> = []
+    additionalCharges: Array<{ description: string; amount: number; ledgerAccountId: number }> = [],
+    offloadDate?: string
   ): Promise<ContainerOffload> {
     // Get all POs for this container
     const pos = await this.getPurchaseOrdersByContainer(containerId);
@@ -1598,7 +1600,7 @@ export class DbStorage implements IStorage {
     }
 
     // Create voucher entries for charges with associated supplier accounts
-    const voucherDate = new Date().toISOString().split('T')[0];
+    const voucherDate = offloadDate || new Date().toISOString().split('T')[0];
     
     // Helper function to find or create expense accounts
     const findOrCreateExpenseAccount = async (code: string, name: string) => {
@@ -1780,6 +1782,7 @@ export class DbStorage implements IStorage {
       totalCharges: totalCharges.toFixed(2),
       totalBales: totalBales.toFixed(3),
       additionalCostPerBale: additionalCostPerBale.toFixed(2),
+      offloadedAt: offloadDate ? new Date(offloadDate) : new Date(),
     }).returning();
 
     return offload;

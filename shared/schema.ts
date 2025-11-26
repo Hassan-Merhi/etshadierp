@@ -573,6 +573,7 @@ export const insertContainerOffloadSchema = createInsertSchema(containerOffloads
 export const offloadRequestSchema = insertContainerOffloadSchema.omit({
   containerId: true,
 }).extend({
+  offloadDate: z.string().min(1, "Offload date is required").regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD required)"),
   dutiesAccountId: z.number().nullable().optional(),
   officeChargesAccountId: z.number().nullable().optional(),
   officeChargesCashAccountId: z.number().nullable().optional(),

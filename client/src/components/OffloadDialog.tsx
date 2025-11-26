@@ -183,6 +183,7 @@ export function OffloadDialog({
   const [_location, setLocation] = useLocation();
   const { toast } = useToast();
   const [locationId, setLocationId] = useState<number | null>(null);
+  const [offloadDate, setOffloadDate] = useState(new Date().toISOString().split('T')[0]);
   const [duties, setDuties] = useState("0");
   const [dutiesAccountId, setDutiesAccountId] = useState("");
   const [officeCharges, setOfficeCharges] = useState("0");
@@ -278,6 +279,7 @@ export function OffloadDialog({
         `/api/containers/${containerId}/offload`,
         {
           locationId,
+          offloadDate,
           duties: duties,
           dutiesAccountId: dutiesAccountId ? parseInt(dutiesAccountId) : null,
           officeCharges: officeCharges,
@@ -332,6 +334,18 @@ export function OffloadDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Offload Date */}
+          <div className="space-y-2">
+            <Label htmlFor="offload-date">Offload Date</Label>
+            <Input
+              id="offload-date"
+              type="date"
+              value={offloadDate}
+              onChange={(e) => setOffloadDate(e.target.value)}
+              data-testid="input-offload-date"
+            />
+          </div>
+
           {/* Duties Section */}
           <div className="space-y-2">
             <Label>Duties</Label>
