@@ -543,7 +543,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Handle opening voucher for editing
   const handleEditVoucher = (voucherId: number) => {
     // Navigate to the full voucher edit page for better editing experience
-    setLocation(`/voucher/${voucherId}`);
+    setLocation(`/vouchers/${voucherId}/edit`);
   };
 
   // Synchronize activeTab and editVoucherId with URL parameters
@@ -2645,71 +2645,76 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </TabsList>
         )}
 
-        <TabsContent value="payment" className="space-y-4">
-          <PaymentVoucherTab
-            form={form}
-            fieldArray={fieldArray}
-            entries={entries}
-            total={total}
-            paymentAccountId={paymentAccountId}
-            paymentAccountType={paymentAccountType}
-            paymentAccountName={paymentAccountName}
-            accountBalance={accountBalance}
-            allAccounts={allAccounts}
-            sidebarAccounts={sidebarAccounts}
-            filteredSidebarAccounts={filteredSidebarAccounts}
-            sidebarSearchValue={sidebarSearchValue}
-            setSidebarSearchValue={setSidebarSearchValue}
-            sidebarHighlightedIndex={sidebarHighlightedIndex}
-            setSidebarHighlightedIndex={setSidebarHighlightedIndex}
-            selectedAccountId={selectedAccountId}
-            selectedAccountType={selectedAccountType}
-            handleSidebarAccountSelect={handleSidebarAccountSelect}
-            handleAmountCommit={handleAmountCommit}
-            handlePrint={handlePrint}
-            onSubmit={onSubmit}
-            activeTab="payment"
-            activeRowIndex={activeRowIndex}
-            setActiveRowIndex={setActiveRowIndex}
-          />
-        </TabsContent>
+        {!isPOS && (
+          <TabsContent value="payment" className="space-y-4">
+            <PaymentVoucherTab
+              form={form}
+              fieldArray={fieldArray}
+              entries={entries}
+              total={total}
+              paymentAccountId={paymentAccountId}
+              paymentAccountType={paymentAccountType}
+              paymentAccountName={paymentAccountName}
+              accountBalance={accountBalance}
+              allAccounts={allAccounts}
+              sidebarAccounts={sidebarAccounts}
+              filteredSidebarAccounts={filteredSidebarAccounts}
+              sidebarSearchValue={sidebarSearchValue}
+              setSidebarSearchValue={setSidebarSearchValue}
+              sidebarHighlightedIndex={sidebarHighlightedIndex}
+              setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+              selectedAccountId={selectedAccountId}
+              selectedAccountType={selectedAccountType}
+              handleSidebarAccountSelect={handleSidebarAccountSelect}
+              handleAmountCommit={handleAmountCommit}
+              handlePrint={handlePrint}
+              onSubmit={onSubmit}
+              activeTab="payment"
+              activeRowIndex={activeRowIndex}
+              setActiveRowIndex={setActiveRowIndex}
+            />
+          </TabsContent>
+        )}
 
-        <TabsContent value="receipt" className="space-y-4">
-          <ReceiptVoucherTab
-            form={form}
-            fieldArray={fieldArray}
-            entries={entries}
-            total={total}
-            paymentAccountId={paymentAccountId}
-            paymentAccountType={paymentAccountType}
-            paymentAccountName={paymentAccountName}
-            accountBalance={accountBalance}
-            allAccounts={allAccounts}
-            sidebarAccounts={sidebarAccounts}
-            filteredSidebarAccounts={filteredSidebarAccounts}
-            sidebarSearchValue={sidebarSearchValue}
-            setSidebarSearchValue={setSidebarSearchValue}
-            sidebarHighlightedIndex={sidebarHighlightedIndex}
-            setSidebarHighlightedIndex={setSidebarHighlightedIndex}
-            selectedAccountId={selectedAccountId}
-            selectedAccountType={selectedAccountType}
-            handleSidebarAccountSelect={handleSidebarAccountSelect}
-            handleAmountCommit={handleAmountCommit}
-            handlePrint={handlePrint}
-            onSubmit={onSubmit}
-            activeTab="receipt"
-            activeRowIndex={activeRowIndex}
-            setActiveRowIndex={setActiveRowIndex}
-          />
-        </TabsContent>
+        {!isPOS && (
+          <TabsContent value="receipt" className="space-y-4">
+            <ReceiptVoucherTab
+              form={form}
+              fieldArray={fieldArray}
+              entries={entries}
+              total={total}
+              paymentAccountId={paymentAccountId}
+              paymentAccountType={paymentAccountType}
+              paymentAccountName={paymentAccountName}
+              accountBalance={accountBalance}
+              allAccounts={allAccounts}
+              sidebarAccounts={sidebarAccounts}
+              filteredSidebarAccounts={filteredSidebarAccounts}
+              sidebarSearchValue={sidebarSearchValue}
+              setSidebarSearchValue={setSidebarSearchValue}
+              sidebarHighlightedIndex={sidebarHighlightedIndex}
+              setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+              selectedAccountId={selectedAccountId}
+              selectedAccountType={selectedAccountType}
+              handleSidebarAccountSelect={handleSidebarAccountSelect}
+              handleAmountCommit={handleAmountCommit}
+              handlePrint={handlePrint}
+              onSubmit={onSubmit}
+              activeTab="receipt"
+              activeRowIndex={activeRowIndex}
+              setActiveRowIndex={setActiveRowIndex}
+            />
+          </TabsContent>
+        )}
 
         {/* Journal Voucher Tab */}
-        <TabsContent value="journal" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Journal Voucher</CardTitle>
-            </CardHeader>
-            <CardContent>
+        {!isPOS && (
+          <TabsContent value="journal" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Journal Voucher</CardTitle>
+              </CardHeader>
+              <CardContent>
               <Form {...journalForm}>
                 <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
                   {/* Header section */}
@@ -3008,11 +3013,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
                     </Button>
                   </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="transfer" className="space-y-4">
           <div className="flex gap-4">
@@ -3525,12 +3531,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
         </TabsContent>
 
-        <TabsContent value="adjustment" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Production / Consumption Voucher</CardTitle>
-            </CardHeader>
-            <CardContent>
+        {!isPOS && (
+          <TabsContent value="adjustment" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Production / Consumption Voucher</CardTitle>
+              </CardHeader>
+              <CardContent>
               <Form {...stockAdjustmentForm}>
                 <form onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
                   {/* Header section */}
@@ -3839,9 +3846,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
                 </form>
               </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
       </Tabs>
 
