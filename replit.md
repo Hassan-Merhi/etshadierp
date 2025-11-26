@@ -2,12 +2,19 @@
 
 ## Recent Changes (Nov 26, 2025)
 
+- **Stock Transfer Consolidated to Vouchers Page**: POS users now access stock transfer through the Vouchers page
+  - Removed standalone `/stock-transfer` page and routes
+  - POS users see only the Stock Transfer tab (other voucher tabs hidden)
+  - Source location auto-populated with POS user's assigned location (read-only)
+  - Rate and Total columns hidden for POS users (cost prices protected)
+  - Import button hidden for POS users (admin-only feature)
+  - Page title changes to "Stock Transfer" for POS users
 - **POS Stock Transfer Redesigned**: Completely rewritten with table-based, typable item entry
   - Uses StockItemAutocomplete component for searchable item selection
   - Shows available quantity for each item (no cost prices for POS users)
   - Supports unlimited item additions with "Add Item" button
   - Validates quantities against available stock before submission
-  - Uses `activeSourceLocation` to ensure inventory loads immediately for POS users
+  - POS users' source location is automatically set to their assigned location
   - Destination dropdown automatically excludes the source location
 - **Location Name Preservation**: Vouchers now save the location name as text when created/updated
   - Sales reports display saved location name even after the original location is deleted (instead of "-")

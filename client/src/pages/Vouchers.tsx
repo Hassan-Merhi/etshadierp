@@ -527,6 +527,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
+  const posLocationId = posUser?.assignedLocationId;
   
   // Parse URL parameters for edit mode (use window.location.search since wouter doesn't include query params)
   const searchParams = new URLSearchParams(window.location.search);
@@ -592,6 +593,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
+
+  // Get POS user's location name for auto-populating source location
+  const posLocation = isPOS && posLocationId ? locations.find(l => l.id === posLocationId) : null;
+  const posLocationName = posLocation?.name || "";
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
@@ -1479,7 +1484,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Track active transfer row for showing suggestions
   const [activeTransferRow, setActiveTransferRow] = useState<number | null>(null);
-  const [transferInventorySource, setTransferInventorySource] = useState<number | null>(null);
+  const [transferInventorySource, setTransferInventorySource] = useState<number | null>(isPOS && posLocationId ? posLocationId : null);
+
+  // For POS users, auto-set source location to their assigned location when locations load
+  useEffect(() => {
+    if (isPOS && posLocationId && posLocationName) {
+      // Update all entries to use POS user's location as source
+      const entries = stockTransferForm.getValues("entries");
+      entries.forEach((_, index) => {
+        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, posLocationId);
+        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, posLocationName);
+      });
+      // Set inventory source for sidebar
+      setTransferInventorySource(posLocationId);
+    }
+  }, [isPOS, posLocationId, posLocationName]);
 
   // Stock Transfer Import state
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -3126,69 +3145,75 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         {transferFields.map((field, index) => (
                           <tr key={field.id} className="border-t">
                             <td className="p-2">
-                              <FormField
-                                control={stockTransferForm.control}
-                                name={`entries.${index}.sourceLocationId`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <LocationAutocomplete
-                                        value={field.value}
-                                        onChange={(locationId, locationName) => {
-                                          field.onChange(locationId);
-                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, locationName);
-                                          setTransferInventorySource(locationId);
-                                          setActiveTransferRow(index);
-                                        }}
-                                        locations={locations}
-                                        onFocus={() => {
-                                          setActiveTransferRow(index);
-                                          if (transferEntries[index].sourceLocationId > 0) {
-                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                          }
-                                        }}
-                                        onArrowUp={() => {
-                                          if (index > 0) {
+                              {isPOS ? (
+                                <div className="px-3 py-2 text-sm bg-muted/50 rounded-md" data-testid={`text-source-location-${index}`}>
+                                  {posLocationName || "Loading..."}
+                                </div>
+                              ) : (
+                                <FormField
+                                  control={stockTransferForm.control}
+                                  name={`entries.${index}.sourceLocationId`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <LocationAutocomplete
+                                          value={field.value}
+                                          onChange={(locationId, locationName) => {
+                                            field.onChange(locationId);
+                                            stockTransferForm.setValue(`entries.${index}.sourceLocationName`, locationName);
+                                            setTransferInventorySource(locationId);
+                                            setActiveTransferRow(index);
+                                          }}
+                                          locations={locations}
+                                          onFocus={() => {
+                                            setActiveTransferRow(index);
+                                            if (transferEntries[index].sourceLocationId > 0) {
+                                              setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                            }
+                                          }}
+                                          onArrowUp={() => {
+                                            if (index > 0) {
+                                              setTimeout(() => {
+                                                const prevInput = document.querySelector(`[data-testid="input-source-location-${index - 1}"]`) as HTMLInputElement;
+                                                if (prevInput) {
+                                                  prevInput.focus();
+                                                  prevInput.select();
+                                                }
+                                              }, 50);
+                                            }
+                                          }}
+                                          onArrowDown={() => {
+                                            if (index < transferFields.length - 1) {
+                                              setTimeout(() => {
+                                                const nextInput = document.querySelector(`[data-testid="input-source-location-${index + 1}"]`) as HTMLInputElement;
+                                                if (nextInput) {
+                                                  nextInput.focus();
+                                                  nextInput.select();
+                                                }
+                                              }, 50);
+                                            }
+                                          }}
+                                          onArrowRight={() => {
                                             setTimeout(() => {
-                                              const prevInput = document.querySelector(`[data-testid="input-source-location-${index - 1}"]`) as HTMLInputElement;
-                                              if (prevInput) {
-                                                prevInput.focus();
-                                                prevInput.select();
-                                              }
+                                              const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
+                                              if (stockItemInput) stockItemInput.focus();
                                             }, 50);
-                                          }
-                                        }}
-                                        onArrowDown={() => {
-                                          if (index < transferFields.length - 1) {
+                                          }}
+                                          onTab={() => {
                                             setTimeout(() => {
-                                              const nextInput = document.querySelector(`[data-testid="input-source-location-${index + 1}"]`) as HTMLInputElement;
-                                              if (nextInput) {
-                                                nextInput.focus();
-                                                nextInput.select();
-                                              }
+                                              const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
+                                              if (stockItemInput) stockItemInput.focus();
                                             }, 50);
-                                          }
-                                        }}
-                                        onArrowRight={() => {
-                                          setTimeout(() => {
-                                            const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
-                                            if (stockItemInput) stockItemInput.focus();
-                                          }, 50);
-                                        }}
-                                        onTab={() => {
-                                          setTimeout(() => {
-                                            const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
-                                            if (stockItemInput) stockItemInput.focus();
-                                          }, 50);
-                                        }}
-                                        placeholder="Type location..."
-                                        testId={`input-source-location-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                          }}
+                                          placeholder="Type location..."
+                                          testId={`input-source-location-${index}`}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
                             </td>
                             <td className="p-2">
                               <FormField
@@ -3369,8 +3394,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               size="sm"
                               onClick={() =>
                                 appendTransfer({
-                                  sourceLocationId: 0,
-                                  sourceLocationName: "",
+                                  sourceLocationId: isPOS && posLocationId ? posLocationId : 0,
+                                  sourceLocationName: isPOS && posLocationName ? posLocationName : "",
                                   stockItemId: 0,
                                   stockItemName: "",
                                   quantity: "",
