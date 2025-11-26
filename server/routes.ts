@@ -67,7 +67,7 @@ import {
   salaryAdvanceDeductions,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne, desc } from "drizzle-orm";
 import { format } from "date-fns";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -5904,7 +5904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all locations for name lookup
-      const allLocations = await storage.getLocations(req.session.currentCompanyId!);
+      const allLocations = await storage.getAllLocations(req.session.currentCompanyId!);
       const locationsByName: Record<string, number> = {};
       allLocations.forEach(loc => {
         locationsByName[loc.name.toLowerCase().trim()] = loc.id;
@@ -6031,7 +6031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all locations for this company for name lookup and validation
-      const allLocations = await storage.getLocations(req.session.currentCompanyId!);
+      const allLocations = await storage.getAllLocations(req.session.currentCompanyId!);
       const locationsById: Record<number, string> = {};
       const validLocationIds = new Set<number>();
       allLocations.forEach(loc => {
@@ -6156,19 +6156,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .returning();
 
+        // Create stock transfer record (use first source location for the main record)
+        const firstSourceId = processedItems[0]?.sourceLocationId || 0;
+        const [transferRecord] = await tx.insert(stockTransferVouchers).values({
+          voucherId: voucher.id,
+          sourceLocationId: firstSourceId,
+          destinationLocationId,
+        }).returning();
+
         // Process each item - re-fetch inventory inside transaction and update
         for (const item of processedItems) {
           const sourceLocationId = item.sourceLocationId;
           const qty = item.quantity;
           const rate = item.rate;
+          const itemTotal = qty * rate;
 
-          // Create voucher item
-          await tx.insert(voucherItems).values({
-            voucherId: voucher.id,
+          // Create stock transfer item with individual sourceLocationId
+          await tx.insert(stockTransferItems).values({
+            transferId: transferRecord.id,
             stockItemId: item.stockItemId,
+            sourceLocationId: sourceLocationId,
             quantity: qty.toString(),
             rate: rate.toString(),
-            sourceLocationId: sourceLocationId,
+            totalAmount: itemTotal.toString(),
           });
 
           // Re-fetch source inventory inside transaction for consistency
