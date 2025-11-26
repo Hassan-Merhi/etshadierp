@@ -6924,17 +6924,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get line items for this PO
       const lineItems = await storage.getLineItemsByPO(id);
+      
+      // Get supplier info
+      const supplier = await storage.getSupplierById(po.supplierId);
+      
+      // Get container info
+      const container = await storage.getContainerById(po.containerId);
 
       res.json({
         ...po,
         items: lineItems,
+        supplierName: supplier?.legalName || 'Unknown Supplier',
+        supplierCode: supplier?.code || '',
+        containerNumber: container?.containerNumber || '',
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Update a purchase order
+  // Update a purchase order with line items
   app.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -6970,7 +6979,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ message: "Only Admin and Owner can edit purchase orders" });
       }
 
-      // Only allow updating specific fields
+      // Update line items if provided
+      if (req.body.items && Array.isArray(req.body.items)) {
+        // Calculate new items total
+        let itemsTotal = 0;
+        const newItems = req.body.items.map((item: any) => {
+          const lineTotal = parseFloat(item.quantity || "0") * parseFloat(item.rate || "0");
+          itemsTotal += lineTotal;
+          return {
+            poId: id,
+            stockItemId: item.stockItemId,
+            itemName: item.itemName,
+            quantity: item.quantity?.toString() || "0",
+            rate: item.rate?.toString() || "0",
+            lineTotal: lineTotal.toFixed(2),
+          };
+        });
+
+        // Delete existing line items and create new ones in a transaction
+        await db.transaction(async (tx) => {
+          // Delete old line items
+          await tx.delete(poLineItems).where(eq(poLineItems.poId, id));
+          
+          // Insert new line items
+          if (newItems.length > 0) {
+            await tx.insert(poLineItems).values(newItems);
+          }
+          
+          // Update PO with new items total
+          await tx.update(purchaseOrders)
+            .set({ 
+              itemsTotal: itemsTotal.toFixed(2),
+              poNumber: req.body.poNumber || existingPO.poNumber,
+              currency: req.body.currency || existingPO.currency,
+              status: req.body.status || existingPO.status,
+            })
+            .where(eq(purchaseOrders.id, id));
+            
+          // Also update container's itemsTotal if applicable
+          const container = await storage.getContainerById(existingPO.containerId);
+          if (container) {
+            // Get all POs for this container and recalculate total
+            const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
+            const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
+            let totalItemsCost = 0;
+            for (const po of containerPOs) {
+              if (po.id === id) {
+                totalItemsCost += itemsTotal;
+              } else {
+                totalItemsCost += parseFloat(po.itemsTotal || "0");
+              }
+            }
+            
+            // Update container totals
+            const chargesTotal = parseFloat(container.chargesTotal || "0");
+            await tx.update(containers)
+              .set({
+                itemsTotal: totalItemsCost.toFixed(2),
+                grandTotal: (totalItemsCost + chargesTotal).toFixed(2),
+              })
+              .where(eq(containers.id, existingPO.containerId));
+          }
+        });
+        
+        // Get updated PO with items
+        const updatedPO = await storage.getPurchaseOrderById(id);
+        const lineItems = await storage.getLineItemsByPO(id);
+        const supplier = await storage.getSupplierById(existingPO.supplierId);
+        const container = await storage.getContainerById(existingPO.containerId);
+        
+        return res.json({
+          ...updatedPO,
+          items: lineItems,
+          supplierName: supplier?.legalName || 'Unknown Supplier',
+          supplierCode: supplier?.code || '',
+          containerNumber: container?.containerNumber || '',
+        });
+      }
+
+      // Only allow updating specific fields if no items provided
       const allowedUpdates: Partial<InsertPurchaseOrder> = {};
       if (req.body.poNumber !== undefined)
         allowedUpdates.poNumber = req.body.poNumber;
@@ -11114,9 +11201,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lineItems = await storage.getLineItemsByPO(purchaseOrder.id);
           
           if (lineItems.length > 0) {
-            // Get supplier info
+            // Get supplier info (use legalName field from suppliers table)
             const supplier = await storage.getSupplierById(purchaseOrder.supplierId);
-            const supplierName = supplier?.name || 'Unknown Supplier';
+            const supplierName = supplier?.legalName || 'Unknown Supplier';
+            const supplierCode = supplier?.code || '';
             
             // Get container info
             const container = await storage.getContainerById(purchaseOrder.containerId);
@@ -11168,6 +11256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 poNumber: purchaseOrder.poNumber,
                 supplierId: purchaseOrder.supplierId,
                 supplierName: supplierName,
+                supplierCode: supplierCode,
                 containerId: purchaseOrder.containerId,
                 containerNumber: containerNumber,
                 currency: purchaseOrder.currency,

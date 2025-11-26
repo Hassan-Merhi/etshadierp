@@ -1047,6 +1047,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <div>
                                 <div className="font-medium">{purchaseOrderData.supplierName}</div>
                                 <div className="text-xs text-muted-foreground">
+                                  {purchaseOrderData.supplierCode && <span>{purchaseOrderData.supplierCode} | </span>}
                                   PO: {purchaseOrderData.poNumber} | Container: {purchaseOrderData.containerNumber}
                                 </div>
                               </div>
@@ -1059,6 +1060,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <Badge variant={purchaseOrderData.status === "Closed" ? "secondary" : "default"}>
                                   {purchaseOrderData.status}
                                 </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setViewDialogOpen(false);
+                                    navigate(`/purchase-orders/${purchaseOrderData.id}/edit`);
+                                  }}
+                                  data-testid="button-edit-po"
+                                >
+                                  Edit PO
+                                </Button>
                               </div>
                             </div>
                           </div>

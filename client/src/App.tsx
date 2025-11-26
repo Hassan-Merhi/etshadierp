@@ -47,6 +47,7 @@ import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
 import OrphanedRecords from "@/pages/OrphanedRecords";
+import PurchaseOrderEdit from "@/pages/PurchaseOrderEdit";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -92,6 +93,7 @@ function Router({ user }: { user: any }) {
       <Route path="/customers" component={Customers} />
       <Route path="/vouchers">{() => <Vouchers />}</Route>
       <Route path="/vouchers/:id/edit" component={VoucherEdit} />
+      <Route path="/purchase-orders/:id/edit" component={PurchaseOrderEdit} />
       <Route path="/daybook">{() => <Daybook user={user} />}</Route>
       <Route path="/payroll" component={Payroll} />
       <Route path="/create" component={AccountingCreate} />
