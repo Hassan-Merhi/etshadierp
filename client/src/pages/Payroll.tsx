@@ -121,7 +121,7 @@ type DeductionFormData = z.infer<typeof deductionSchema>;
 const workerFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  code: z.string().min(1, "Worker code is required"),
+  code: z.string().optional(),
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   department: z.string().optional(),
   active: z.boolean().default(true),
@@ -129,8 +129,8 @@ const workerFormSchema = z.object({
 
 type WorkerFormData = z.infer<typeof workerFormSchema>;
 
-// Employee form schema - extend insertEmployeeSchema for UI-specific validation
-const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true }).extend({
+// Employee form schema - omit companyId and employeeType since they're set in the mutation
+const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true, employeeType: true }).extend({
   monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   openingBalance: z.string().optional(),
   employeeGroupId: z.string().optional(),
@@ -747,7 +747,7 @@ export default function Payroll() {
       };
       
       // Include employeeGroupId if selected (parse from string to number)
-      if (employeeGroupId && employeeGroupId !== "") {
+      if (employeeGroupId && employeeGroupId !== "" && employeeGroupId !== "none") {
         payload.employeeGroupId = parseInt(employeeGroupId, 10);
       }
       
@@ -2464,9 +2464,9 @@ export default function Payroll() {
                 name="code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Worker Code</FormLabel>
+                    <FormLabel>Worker Code (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-new-worker-code" />
+                      <Input placeholder="Auto-generated if left blank" {...field} data-testid="input-new-worker-code" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -2843,7 +2843,7 @@ export default function Payroll() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="" data-testid="option-no-group">
+                        <SelectItem value="none" data-testid="option-no-group">
                           No Group
                         </SelectItem>
                         {employeeGroups.map((group: any) => (
