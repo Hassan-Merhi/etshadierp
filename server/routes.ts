@@ -11134,8 +11134,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
               narration: `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
               accountName: item.stockItemName || 'Unknown Item',
               accountCode: item.stockItemCode || '-',
+              isStockItem: true,
             }));
-            return res.json([...entries, ...itemsWithDetails]);
+            return res.json(itemsWithDetails);
+          }
+        }
+      }
+
+      // For Stock Transfer vouchers, get stock transfer items
+      if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
+        const transferVoucher = await db.query.stockTransferVouchers.findFirst({
+          where: eq(stockTransferVouchers.voucherId, id),
+        });
+
+        if (transferVoucher) {
+          const transferItemsList = await db
+            .select({
+              id: stockTransferItems.id,
+              transferId: stockTransferItems.transferId,
+              stockItemId: stockTransferItems.stockItemId,
+              quantity: stockTransferItems.quantity,
+              rate: stockTransferItems.rate,
+              totalAmount: stockTransferItems.totalAmount,
+              stockItemName: stockItems.name,
+              stockItemCode: stockItems.code,
+            })
+            .from(stockTransferItems)
+            .leftJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
+            .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+          if (transferItemsList.length > 0) {
+            const itemsWithDetails = transferItemsList.map((item) => ({
+              id: item.id,
+              voucherId: id,
+              stockItemId: item.stockItemId,
+              stockItemName: item.stockItemName || 'Unknown Item',
+              stockItemCode: item.stockItemCode || '-',
+              quantity: item.quantity,
+              rate: item.rate,
+              debitAmount: "0",
+              creditAmount: item.totalAmount,
+              narration: `Transfer of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
+              accountName: item.stockItemName || 'Unknown Item',
+              accountCode: item.stockItemCode || '-',
+              isStockItem: true,
+            }));
+            return res.json(itemsWithDetails);
           }
         }
       }

@@ -912,11 +912,24 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Account</TableHead>
-                          {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
-                            <TableHead className="text-right">Amount</TableHead>
+                          {(selectedVoucher.voucherType === "Consumption" || 
+                            selectedVoucher.voucherType === "Production" || 
+                            selectedVoucher.voucherType === "Stock Transfer" ||
+                            selectedVoucher.voucherType === "StockTransfer") ? (
+                            <>
+                              <TableHead>Item Name</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                              <TableHead className="text-right">Total Amount</TableHead>
+                            </>
+                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                            <>
+                              <TableHead>Account</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                            </>
                           ) : (
                             <>
+                              <TableHead>Account</TableHead>
                               <TableHead className="text-right">Debit</TableHead>
                               <TableHead className="text-right">Credit</TableHead>
                               <TableHead>Narration</TableHead>
@@ -926,6 +939,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       </TableHeader>
                       <TableBody>
                         {(() => {
+                          // For Consumption/Production/Stock Transfer, show stock items
+                          if (selectedVoucher.voucherType === "Consumption" || 
+                              selectedVoucher.voucherType === "Production" || 
+                              selectedVoucher.voucherType === "Stock Transfer" ||
+                              selectedVoucher.voucherType === "StockTransfer") {
+                            return viewVoucherEntries.map((entry) => {
+                              const qty = parseFloat(entry.quantity || "0");
+                              const rate = parseFloat(entry.rate || "0");
+                              const totalAmount = qty * rate;
+                              return (
+                                <TableRow key={entry.id}>
+                                  <TableCell>
+                                    <div className="font-medium">{entry.stockItemName || entry.accountName}</div>
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {Math.abs(qty).toFixed(3)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    ${rate.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    ${totalAmount.toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
+                          }
+                          
                           // For Payment/Receipt, filter out the cash source entries
                           const displayEntries = (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt")
                             ? viewVoucherEntries.filter(entry => {
@@ -973,16 +1014,41 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         })()}
                         {/* Totals Row */}
                         <TableRow className="font-bold bg-muted/50">
-                          <TableCell>Total</TableCell>
-                          {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
-                            <TableCell className="text-right font-mono">
-                              ${formatAmount(Math.max(
-                                viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0),
-                                viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
-                              ))}
-                            </TableCell>
+                          {(selectedVoucher.voucherType === "Consumption" || 
+                            selectedVoucher.voucherType === "Production" || 
+                            selectedVoucher.voucherType === "Stock Transfer" ||
+                            selectedVoucher.voucherType === "StockTransfer") ? (
+                            <>
+                              <TableCell>Total</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {viewVoucherEntries
+                                  .reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0)
+                                  .toFixed(3)}
+                              </TableCell>
+                              <TableCell></TableCell>
+                              <TableCell className="text-right font-mono">
+                                ${viewVoucherEntries
+                                  .reduce((sum, e) => {
+                                    const qty = Math.abs(parseFloat(e.quantity || "0"));
+                                    const rate = parseFloat(e.rate || "0");
+                                    return sum + (qty * rate);
+                                  }, 0)
+                                  .toFixed(2)}
+                              </TableCell>
+                            </>
+                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                            <>
+                              <TableCell>Total</TableCell>
+                              <TableCell className="text-right font-mono">
+                                ${formatAmount(Math.max(
+                                  viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0),
+                                  viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
+                                ))}
+                              </TableCell>
+                            </>
                           ) : (
                             <>
+                              <TableCell>Total</TableCell>
                               <TableCell className="text-right font-mono">
                                 ${formatAmount(viewVoucherEntries
                                   .reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0))}
