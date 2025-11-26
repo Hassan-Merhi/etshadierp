@@ -1,5 +1,16 @@
 # ERP POS System
 
+## Recent Changes (Nov 26, 2025)
+
+- **Location Name Preservation**: Vouchers now save the location name as text when created/updated
+  - Sales reports display saved location name even after the original location is deleted (instead of "-")
+  - Uses COALESCE in queries to fallback to saved locationName when location record is missing
+  - All voucher creation and edit paths now persist locationName alongside locationId
+- **Orphaned Records Management**: Admin-only page to find and reassign records with deleted locations
+  - API: GET `/api/orphaned-records` - Lists vouchers with deleted locations
+  - API: POST `/api/orphaned-records/reassign` - Bulk reassign vouchers to new location
+  - UI: `/orphaned-records` page (Admin only) with selection and reassignment interface
+
 ## Recent Changes (Nov 24, 2025)
 
 - **Added Stock Transfer for POS**: POS users can now transfer stock between locations via `/stock-transfer` page
