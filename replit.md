@@ -2,6 +2,13 @@
 
 ## Recent Changes (Nov 26, 2025)
 
+- **POS Stock Transfer Redesigned**: Completely rewritten with table-based, typable item entry
+  - Uses StockItemAutocomplete component for searchable item selection
+  - Shows available quantity for each item (no cost prices for POS users)
+  - Supports unlimited item additions with "Add Item" button
+  - Validates quantities against available stock before submission
+  - Uses `activeSourceLocation` to ensure inventory loads immediately for POS users
+  - Destination dropdown automatically excludes the source location
 - **Location Name Preservation**: Vouchers now save the location name as text when created/updated
   - Sales reports display saved location name even after the original location is deleted (instead of "-")
   - Uses COALESCE in queries to fallback to saved locationName when location record is missing
