@@ -5362,6 +5362,406 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= Stock Transfer Import Endpoints =============
+
+  // Stock Transfer Import - Parse and Preview Excel
+  app.post(
+    "/api/stock-transfer-import/parse",
+    requireAuth,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (rawData.length === 0) {
+          return res.status(400).json({ message: "Excel file is empty" });
+        }
+
+        // Parse rows
+        const rows = rawData as any[];
+        const items: any[] = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+
+          // Expected columns: Barcode, Quantity
+          const barcode = row.Barcode || row.barcode || row.Code || row.code;
+          const quantity = parseFloat(
+            row.Quantity || row.quantity || row.Qty || row.qty || "0",
+          );
+
+          if (!barcode) {
+            continue; // Skip rows without barcode
+          }
+
+          if (quantity <= 0) {
+            continue; // Skip invalid quantities
+          }
+
+          items.push({
+            rowNum,
+            barcode: barcode.toString().trim(),
+            quantity,
+          });
+        }
+
+        res.json({
+          items,
+          totalItems: items.length,
+          fileName: req.file.originalname,
+        });
+      } catch (error: any) {
+        console.error("Stock Transfer Import parse error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Stock Transfer Import - Validate data before import
+  app.post("/api/stock-transfer-import/validate", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { sourceLocationId, destinationLocationId, items } = req.body;
+
+      if (!sourceLocationId || !destinationLocationId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      if (sourceLocationId === destinationLocationId) {
+        return res.status(400).json({ message: "Source and destination must be different" });
+      }
+
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      const validatedItems: any[] = [];
+
+      // Validate locations exist
+      const sourceLocation = await storage.getLocationById(sourceLocationId);
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      
+      if (!sourceLocation) {
+        errors.push("Source location not found");
+        return res.json({ errors, warnings, validatedItems });
+      }
+      
+      if (!destLocation) {
+        errors.push("Destination location not found");
+        return res.json({ errors, warnings, validatedItems });
+      }
+
+      // Validate each item
+      for (const item of items) {
+        const validatedItem: any = { ...item };
+
+        // Find stock item by barcode (code or alias)
+        let stockItem = await storage.getStockItemByCodeOrAlias(
+          item.barcode,
+          req.session.currentCompanyId!,
+        );
+
+        if (!stockItem) {
+          validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
+          errors.push(
+            `Row ${item.rowNum}: Barcode '${item.barcode}' not found`,
+          );
+        } else {
+          validatedItem.stockItemId = stockItem.id;
+          validatedItem.stockItemName = stockItem.name;
+          validatedItem.stockItemUom = stockItem.uom;
+
+          // Check source location inventory
+          const [inventoryItem] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, sourceLocationId),
+              ),
+            )
+            .limit(1);
+
+          if (inventoryItem) {
+            const currentQty = parseFloat(inventoryItem.quantity || "0");
+            const transferQty = parseFloat(item.quantity);
+            const remainingQty = currentQty - transferQty;
+            
+            validatedItem.currentStock = currentQty;
+            validatedItem.remainingStock = remainingQty;
+            validatedItem.averageRate = inventoryItem.averageRate;
+
+            if (remainingQty < 0) {
+              validatedItem.error = `Insufficient stock (Available: ${currentQty.toFixed(2)})`;
+              errors.push(
+                `${stockItem.name}: Insufficient stock (Available: ${currentQty.toFixed(2)}, Requested: ${transferQty.toFixed(2)})`
+              );
+            }
+          } else {
+            validatedItem.currentStock = 0;
+            validatedItem.error = `No stock at source location`;
+            errors.push(
+              `${stockItem.name}: No stock at source location`
+            );
+          }
+        }
+
+        validatedItems.push(validatedItem);
+      }
+
+      res.json({
+        errors,
+        warnings,
+        validatedItems,
+      });
+    } catch (error: any) {
+      console.error("Stock Transfer Import validation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stock Transfer Import - Create stock transfer
+  app.post("/api/stock-transfer-import/import", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { sourceLocationId, destinationLocationId, transferDate, items, notes } = req.body;
+
+      if (!sourceLocationId || !destinationLocationId || !transferDate || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Validate locations
+      const sourceLocation = await storage.getLocationById(sourceLocationId);
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      
+      if (!sourceLocation) {
+        return res.status(400).json({ message: "Source location not found" });
+      }
+      
+      if (!destLocation) {
+        return res.status(400).json({ message: "Destination location not found" });
+      }
+
+      let totalValue = 0;
+      const transferItems: Array<{ stockItemId: number; quantity: string; rate: string }> = [];
+
+      // Prepare items with rates from inventory
+      for (const item of items) {
+        const stockItem = await storage.getStockItemByCodeOrAlias(
+          item.barcode,
+          req.session.currentCompanyId!,
+        );
+        
+        if (!stockItem) {
+          return res.status(400).json({ message: `Stock item not found: ${item.barcode}` });
+        }
+
+        // Get rate from source inventory
+        const [inventoryItem] = await db
+          .select()
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.stockItemId, stockItem.id),
+              eq(inventory.locationId, sourceLocationId),
+            ),
+          )
+          .limit(1);
+
+        if (!inventoryItem) {
+          return res.status(400).json({ message: `No inventory found for: ${stockItem.name}` });
+        }
+
+        const rate = parseFloat(inventoryItem.averageRate || "0");
+        const quantity = parseFloat(item.quantity);
+        
+        totalValue += rate * quantity;
+
+        transferItems.push({
+          stockItemId: stockItem.id,
+          quantity: quantity.toString(),
+          rate: rate.toString(),
+        });
+      }
+
+      await db.transaction(async (tx) => {
+        // Create stock transfer voucher
+        const voucherNumber = `ST-${Date.now()}`;
+
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId!,
+            locationId: sourceLocationId,
+            locationName: sourceLocation.name,
+            voucherNumber,
+            voucherType: "Stock Transfer",
+            voucherDate: transferDate,
+            description: notes || `Excel Import - ${items.length} items from ${sourceLocation.name} to ${destLocation.name}`,
+            totalAmount: totalValue.toString(),
+            optional: false,
+          })
+          .returning();
+
+        // Create stock transfer record
+        await tx.insert(stockTransfers).values({
+          voucherId: voucher.id,
+          sourceLocationId,
+          destinationLocationId,
+        });
+
+        // Process each item
+        for (const item of transferItems) {
+          // Create stock transfer item
+          await tx.insert(stockTransferItems).values({
+            voucherId: voucher.id,
+            stockItemId: item.stockItemId,
+            quantity: item.quantity,
+            rate: item.rate,
+          });
+
+          // Reduce source inventory
+          const [sourceInventory] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, sourceLocationId),
+              ),
+            )
+            .limit(1);
+
+          if (sourceInventory) {
+            const newQty = parseFloat(sourceInventory.quantity) - parseFloat(item.quantity);
+            const newValue = newQty * parseFloat(sourceInventory.averageRate || "0");
+            
+            await tx
+              .update(inventory)
+              .set({
+                quantity: newQty.toString(),
+                totalValue: newValue.toString(),
+              })
+              .where(eq(inventory.id, sourceInventory.id));
+          }
+
+          // Add to destination inventory
+          const [destInventory] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, destinationLocationId),
+              ),
+            )
+            .limit(1);
+
+          if (destInventory) {
+            // Update existing inventory with weighted average
+            const existingQty = parseFloat(destInventory.quantity);
+            const existingRate = parseFloat(destInventory.averageRate || "0");
+            const addQty = parseFloat(item.quantity);
+            const addRate = parseFloat(item.rate);
+            
+            const newQty = existingQty + addQty;
+            const newAvgRate = newQty > 0 
+              ? ((existingQty * existingRate) + (addQty * addRate)) / newQty 
+              : 0;
+            const newValue = newQty * newAvgRate;
+            
+            await tx
+              .update(inventory)
+              .set({
+                quantity: newQty.toString(),
+                averageRate: newAvgRate.toString(),
+                totalValue: newValue.toString(),
+              })
+              .where(eq(inventory.id, destInventory.id));
+          } else {
+            // Create new inventory at destination
+            const qty = parseFloat(item.quantity);
+            const rate = parseFloat(item.rate);
+            
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId: destinationLocationId,
+              stockItemId: item.stockItemId,
+              quantity: item.quantity,
+              averageRate: item.rate,
+              totalValue: (qty * rate).toString(),
+            });
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        itemsCount: items.length,
+        totalValue: totalValue.toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("Stock Transfer Import error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download sample Stock Transfer import template
+  app.get("/api/stock-transfer-import/template", (_req, res) => {
+    try {
+      const sampleData = [
+        {
+          Barcode: "BC001",
+          Quantity: 5,
+        },
+        {
+          Barcode: "BC002",
+          Quantity: 10,
+        },
+        {
+          Barcode: "BC003",
+          Quantity: 15,
+        },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(sampleData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Transfer");
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=Stock_Transfer_Import_Template.xlsx",
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Template generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get containers
   app.get("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {
