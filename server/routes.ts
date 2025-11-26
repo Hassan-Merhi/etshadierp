@@ -7013,6 +7013,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       const { startDate, endDate } = req.query;
+      
+      // Check if user is POS role
+      const isPOS = req.session.currentRole?.startsWith("POS");
 
       let vouchers;
       if (startDate && endDate) {
@@ -7024,7 +7027,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vouchers = await storage.getAllVouchers(req.session.currentCompanyId);
       }
 
-      res.json(vouchers);
+      // Strip totalAmount from Stock Transfer vouchers for POS users
+      const sanitizedVouchers = isPOS
+        ? vouchers.map((v: any) => {
+            // Check for all variants of Stock Transfer voucher type
+            const isStockTransfer = v.voucherType === "Stock Transfer" || 
+                                    v.voucherType === "StockTransfer" ||
+                                    v.voucherType?.toLowerCase().includes("stock transfer");
+            if (isStockTransfer) {
+              const { totalAmount, ...rest } = v;
+              return { ...rest, totalAmount: "0" };
+            }
+            return v;
+          })
+        : vouchers;
+
+      res.json(sanitizedVouchers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -14079,7 +14097,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
-      const transfers = await db
+      // Check if user is POS role
+      const isPOS = req.session.currentRole?.startsWith("POS");
+      
+      const voucherIdParam = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
+      
+      let query = db
         .select({
           id: stockTransferVouchers.id,
           voucherId: stockTransferVouchers.voucherId,
@@ -14090,8 +14113,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(stockTransferVouchers)
         .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-        .where(eq(vouchers.companyId, companyId))
+        .where(
+          voucherIdParam 
+            ? and(eq(vouchers.companyId, companyId), eq(stockTransferVouchers.voucherId, voucherIdParam))
+            : eq(vouchers.companyId, companyId)
+        )
         .orderBy(sql`${stockTransferVouchers.createdAt} DESC`);
+      
+      const transfers = await query;
+      
+      // If fetching by voucherId, also include items
+      if (voucherIdParam && transfers.length > 0) {
+        const transfer = transfers[0];
+        const items = await db
+          .select({
+            id: stockTransferItems.id,
+            stockItemId: stockTransferItems.stockItemId,
+            quantity: stockTransferItems.quantity,
+            rate: stockTransferItems.rate,
+            totalAmount: stockTransferItems.totalAmount,
+            stockItemName: stockItems.name,
+            stockItemCode: stockItems.code,
+          })
+          .from(stockTransferItems)
+          .innerJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
+          .where(eq(stockTransferItems.transferId, transfer.id));
+        
+        // Strip cost fields for POS users
+        if (isPOS) {
+          const sanitizedItems = items.map(({ rate, totalAmount, ...rest }) => rest);
+          // Also strip any voucher-level totals
+          const { totalAmount: _, ...sanitizedTransfer } = transfer as any;
+          return res.json({ ...sanitizedTransfer, items: sanitizedItems });
+        }
+        
+        return res.json({ ...transfer, items });
+      }
       
       res.json(transfers);
     } catch (error: any) {
@@ -14163,7 +14220,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const item of items) {
         const quantity = parseFloat(item.quantity);
-        const rate = parseFloat(item.rate);
+        
+        // Always lookup rate from source inventory - never trust client-provided rates
+        const [sourceInvForRate] = await db
+          .select({ averageRate: inventory.averageRate })
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.locationId, sourceLocationId),
+              eq(inventory.stockItemId, item.stockItemId)
+            )
+          )
+          .limit(1);
+        
+        const rate = parseFloat(sourceInvForRate?.averageRate || "0");
         const totalItemAmount = quantity * rate;
         totalAmount += totalItemAmount;
         
@@ -14291,6 +14361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
+      // Check if user is POS role
+      const isPOS = req.session.currentRole?.startsWith("POS");
+      
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
       
@@ -14312,7 +14385,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
-      res.json(items);
+      // Strip cost fields for POS users
+      const sanitizedItems = isPOS
+        ? items.map(({ averageRate, ...rest }) => rest)
+        : items;
+      
+      res.json(sanitizedItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

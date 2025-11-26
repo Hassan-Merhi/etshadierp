@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2 } from "lucide-react";
+import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight } from "lucide-react";
 import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -114,13 +114,13 @@ export default function POSDaybook() {
     enabled: !isLoadingUser, // Only fetch vouchers after user data is loaded
   });
 
-  // Filter to show only Sales vouchers from the user's assigned location
+  // Filter to show Sales and StockTransfer vouchers from the user's assigned location
   // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
   const bypassLocationFilter = voucherIdParam && (currentUser?.role === "Admin" || currentUser?.role === "Owner");
   
-  const salesVouchers = vouchers.filter((v) => {
-    // Must be a Sales voucher
-    if (v.voucherType !== "Sales") return false;
+  const filteredVouchers = vouchers.filter((v) => {
+    // Must be a Sales or Stock Transfer voucher
+    if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer") return false;
     
     // Bypass location filter when viewing specific historical voucher
     if (bypassLocationFilter) return true;
@@ -133,6 +133,9 @@ export default function POSDaybook() {
     // Non-POS users see all transactions
     return true;
   });
+  
+  // Backward compatibility alias
+  const salesVouchers = filteredVouchers;
 
   // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
@@ -282,8 +285,13 @@ export default function POSDaybook() {
     setEditedItems(newItems);
   };
 
-  const totalSales = salesVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount), 0);
-  const transactionCount = salesVouchers.length;
+  // Separate sales from transfers for accurate metrics
+  const salesOnlyVouchers = salesVouchers.filter(v => v.voucherType === "Sales");
+  const transferVouchers = salesVouchers.filter(v => v.voucherType !== "Sales");
+  
+  const totalSales = salesOnlyVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount), 0);
+  const salesTransactionCount = salesOnlyVouchers.length;
+  const transferCount = transferVouchers.length;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -298,11 +306,11 @@ export default function POSDaybook() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Today's Transactions
+              Sales Count
             </CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -311,7 +319,7 @@ export default function POSDaybook() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-transaction-count">
-                {transactionCount}
+                {salesTransactionCount}
               </div>
             )}
           </CardContent>
@@ -338,7 +346,7 @@ export default function POSDaybook() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Average Transaction
+              Average Sale
             </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -347,10 +355,28 @@ export default function POSDaybook() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-avg-transaction">
-                ${transactionCount > 0 
-                  ? (totalSales / transactionCount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                ${salesTransactionCount > 0 
+                  ? (totalSales / salesTransactionCount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : "0.00"
                 }
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Transfers Out
+            </CardTitle>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-transfer-count">
+                {transferCount}
               </div>
             )}
           </CardContent>
@@ -359,7 +385,7 @@ export default function POSDaybook() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Sales Transactions</CardTitle>
+          <CardTitle className="text-base">Transactions</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoadingUser || isLoading ? (
@@ -371,8 +397,8 @@ export default function POSDaybook() {
           ) : salesVouchers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No sales today</p>
-              <p className="text-sm mt-1">Sales transactions will appear here</p>
+              <p className="text-lg font-medium">No transactions today</p>
+              <p className="text-sm mt-1">Sales and transfers will appear here</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -380,6 +406,7 @@ export default function POSDaybook() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Time</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Receipt #</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -395,6 +422,11 @@ export default function POSDaybook() {
                     >
                       <TableCell className="font-mono text-sm">
                         {format(new Date(voucher.createdAt), "hh:mm a")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"}>
+                          {voucher.voucherType === "Sales" ? "Sale" : "Transfer Out"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm font-medium">
                         {voucher.voucherNumber}
