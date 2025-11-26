@@ -26,6 +26,7 @@ import {
   Layers,
   Barcode,
   Tags,
+  AlertCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -158,6 +159,11 @@ const menuItems = [
     url: "/settings",
     icon: Settings,
   },
+  {
+    title: "Orphaned Records",
+    url: "/orphaned-records",
+    icon: AlertCircle,
+  },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
@@ -173,8 +179,8 @@ export function AppSidebar({ user }: { user?: any }) {
     }
     
     // For non-POS users:
-    // Settings is Admin only
-    if (item.url === "/settings") {
+    // Settings and Orphaned Records are Admin only
+    if (item.url === "/settings" || item.url === "/orphaned-records") {
       return user?.role === "Admin";
     }
     

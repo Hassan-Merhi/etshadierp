@@ -47,6 +47,7 @@ import ProductionBales from "@/pages/ProductionBales";
 import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
 import StockTransfer from "@/pages/stock-transfer";
+import OrphanedRecords from "@/pages/OrphanedRecords";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -107,6 +108,7 @@ function Router({ user }: { user: any }) {
       <Route path="/production-bales" component={ProductionBales} />
       <Route path="/bale-products" component={BaleProducts} />
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
+      {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
       <Route component={NotFound} />
     </Switch>
   );

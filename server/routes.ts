@@ -5185,6 +5185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values({
             companyId: req.session.currentCompanyId!,
             locationId,
+            locationName: location.name,
             voucherNumber,
             voucherType: "Sales",
             voucherDate: saleDate,
@@ -9070,8 +9071,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
       if (description !== undefined) voucherUpdates.description = description;
-      if (validatedLocationId !== null)
+      if (validatedLocationId !== null) {
         voucherUpdates.locationId = validatedLocationId;
+        // Also save the location name for when the location is later deleted
+        const location = await storage.getLocationById(validatedLocationId);
+        if (location) {
+          voucherUpdates.locationName = location.name;
+        }
+      }
 
       const updated = await db
         .update(vouchers)
@@ -9489,10 +9496,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
 
         // Update the main voucher
+        const parsedLocationId = parseInt(locationId);
         const voucherUpdates: any = {
           totalAmount: totalAmount.toFixed(2),
-          locationId: parseInt(locationId),
+          locationId: parsedLocationId,
         };
+        // Also save the location name for when the location is later deleted
+        const location = await storage.getLocationById(parsedLocationId);
+        if (location) {
+          voucherUpdates.locationName = location.name;
+        }
         if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
         if (description !== undefined) voucherUpdates.description = description;
 
@@ -9819,10 +9832,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(stockTransferVouchers.id, transferVoucher.id));
 
           // Update the main voucher
+          const parsedSourceLocationId = parseInt(sourceLocationId);
           const voucherUpdates: any = {
             totalAmount: totalAmount.toFixed(2),
-            locationId: parseInt(sourceLocationId), // Use source location as the primary location for the voucher
+            locationId: parsedSourceLocationId, // Use source location as the primary location for the voucher
           };
+          // Also save the location name for when the location is later deleted
+          const sourceLocation = await storage.getLocationById(parsedSourceLocationId);
+          if (sourceLocation) {
+            voucherUpdates.locationName = sourceLocation.name;
+          }
           if (voucherDate !== undefined)
             voucherUpdates.voucherDate = voucherDate;
           if (description !== undefined)
@@ -10929,6 +10948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values({
             companyId: req.session.currentCompanyId!,
             locationId,
+            locationName: location.name,
             voucherNumber,
             voucherType: "Sales",
             voucherDate,
@@ -12226,7 +12246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherNumber: vouchers.voucherNumber,
           voucherDate: vouchers.voucherDate,
           locationId: vouchers.locationId,
-          locationName: locations.name,
+          locationName: sql<string>`COALESCE(${locations.name}, ${vouchers.locationName})`.as("location_name"),
           stockItemId: salesItems.stockItemId,
           stockItemCode: stockItems.code,
           stockItemName: stockItems.name,
@@ -14119,8 +14139,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherType: "Stock Transfer",
           voucherNumber,
           voucherDate: format(new Date(), "yyyy-MM-dd"),
-          status: "POSTED",
-          createdByUserId: req.session.userId!,
           description: notes || null,
           totalAmount: "0",
         })
@@ -14397,6 +14415,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         costPerKg: b.costPerKg,
         totalCost: b.totalCost
       })));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Orphaned Records Cleanup API - Find and reassign vouchers with deleted locations
+  app.get("/api/orphaned-records", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      // Find vouchers that have a locationId but the location no longer exists
+      const orphanedVouchers = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          locationId: vouchers.locationId,
+          locationName: vouchers.locationName,
+          totalAmount: vouchers.totalAmount,
+          description: vouchers.description,
+          createdAt: vouchers.createdAt,
+        })
+        .from(vouchers)
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.locationId} IS NOT NULL`,
+            sql`${locations.id} IS NULL`
+          )
+        )
+        .orderBy(sql`${vouchers.createdAt} DESC`);
+      
+      res.json(orphanedVouchers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/orphaned-records/reassign", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      const { voucherIds, newLocationId } = req.body;
+      
+      if (!voucherIds || !Array.isArray(voucherIds) || voucherIds.length === 0) {
+        return res.status(400).json({ message: "No vouchers selected" });
+      }
+      
+      if (!newLocationId) {
+        return res.status(400).json({ message: "New location is required" });
+      }
+      
+      // Verify the new location exists and belongs to current company
+      const newLocation = await storage.getLocationById(newLocationId);
+      if (!newLocation || newLocation.companyId !== companyId) {
+        return res.status(400).json({ message: "Invalid location" });
+      }
+      
+      // Verify all vouchers belong to current company
+      const vouchersToUpdate = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            inArray(vouchers.id, voucherIds)
+          )
+        );
+      
+      if (vouchersToUpdate.length !== voucherIds.length) {
+        return res.status(400).json({ message: "Some vouchers not found or belong to different company" });
+      }
+      
+      // Update vouchers with new location
+      await db
+        .update(vouchers)
+        .set({
+          locationId: newLocationId,
+          locationName: newLocation.name,
+        })
+        .where(inArray(vouchers.id, voucherIds));
+      
+      res.json({ success: true, updated: voucherIds.length, newLocationName: newLocation.name });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
