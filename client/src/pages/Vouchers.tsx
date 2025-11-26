@@ -1654,20 +1654,46 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
       return;
     }
+    
+    // Filter valid items (those without errors)
+    const validItems = importValidationResult.validatedItems.filter((item: any) => !item.error);
+    
+    // If there are validation errors, show confirmation dialog
     if (importValidationResult?.errors?.length > 0) {
-      toast({
-        title: "Validation errors present",
-        description: "Please fix validation errors before importing",
-        variant: "destructive",
-      });
+      setImportConfirmDialogOpen(true);
       return;
     }
+    
+    // No errors - proceed directly
     importMutation.mutate({
       destinationLocationId: parseInt(importDestLocation),
       transferDate: importDate,
       notes: importNotes,
-      items: importValidationResult.validatedItems,
+      items: validItems,
     });
+  };
+  
+  const handleConfirmedImport = () => {
+    // Filter valid items and proceed with import
+    const validItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+    
+    if (validItems.length === 0) {
+      toast({
+        title: "No valid items",
+        description: "All items have validation errors. Nothing to import.",
+        variant: "destructive",
+      });
+      setImportConfirmDialogOpen(false);
+      return;
+    }
+    
+    importMutation.mutate({
+      destinationLocationId: parseInt(importDestLocation),
+      transferDate: importDate,
+      notes: importNotes,
+      items: validItems,
+    });
+    setImportConfirmDialogOpen(false);
   };
 
   const downloadImportTemplate = () => {
@@ -1676,6 +1702,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const importIsValidated = importValidationResult !== null;
   const importHasErrors = importValidationResult?.errors && importValidationResult.errors.length > 0;
+  
+  // Calculate valid items (items without errors)
+  const importValidItems = importValidationResult?.validatedItems?.filter((item: any) => !item.error) || [];
+  const importValidItemsCount = importValidItems.length;
+  const importTotalItemsCount = importValidationResult?.validatedItems?.length || 0;
+  
+  // Confirmation dialog state for import with errors
+  const [importConfirmDialogOpen, setImportConfirmDialogOpen] = useState(false);
 
   // Fetch inventory for the source location of the active row
   const { data: transferInventory = [] } = useQuery<any[]>({
@@ -4004,11 +4038,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
               <Button
                 onClick={handleImportSubmit}
-                disabled={!importIsValidated || importHasErrors || importMutation.isPending}
+                disabled={!importIsValidated || importMutation.isPending}
                 data-testid="button-import-submit"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {importMutation.isPending ? "Importing..." : "Import Transfer"}
+                {importMutation.isPending ? "Importing..." : importHasErrors ? `Import Transfer (${importValidItemsCount} valid)` : "Import Transfer"}
               </Button>
             </div>
 
@@ -4088,6 +4122,36 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Import Confirmation Dialog */}
+      <AlertDialog open={importConfirmDialogOpen} onOpenChange={setImportConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import with Validation Errors?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {importValidItemsCount === 0 ? (
+                <>All {importTotalItemsCount} items have validation errors. Nothing will be imported.</>
+              ) : (
+                <>
+                  {importTotalItemsCount - importValidItemsCount} of {importTotalItemsCount} items have validation errors and will be skipped.
+                  <br /><br />
+                  <strong>{importValidItemsCount} valid item(s)</strong> will be transferred.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-import-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmedImport}
+              disabled={importValidItemsCount === 0}
+              data-testid="button-import-confirm"
+            >
+              {importValidItemsCount === 0 ? "OK" : `Import ${importValidItemsCount} Item(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
