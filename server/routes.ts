@@ -11104,8 +11104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userRole = req.session.currentRole;
       const isPOSUser = userRole?.startsWith("POS");
 
-      // For Production/Consumption vouchers, get stock adjustment items
-      if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption") {
+      // For Production/Consumption/Mixed vouchers, get stock adjustment items
+      if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") {
         const adjustmentVoucher = await db.query.stockAdjustmentVouchers.findFirst({
           where: eq(stockAdjustmentVouchers.voucherId, id),
         });
@@ -11127,25 +11127,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
           if (adjustmentItemsList.length > 0) {
-            const isProduction = voucher.voucherType === "Production";
-            const itemsWithDetails = adjustmentItemsList.map((item) => ({
-              id: item.id,
-              voucherId: id,
-              stockItemId: item.stockItemId,
-              stockItemName: item.stockItemName || 'Unknown Item',
-              stockItemCode: item.stockItemCode || '-',
-              quantity: item.quantity,
-              rate: isPOSUser ? null : item.rate,
-              debitAmount: isPOSUser ? "0" : (isProduction ? item.totalAmount : "0"),
-              creditAmount: isPOSUser ? "0" : (isProduction ? "0" : item.totalAmount),
-              narration: isPOSUser 
-                ? `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'}`
-                : `${voucher.voucherType} of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
-              accountName: item.stockItemName || 'Unknown Item',
-              accountCode: item.stockItemCode || '-',
-              isStockItem: true,
-              totalAmount: isPOSUser ? null : item.totalAmount,
-            }));
+            const itemsWithDetails = adjustmentItemsList.map((item) => {
+              // For Mixed vouchers, determine Production vs Consumption by quantity sign
+              // Positive quantity = Production (adding stock), Negative = Consumption (removing stock)
+              const qty = parseFloat(item.quantity || "0");
+              const isProduction = voucher.voucherType === "Production" || (voucher.voucherType === "Mixed" && qty > 0);
+              const adjustmentLabel = voucher.voucherType === "Mixed" 
+                ? (qty > 0 ? "Production" : "Consumption")
+                : voucher.voucherType;
+              
+              return {
+                id: item.id,
+                voucherId: id,
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName || 'Unknown Item',
+                stockItemCode: item.stockItemCode || '-',
+                quantity: item.quantity,
+                rate: isPOSUser ? null : item.rate,
+                debitAmount: isPOSUser ? "0" : (isProduction ? item.totalAmount : "0"),
+                creditAmount: isPOSUser ? "0" : (isProduction ? "0" : item.totalAmount),
+                narration: isPOSUser 
+                  ? `${adjustmentLabel} of ${Math.abs(qty)} x ${item.stockItemName || 'Unknown Item'}`
+                  : `${adjustmentLabel} of ${Math.abs(qty)} x ${item.stockItemName || 'Unknown Item'} @ $${item.rate}`,
+                accountName: item.stockItemName || 'Unknown Item',
+                accountCode: item.stockItemCode || '-',
+                isStockItem: true,
+                totalAmount: isPOSUser ? null : item.totalAmount,
+                adjustmentType: adjustmentLabel,
+              };
+            });
             return res.json(itemsWithDetails);
           }
         }

@@ -999,10 +999,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         <TableRow>
                           {(selectedVoucher.voucherType === "Consumption" || 
                             selectedVoucher.voucherType === "Production" || 
+                            selectedVoucher.voucherType === "Mixed" ||
                             selectedVoucher.voucherType === "Stock Transfer" ||
                             selectedVoucher.voucherType === "StockTransfer") ? (
                             <>
                               <TableHead>Item Name</TableHead>
+                              {selectedVoucher.voucherType === "Mixed" && (
+                                <TableHead>Type</TableHead>
+                              )}
                               <TableHead className="text-right">Qty</TableHead>
                               {user && !user?.role?.startsWith("POS") && (
                                 <>
@@ -1030,9 +1034,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         {(() => {
                           const isPOSUser = !user || user?.role?.startsWith("POS");
                           
-                          // For Consumption/Production/Stock Transfer, show stock items
+                          // For Consumption/Production/Mixed/Stock Transfer, show stock items
                           if (selectedVoucher.voucherType === "Consumption" || 
                               selectedVoucher.voucherType === "Production" || 
+                              selectedVoucher.voucherType === "Mixed" ||
                               selectedVoucher.voucherType === "Stock Transfer" ||
                               selectedVoucher.voucherType === "StockTransfer") {
                             return viewVoucherEntries.map((entry) => {
@@ -1044,6 +1049,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableCell>
                                     <div className="font-medium">{entry.stockItemName || entry.accountName}</div>
                                   </TableCell>
+                                  {selectedVoucher.voucherType === "Mixed" && (
+                                    <TableCell>
+                                      <Badge variant={entry.adjustmentType === "Production" ? "default" : "secondary"}>
+                                        {entry.adjustmentType || (qty > 0 ? "Production" : "Consumption")}
+                                      </Badge>
+                                    </TableCell>
+                                  )}
                                   <TableCell className="text-right font-mono">
                                     {Math.abs(qty).toFixed(3)}
                                   </TableCell>
