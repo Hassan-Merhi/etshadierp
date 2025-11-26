@@ -88,6 +88,12 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
   const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/inventory-by-location", selectedSourceLocation],
+    queryFn: async () => {
+      if (!selectedSourceLocation || selectedSourceLocation <= 0) return [];
+      const res = await fetch(`/api/inventory-by-location/${selectedSourceLocation}`);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
     enabled: selectedSourceLocation !== null && selectedSourceLocation > 0,
   });
 
