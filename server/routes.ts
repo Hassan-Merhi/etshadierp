@@ -11087,11 +11087,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemCode: item.stockItemCode || '-',
             quantity: item.quantity,
             rate: item.sellingPrice,
+            sellingPrice: item.sellingPrice,
+            totalSales: item.totalSales,
             debitAmount: "0",
             creditAmount: item.totalSales,
             narration: `Sale of ${item.quantity} x ${item.stockItemName || 'Unknown Item'} @ $${item.sellingPrice}`,
             accountName: item.stockItemName || 'Unknown Item',
             accountCode: item.stockItemCode || '-',
+            isStockItem: true,
           }));
           return res.json([...entries, ...itemsWithDetails]);
         }

@@ -509,12 +509,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const handleEdit = (voucher: Voucher) => {
-    // Navigate to vouchers page with edit mode for all supported types
+    // Sales vouchers use the dedicated edit page
+    if (voucher.voucherType === "Sales") {
+      navigate(`/vouchers/${voucher.id}/edit`);
+      return;
+    }
+    
+    // Other voucher types navigate to vouchers page with edit mode
     const voucherTypeMap: Record<string, string> = {
       "Payment": "payment",
       "Receipt": "receipt",
       "Journal": "journal",
-      "Sales": "adjustment",
       "Purchase": "adjustment",
       "Consumption": "adjustment",
       "Production": "adjustment",
@@ -907,6 +912,86 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No entries found
                   </p>
+                ) : selectedVoucher.voucherType === "Sales" ? (
+                  // Special rendering for Sales vouchers
+                  (() => {
+                    // Separate ledger entries (cash/revenue) from sales items
+                    const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
+                    const salesItems = viewVoucherEntries.filter(e => e.isStockItem || e.stockItemId);
+                    
+                    // Find cash entry (debit) and revenue entry (credit)
+                    const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+                    const revenueEntry = ledgerEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Cash Account Summary */}
+                        {cashEntry && (
+                          <div className="p-3 bg-muted/50 rounded-md">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="font-medium">{cashEntry.accountName}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{cashEntry.accountCode}</div>
+                              </div>
+                              <div className="text-right font-mono font-bold">
+                                ${formatAmount(cashEntry.debitAmount)}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Sales Items Table */}
+                        {salesItems.length > 0 && (
+                          <div className="border rounded-md">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item Name</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Rate</TableHead>
+                                  <TableHead className="text-right">Total Amount</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {salesItems.map((item) => {
+                                  const qty = parseFloat(item.quantity || "0");
+                                  const rate = parseFloat(item.rate || item.sellingPrice || "0");
+                                  const totalAmount = parseFloat(item.totalSales || item.creditAmount || "0");
+                                  return (
+                                    <TableRow key={item.id}>
+                                      <TableCell>
+                                        <div className="font-medium">{item.stockItemName || item.accountName}</div>
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {qty.toFixed(3)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        ${rate.toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        ${totalAmount.toFixed(2)}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                {/* Totals Row */}
+                                <TableRow className="font-bold bg-muted/50">
+                                  <TableCell>Total</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {salesItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0).toFixed(3)}
+                                  </TableCell>
+                                  <TableCell></TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    ${salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales || item.creditAmount || "0"), 0).toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="border rounded-md">
                     <Table>
