@@ -5506,15 +5506,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             validatedItem.averageRate = inventoryItem.averageRate;
 
             if (remainingQty < 0) {
-              validatedItem.error = `Insufficient stock (Available: ${currentQty.toFixed(2)})`;
-              errors.push(
-                `${stockItem.name}: Insufficient stock (Available: ${currentQty.toFixed(2)}, Requested: ${transferQty.toFixed(2)})`
+              validatedItem.warning = `Stock will go negative (Available: ${currentQty.toFixed(2)})`;
+              warnings.push(
+                `${stockItem.name}: Stock will go negative (Available: ${currentQty.toFixed(2)}, Requested: ${transferQty.toFixed(2)})`
               );
             }
           } else {
             validatedItem.currentStock = 0;
-            validatedItem.error = `No stock at source location`;
-            errors.push(
+            validatedItem.remainingStock = -parseFloat(item.quantity);
+            validatedItem.averageRate = "0";
+            validatedItem.warning = `No stock at source location, will go negative`;
+            warnings.push(
               `${stockItem.name}: No stock at source location`
             );
           }
@@ -5585,11 +5587,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
           .limit(1);
 
-        if (!inventoryItem) {
-          return res.status(400).json({ message: `No inventory found for: ${stockItem.name}` });
-        }
-
-        const rate = parseFloat(inventoryItem.averageRate || "0");
+        // Use inventory rate if available, otherwise use stock item's selling price as fallback
+        const rate = inventoryItem 
+          ? parseFloat(inventoryItem.averageRate || "0") 
+          : parseFloat(stockItem.sellingPrice || "0");
         const quantity = parseFloat(item.quantity);
         
         totalValue += rate * quantity;
@@ -5663,6 +5664,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 totalValue: newValue.toString(),
               })
               .where(eq(inventory.id, sourceInventory.id));
+          } else {
+            // Create negative inventory at source (stock being transferred without prior record)
+            const negativeQty = -parseFloat(item.quantity);
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId: sourceLocationId,
+              stockItemId: item.stockItemId,
+              quantity: negativeQty.toString(),
+              averageRate: item.rate,
+              totalValue: (negativeQty * parseFloat(item.rate)).toString(),
+            });
           }
 
           // Add to destination inventory
@@ -5968,9 +5980,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const invRecord = inventoryResult[0];
           if (!invRecord) {
-            validatedItem.error = `No inventory at source location '${item.sourceLocation}'`;
+            validatedItem.warning = `No inventory at source location '${item.sourceLocation}', will go negative`;
             validatedItem.currentStock = 0;
-            errors.push(
+            validatedItem.rate = "0";
+            warnings.push(
               `Row ${item.rowNum}: '${stockItem.name}' has no inventory at '${item.sourceLocation}'`,
             );
           } else {
@@ -5979,8 +5992,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             validatedItem.rate = invRecord.averageRate;
 
             if (item.quantity > currentQty) {
-              validatedItem.error = `Insufficient quantity (available: ${currentQty.toFixed(2)})`;
-              errors.push(
+              validatedItem.warning = `Stock will go negative (available: ${currentQty.toFixed(2)})`;
+              warnings.push(
                 `Row ${item.rowNum}: '${stockItem.name}' - requested ${item.quantity}, available ${currentQty.toFixed(2)}`,
               );
             }
@@ -6083,23 +6096,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
           .limit(1);
 
-        if (!sourceInv[0]) {
-          return res.status(400).json({
-            message: `No inventory for item at source location`,
-          });
-        }
-
-        const currentQty = parseFloat(sourceInv[0].quantity);
+        // Use server-derived rate from inventory, or stock item's selling price as fallback
+        const serverRate = sourceInv[0] 
+          ? parseFloat(sourceInv[0].averageRate || "0") 
+          : parseFloat(stockItem.sellingPrice || "0");
         const requestedQty = parseFloat(item.quantity);
-
-        if (requestedQty > currentQty) {
-          return res.status(400).json({
-            message: `Insufficient inventory: requested ${requestedQty}, available ${currentQty}`,
-          });
-        }
-
-        // Use server-derived rate from inventory, not client-provided rate
-        const serverRate = parseFloat(sourceInv[0].averageRate || "0");
 
         processedItems.push({
           stockItemId: item.stockItemId,
@@ -6194,29 +6195,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
-          if (!sourceInventory[0]) {
-            throw new Error(`Inventory not found for item at source location`);
+          if (sourceInventory[0]) {
+            // Update existing inventory (can go negative)
+            const currentQty = parseFloat(sourceInventory[0].quantity);
+            const currentValue = parseFloat(sourceInventory[0].totalValue);
+            const deductValue = qty * rate;
+            const newQty = currentQty - qty;
+            const newValue = currentValue - deductValue;
+            const newAvgRate = newQty > 0 ? newValue / newQty : (newQty < 0 ? rate : 0);
+
+            await tx
+              .update(inventory)
+              .set({
+                quantity: newQty.toString(),
+                averageRate: newAvgRate.toString(),
+                totalValue: newValue.toString(),
+              })
+              .where(eq(inventory.id, sourceInventory[0].id));
+          } else {
+            // Create negative inventory at source (stock being transferred without prior record)
+            const negativeQty = -qty;
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId: sourceLocationId,
+              stockItemId: item.stockItemId,
+              quantity: negativeQty.toString(),
+              averageRate: rate.toString(),
+              totalValue: (negativeQty * rate).toString(),
+            });
           }
-
-          const currentQty = parseFloat(sourceInventory[0].quantity);
-          if (qty > currentQty) {
-            throw new Error(`Insufficient inventory: requested ${qty}, available ${currentQty}`);
-          }
-
-          const currentValue = parseFloat(sourceInventory[0].totalValue);
-          const deductValue = qty * rate;
-          const newQty = currentQty - qty;
-          const newValue = currentValue - deductValue;
-          const newAvgRate = newQty > 0 ? newValue / newQty : 0;
-
-          await tx
-            .update(inventory)
-            .set({
-              quantity: newQty.toString(),
-              averageRate: newAvgRate.toString(),
-              totalValue: newValue.toString(),
-            })
-            .where(eq(inventory.id, sourceInventory[0].id));
 
           // Add to destination inventory
           const destInventory = await tx

@@ -925,37 +925,52 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewVoucherEntries.map((entry) => (
-                          <TableRow key={entry.id}>
-                            <TableCell>
-                              <div className="font-medium">{entry.accountName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">
-                                {entry.accountCode}
-                              </div>
-                            </TableCell>
-                            {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
-                              <TableCell className="text-right font-mono">
-                                ${formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
+                        {(() => {
+                          // For Payment/Receipt, filter out the cash source entries
+                          const displayEntries = (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt")
+                            ? viewVoucherEntries.filter(entry => {
+                                // Payment: show only debit entries (accounts being paid)
+                                // Receipt: show only credit entries (accounts receiving)
+                                if (selectedVoucher.voucherType === "Payment") {
+                                  return parseFloat(entry.debitAmount || "0") > 0;
+                                } else {
+                                  return parseFloat(entry.creditAmount || "0") > 0;
+                                }
+                              })
+                            : viewVoucherEntries;
+                          
+                          return displayEntries.map((entry) => (
+                            <TableRow key={entry.id}>
+                              <TableCell>
+                                <div className="font-medium">{entry.accountName}</div>
+                                <div className="text-xs text-muted-foreground font-mono">
+                                  {entry.accountCode}
+                                </div>
                               </TableCell>
-                            ) : (
-                              <>
+                              {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
                                 <TableCell className="text-right font-mono">
-                                  {parseFloat(entry.debitAmount) > 0
-                                    ? `$${formatAmount(entry.debitAmount)}`
-                                    : "-"}
+                                  ${formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
                                 </TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {parseFloat(entry.creditAmount) > 0
-                                    ? `$${formatAmount(entry.creditAmount)}`
-                                    : "-"}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {entry.narration || "-"}
-                                </TableCell>
-                              </>
-                            )}
-                          </TableRow>
-                        ))}
+                              ) : (
+                                <>
+                                  <TableCell className="text-right font-mono">
+                                    {parseFloat(entry.debitAmount) > 0
+                                      ? `$${formatAmount(entry.debitAmount)}`
+                                      : "-"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {parseFloat(entry.creditAmount) > 0
+                                      ? `$${formatAmount(entry.creditAmount)}`
+                                      : "-"}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {entry.narration || "-"}
+                                  </TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          ));
+                        })()}
                         {/* Totals Row */}
                         <TableRow className="font-bold bg-muted/50">
                           <TableCell>Total</TableCell>

@@ -477,7 +477,20 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                       </tr>
                     </thead>
                     <tbody>
-                      {fields.map((field, index) => (
+                      {fields.map((field, index) => {
+                        // For Payment/Receipt, hide cash source entries (credit for Payment, debit for Receipt)
+                        const voucherType = form.watch("voucherType");
+                        const debitAmount = parseFloat(form.watch(`entries.${index}.debitAmount`) || "0");
+                        const creditAmount = parseFloat(form.watch(`entries.${index}.creditAmount`) || "0");
+                        
+                        if (voucherType === "Payment" && creditAmount > 0 && debitAmount === 0) {
+                          return null; // Hide cash source (credit) entries for Payment
+                        }
+                        if (voucherType === "Receipt" && debitAmount > 0 && creditAmount === 0) {
+                          return null; // Hide cash source (debit) entries for Receipt
+                        }
+                        
+                        return (
                         <tr key={field.id} className="border-b">
                           <td className="py-2 px-2">
                             <div className="space-y-1">
@@ -623,7 +636,8 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                     <tfoot className="border-t-2 font-semibold">
                       <tr>
