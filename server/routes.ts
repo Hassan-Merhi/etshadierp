@@ -9962,15 +9962,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(voucherEntries.voucherId, id));
 
         // Update voucher metadata
+        const voucherUpdates: any = {
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description || null,
+          optional: voucher.optional ?? false,
+          totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+        };
+        // If locationId is being updated, also save the location name
+        if (voucher.locationId !== undefined) {
+          voucherUpdates.locationId = voucher.locationId;
+          if (voucher.locationId) {
+            const location = await storage.getLocationById(voucher.locationId);
+            if (location) {
+              voucherUpdates.locationName = location.name;
+            }
+          } else {
+            voucherUpdates.locationName = null;
+          }
+        }
         [updatedVoucher] = await db
           .update(vouchers)
-          .set({
-            voucherType: voucher.voucherType,
-            voucherDate: voucher.voucherDate,
-            description: voucher.description || null,
-            optional: voucher.optional ?? false,
-            totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
-          })
+          .set(voucherUpdates)
           .where(eq(vouchers.id, id))
           .returning();
 
