@@ -10074,20 +10074,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.insert(voucherEntries).values(debitEntry);
 
         // Credit: Sales Account (Revenue increases)
-        // Get the SALES ledger account for this company
-        const [salesAccount] = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, existingVoucher.companyId),
-              eq(ledgerAccounts.accountType, "SALES"),
-            ),
-          )
-          .limit(1);
+        // Get or create SALES revenue account for this company
+        const allAccounts = await storage.getAllLedgerAccounts(existingVoucher.companyId);
+        let salesAccount = allAccounts.find((a: any) => a.code === "SALES");
 
         if (!salesAccount) {
-          throw new Error("Sales revenue account not found for this company");
+          salesAccount = await storage.createLedgerAccount({
+            companyId: existingVoucher.companyId,
+            code: "SALES",
+            name: "Sales Revenue",
+            accountType: "Income",
+            openingBalance: "0",
+            active: true,
+          });
         }
 
         await db.insert(voucherEntries).values({
@@ -11897,6 +11896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items,
         notes,
         isCreditSale,
+        voucherDate: providedVoucherDate,
       } = req.body;
 
       // Determine account type and ID by validating against actual database records
@@ -12091,7 +12091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
-      const voucherDate = new Date().toISOString().split("T")[0];
+      const voucherDate = providedVoucherDate || new Date().toISOString().split("T")[0];
 
       // STEP 1a: Validate inventory rows
       const inventoryValidation: Array<{

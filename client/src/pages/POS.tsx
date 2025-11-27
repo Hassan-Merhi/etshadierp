@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, CalendarIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -157,6 +157,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [notes, setNotes] = useState("");
+  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -228,6 +229,11 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       // Populate notes
       if (editVoucher.description) {
         setNotes(editVoucher.description);
+      }
+
+      // Populate date from voucher
+      if (editVoucher.voucherDate) {
+        setSaleDate(editVoucher.voucherDate);
       }
 
       // Populate payment account and credit sale info from voucher entries
@@ -874,6 +880,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       paymentAccountId: isCreditSale ? parseInt(selectedCustomerId) : parseInt(paymentAccountId),
       isCreditSale,
       notes,
+      voucherDate: saleDate,
       items: validItems.map(row => ({
         stockItemId: row.stockItemId,
         quantity: row.quantity.toString(),
@@ -957,6 +964,18 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
               </SelectContent>
             </Select>
           )}
+        </div>
+
+        {/* Date Picker */}
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+          <Input
+            type="date"
+            value={saleDate}
+            onChange={(e) => setSaleDate(e.target.value)}
+            className="w-40"
+            data-testid="input-sale-date"
+          />
         </div>
 
         {/* Hide cash account selector when credit sale is ON */}
