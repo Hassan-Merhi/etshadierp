@@ -938,15 +938,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
               
               {/* Payment/Receipt Source Account Summary */}
               {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") && !viewEntriesLoading && viewVoucherEntries.length > 0 && (() => {
-                // For Payment: credit entry is the source (where money comes FROM)
-                // For Receipt: debit entry is the source (where money goes INTO)
+                // For Payment: credit entry is the source (cash/bank account where money comes FROM)
+                // For Receipt: debit entry is the source (cash/bank account where money goes INTO)
                 const sourceEntry = selectedVoucher.voucherType === "Payment"
-                  ? viewVoucherEntries.find(e => parseFloat(e.creditAmount || "0") > 0)
-                  : viewVoucherEntries.find(e => parseFloat(e.debitAmount || "0") > 0 && (e.accountName?.includes("CASH") || e.accountType === "Cash" || e.bankAccountId));
+                  ? viewVoucherEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+                  : viewVoucherEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
                 
+                // Total = sum of the opposite side entries
                 const totalAmount = selectedVoucher.voucherType === "Payment"
-                  ? viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0)
-                  : viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+                  ? viewVoucherEntries.reduce((sum: number, e: any) => sum + parseFloat(e.debitAmount || "0"), 0)
+                  : viewVoucherEntries.reduce((sum: number, e: any) => sum + parseFloat(e.creditAmount || "0"), 0);
                 
                 if (!sourceEntry) return null;
                 
