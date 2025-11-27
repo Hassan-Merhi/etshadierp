@@ -936,6 +936,41 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </div>
               )}
               
+              {/* Payment/Receipt Source Account Summary */}
+              {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") && !viewEntriesLoading && viewVoucherEntries.length > 0 && (() => {
+                // For Payment: credit entry is the source (where money comes FROM)
+                // For Receipt: debit entry is the source (where money goes INTO)
+                const sourceEntry = selectedVoucher.voucherType === "Payment"
+                  ? viewVoucherEntries.find(e => parseFloat(e.creditAmount || "0") > 0)
+                  : viewVoucherEntries.find(e => parseFloat(e.debitAmount || "0") > 0 && (e.accountName?.includes("CASH") || e.accountType === "Cash" || e.bankAccountId));
+                
+                const totalAmount = selectedVoucher.voucherType === "Payment"
+                  ? viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0)
+                  : viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+                
+                if (!sourceEntry) return null;
+                
+                return (
+                  <div className="p-4 bg-muted/50 rounded-md mb-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {selectedVoucher.voucherType === "Payment" ? "Paid From" : "Received In"}
+                        </p>
+                        <div className="font-medium text-lg">{sourceEntry.accountName}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{sourceEntry.accountCode}</div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                        <div className="text-2xl font-bold font-mono">
+                          ${formatAmount(totalAmount)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Voucher Entries Table */}
               <div>
                 <h3 className="font-semibold mb-3">Entries</h3>
