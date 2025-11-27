@@ -452,6 +452,14 @@ export default function ContainerDetail() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setLocation(`/purchase-orders/${po.id}/edit`)}
+                        data-testid={`button-edit-po-${po.id}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleDeletePO(po.id, po.poNumber)}
                         disabled={deletePOMutation.isPending}
                         data-testid={`button-delete-po-${po.id}`}
