@@ -51,7 +51,7 @@ export default function PurchaseOrderEdit() {
   });
 
   const { data: po, isLoading, error } = useQuery<PurchaseOrder>({
-    queryKey: ["/api/purchase-orders", poId],
+    queryKey: [`/api/purchase-orders/${poId}`],
     enabled: !!poId,
   });
 
@@ -76,7 +76,7 @@ export default function PurchaseOrderEdit() {
       return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/purchase-orders/${poId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       toast({
