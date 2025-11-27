@@ -1140,11 +1140,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employees = await storage.getAllEmployees(
         req.session.currentCompanyId,
       );
-      // Ensure proper camelCase field names for frontend
+      // Ensure proper camelCase field names for frontend and calculate total balance including opening balance
       const transformedEmployees = employees.map(emp => ({
         ...emp,
         firstName: emp.firstName || (emp as any).first_name,
         lastName: emp.lastName || (emp as any).last_name,
+        currentBalance: (parseFloat((emp as any).currentBalance || "0") + parseFloat((emp as any).openingBalance || "0")).toFixed(2),
       }));
       res.json(transformedEmployees);
     } catch (error: any) {
