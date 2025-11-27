@@ -13485,6 +13485,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recalculate cost prices for sales items using current inventory rates
+  app.post(
+    "/api/sales-report/recalculate-costs",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { startDate, endDate, stockItemId, locationId } = req.body;
+
+        // Build conditions for finding sales items to update
+        const conditions = [eq(vouchers.companyId, companyId)];
+        
+        if (startDate) {
+          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        }
+        if (endDate) {
+          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        }
+        if (stockItemId) {
+          conditions.push(eq(salesItems.stockItemId, stockItemId));
+        }
+        if (locationId) {
+          conditions.push(eq(vouchers.locationId, locationId));
+        }
+
+        // Get all sales items that match the criteria
+        const itemsToUpdate = await db
+          .select({
+            salesItemId: salesItems.id,
+            stockItemId: salesItems.stockItemId,
+            quantity: salesItems.quantity,
+            sellingPrice: salesItems.sellingPrice,
+            oldCostPrice: salesItems.costPrice,
+            locationId: vouchers.locationId,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(and(...conditions));
+
+        let updatedCount = 0;
+        const updates: { id: number; oldCost: number; newCost: number; itemName: string }[] = [];
+
+        for (const item of itemsToUpdate) {
+          // Get current average rate from inventory at that location
+          let newCostPrice = 0;
+          
+          if (item.locationId) {
+            const [invRecord] = await db
+              .select({
+                averageRate: inventory.averageRate,
+              })
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.stockItemId, item.stockItemId),
+                  eq(inventory.locationId, item.locationId)
+                )
+              )
+              .limit(1);
+            
+            if (invRecord) {
+              newCostPrice = parseFloat(invRecord.averageRate || "0");
+            }
+          }
+
+          // If no inventory at location, try to get from any location
+          if (newCostPrice === 0) {
+            const [anyInvRecord] = await db
+              .select({
+                averageRate: inventory.averageRate,
+              })
+              .from(inventory)
+              .where(eq(inventory.stockItemId, item.stockItemId))
+              .limit(1);
+            
+            if (anyInvRecord) {
+              newCostPrice = parseFloat(anyInvRecord.averageRate || "0");
+            }
+          }
+
+          const oldCostPrice = parseFloat(item.oldCostPrice || "0");
+          
+          // Only update if cost price is different
+          if (Math.abs(newCostPrice - oldCostPrice) > 0.01) {
+            const qty = parseFloat(item.quantity || "0");
+            const sellingPrice = parseFloat(item.sellingPrice || "0");
+            const totalSales = qty * sellingPrice;
+            const totalCost = qty * newCostPrice;
+            const profit = totalSales - totalCost;
+
+            await db
+              .update(salesItems)
+              .set({
+                costPrice: newCostPrice.toFixed(2),
+                totalCost: totalCost.toFixed(2),
+                profit: profit.toFixed(2),
+              })
+              .where(eq(salesItems.id, item.salesItemId));
+
+            // Get item name for response
+            const [stockItem] = await db
+              .select({ name: stockItems.name })
+              .from(stockItems)
+              .where(eq(stockItems.id, item.stockItemId))
+              .limit(1);
+
+            updates.push({
+              id: item.salesItemId,
+              oldCost: oldCostPrice,
+              newCost: newCostPrice,
+              itemName: stockItem?.name || "Unknown",
+            });
+
+            updatedCount++;
+          }
+        }
+
+        res.json({
+          message: `Updated cost prices for ${updatedCount} sales items`,
+          totalChecked: itemsToUpdate.length,
+          updatedCount,
+          updates: updates.slice(0, 50), // Limit response to first 50 updates
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   // Reports API Endpoints
 
   // Profit & Loss Report

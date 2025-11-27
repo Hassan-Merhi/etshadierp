@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -26,7 +28,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
 
@@ -81,6 +83,34 @@ export default function SalesReport() {
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Mutation to recalculate cost prices
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = {};
+      if (startDate) body.startDate = startDate;
+      if (endDate) body.endDate = endDate;
+      if (selectedLocation && selectedLocation !== "all") body.locationId = parseInt(selectedLocation);
+      if (selectedStockItem && selectedStockItem !== "all") body.stockItemId = parseInt(selectedStockItem);
+      
+      return apiRequest("POST", "/api/sales-report/recalculate-costs", body);
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cost Prices Updated",
+        description: `Updated ${data.updatedCount} of ${data.totalChecked} sales items`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch locations
   const { data: locations = [] } = useQuery<any[]>({
@@ -234,6 +264,15 @@ export default function SalesReport() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            data-testid="button-recalculate-costs"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
+            {recalculateMutation.isPending ? "Updating..." : "Fix Cost Prices"}
+          </Button>
           <Button
             variant="outline"
             onClick={handleExportExcel}
