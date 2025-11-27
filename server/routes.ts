@@ -6928,7 +6928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get line items for this PO
       const lineItems = await db.query.poLineItems.findMany({
-        where: eq(poLineItems.purchaseOrderId, id),
+        where: eq(poLineItems.poId, id),
       });
       
       // Get supplier info
