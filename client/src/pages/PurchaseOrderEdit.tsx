@@ -21,6 +21,12 @@ interface LineItem {
   lineTotal?: string;
 }
 
+interface Charge {
+  id?: number;
+  chargeType: string;
+  amount: string;
+}
+
 interface PurchaseOrder {
   id: number;
   poNumber: string;
@@ -33,6 +39,7 @@ interface PurchaseOrder {
   itemsTotal: string;
   status: string;
   items: LineItem[];
+  charges: Charge[];
 }
 
 export default function PurchaseOrderEdit() {
@@ -45,6 +52,7 @@ export default function PurchaseOrderEdit() {
   const [currency, setCurrency] = useState("USD");
   const [status, setStatus] = useState("Open");
   const [items, setItems] = useState<LineItem[]>([]);
+  const [charges, setCharges] = useState<Charge[]>([]);
 
   const { data: stockItems } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
@@ -68,11 +76,12 @@ export default function PurchaseOrderEdit() {
         rate: item.rate,
         lineTotal: item.lineTotal,
       })));
+      setCharges(po.charges || []);
     }
   }, [po]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { poNumber: string; currency: string; status: string; items: LineItem[] }) => {
+    mutationFn: async (data: { poNumber: string; currency: string; status: string; items: LineItem[]; charges: Charge[] }) => {
       return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
     },
     onSuccess: () => {
@@ -105,6 +114,20 @@ export default function PurchaseOrderEdit() {
 
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleAddCharge = () => {
+    setCharges([...charges, { chargeType: "", amount: "0" }]);
+  };
+
+  const handleRemoveCharge = (index: number) => {
+    setCharges(charges.filter((_, i) => i !== index));
+  };
+
+  const handleChargeChange = (index: number, field: keyof Charge, value: string) => {
+    const newCharges = [...charges];
+    (newCharges[index] as any)[field] = value;
+    setCharges(newCharges);
   };
 
   const handleItemChange = (index: number, field: keyof LineItem, value: string | number | null) => {
@@ -165,6 +188,7 @@ export default function PurchaseOrderEdit() {
         quantity: item.quantity,
         rate: item.rate,
       })),
+      charges: charges.filter(c => c.chargeType.trim()),
     });
   };
 
@@ -347,6 +371,69 @@ export default function PurchaseOrderEdit() {
                         ${calculateTotal()}
                       </TableCell>
                       <TableCell></TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Freight & Other Charges</Label>
+              <Button size="sm" variant="outline" onClick={handleAddCharge} data-testid="button-add-charge">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Charge
+              </Button>
+            </div>
+            
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50%]">Charge Type</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {charges.map((charge, index) => (
+                    <TableRow key={index} data-testid={`row-charge-${index}`}>
+                      <TableCell>
+                        <Input
+                          type="text"
+                          placeholder="e.g. Freight, Customs, Storage"
+                          value={charge.chargeType}
+                          onChange={(e) => handleChargeChange(index, "chargeType", e.target.value)}
+                          data-testid={`input-charge-type-${index}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={charge.amount}
+                          onChange={(e) => handleChargeChange(index, "amount", e.target.value)}
+                          className="text-right"
+                          data-testid={`input-charge-amount-${index}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveCharge(index)}
+                          data-testid={`button-remove-charge-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {charges.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                        No charges. Click "Add Charge" to add freight or other charges.
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
