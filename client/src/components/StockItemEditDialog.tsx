@@ -45,6 +45,7 @@ interface StockItem {
   barcode: string | null;
   uom: string;
   stockGroupId: number | null;
+  sellingPrice: string;
   active: boolean;
 }
 
@@ -67,6 +68,7 @@ export function StockItemEditDialog({
   const [barcode, setBarcode] = useState("");
   const [uom, setUom] = useState("");
   const [stockGroupId, setStockGroupId] = useState<number | null>(null);
+  const [sellingPrice, setSellingPrice] = useState("");
   const [active, setActive] = useState(true);
 
   // Fetch stock item details
@@ -89,6 +91,7 @@ export function StockItemEditDialog({
       setBarcode(stockItem.barcode || "");
       setUom(stockItem.uom);
       setStockGroupId(stockItem.stockGroupId);
+      setSellingPrice(stockItem.sellingPrice);
       setActive(stockItem.active);
     }
   }, [stockItem]);
@@ -175,6 +178,7 @@ export function StockItemEditDialog({
       barcode: barcode.trim() || null,
       uom: uom.trim(),
       stockGroupId,
+      sellingPrice,
       active,
     });
   };
@@ -271,6 +275,17 @@ export function StockItemEditDialog({
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="sellingPrice">Selling Price</Label>
+                <Input
+                  id="sellingPrice"
+                  type="number"
+                  step="0.01"
+                  value={sellingPrice}
+                  onChange={(e) => setSellingPrice(e.target.value)}
+                  data-testid="input-selling-price"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

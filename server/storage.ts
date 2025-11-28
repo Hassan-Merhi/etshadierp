@@ -772,38 +772,8 @@ export class DbStorage implements IStorage {
   }
 
   // Stock Items
-  async getAllStockItems(companyId: number, locationId?: number): Promise<any[]> {
-    if (!locationId) {
-      return await db.select().from(schema.stockItems).where(eq(schema.stockItems.companyId, companyId));
-    }
-    
-    // Join with location prices to get location-specific pricing
-    return await db
-      .select({
-        id: schema.stockItems.id,
-        companyId: schema.stockItems.companyId,
-        code: schema.stockItems.code,
-        name: schema.stockItems.name,
-        barcode: schema.stockItems.barcode,
-        stockGroupId: schema.stockItems.stockGroupId,
-        uom: schema.stockItems.uom,
-        openingQty: schema.stockItems.openingQty,
-        openingRate: schema.stockItems.openingRate,
-        openingValue: schema.stockItems.openingValue,
-        reorderLevel: schema.stockItems.reorderLevel,
-        active: schema.stockItems.active,
-        createdAt: schema.stockItems.createdAt,
-        sellingPrice: schema.stockItemLocationPrices.sellingPrice,
-      })
-      .from(schema.stockItems)
-      .leftJoin(
-        schema.stockItemLocationPrices,
-        and(
-          eq(schema.stockItems.id, schema.stockItemLocationPrices.stockItemId),
-          eq(schema.stockItemLocationPrices.locationId, locationId)
-        )
-      )
-      .where(eq(schema.stockItems.companyId, companyId));
+  async getAllStockItems(companyId: number): Promise<StockItem[]> {
+    return await db.select().from(schema.stockItems).where(eq(schema.stockItems.companyId, companyId));
   }
 
   async getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined> {

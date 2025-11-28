@@ -3177,10 +3177,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : undefined;
       const items = await storage.getAllStockItems(
         req.session.currentCompanyId,
-        locationId,
       );
       res.json(items);
     } catch (error: any) {
