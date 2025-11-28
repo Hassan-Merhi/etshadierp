@@ -69,9 +69,9 @@ export function StockItemCreateDialog({
     defaultValues: {
       code: "",
       name: "",
+      barcode: "",
       uom: "",
       stockGroupId: null,
-      sellingPrice: "0.00",
       openingQty: "0",
       openingRate: "0.00",
       openingValue: "0.00",
@@ -238,27 +238,6 @@ export function StockItemCreateDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="sellingPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Selling Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        data-testid="input-selling-price"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <FormField
                 control={form.control}
                 name="reorderLevel"

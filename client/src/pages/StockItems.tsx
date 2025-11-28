@@ -33,7 +33,6 @@ interface StockItem {
   barcode: string | null;
   uom: string;
   stockGroupId: number | null;
-  sellingPrice: string;
   active: boolean;
   companyId: number;
 }
@@ -146,7 +145,6 @@ export default function StockItems() {
       Barcode: item.barcode || "",
       UOM: item.uom,
       "Stock Group": getStockGroupName(item.stockGroupId),
-      "Selling Price": item.sellingPrice,
       Active: item.active ? "Yes" : "No",
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
