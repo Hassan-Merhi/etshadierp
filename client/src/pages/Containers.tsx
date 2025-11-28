@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, Eye, Search, Filter, X } from "lucide-react";
+import { Plus, Package, Eye, Search, Filter, X, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AddContainerDialog } from "../components/AddContainerDialog";
+import * as XLSX from "xlsx";
 import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
@@ -60,6 +61,21 @@ export default function Containers() {
     setSearchTerm("");
   };
 
+  const exportToExcel = () => {
+    const data = containers.map((container) => ({
+      "Container Number": container.containerNumber,
+      Supplier: getSupplierName(container.supplierId),
+      Status: container.status,
+      Amount: parseFloat(container.grandTotal || "0"),
+      "Import Date": new Date(container.importDate).toLocaleDateString(),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Containers");
+    XLSX.writeFile(workbook, "containers.xlsx");
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -83,6 +99,15 @@ export default function Containers() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={exportToExcel}
+            variant="outline"
+            className="gap-2"
+            data-testid="button-export-excel"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
           <Button
             onClick={() => setAddDialogOpen(true)}
             variant="outline"
