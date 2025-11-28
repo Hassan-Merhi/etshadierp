@@ -916,7 +916,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         </div>
                       </TableCell>
                       <TableCell className="max-w-md truncate">
-                        {voucher.description || "-"}
+                        {voucher.description || (
+                          (voucher.voucherType === "Payment" || voucher.voucherType === "Receipt" || voucher.voucherType === "Journal")
+                            ? voucher.voucherType
+                            : "-"
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium">
                         ${formatAmount(voucher.totalAmount)}
