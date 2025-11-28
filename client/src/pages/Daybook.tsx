@@ -360,11 +360,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return cashEntry?.accountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Fetch cash account balance
-  const { data: cashAccount } = useQuery<any>({
+  // Fetch cash account balance - always refetch to get fresh balance
+  const { data: cashAccount, refetch: refetchCashAccount } = useQuery<any>({
     queryKey: cashAccountId ? [`/api/ledger-accounts/${cashAccountId}`] : [],
     enabled: !!cashAccountId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+  // Refetch cash account when vouchers change
+  useEffect(() => {
+    if (cashAccountId && viewDialogOpen) {
+      refetchCashAccount();
+    }
+  }, [cashAccountId, viewDialogOpen, refetchCashAccount]);
 
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
@@ -501,6 +510,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      if (cashAccountId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/ledger-accounts/${cashAccountId}`] });
+      }
       toast({
         title: "Success",
         description: "Voucher updated successfully",
@@ -526,6 +539,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      if (cashAccountId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/ledger-accounts/${cashAccountId}`] });
+      }
       toast({
         title: "Success",
         description: "Voucher deleted successfully",
