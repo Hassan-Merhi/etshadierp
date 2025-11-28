@@ -3262,6 +3262,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update selling prices by barcode
+  app.post("/api/stock-items/bulk-update-prices", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { prices } = req.body;
+      if (!Array.isArray(prices) || prices.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty prices array" });
+      }
+
+      let updated = 0;
+      let notFound = 0;
+
+      for (const priceEntry of prices) {
+        const { barcode, sellingPrice } = priceEntry;
+        if (!barcode || !sellingPrice) continue;
+
+        const item = await storage.getStockItemByBarcode(barcode);
+        if (item) {
+          await storage.updateStockItem(item.id, { sellingPrice });
+          updated++;
+        } else {
+          notFound++;
+        }
+      }
+
+      const message = `Updated ${updated} price(s)${notFound > 0 ? `. ${notFound} barcode(s) not found.` : "."}`;
+      res.json({ message, updated, notFound });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {

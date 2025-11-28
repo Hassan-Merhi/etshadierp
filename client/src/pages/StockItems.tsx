@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2 } from "lucide-react";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
 import { StockItemCreateDialog } from "@/components/StockItemCreateDialog";
+import { ImportPricesDialog } from "@/components/ImportPricesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import * as XLSX from "xlsx";
 
 interface StockItem {
   id: number;
@@ -52,6 +54,7 @@ export default function StockItems() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [importPricesDialogOpen, setImportPricesDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -136,6 +139,17 @@ export default function StockItems() {
   const allFilteredSelected = filteredStockItems.length > 0 && 
     filteredStockItems.every(item => selectedIds.includes(item.id));
 
+  const exportToExcel = () => {
+    const data = stockItems.map(item => ({
+      Name: item.name,
+      Barcode: item.barcode || "",
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Items");
+    XLSX.writeFile(workbook, "stock-items.xlsx");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -157,6 +171,24 @@ export default function StockItems() {
               Delete {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={exportToExcel}
+            data-testid="button-export-items"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setImportPricesDialogOpen(true)}
+            data-testid="button-import-prices"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import Prices
+          </Button>
           <Link href="/import-stock-items">
             <Button variant="outline" className="gap-2" data-testid="button-import-items">
               <FileSpreadsheet className="h-4 w-4" />
@@ -307,6 +339,11 @@ export default function StockItems() {
       <StockItemCreateDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+      />
+
+      <ImportPricesDialog
+        open={importPricesDialogOpen}
+        onOpenChange={setImportPricesDialogOpen}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
