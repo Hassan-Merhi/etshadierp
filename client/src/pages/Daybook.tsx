@@ -352,6 +352,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [viewVoucherEntriesRaw]);
 
+  // Extract cash account ID for fetching balance
+  const cashAccountId = useMemo(() => {
+    if (!selectedVoucher || selectedVoucher.voucherType !== "Sales") return null;
+    const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
+    const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+    return cashEntry?.accountId || null;
+  }, [selectedVoucher, viewVoucherEntries]);
+
+  // Fetch cash account balance
+  const { data: cashAccount } = useQuery<any>({
+    queryKey: cashAccountId ? [`/api/ledger-accounts/${cashAccountId}`] : [],
+    enabled: !!cashAccountId,
+  });
+
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
     queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
@@ -1011,7 +1025,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <div className="font-medium">{cashEntry.accountName}</div>
                               </div>
                               <div className="text-right font-mono font-bold">
-                                ${formatAmount(cashEntry.debitAmount)}
+                                ${formatAmount(cashAccount?.openingBalance || "0")}
                               </div>
                             </div>
                           </div>
