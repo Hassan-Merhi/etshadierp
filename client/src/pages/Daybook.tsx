@@ -1008,22 +1008,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 );
               })()}
 
-              {/* Cash Account Balance - Show for all voucher types */}
-              {cashAccountId && !viewEntriesLoading && (
-                <div className="p-3 bg-muted/50 rounded-md mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">
-                        {viewVoucherEntries.find((e: any) => e.accountId === cashAccountId)?.accountName || "Cash"}
-                      </div>
-                    </div>
-                    <div className="text-right font-mono font-bold">
-                      ${formatAmount(cashAccountBalance)}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Voucher Entries Table */}
               <div>
                 <h3 className="font-semibold mb-3">Entries</h3>
@@ -1049,6 +1033,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     
                     return (
                       <div className="space-y-4">
+                        {/* Cash Account Summary */}
+                        {cashEntry && (
+                          <div className="p-3 bg-muted/50 rounded-md">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="font-medium">{cashEntry.accountName}</div>
+                              </div>
+                              <div className="text-right font-mono font-bold">
+                                ${formatAmount(cashAccountBalance)}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Sales Items Table */}
                         {salesItems.length > 0 && (
                           <div className="border rounded-md">
