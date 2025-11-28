@@ -236,7 +236,6 @@ export default function StockItems() {
                     />
                   </th>
                   <th className="text-left px-3 font-medium">Name</th>
-                  <th className="text-right px-3 font-medium">Selling Price</th>
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
                 </tr>
@@ -277,13 +276,6 @@ export default function StockItems() {
                           </div>
                         </td>
                         <td 
-                          className="px-3 text-right font-mono cursor-pointer" 
-                          onClick={() => handleStockItemClick(item.id, item.name)}
-                          data-testid={`price-${item.id}`}
-                        >
-                          ${sellingPrice.toFixed(2)}
-                        </td>
-                        <td 
                           className="px-3 cursor-pointer" 
                           onClick={() => handleStockItemClick(item.id, item.name)}
                           data-testid={`status-${item.id}`}
@@ -315,7 +307,7 @@ export default function StockItems() {
 
         {!isLoading && filteredStockItems.length > 0 && (
           <div className="mt-4 text-sm text-muted-foreground">
-            Showing {filteredStockItems.length} of {stockItems.length} items
+            Showing {filteredStockItems.length} of {stockItems.length} items (Use Location Prices tab to set per-location prices)
           </div>
         )}
       </Card>

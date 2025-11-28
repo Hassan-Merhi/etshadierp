@@ -13573,7 +13573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockItemName: stockItems.name,
           quantity: salesItems.quantity,
           actualSellingPrice: salesItems.sellingPrice, // Price item was actually sold at
-          configuredSellingPrice: stockItems.sellingPrice, // Configured price in stock items
+          configuredSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`.as("configured_selling_price"), // Location-specific price if available, otherwise stock item default
           costPrice: salesItems.costPrice,
           totalSales: salesItems.totalSales,
           totalCost: salesItems.totalCost,
@@ -13584,6 +13584,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
         .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
         .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .leftJoin(
+          schema.stockItemLocationPrices,
+          and(
+            eq(schema.stockItemLocationPrices.stockItemId, salesItems.stockItemId),
+            eq(schema.stockItemLocationPrices.locationId, vouchers.locationId)
+          )
+        )
         .where(and(...conditions))
         .orderBy(vouchers.voucherDate);
 
