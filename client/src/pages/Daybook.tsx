@@ -352,20 +352,24 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [viewVoucherEntriesRaw]);
 
-  // Extract cash account ID for fetching balance
+  // Extract cash account ID for fetching balance (works for Sales and POS)
   const cashAccountId = useMemo(() => {
-    if (!selectedVoucher || selectedVoucher.voucherType !== "Sales") return null;
-    const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
-    const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
-    return cashEntry?.accountId || null;
+    if (!selectedVoucher) return null;
+    // For Sales and POS vouchers, find the cash entry (debit > 0)
+    if (selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") {
+      const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
+      const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+      return cashEntry?.accountId || null;
+    }
+    return null;
   }, [selectedVoucher, viewVoucherEntries]);
 
   // Fetch actual cash account balance
   const { data: cashBalanceData = null } = useQuery<{ balance: number } | null>({
-    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/balance`] : [],
-    queryFn: async ({ queryKey }) => {
-      if (!queryKey[0]) return null;
-      const res = await fetch(queryKey[0] as string, { credentials: "include" });
+    queryKey: [`/api/accounts/ledger/${cashAccountId}/balance`, cashAccountId],
+    queryFn: async () => {
+      if (!cashAccountId) return null;
+      const res = await fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
