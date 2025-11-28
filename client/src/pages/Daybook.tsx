@@ -935,6 +935,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   <p className="text-sm">{selectedVoucher.description}</p>
                 </div>
               )}
+              {selectedVoucher.locationName && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Location</p>
+                  <p className="text-sm">{selectedVoucher.locationName}</p>
+                </div>
+              )}
               
               {/* Payment/Receipt Source Account Summary */}
               {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") && !viewEntriesLoading && viewVoucherEntries.length > 0 && (() => {
