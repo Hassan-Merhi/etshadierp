@@ -360,33 +360,31 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return cashEntry?.accountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Fetch cash account details
-  const { data: cashAccountDetails } = useQuery<any>({
-    queryKey: cashAccountId ? [`/api/ledger-accounts/${cashAccountId}`] : [],
-    enabled: !!cashAccountId,
-    staleTime: 0,
-  });
-
-  // Fetch cash account transactions
+  // Fetch cash account transactions for balance calculation
   const { data: cashAccountTransactions = [], refetch: refetchCashAccount } = useQuery<any>({
-    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/transactions`] : [],
-    enabled: !!cashAccountId,
+    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/transactions`] : null,
+    queryFn: async ({ queryKey }) => {
+      if (!queryKey[0]) return [];
+      const res = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!cashAccountId && viewDialogOpen,
     staleTime: 0,
-    refetchOnMount: true,
   });
 
-  // Calculate current balance from opening balance + all transactions
+  // Calculate current balance from all transactions
   const cashAccountBalance = useMemo(() => {
-    let balance = parseFloat(cashAccountDetails?.openingBalance || "0");
+    let balance = 0;
     
-    // Add debits and subtract credits for cash account
+    // Add debits and subtract credits
     (Array.isArray(cashAccountTransactions) ? cashAccountTransactions : []).forEach((tx: any) => {
       balance += parseFloat(tx.debitAmount || "0");
       balance -= parseFloat(tx.creditAmount || "0");
     });
     
     return balance.toString();
-  }, [cashAccountDetails, cashAccountTransactions]);
+  }, [cashAccountTransactions]);
 
   // Refetch cash account when vouchers change
   useEffect(() => {
