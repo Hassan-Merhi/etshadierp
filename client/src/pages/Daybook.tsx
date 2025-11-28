@@ -1009,7 +1009,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <div className="flex justify-between items-center">
                               <div>
                                 <div className="font-medium">{cashEntry.accountName}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{cashEntry.accountCode}</div>
                               </div>
                               <div className="text-right font-mono font-bold">
                                 ${formatAmount(cashEntry.debitAmount)}
@@ -1041,13 +1040,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         <div className="font-medium">{item.stockItemName || item.accountName}</div>
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
-                                        {qty.toFixed(3)}
+                                        {formatAmount(qty)}
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
-                                        ${rate.toFixed(2)}
+                                        ${formatAmount(rate)}
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
-                                        ${totalAmount.toFixed(2)}
+                                        ${formatAmount(totalAmount)}
                                       </TableCell>
                                     </TableRow>
                                   );
@@ -1056,11 +1055,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <TableRow className="font-bold bg-muted/50">
                                   <TableCell>Total</TableCell>
                                   <TableCell className="text-right font-mono">
-                                    {salesItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0).toFixed(3)}
+                                    {formatAmount(salesItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0))}
                                   </TableCell>
                                   <TableCell></TableCell>
                                   <TableCell className="text-right font-mono">
-                                    ${salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales || item.creditAmount || "0"), 0).toFixed(2)}
+                                    ${formatAmount(salesItems.reduce((sum, item) => sum + parseFloat(item.totalSales || item.creditAmount || "0"), 0))}
                                   </TableCell>
                                 </TableRow>
                               </TableBody>
