@@ -379,17 +379,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [selectedVoucher, viewVoucherEntries]);
 
   // Fetch actual cash account balance
-  const { data: cashBalanceData = null } = useQuery<{ balance: number } | null>({
+  const { data: cashBalanceData = null, refetch: refetchBalance } = useQuery<{ balance: number } | null>({
     queryKey: [`/api/accounts/ledger/${cashAccountId}/balance`, cashAccountId],
     queryFn: async () => {
       if (!cashAccountId) return null;
-      const res = await fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        const res = await fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include" });
+        if (!res.ok) return null;
+        return res.json();
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        return null;
+      }
     },
-    enabled: !!cashAccountId && viewDialogOpen,
+    enabled: !!cashAccountId,
     staleTime: 0,
   });
+
+  // Refetch balance when cash account ID changes
+  useEffect(() => {
+    if (cashAccountId && viewDialogOpen) {
+      refetchBalance();
+    }
+  }, [cashAccountId, viewDialogOpen, refetchBalance]);
 
   const cashAccountBalance = useMemo(() => {
     return cashBalanceData?.balance?.toString() || "0";
@@ -1017,7 +1029,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           {selectedVoucher.voucherType === "Payment" ? "Paid From" : "Received In"}
                         </p>
                         <div className="font-medium text-lg">{sourceEntry.accountName}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{sourceEntry.accountCode}</div>
                         <div className="text-sm font-mono mt-2">Balance: ${formatAmount(cashAccountBalance)}</div>
                       </div>
                       <div className="text-right">
@@ -1058,13 +1069,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <div className="space-y-4">
                         {/* Cash Account Summary */}
                         {cashEntry && (
-                          <div className="p-3 bg-muted/50 rounded-md">
+                          <div className="p-3 bg-muted/50 rounded-md mb-4">
                             <div className="flex justify-between items-center">
                               <div>
                                 <div className="font-medium">{cashEntry.accountName}</div>
                               </div>
-                              <div className="text-right font-mono font-bold">
-                                ${formatAmount(cashAccountBalance)}
+                              <div className="text-right">
+                                <div className="text-sm text-muted-foreground mb-1">Balance</div>
+                                <div className="font-mono font-bold">
+                                  ${formatAmount(cashAccountBalance)}
+                                </div>
                               </div>
                             </div>
                           </div>
