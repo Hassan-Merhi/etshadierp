@@ -360,38 +360,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return cashEntry?.accountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Fetch cash account transactions for balance calculation
-  const { data: cashAccountTransactions = [], refetch: refetchCashAccount } = useQuery<any>({
-    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/transactions`] : null,
-    queryFn: async ({ queryKey }) => {
-      if (!queryKey[0]) return [];
-      const res = await fetch(queryKey[0] as string, { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!cashAccountId && viewDialogOpen,
-    staleTime: 0,
-  });
-
-  // Calculate current balance from all transactions
+  // Calculate balance directly from current voucher entries for this transaction
   const cashAccountBalance = useMemo(() => {
-    let balance = 0;
+    if (!selectedVoucher) return "0";
     
-    // Add debits and subtract credits
-    (Array.isArray(cashAccountTransactions) ? cashAccountTransactions : []).forEach((tx: any) => {
-      balance += parseFloat(tx.debitAmount || "0");
-      balance -= parseFloat(tx.creditAmount || "0");
-    });
+    // Find the cash entry amount for this voucher
+    const cashEntry = viewVoucherEntries.find((e: any) => e.accountId === cashAccountId);
+    if (!cashEntry) return "0";
     
-    return balance.toString();
-  }, [cashAccountTransactions]);
+    // Return the debit or credit amount
+    const amount = parseFloat(cashEntry.debitAmount || "0") || parseFloat(cashEntry.creditAmount || "0");
+    return amount.toString();
+  }, [selectedVoucher, viewVoucherEntries, cashAccountId]);
 
-  // Refetch cash account when vouchers change
-  useEffect(() => {
-    if (cashAccountId && viewDialogOpen) {
-      refetchCashAccount();
-    }
-  }, [cashAccountId, viewDialogOpen, refetchCashAccount]);
 
   // Fetch voucher entries when editing
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
