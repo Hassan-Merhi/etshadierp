@@ -453,10 +453,46 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [voucherToEdit, voucherEntries, entriesLoading, editFormInitialized, editForm]);
 
+  // State to cache first account names for Payment/Receipt/Journal vouchers
+  const [accountNameCache, setAccountNameCache] = useState<Record<number, string>>({});
+
   // Fetch all vouchers
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
     queryKey: ["/api/vouchers"],
   });
+
+  // Fetch account names for Payment/Receipt/Journal vouchers
+  useEffect(() => {
+    const paymentVouchers = vouchers.filter(v => 
+      v.voucherType === "Payment" || v.voucherType === "Receipt" || v.voucherType === "Journal"
+    );
+
+    const fetchAccountNames = async () => {
+      const newCache = { ...accountNameCache };
+      for (const voucher of paymentVouchers) {
+        if (!(voucher.id in newCache)) {
+          try {
+            const res = await fetch(`/api/vouchers/${voucher.id}/view-entries`, { 
+              credentials: "include" 
+            });
+            if (res.ok) {
+              const entries = await res.json();
+              if (entries.length > 0) {
+                newCache[voucher.id] = entries[0].accountName || "Unknown";
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching account name:", error);
+          }
+        }
+      }
+      setAccountNameCache(newCache);
+    };
+
+    if (paymentVouchers.length > 0) {
+      fetchAccountNames();
+    }
+  }, [vouchers]);
 
   // Apply filters
   const filteredVouchers = useMemo(() => {
@@ -918,7 +954,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       <TableCell className="max-w-md truncate">
                         {voucher.description || (
                           (voucher.voucherType === "Payment" || voucher.voucherType === "Receipt" || voucher.voucherType === "Journal")
-                            ? voucher.voucherType
+                            ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
                             : "-"
                         )}
                       </TableCell>
