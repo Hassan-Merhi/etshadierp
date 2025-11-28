@@ -7883,6 +7883,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get balance for a specific ledger account
+  app.get("/api/accounts/ledger/:id/balance", requireAuth, async (req, res) => {
+    try {
+      const ledgerAccountId = parseInt(req.params.id);
+
+      if (isNaN(ledgerAccountId)) {
+        return res.status(400).json({ message: "Invalid ledger account ID" });
+      }
+
+      const account = await storage.getLedgerAccountById(ledgerAccountId);
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const transactions = await storage.getVoucherEntriesByLedger(ledgerAccountId);
+      
+      let debits = 0;
+      let credits = 0;
+      
+      for (const tx of transactions) {
+        debits += parseFloat(tx.debitAmount || "0");
+        credits += parseFloat(tx.creditAmount || "0");
+      }
+
+      const balance = (parseFloat(account.openingBalance || "0") * (account.openingBalanceSide === "Cr" ? -1 : 1)) + debits - credits;
+
+      res.json({ balance });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get transactions for a specific ledger account with optional date filtering
   app.get("/api/accounts/ledger/:id/transactions", async (req, res) => {
     try {

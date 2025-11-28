@@ -360,18 +360,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return cashEntry?.accountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Calculate balance directly from current voucher entries for this transaction
+  // Fetch actual cash account balance
+  const { data: cashBalanceData = null } = useQuery<{ balance: number } | null>({
+    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/balance`] : [],
+    queryFn: async ({ queryKey }) => {
+      if (!queryKey[0]) return null;
+      const res = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!cashAccountId && viewDialogOpen,
+    staleTime: 0,
+  });
+
   const cashAccountBalance = useMemo(() => {
-    if (!selectedVoucher) return "0";
-    
-    // Find the cash entry amount for this voucher
-    const cashEntry = viewVoucherEntries.find((e: any) => e.accountId === cashAccountId);
-    if (!cashEntry) return "0";
-    
-    // Return the debit or credit amount
-    const amount = parseFloat(cashEntry.debitAmount || "0") || parseFloat(cashEntry.creditAmount || "0");
-    return amount.toString();
-  }, [selectedVoucher, viewVoucherEntries, cashAccountId]);
+    return cashBalanceData?.balance?.toString() || "0";
+  }, [cashBalanceData]);
 
 
   // Fetch voucher entries when editing
