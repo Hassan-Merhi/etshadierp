@@ -1311,7 +1311,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </>
                               )}
                             </>
-                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") ? (
                             <>
                               <TableHead>Account</TableHead>
                               <TableHead className="text-right">Amount</TableHead>
@@ -1370,15 +1370,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             });
                           }
                           
-                          // For Payment/Receipt, filter out the cash source entries
-                          const displayEntries = (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt")
+                          // For Payment/Receipt/Journal, filter out the cash source entries
+                          const displayEntries = (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal")
                             ? viewVoucherEntries.filter(entry => {
                                 // Payment: show only debit entries (accounts being paid)
                                 // Receipt: show only credit entries (accounts receiving)
+                                // Journal: show all entries (no filtering)
                                 if (selectedVoucher.voucherType === "Payment") {
                                   return parseFloat(entry.debitAmount || "0") > 0;
-                                } else {
+                                } else if (selectedVoucher.voucherType === "Receipt") {
                                   return parseFloat(entry.creditAmount || "0") > 0;
+                                } else {
+                                  // Journal: show all entries
+                                  return true;
                                 }
                               })
                             : viewVoucherEntries;
@@ -1388,7 +1392,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <TableCell>
                                 <div className="font-medium">{entry.accountName}</div>
                               </TableCell>
-                              {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                              {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") ? (
                                 <TableCell className="text-right font-mono">
                                   ${formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
                                 </TableCell>
@@ -1443,7 +1447,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </>
                               )}
                             </>
-                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
+                          ) : (selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") ? (
                             <>
                               <TableCell>Total</TableCell>
                               <TableCell className="text-right font-mono">
