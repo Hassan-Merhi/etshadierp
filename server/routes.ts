@@ -3334,6 +3334,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get location prices for a stock item
+  app.get("/api/stock-items/:id/location-prices", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      const prices = await storage.getStockItemLocationPrices(stockItemId);
+      res.json(prices);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update or create location price for a stock item
+  app.post("/api/stock-items/:id/location-prices", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      if (isNaN(stockItemId)) {
+        return res.status(400).json({ message: "Invalid stock item ID" });
+      }
+
+      const { locationId, sellingPrice } = req.body;
+      if (!locationId || !sellingPrice) {
+        return res.status(400).json({ message: "Location ID and selling price are required" });
+      }
+
+      await storage.upsertLocationPrice(stockItemId, locationId, sellingPrice);
+      res.json({ message: "Location price updated successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete location price
+  app.delete("/api/stock-item-location-prices/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const priceId = parseInt(req.params.id);
+      if (isNaN(priceId)) {
+        return res.status(400).json({ message: "Invalid price ID" });
+      }
+
+      await storage.deleteLocationPrice(priceId);
+      res.json({ message: "Location price deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk import stock items
   app.post(
     "/api/stock-items/import",

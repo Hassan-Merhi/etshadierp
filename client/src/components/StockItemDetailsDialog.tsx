@@ -22,6 +22,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Edit, Save, X, Package, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
+import type { Location } from "@shared/schema";
 
 interface StockItemDetailsDialogProps {
   open: boolean;
@@ -93,6 +94,11 @@ export function StockItemDetailsDialog({
   const [newAliasCode, setNewAliasCode] = useState("");
   const [newAliasDescription, setNewAliasDescription] = useState("");
 
+  // Location prices state
+  const [newLocationId, setNewLocationId] = useState<string>("");
+  const [newLocationPrice, setNewLocationPrice] = useState("");
+  const [editingLocationPriceId, setEditingLocationPriceId] = useState<number | null>(null);
+
   // Fetch stock item details
   const { data: stockItem, isLoading: loadingItem } = useQuery<StockItem>({
     queryKey: [`/api/stock-items/${stockItemId}`],
@@ -120,6 +126,18 @@ export function StockItemDetailsDialog({
   // Fetch code aliases
   const { data: codeAliases = [], isLoading: loadingAliases } = useQuery<CodeAlias[]>({
     queryKey: [`/api/stock-items/${stockItemId}/code-aliases`],
+    enabled: open,
+  });
+
+  // Fetch locations
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+    enabled: open,
+  });
+
+  // Fetch location prices
+  const { data: locationPrices = [], isLoading: loadingLocationPrices } = useQuery<any[]>({
+    queryKey: [`/api/stock-items/${stockItemId}/location-prices`],
     enabled: open,
   });
 
@@ -215,6 +233,51 @@ export function StockItemDetailsDialog({
       toast({
         title: "Deletion Failed",
         description: error.message || "Failed to delete code alias",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create/update location price mutation
+  const upsertLocationPriceMutation = useMutation({
+    mutationFn: async (data: { locationId: number; sellingPrice: string }) => {
+      return await apiRequest("POST", `/api/stock-items/${stockItemId}/location-prices`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/location-prices`] });
+      setNewLocationId("");
+      setNewLocationPrice("");
+      setEditingLocationPriceId(null);
+      toast({
+        title: "Success",
+        description: "Location price saved successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed",
+        description: error.message || "Failed to save location price",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete location price mutation
+  const deleteLocationPriceMutation = useMutation({
+    mutationFn: async (priceId: number) => {
+      await apiRequest("DELETE", `/api/stock-item-location-prices/${priceId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/location-prices`] });
+      toast({
+        title: "Deleted",
+        description: "Location price deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Deletion Failed",
+        description: error.message || "Failed to delete location price",
         variant: "destructive",
       });
     },
@@ -363,9 +426,12 @@ export function StockItemDetailsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details" data-testid="tab-details">
               Item Details
+            </TabsTrigger>
+            <TabsTrigger value="prices" data-testid="tab-location-prices">
+              Location Prices
             </TabsTrigger>
             <TabsTrigger value="aliases" data-testid="tab-aliases">
               Code Aliases
@@ -528,6 +594,109 @@ export function StockItemDetailsDialog({
                 </div>
               </div>
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="prices" className="space-y-4 mt-4">
+            <div className="space-y-4">
+              <Card className="p-4">
+                <h3 className="font-medium mb-3">Add Location Price</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="locationSelect">Location *</Label>
+                    <Select value={newLocationId} onValueChange={setNewLocationId}>
+                      <SelectTrigger data-testid="select-location-price">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id.toString()}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="locationPrice">Selling Price *</Label>
+                    <Input
+                      id="locationPrice"
+                      type="number"
+                      step="0.01"
+                      value={newLocationPrice}
+                      onChange={(e) => setNewLocationPrice(e.target.value)}
+                      placeholder="0.00"
+                      data-testid="input-location-price"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <Button
+                    onClick={() => {
+                      if (!newLocationId || !newLocationPrice) {
+                        toast({
+                          title: "Error",
+                          description: "Please fill in all fields",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      upsertLocationPriceMutation.mutate({
+                        locationId: parseInt(newLocationId),
+                        sellingPrice: newLocationPrice,
+                      });
+                    }}
+                    disabled={upsertLocationPriceMutation.isPending}
+                    data-testid="button-add-location-price"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Price
+                  </Button>
+                </div>
+              </Card>
+
+              <div>
+                <h3 className="font-medium mb-3">Location Prices</h3>
+                {loadingLocationPrices ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading prices...</p>
+                  </div>
+                ) : locationPrices.length === 0 ? (
+                  <div className="flex items-center justify-center py-8 border rounded-lg">
+                    <p className="text-muted-foreground">No location prices set</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {locationPrices.map((price) => (
+                      <Card key={price.id} className="p-4" data-testid={`price-${price.id}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium" data-testid={`location-name-${price.id}`}>
+                              {price.locationName}
+                            </p>
+                            <p className="text-sm text-muted-foreground" data-testid={`price-value-${price.id}`}>
+                              {parseFloat(price.sellingPrice).toFixed(2)}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              if (confirm("Delete this location price?")) {
+                                deleteLocationPriceMutation.mutate(price.id);
+                              }
+                            }}
+                            variant="outline"
+                            size="sm"
+                            disabled={deleteLocationPriceMutation.isPending}
+                            data-testid={`button-delete-price-${price.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="aliases" className="space-y-4 mt-4">

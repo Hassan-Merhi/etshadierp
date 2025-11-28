@@ -175,6 +175,11 @@ export interface IStorage {
   // Stock Items - Additional methods for barcode lookup
   getStockItemByBarcode(barcode: string): Promise<StockItem | undefined>;
 
+  // Stock Item Location Prices
+  getStockItemLocationPrices(stockItemId: number): Promise<(schema.StockItemLocationPrice & { locationName: string })[]>;
+  upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<void>;
+  deleteLocationPrice(id: number): Promise<void>;
+
   // Inventory - Location-based stock tracking
   getLocationInventory(locationId: number): Promise<any[]>;
   getCompanyInventory(companyId: number): Promise<any[]>;
@@ -1280,6 +1285,44 @@ export class DbStorage implements IStorage {
   async getStockItemByBarcode(barcode: string): Promise<StockItem | undefined> {
     const [item] = await db.select().from(schema.stockItems).where(eq(schema.stockItems.code, barcode));
     return item;
+  }
+
+  // Stock Item Location Prices
+  async getStockItemLocationPrices(stockItemId: number): Promise<any[]> {
+    return await db
+      .select({
+        id: schema.stockItemLocationPrices.id,
+        stockItemId: schema.stockItemLocationPrices.stockItemId,
+        locationId: schema.stockItemLocationPrices.locationId,
+        sellingPrice: schema.stockItemLocationPrices.sellingPrice,
+        createdAt: schema.stockItemLocationPrices.createdAt,
+        updatedAt: schema.stockItemLocationPrices.updatedAt,
+        locationName: schema.locations.name,
+      })
+      .from(schema.stockItemLocationPrices)
+      .leftJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
+      .where(eq(schema.stockItemLocationPrices.stockItemId, stockItemId));
+  }
+
+  async upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<void> {
+    await db
+      .insert(schema.stockItemLocationPrices)
+      .values({
+        stockItemId,
+        locationId,
+        sellingPrice: sellingPrice,
+      })
+      .onConflictDoUpdate({
+        target: [schema.stockItemLocationPrices.stockItemId, schema.stockItemLocationPrices.locationId],
+        set: {
+          sellingPrice: sellingPrice,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  async deleteLocationPrice(id: number): Promise<void> {
+    await db.delete(schema.stockItemLocationPrices).where(eq(schema.stockItemLocationPrices.id, id));
   }
 
   // Inventory - Location-based stock tracking
