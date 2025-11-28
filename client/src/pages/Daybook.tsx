@@ -360,13 +360,33 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return cashEntry?.accountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Fetch cash account balance - always refetch to get fresh balance
-  const { data: cashAccount, refetch: refetchCashAccount } = useQuery<any>({
+  // Fetch cash account details
+  const { data: cashAccountDetails } = useQuery<any>({
     queryKey: cashAccountId ? [`/api/ledger-accounts/${cashAccountId}`] : [],
+    enabled: !!cashAccountId,
+    staleTime: 0,
+  });
+
+  // Fetch cash account transactions
+  const { data: cashAccountTransactions = [], refetch: refetchCashAccount } = useQuery<any>({
+    queryKey: cashAccountId ? [`/api/accounts/ledger/${cashAccountId}/transactions`] : [],
     enabled: !!cashAccountId,
     staleTime: 0,
     refetchOnMount: true,
   });
+
+  // Calculate current balance from opening balance + all transactions
+  const cashAccountBalance = useMemo(() => {
+    let balance = parseFloat(cashAccountDetails?.openingBalance || "0");
+    
+    // Add debits and subtract credits for cash account
+    (Array.isArray(cashAccountTransactions) ? cashAccountTransactions : []).forEach((tx: any) => {
+      balance += parseFloat(tx.debitAmount || "0");
+      balance -= parseFloat(tx.creditAmount || "0");
+    });
+    
+    return balance.toString();
+  }, [cashAccountDetails, cashAccountTransactions]);
 
   // Refetch cash account when vouchers change
   useEffect(() => {
@@ -1042,7 +1062,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <div className="font-medium">{cashEntry.accountName}</div>
                               </div>
                               <div className="text-right font-mono font-bold">
-                                ${formatAmount(cashAccount?.openingBalance || "0")}
+                                ${formatAmount(cashAccountBalance)}
                               </div>
                             </div>
                           </div>
