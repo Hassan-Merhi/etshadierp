@@ -352,7 +352,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [viewVoucherEntriesRaw]);
 
-  // Extract cash account ID for fetching balance (works for Sales, POS, Payment, and Receipt)
+  // Extract cash account ID for fetching balance (works for Sales, POS, Payment, Receipt, and Journal)
   // Note: viewVoucherEntries has ledgerAccountId, bankAccountId, etc. NOT accountId
   const cashAccountId = useMemo(() => {
     if (!selectedVoucher) return null;
@@ -375,6 +375,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (selectedVoucher.voucherType === "Receipt") {
       const sourceEntry = viewVoucherEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
       return sourceEntry?.ledgerAccountId || sourceEntry?.bankAccountId || null;
+    }
+    
+    // For Journal vouchers, find the first account (any debit or credit)
+    if (selectedVoucher.voucherType === "Journal") {
+      const firstEntry = viewVoucherEntries.find(e => !e.isStockItem && !e.stockItemId);
+      return firstEntry?.ledgerAccountId || firstEntry?.bankAccountId || null;
     }
     
     return null;
