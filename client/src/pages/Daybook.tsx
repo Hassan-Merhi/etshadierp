@@ -352,15 +352,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [viewVoucherEntriesRaw]);
 
-  // Extract cash account ID for fetching balance (works for Sales and POS)
+  // Extract cash account ID for fetching balance (works for Sales, POS, Payment, and Receipt)
   const cashAccountId = useMemo(() => {
     if (!selectedVoucher) return null;
+    
     // For Sales and POS vouchers, find the cash entry (debit > 0)
     if (selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") {
       const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
       const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
       return cashEntry?.accountId || null;
     }
+    
+    // For Payment vouchers, find the source account (credit > 0 - money going out)
+    if (selectedVoucher.voucherType === "Payment") {
+      const sourceEntry = viewVoucherEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
+      return sourceEntry?.accountId || null;
+    }
+    
+    // For Receipt vouchers, find the source account (debit > 0 - money going in)
+    if (selectedVoucher.voucherType === "Receipt") {
+      const sourceEntry = viewVoucherEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+      return sourceEntry?.accountId || null;
+    }
+    
     return null;
   }, [selectedVoucher, viewVoucherEntries]);
 
@@ -1004,6 +1018,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                         </p>
                         <div className="font-medium text-lg">{sourceEntry.accountName}</div>
                         <div className="text-xs text-muted-foreground font-mono">{sourceEntry.accountCode}</div>
+                        <div className="text-sm font-mono mt-2">Balance: ${formatAmount(cashAccountBalance)}</div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
