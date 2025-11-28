@@ -31,23 +31,6 @@ export default function Containers() {
     queryKey: ["/api/suppliers"],
   });
 
-  // Fetch all purchase orders to get line items for qty calculation
-  const { data: purchaseOrders = [] } = useQuery<any[]>({
-    queryKey: ["/api/purchase-orders"],
-  });
-
-  // Calculate total qty for a container
-  const getContainerTotalQty = (containerId: number) => {
-    const pos = purchaseOrders.filter(po => po.containerId === containerId);
-    let totalQty = 0;
-    for (const po of pos) {
-      if (po.lineItems && Array.isArray(po.lineItems)) {
-        totalQty += po.lineItems.reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0);
-      }
-    }
-    return totalQty;
-  };
-
   // Apply all filters
   const containers = allContainers
     .filter((c) => {
@@ -213,55 +196,76 @@ export default function Containers() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Container Number</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total Qty</TableHead>
-                  <TableHead>Grand Total</TableHead>
-                  <TableHead>Import Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {containers.map((container) => (
-                  <TableRow key={container.id} data-testid={`row-container-${container.id}`}>
-                    <TableCell className="font-mono font-medium">
-                      {container.containerNumber}
-                    </TableCell>
-                    <TableCell>{getSupplierName(container.supplierId)}</TableCell>
-                    <TableCell>
-                      <Badge variant={container.status === "OTW" ? "default" : "secondary"}>
-                        {container.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {getContainerTotalQty(container.id).toFixed(3)}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      ${parseFloat(container.grandTotal || "0").toFixed(2)}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      {new Date(container.importDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/containers/${container.id}`}>
-                        <Button size="sm" variant="outline" data-testid={`button-view-${container.id}`}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </Button>
-                      </Link>
-                    </TableCell>
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Total Containers</p>
+                  <p className="text-2xl font-semibold" data-testid="text-total-containers">
+                    {containers.length}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="text-2xl font-semibold font-mono" data-testid="text-total-amount">
+                    ${containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0).toFixed(2)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Container Number</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Grand Total</TableHead>
+                    <TableHead>Import Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {containers.map((container) => (
+                    <TableRow key={container.id} data-testid={`row-container-${container.id}`}>
+                      <TableCell className="font-mono font-medium">
+                        {container.containerNumber}
+                      </TableCell>
+                      <TableCell>{getSupplierName(container.supplierId)}</TableCell>
+                      <TableCell>
+                        <Badge variant={container.status === "OTW" ? "default" : "secondary"}>
+                          {container.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        ${parseFloat(container.grandTotal || "0").toFixed(2)}
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        {new Date(container.importDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/containers/${container.id}`}>
+                          <Button size="sm" variant="outline" data-testid={`button-view-${container.id}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       <AddContainerDialog
