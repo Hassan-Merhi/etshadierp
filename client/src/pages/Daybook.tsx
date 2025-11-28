@@ -378,34 +378,27 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return null;
   }, [selectedVoucher, viewVoucherEntries]);
 
-  // Fetch actual cash account balance
-  const { data: cashBalanceData = null, refetch: refetchBalance } = useQuery<{ balance: number } | null>({
-    queryKey: [`/api/accounts/ledger/${cashAccountId}/balance`, cashAccountId],
-    queryFn: async () => {
-      if (!cashAccountId) return null;
+  // State to store cash account balance
+  const [cashAccountBalance, setCashAccountBalance] = useState<string>("0");
+
+  // Fetch balance when cash account ID is available and dialog is open
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!cashAccountId || !viewDialogOpen) {
+        return;
+      }
       try {
         const res = await fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include" });
-        if (!res.ok) return null;
-        return res.json();
+        if (res.ok) {
+          const data = await res.json();
+          setCashAccountBalance(data.balance?.toString() || "0");
+        }
       } catch (error) {
         console.error("Error fetching balance:", error);
-        return null;
       }
-    },
-    enabled: !!cashAccountId,
-    staleTime: 0,
-  });
-
-  // Refetch balance when cash account ID changes
-  useEffect(() => {
-    if (cashAccountId && viewDialogOpen) {
-      refetchBalance();
-    }
-  }, [cashAccountId, viewDialogOpen, refetchBalance]);
-
-  const cashAccountBalance = useMemo(() => {
-    return cashBalanceData?.balance?.toString() || "0";
-  }, [cashBalanceData]);
+    };
+    fetchBalance();
+  }, [cashAccountId, viewDialogOpen]);
 
 
   // Fetch voucher entries when editing
@@ -1267,7 +1260,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableRow key={entry.id}>
                                     <TableCell>
                                       <div className="font-medium">{entry.accountName}</div>
-                                      <div className="text-xs text-muted-foreground font-mono">{entry.accountCode}</div>
                                     </TableCell>
                                     {!isPOSUser && (
                                       <>
@@ -1387,9 +1379,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             <TableRow key={entry.id}>
                               <TableCell>
                                 <div className="font-medium">{entry.accountName}</div>
-                                <div className="text-xs text-muted-foreground font-mono">
-                                  {entry.accountCode}
-                                </div>
                               </TableCell>
                               {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") ? (
                                 <TableCell className="text-right font-mono">
