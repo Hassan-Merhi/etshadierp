@@ -7884,7 +7884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get balance for a specific ledger account
-  app.get("/api/accounts/ledger/:id/balance", requireAuth, async (req, res) => {
+  app.get("/api/accounts/ledger/:id/balance", async (req, res) => {
     try {
       const ledgerAccountId = parseInt(req.params.id);
 
