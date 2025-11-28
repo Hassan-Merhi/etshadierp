@@ -1288,7 +1288,11 @@ export class DbStorage implements IStorage {
   }
 
   // Stock Item Location Prices
-  async getStockItemLocationPrices(stockItemId: number): Promise<any[]> {
+  async getStockItemLocationPrices(stockItemId: number, companyId?: number): Promise<any[]> {
+    const conditions = [eq(schema.stockItemLocationPrices.stockItemId, stockItemId)];
+    if (companyId) {
+      conditions.push(eq(schema.locations.companyId, companyId));
+    }
     return await db
       .select({
         id: schema.stockItemLocationPrices.id,
@@ -1301,7 +1305,7 @@ export class DbStorage implements IStorage {
       })
       .from(schema.stockItemLocationPrices)
       .leftJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
-      .where(eq(schema.stockItemLocationPrices.stockItemId, stockItemId));
+      .where(and(...conditions));
   }
 
   async upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<void> {
@@ -1327,7 +1331,7 @@ export class DbStorage implements IStorage {
 
   // Inventory - Location-based stock tracking
   async getLocationInventory(locationId: number): Promise<any[]> {
-    // First, get the basic inventory data
+    // Get inventory with location-specific prices (NEW!)
     const results = await db
       .select({
         inventoryId: schema.inventory.id,
@@ -1343,48 +1347,21 @@ export class DbStorage implements IStorage {
         stockGroupId: schema.stockItems.stockGroupId,
         stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
         stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+        lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`.as('configured_price'),
       })
       .from(schema.inventory)
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .leftJoin(
+        schema.stockItemLocationPrices,
+        and(
+          eq(schema.stockItemLocationPrices.stockItemId, schema.inventory.stockItemId),
+          eq(schema.stockItemLocationPrices.locationId, locationId)
+        )
+      )
       .where(eq(schema.inventory.locationId, locationId));
     
-    // Get last selling prices for all stock items in this location
-    const stockItemIds = results.map(r => r.stockItemId);
-    
-    if (stockItemIds.length === 0) {
-      return results;
-    }
-    
-    // Query to get the most recent selling price for each stock item
-    const lastPrices = await db
-      .select({
-        stockItemId: schema.salesItems.stockItemId,
-        lastSellingPrice: schema.salesItems.sellingPrice,
-        voucherId: schema.salesItems.voucherId,
-      })
-      .from(schema.salesItems)
-      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        inArray(schema.salesItems.stockItemId, stockItemIds),
-        eq(schema.vouchers.locationId, locationId)
-      ))
-      .orderBy(desc(schema.vouchers.voucherDate))
-      .execute();
-    
-    // Create a map of stockItemId -> last selling price
-    const priceMap = new Map<number, string>();
-    for (const price of lastPrices) {
-      if (!priceMap.has(price.stockItemId)) {
-        priceMap.set(price.stockItemId, price.lastSellingPrice);
-      }
-    }
-    
-    // Add lastSellingPrice to results
-    return results.map(item => ({
-      ...item,
-      lastSellingPrice: priceMap.get(item.stockItemId) || item.averageRate,
-    }));
+    return results;
   }
 
   async getCompanyInventory(companyId: number): Promise<any[]> {
