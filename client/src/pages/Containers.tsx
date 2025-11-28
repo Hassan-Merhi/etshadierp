@@ -16,7 +16,7 @@ import type { Container, Supplier } from "@shared/schema";
 
 export default function Containers() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("OTW");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -30,6 +30,23 @@ export default function Containers() {
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+
+  // Fetch all purchase orders to get line items for qty calculation
+  const { data: purchaseOrders = [] } = useQuery<any[]>({
+    queryKey: ["/api/purchase-orders"],
+  });
+
+  // Calculate total qty for a container
+  const getContainerTotalQty = (containerId: number) => {
+    const pos = purchaseOrders.filter(po => po.containerId === containerId);
+    let totalQty = 0;
+    for (const po of pos) {
+      if (po.lineItems && Array.isArray(po.lineItems)) {
+        totalQty += po.lineItems.reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0);
+      }
+    }
+    return totalQty;
+  };
 
   // Apply all filters
   const containers = allContainers
@@ -204,6 +221,7 @@ export default function Containers() {
                   <TableHead>Container Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total Qty</TableHead>
                   <TableHead>Grand Total</TableHead>
                   <TableHead>Import Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -220,6 +238,9 @@ export default function Containers() {
                       <Badge variant={container.status === "OTW" ? "default" : "secondary"}>
                         {container.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {getContainerTotalQty(container.id).toFixed(3)}
                     </TableCell>
                     <TableCell className="font-mono">
                       ${parseFloat(container.grandTotal || "0").toFixed(2)}
