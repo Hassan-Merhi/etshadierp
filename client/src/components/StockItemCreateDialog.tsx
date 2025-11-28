@@ -69,7 +69,6 @@ export function StockItemCreateDialog({
     defaultValues: {
       code: "",
       name: "",
-      barcode: "",
       uom: "",
       stockGroupId: null,
       sellingPrice: "0.00",

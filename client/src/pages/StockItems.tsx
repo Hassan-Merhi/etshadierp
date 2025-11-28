@@ -1,4 +1,109 @@
- => {
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
+import { StockItemEditDialog } from "@/components/StockItemEditDialog";
+import { StockItemCreateDialog } from "@/components/StockItemCreateDialog";
+import { CombinedImportDialog } from "@/components/CombinedImportDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import * as XLSX from "xlsx";
+
+interface StockItem {
+  id: number;
+  code: string;
+  name: string;
+  barcode: string | null;
+  uom: string;
+  stockGroupId: number | null;
+  sellingPrice: string;
+  active: boolean;
+  companyId: number;
+}
+
+interface StockGroup {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export default function StockItems() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
+  const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editStockItemId, setEditStockItemId] = useState<number | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const { toast } = useToast();
+
+  const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
+    queryKey: ["/api/stock-items"],
+  });
+
+  const { data: stockGroups = [] } = useQuery<StockGroup[]>({
+    queryKey: ["/api/stock-groups"],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      return await apiRequest("POST", "/api/stock-items/bulk-delete", { ids });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      setSelectedIds([]);
+      toast({
+        title: "Success",
+        description: data.message || "Stock items deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete stock items",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredStockItems.map(item => item.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectItem = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(itemId => itemId !== id));
+    }
+  };
+
+  const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
   };
 
