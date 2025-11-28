@@ -3262,7 +3262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk update selling prices by barcode
+  // Bulk update selling prices by barcode (global or location-specific)
   app.post("/api/stock-items/bulk-update-prices", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
@@ -3278,12 +3278,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let notFound = 0;
 
       for (const priceEntry of prices) {
-        const { barcode, sellingPrice } = priceEntry;
+        const { barcode, sellingPrice, locationId } = priceEntry;
         if (!barcode || !sellingPrice) continue;
 
         const item = await storage.getStockItemByBarcode(barcode);
         if (item) {
-          await storage.updateStockItem(item.id, { sellingPrice });
+          if (locationId) {
+            // Update location-specific price
+            await storage.upsertLocationPrice(item.id, locationId, sellingPrice);
+          } else {
+            // Update global price
+            await storage.updateStockItem(item.id, { sellingPrice });
+          }
           updated++;
         } else {
           notFound++;

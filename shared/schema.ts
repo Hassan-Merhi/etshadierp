@@ -1403,3 +1403,28 @@ export const insertCustomerBalanceSchema = createInsertSchema(customerBalances).
 
 export type InsertCustomerBalance = z.infer<typeof insertCustomerBalanceSchema>;
 export type CustomerBalance = typeof customerBalances.$inferSelect;
+
+// Stock Item Location Prices - allows different selling prices per location
+export const stockItemLocationPrices = pgTable("stock_item_location_prices", {
+  id: serial("id").primaryKey(),
+  stockItemId: integer("stock_item_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueItemLocation: uniqueIndex("stock_item_location_prices_item_location_unique").on(t.stockItemId, t.locationId),
+}));
+
+export const insertStockItemLocationPriceSchema = createInsertSchema(stockItemLocationPrices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  stockItemId: z.number().min(1, "Stock item is required"),
+  locationId: z.number().min(1, "Location is required"),
+  sellingPrice: z.string().min(1, "Selling price is required"),
+});
+
+export type InsertStockItemLocationPrice = z.infer<typeof insertStockItemLocationPriceSchema>;
+export type StockItemLocationPrice = typeof stockItemLocationPrices.$inferSelect;

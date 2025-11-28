@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import { Download } from "lucide-react";
+import type { Location } from "@shared/schema";
 
 interface CombinedImportDialogProps {
   open: boolean;
@@ -16,11 +18,16 @@ interface CombinedImportDialogProps {
 
 export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialogProps) {
   const [pricesFile, setPricesFile] = useState<File | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
+  });
+
   const importMutation = useMutation({
-    mutationFn: async (data: Array<{ barcode: string; sellingPrice: string }>) => {
+    mutationFn: async (data: Array<{ barcode: string; sellingPrice: string; locationId?: number }>) => {
       return await apiRequest("POST", "/api/stock-items/bulk-update-prices", { prices: data });
     },
     onSuccess: (result: any) => {
@@ -75,6 +82,15 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       return;
     }
 
+    if (!selectedLocation) {
+      toast({
+        title: "Error",
+        description: "Please select a location",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const arrayBuffer = await pricesFile.arrayBuffer();
@@ -96,6 +112,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         .map((row) => ({
           barcode: String(row.Barcode || "").trim(),
           sellingPrice: String(row["Selling Price"] || "0").trim(),
+          locationId: parseInt(selectedLocation),
         }))
         .filter((item) => item.barcode);
 
@@ -138,6 +155,25 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
           <TabsContent value="prices" className="space-y-4">
             <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Location</label>
+                <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                  <SelectTrigger data-testid="select-location-import">
+                    <SelectValue placeholder="Select a location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Prices will be applied to this location
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">File</label>
                 <Input
