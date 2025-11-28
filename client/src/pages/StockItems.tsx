@@ -141,8 +141,13 @@ export default function StockItems() {
 
   const exportToExcel = () => {
     const data = stockItems.map(item => ({
+      Code: item.code,
       Name: item.name,
       Barcode: item.barcode || "",
+      UOM: item.uom,
+      "Stock Group": getStockGroupName(item.stockGroupId),
+      "Selling Price": item.sellingPrice,
+      Active: item.active ? "Yes" : "No",
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
