@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
 import { StockItemCreateDialog } from "@/components/StockItemCreateDialog";
-import { ImportPricesDialog } from "@/components/ImportPricesDialog";
+import { CombinedImportDialog } from "@/components/CombinedImportDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,7 +54,7 @@ export default function StockItems() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [importPricesDialogOpen, setImportPricesDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -183,18 +183,12 @@ export default function StockItems() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => setImportPricesDialogOpen(true)}
-            data-testid="button-import-prices"
+            onClick={() => setImportDialogOpen(true)}
+            data-testid="button-import-data"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Import Prices
+            Import
           </Button>
-          <Link href="/import-stock-items">
-            <Button variant="outline" className="gap-2" data-testid="button-import-items">
-              <FileSpreadsheet className="h-4 w-4" />
-              Import Items
-            </Button>
-          </Link>
           <Button 
             className="gap-2" 
             onClick={() => setCreateDialogOpen(true)}
@@ -341,9 +335,9 @@ export default function StockItems() {
         onOpenChange={setCreateDialogOpen}
       />
 
-      <ImportPricesDialog
-        open={importPricesDialogOpen}
-        onOpenChange={setImportPricesDialogOpen}
+      <CombinedImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
