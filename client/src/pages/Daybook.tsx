@@ -353,6 +353,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [viewVoucherEntriesRaw]);
 
   // Extract cash account ID for fetching balance (works for Sales, POS, Payment, and Receipt)
+  // Note: viewVoucherEntries has ledgerAccountId, bankAccountId, etc. NOT accountId
   const cashAccountId = useMemo(() => {
     if (!selectedVoucher) return null;
     
@@ -360,19 +361,20 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") {
       const ledgerEntries = viewVoucherEntries.filter(e => !e.isStockItem && !e.stockItemId);
       const cashEntry = ledgerEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
-      return cashEntry?.accountId || null;
+      // Use ledgerAccountId or bankAccountId (the actual field names from storage)
+      return cashEntry?.ledgerAccountId || cashEntry?.bankAccountId || null;
     }
     
     // For Payment vouchers, find the source account (credit > 0 - money going out)
     if (selectedVoucher.voucherType === "Payment") {
       const sourceEntry = viewVoucherEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
-      return sourceEntry?.accountId || null;
+      return sourceEntry?.ledgerAccountId || sourceEntry?.bankAccountId || null;
     }
     
     // For Receipt vouchers, find the source account (debit > 0 - money going in)
     if (selectedVoucher.voucherType === "Receipt") {
       const sourceEntry = viewVoucherEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
-      return sourceEntry?.accountId || null;
+      return sourceEntry?.ledgerAccountId || sourceEntry?.bankAccountId || null;
     }
     
     return null;
