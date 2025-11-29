@@ -13615,17 +13615,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(...conditions))
         .orderBy(vouchers.voucherDate);
 
-      // Calculate configured profit for each item (configured selling price - cost price) * quantity
+      // Calculate configured profit for each item (configured selling price - actual selling price) * quantity
       const enhancedSalesData = salesData.map(item => {
         // Use location price if available, otherwise use actual selling price
         const configuredPrice = parseFloat(item.configuredSellingPrice || "0") > 0 
           ? parseFloat(item.configuredSellingPrice || "0")
           : parseFloat(item.actualSellingPrice || "0");
         
+        const actualPrice = parseFloat(item.actualSellingPrice || "0");
+        
         return {
           ...item,
           configuredSellingPrice: configuredPrice.toString(),
-          configuredProfit: (configuredPrice - parseFloat(item.costPrice || "0")) * parseFloat(item.quantity || "0"),
+          configuredProfit: (configuredPrice - actualPrice) * parseFloat(item.quantity || "0"),
           totalConfiguredCost: configuredPrice * parseFloat(item.quantity || "0"),
         };
       });
