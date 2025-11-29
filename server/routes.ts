@@ -13594,7 +13594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockItemName: stockItems.name,
           quantity: salesItems.quantity,
           actualSellingPrice: salesItems.sellingPrice, // Price item was actually sold at
-          configuredSellingPrice: sql<string>`COALESCE(${stockItemLocationPrices.sellingPrice}, ${stockItems.sellingPrice})`.as("configured_selling_price"), // Location-specific price if available, otherwise stock item default
+          configuredSellingPrice: stockItemLocationPrices.sellingPrice, // Location-specific price
           costPrice: salesItems.costPrice,
           totalSales: salesItems.totalSales,
           totalCost: salesItems.totalCost,
@@ -13616,11 +13616,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(vouchers.voucherDate);
 
       // Calculate configured profit for each item (configured selling price - cost price) * quantity
-      const enhancedSalesData = salesData.map(item => ({
-        ...item,
-        configuredProfit: (parseFloat(item.configuredSellingPrice || "0") - parseFloat(item.costPrice || "0")) * parseFloat(item.quantity || "0"),
-        totalConfiguredCost: parseFloat(item.configuredSellingPrice || "0") * parseFloat(item.quantity || "0"),
-      }));
+      const enhancedSalesData = salesData.map(item => {
+        // Use location price if available, otherwise use actual selling price
+        const configuredPrice = parseFloat(item.configuredSellingPrice || "0") > 0 
+          ? parseFloat(item.configuredSellingPrice || "0")
+          : parseFloat(item.actualSellingPrice || "0");
+        
+        return {
+          ...item,
+          configuredSellingPrice: configuredPrice.toString(),
+          configuredProfit: (configuredPrice - parseFloat(item.costPrice || "0")) * parseFloat(item.quantity || "0"),
+          totalConfiguredCost: configuredPrice * parseFloat(item.quantity || "0"),
+        };
+      });
 
       res.json(enhancedSalesData);
     } catch (error: any) {
