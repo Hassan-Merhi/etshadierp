@@ -13535,32 +13535,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { startDate, endDate, locationId, stockItemId } = req.query;
 
-      // Build query to join sales_items with vouchers, stock_items, and locations
-      let query = db
-        .select({
-          id: salesItems.id,
-          voucherId: salesItems.voucherId,
-          voucherNumber: vouchers.voucherNumber,
-          voucherDate: vouchers.voucherDate,
-          locationId: vouchers.locationId,
-          locationName: locations.name,
-          stockItemId: salesItems.stockItemId,
-          stockItemCode: stockItems.code,
-          stockItemName: stockItems.name,
-          quantity: salesItems.quantity,
-          sellingPrice: salesItems.sellingPrice,
-          costPrice: salesItems.costPrice,
-          totalSales: salesItems.totalSales,
-          totalCost: salesItems.totalCost,
-          profit: salesItems.profit,
-          createdAt: salesItems.createdAt,
-        })
-        .from(salesItems)
-        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
-        .leftJoin(locations, eq(vouchers.locationId, locations.id))
-        .where(eq(vouchers.companyId, companyId));
-
       // Apply filters
       const conditions = [eq(vouchers.companyId, companyId)];
 
@@ -13646,7 +13620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(enhancedSalesData);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("Sales report error:", error);
+      res.status(500).json({ message: error.message, details: error.toString() });
     }
   });
 
