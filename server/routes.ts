@@ -13601,7 +13601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costProfit = parseFloat(item.costProfit || "0");
         const quantity = parseFloat(item.quantity || "0");
         
-        const configuredProfit = (configuredPrice - actualPrice) * quantity;
+        const configuredProfit = (actualPrice - configuredPrice) * quantity;
         const totalConfiguredCost = configuredPrice * quantity;
         
         // Calculate percentages
