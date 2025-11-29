@@ -13623,12 +13623,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : parseFloat(item.actualSellingPrice || "0");
         
         const actualPrice = parseFloat(item.actualSellingPrice || "0");
+        const totalSales = parseFloat(item.totalSales || "0");
+        const costProfit = parseFloat(item.costProfit || "0");
+        const quantity = parseFloat(item.quantity || "0");
+        
+        const configuredProfit = (configuredPrice - actualPrice) * quantity;
+        const totalConfiguredCost = configuredPrice * quantity;
+        
+        // Calculate percentages
+        const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
+        const configuredProfitPercentage = totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
         
         return {
           ...item,
           configuredSellingPrice: configuredPrice.toString(),
-          configuredProfit: (configuredPrice - actualPrice) * parseFloat(item.quantity || "0"),
-          totalConfiguredCost: configuredPrice * parseFloat(item.quantity || "0"),
+          configuredProfit,
+          totalConfiguredCost,
+          costProfitPercentage,
+          configuredProfitPercentage,
         };
       });
 
