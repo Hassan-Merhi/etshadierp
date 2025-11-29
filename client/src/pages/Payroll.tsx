@@ -225,6 +225,14 @@ export default function Payroll() {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<any | null>(null);
+  const [groupMembersDialogOpen, setGroupMembersDialogOpen] = useState(false);
+  const [groupMemberSelections, setGroupMemberSelections] = useState<Record<number, boolean>>({});
+
+  const { data: groupMembers = [] } = useQuery<any[]>({
+    queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
+    enabled: !!selectedGroupForMembers?.id,
+  });
 
   // Employee Groups mutations
   const createGroupMutation = useMutation({
@@ -251,6 +259,24 @@ export default function Payroll() {
         description: error.message || "Failed to create employee group",
         variant: "destructive",
       });
+    },
+  });
+
+  const addWorkerToGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
+      await apiRequest("POST", `/api/employee-groups/${groupId}/members`, { employeeId: workerId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"] });
+    },
+  });
+
+  const removeWorkerFromGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
+      await apiRequest("DELETE", `/api/employee-groups/${groupId}/members/${workerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"] });
     },
   });
 
@@ -1256,23 +1282,36 @@ export default function Payroll() {
                                     {group.description || "—"}
                                   </TableCell>
                                   <TableCell data-testid={`cell-worker-group-actions-${group.id}`} className="text-right">
-                                    <ConfirmationDialog
-                                      trigger={
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          data-testid={`button-delete-worker-group-${group.id}`}
-                                        >
-                                          <Trash2 className="h-4 w-4 mr-1" />
-                                          Delete
-                                        </Button>
-                                      }
-                                      title="Delete Worker Group"
-                                      description={`Are you sure you want to delete the group "${group.name}"? This will remove all worker assignments to this group.`}
-                                      onConfirm={() => deleteGroupMutation.mutate(group.id)}
-                                      confirmText="Delete"
-                                      cancelText="Cancel"
-                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedGroupForMembers(group);
+                                          setGroupMembersDialogOpen(true);
+                                        }}
+                                        data-testid={`button-manage-members-${group.id}`}
+                                      >
+                                        Manage Members
+                                      </Button>
+                                      <ConfirmationDialog
+                                        trigger={
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            data-testid={`button-delete-worker-group-${group.id}`}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-1" />
+                                            Delete
+                                          </Button>
+                                        }
+                                        title="Delete Worker Group"
+                                        description={`Are you sure you want to delete the group "${group.name}"? This will remove all worker assignments to this group.`}
+                                        onConfirm={() => deleteGroupMutation.mutate(group.id)}
+                                        confirmText="Delete"
+                                        cancelText="Cancel"
+                                      />
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -2985,6 +3024,54 @@ export default function Payroll() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manage Group Members Dialog */}
+      <Dialog open={groupMembersDialogOpen} onOpenChange={setGroupMembersDialogOpen}>
+        <DialogContent className="max-w-md" data-testid="dialog-manage-group-members">
+          <DialogHeader>
+            <DialogTitle>Manage Group Members: {selectedGroupForMembers?.name}</DialogTitle>
+            <DialogDescription>
+              Select workers to add or remove from this group
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {(employeeStaff || []).map((worker) => {
+              const isMember = groupMembers.some((m: any) => m.id === worker.id);
+              return (
+                <div key={worker.id} className="flex items-center gap-2 p-2 rounded border">
+                  <Checkbox
+                    id={`worker-${worker.id}`}
+                    checked={isMember}
+                    onCheckedChange={(checked) => {
+                      if (checked && selectedGroupForMembers) {
+                        addWorkerToGroupMutation.mutate({ groupId: selectedGroupForMembers.id, workerId: worker.id });
+                      } else if (!checked && selectedGroupForMembers) {
+                        removeWorkerFromGroupMutation.mutate({ groupId: selectedGroupForMembers.id, workerId: worker.id });
+                      }
+                    }}
+                    data-testid={`checkbox-worker-${worker.id}`}
+                  />
+                  <label htmlFor={`worker-${worker.id}`} className="cursor-pointer flex-1">
+                    {worker.firstName} {worker.lastName}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setGroupMembersDialogOpen(false)}
+              data-testid="button-close-members-dialog"
+            >
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
