@@ -183,7 +183,7 @@ export default function Payroll() {
   const [, navigate] = useLocation();
 
   const { data: employees, isLoading: employeesLoading} = useQuery<Array<Employee & { calculatedBalance: string }>>({
-    queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
+    queryKey: ["/api/employees", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -528,7 +528,6 @@ export default function Payroll() {
         title: "Success",
         description: "Salary deposited successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setDepositDialogOpen(false);
       depositForm.reset();
@@ -555,7 +554,6 @@ export default function Payroll() {
         title: "Success",
         description: "Bonus given successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setBonusDialogOpen(false);
       bonusForm.reset();
@@ -582,7 +580,6 @@ export default function Payroll() {
         title: "Success",
         description: "Withdrawal processed successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       setWithdrawalDialogOpen(false);
       withdrawalForm.reset();
@@ -1104,26 +1101,7 @@ export default function Payroll() {
                         return (
                         <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
-                            <div className="flex items-center gap-2">
-                              <span>{employee.firstName} {employee.lastName}</span>
-                              <ConfirmationDialog
-                                trigger={
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 text-destructive hover:text-destructive"
-                                    data-testid={`button-delete-name-${employee.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                }
-                                title="Delete Employee"
-                                description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
-                                confirmText="Delete"
-                                variant="destructive"
-                                onConfirm={() => handleDeleteEmployee(employee)}
-                              />
-                            </div>
+                            {employee.firstName} {employee.lastName}
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
                             {parseFloat(employee.monthlySalary).toFixed(2)}
