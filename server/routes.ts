@@ -13608,6 +13608,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
         const configuredProfitPercentage = totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
         
+        // Debug logging
+        if (item.stockItemName.includes("Men T Shirt")) {
+          console.log(`DEBUG: ${item.stockItemName}`, {
+            quantity,
+            actualPrice,
+            configuredPrice,
+            rawConfiguredPrice: item.configuredSellingPrice,
+            configuredProfit,
+            totalConfiguredCost,
+          });
+        }
+        
         return {
           ...item,
           configuredSellingPrice: configuredPrice.toString(),
