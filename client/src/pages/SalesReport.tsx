@@ -50,7 +50,9 @@ interface SalesReportItem {
   totalCost: string;
   totalConfiguredCost: number;
   costProfit: string;
+  costProfitPercentage: number;
   configuredProfit: number;
+  configuredProfitPercentage: number;
   createdAt: string;
 }
 
@@ -605,7 +607,9 @@ export default function SalesReport() {
                       <TableHead className="text-right">Configured Price</TableHead>
                       <TableHead className="text-right">Total Sales</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
+                      <TableHead className="text-right">Cost %</TableHead>
                       <TableHead className="text-right">Configured Profit</TableHead>
+                      <TableHead className="text-right">Configured %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -631,8 +635,14 @@ export default function SalesReport() {
                         <TableCell className={`text-right font-mono ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
                           ${parseFloat(item.costProfit).toFixed(2)}
                         </TableCell>
+                        <TableCell className={`text-right font-mono text-sm ${item.costProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {item.costProfitPercentage.toFixed(1)}%
+                        </TableCell>
                         <TableCell className={`text-right font-mono ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
                           ${item.configuredProfit.toFixed(2)}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono text-sm ${item.configuredProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {item.configuredProfitPercentage.toFixed(1)}%
                         </TableCell>
                       </TableRow>
                     ))}
