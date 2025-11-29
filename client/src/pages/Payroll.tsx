@@ -1078,7 +1078,26 @@ export default function Payroll() {
                         return (
                         <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
-                            {employee.firstName} {employee.lastName}
+                            <div className="flex items-center gap-2">
+                              <span>{employee.firstName} {employee.lastName}</span>
+                              <ConfirmationDialog
+                                trigger={
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    data-testid={`button-delete-name-${employee.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                }
+                                title="Delete Employee"
+                                description={`Are you sure you want to delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`}
+                                confirmText="Delete"
+                                variant="destructive"
+                                onConfirm={() => handleDeleteEmployee(employee)}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
                             {parseFloat(employee.monthlySalary).toFixed(2)}

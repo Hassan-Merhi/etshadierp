@@ -1135,19 +1135,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       // Ensure proper camelCase field names for frontend
       const transformedEmployees = employees.map(emp => {
-        // Calculate balance: openingBalance + deposits + bonuses - withdrawals
+        // Calculate balance: openingBalance + deposits - withdrawals
         const openingBalance = parseFloat((emp as any).openingBalance || "0");
         const totalDeposits = parseFloat((emp as any).totalDeposits || "0");
-        const totalBonuses = parseFloat((emp as any).totalBonuses || "0");
         const totalWithdrawals = parseFloat((emp as any).totalWithdrawals || "0");
         
-        const calculatedBalance = openingBalance + totalDeposits + totalBonuses - totalWithdrawals;
+        const calculatedBalance = openingBalance + totalDeposits - totalWithdrawals;
+        
+        console.log(`Employee ${emp.firstName} ${emp.lastName}: opening=${openingBalance}, deposits=${totalDeposits}, withdrawals=${totalWithdrawals}, calculated=${calculatedBalance}`);
         
         return {
           ...emp,
           firstName: emp.firstName || (emp as any).first_name,
           lastName: emp.lastName || (emp as any).last_name,
           currentBalance: calculatedBalance.toFixed(2),
+          calculatedBalance: calculatedBalance.toFixed(2),
         };
       });
       res.json(transformedEmployees);
