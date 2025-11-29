@@ -13615,10 +13615,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(...conditions))
         .orderBy(vouchers.voucherDate);
 
-      // Calculate configured profit for each item (actual selling price - configured selling price) * quantity
+      // Calculate configured profit for each item (configured selling price - cost price) * quantity
       const enhancedSalesData = salesData.map(item => ({
         ...item,
-        configuredProfit: (parseFloat(item.actualSellingPrice || "0") - parseFloat(item.configuredSellingPrice || "0")) * parseFloat(item.quantity || "0"),
+        configuredProfit: (parseFloat(item.configuredSellingPrice || "0") - parseFloat(item.costPrice || "0")) * parseFloat(item.quantity || "0"),
         totalConfiguredCost: parseFloat(item.configuredSellingPrice || "0") * parseFloat(item.quantity || "0"),
       }));
 
