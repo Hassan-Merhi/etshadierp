@@ -499,41 +499,17 @@ export class DbStorage implements IStorage {
     // Get all employees for the company
     const employees = await this.getAllEmployees(companyId);
     
-    // Calculate balance for each employee from their voucher transactions
-    const employeesWithBalances = await Promise.all(
-      employees.map(async (employee) => {
-        // Get all voucher entries for this employee
-        const entries = await db
-          .select({
-            debitAmount: schema.voucherEntries.debitAmount,
-            creditAmount: schema.voucherEntries.creditAmount,
-          })
-          .from(schema.voucherEntries)
-          .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-          .where(
-            and(
-              eq(schema.voucherEntries.employeeId, employee.id),
-              eq(schema.vouchers.companyId, companyId)
-            )
-          );
+    // Calculate balance for each employee - use stored currentBalance which includes deposits
+    const employeesWithBalances = employees.map((employee) => {
+      // Use employee.currentBalance which is updated by deposits/bonuses/withdrawals
+      // This includes opening balance + all deposits made via the deposit endpoint
+      const calculatedBalance = parseFloat(employee.currentBalance || "0");
 
-        // Calculate balance: opening balance + credits - debits
-        // Credits increase payable (we owe them salary), Debits decrease payable (we paid them)
-        const openingBalance = parseFloat(employee.openingBalance || "0");
-        const transactionBalance = entries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.creditAmount || "0");
-          const debit = parseFloat(entry.debitAmount || "0");
-          return sum + credit - debit;
-        }, 0);
-        
-        const calculatedBalance = openingBalance + transactionBalance;
-
-        return {
-          ...employee,
-          calculatedBalance: calculatedBalance.toFixed(2),
-        };
-      })
-    );
+      return {
+        ...employee,
+        calculatedBalance: calculatedBalance.toFixed(2),
+      };
+    });
 
     return employeesWithBalances;
   }

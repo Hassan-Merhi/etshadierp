@@ -1133,13 +1133,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employees = await storage.getAllEmployees(
         req.session.currentCompanyId,
       );
-      // Ensure proper camelCase field names for frontend and calculate total balance including opening balance
-      const transformedEmployees = employees.map(emp => ({
-        ...emp,
-        firstName: emp.firstName || (emp as any).first_name,
-        lastName: emp.lastName || (emp as any).last_name,
-        currentBalance: (parseFloat((emp as any).currentBalance || "0") + parseFloat((emp as any).openingBalance || "0")).toFixed(2),
-      }));
+      // Ensure proper camelCase field names for frontend
+      const transformedEmployees = employees.map(emp => {
+        // Initialize currentBalance from openingBalance if not set
+        const currentBalance = parseFloat((emp as any).currentBalance || "0");
+        const openingBalance = parseFloat((emp as any).openingBalance || "0");
+        const finalBalance = currentBalance === 0 && openingBalance > 0 ? openingBalance : currentBalance;
+        
+        return {
+          ...emp,
+          firstName: emp.firstName || (emp as any).first_name,
+          lastName: emp.lastName || (emp as any).last_name,
+          currentBalance: finalBalance.toFixed(2),
+        };
+      });
       res.json(transformedEmployees);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1180,7 +1187,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const employee = await storage.createEmployee(parsed);
+      let employee = await storage.createEmployee(parsed);
+      
+      // Initialize currentBalance to opening balance if provided
+      if (parsed.openingBalance && parseFloat(parsed.openingBalance) > 0) {
+        await db.update(employees).set({
+          currentBalance: parsed.openingBalance,
+        }).where(eq(employees.id, employee.id));
+        
+        employee = {
+          ...employee,
+          currentBalance: parsed.openingBalance,
+        };
+      }
+      
       res.status(201).json(employee);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
