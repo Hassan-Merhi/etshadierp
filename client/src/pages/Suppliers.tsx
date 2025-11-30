@@ -53,7 +53,7 @@ interface SupplierWithStats {
 export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
-  const [hideZeroBalance, setHideZeroBalance] = useState(false);
+  const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
   
