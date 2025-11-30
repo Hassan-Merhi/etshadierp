@@ -1384,7 +1384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
-      const workerGroups = allGroups.filter((g: any) => g.groupType === "Worker");
+      const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
       res.json(workerGroups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1398,7 +1398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const companyId = req.session.currentCompanyId;
       const allGroups = await storage.getAllEmployeeGroups(companyId);
-      const workerGroups = allGroups.filter((g: any) => g.groupType === "Worker");
+      const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
       
       // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
