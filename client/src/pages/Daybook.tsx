@@ -1250,12 +1250,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     <TableRow key={item.id}>
                                       <TableCell>
                                         <div className="font-medium">{item.stockItemName || item.accountName}</div>
-                                        {item.stockItemCode && (
-                                          <div className="text-xs text-muted-foreground font-mono">{item.stockItemCode}</div>
-                                        )}
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
-                                        {qty.toFixed(3)}
+                                        {Math.round(qty).toLocaleString()}
                                       </TableCell>
                                       {!isPOSUser && (
                                         <>
@@ -1274,7 +1271,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <TableRow className="font-bold bg-muted/50">
                                   <TableCell>Total</TableCell>
                                   <TableCell className="text-right font-mono">
-                                    {purchaseItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0).toFixed(3)}
+                                    {Math.round(purchaseItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
                                   </TableCell>
                                   {!isPOSUser && (
                                     <>
