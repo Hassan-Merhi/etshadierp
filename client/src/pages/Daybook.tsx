@@ -520,6 +520,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
         );
       }
 
+      // Hide charge-related vouchers (they appear grouped under PO instead)
+      const chargePatterns = ["Freight -", "Document Charges -", "Fumigation -", "Discount -"];
+      if (voucher.description && chargePatterns.some(pattern => voucher.description!.startsWith(pattern))) {
+        return false;
+      }
+
       return true;
     }).sort((a, b) => {
       // Sort by date (newest first), then by voucher number
