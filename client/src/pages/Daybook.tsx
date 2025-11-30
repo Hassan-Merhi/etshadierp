@@ -521,7 +521,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       }
 
       // Hide charge-related vouchers (they appear grouped under PO instead)
-      const chargePatterns = ["Freight -", "Document Charges -", "Fumigation -", "Discount -"];
+      const chargePatterns = ["Freight -", "Document Charges -", "Fumigation -", "Discount -", "Surcharge -"];
       if (voucher.description && chargePatterns.some(pattern => voucher.description!.startsWith(pattern))) {
         return false;
       }
