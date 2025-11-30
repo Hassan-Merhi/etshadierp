@@ -203,13 +203,40 @@ export function OffloadDialog({
     enabled: open,
   });
 
-  const totalCharges =
+  // Fetch container with PO data to get charges
+  const { data: containerData } = useQuery<any>({
+    queryKey: [`/api/containers/${containerId}`],
+    enabled: open && !!containerId,
+  });
+
+  // Calculate PO charges (freight, document charges, etc.)
+  let poChargesTotal = 0;
+  if (containerData?.purchaseOrders) {
+    containerData.purchaseOrders.forEach((po: any) => {
+      // Sum all charge entries from the vouchers
+      if (Array.isArray(po.vouchers)) {
+        po.vouchers.forEach((voucher: any) => {
+          if (Array.isArray(voucher.entries)) {
+            voucher.entries.forEach((entry: any) => {
+              // Add debit amounts for charges
+              if (parseFloat(entry.debitAmount || "0") > 0) {
+                poChargesTotal += parseFloat(entry.debitAmount);
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  const manualCharges =
     parseFloat(duties || "0") +
     parseFloat(officeCharges || "0") +
     parseFloat(transferCharges || "0") +
     parseFloat(transportFees || "0") +
     additionalCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || "0"), 0);
 
+  const totalCharges = manualCharges + poChargesTotal;
   const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
 
   const handleAddCharge = () => {
@@ -521,10 +548,22 @@ export function OffloadDialog({
           {/* Calculation Summary */}
           <div className="rounded-md border p-4 space-y-2 bg-muted/50">
             <h4 className="font-semibold text-sm">Calculation Summary</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="flex justify-between">
+            <div className="space-y-2 text-sm">
+              {manualCharges > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Manual Charges:</span>
+                  <span className="font-medium">${manualCharges.toFixed(2)}</span>
+                </div>
+              )}
+              {poChargesTotal > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">PO Charges (Freight, Document Charges, etc.):</span>
+                  <span className="font-medium">${poChargesTotal.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold border-t pt-2">
                 <span className="text-muted-foreground">Total Charges:</span>
-                <span className="font-medium" data-testid="text-total-charges">
+                <span data-testid="text-total-charges">
                   ${totalCharges.toFixed(2)}
                 </span>
               </div>
@@ -534,7 +573,7 @@ export function OffloadDialog({
                   {totalBales.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between col-span-2 pt-2 border-t">
+              <div className="flex justify-between pt-2 border-t">
                 <span className="text-muted-foreground">Additional Cost per Bale:</span>
                 <span className="font-semibold" data-testid="text-cost-per-bale">
                   ${additionalCostPerBale.toFixed(2)}
