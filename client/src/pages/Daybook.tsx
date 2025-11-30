@@ -1287,15 +1287,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   </TableRow>
                                 )}
                                 
-                                {/* Charges/Adjustments */}
+                                {/* Charges/Adjustments - Extract charge type from account name */}
                                 {ledgerEntries.length > 0 && ledgerEntries.map((entry) => {
                                   const amount = parseFloat(entry.debitAmount || "0") > 0 
                                     ? parseFloat(entry.debitAmount)
                                     : parseFloat(entry.creditAmount || "0");
+                                  
+                                  // Extract charge type from account name (e.g., "Freight - Container..." -> "Freight")
+                                  let chargeLabel = entry.accountName;
+                                  const dashIndex = entry.accountName.indexOf(" - ");
+                                  if (dashIndex > 0) {
+                                    chargeLabel = entry.accountName.substring(0, dashIndex);
+                                  }
+                                  
                                   return (
                                     <TableRow key={entry.id} className="bg-muted/20">
                                       <TableCell>
-                                        <div className="font-medium text-sm">{entry.accountName}</div>
+                                        <div className="font-medium text-sm">{chargeLabel}</div>
                                       </TableCell>
                                       <TableCell></TableCell>
                                       {!isPOSUser && (
