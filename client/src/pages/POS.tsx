@@ -167,6 +167,7 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
+  const [printTime, setPrintTime] = useState<string>("");
   const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
   const itemListRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
@@ -381,6 +382,23 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
       });
     },
   });
+
+  // Set print time when print dialog opens
+  useEffect(() => {
+    if (showPrintDialog) {
+      const now = new Date();
+      const timeString = now.toLocaleString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      });
+      setPrintTime(timeString);
+    }
+  }, [showPrintDialog]);
 
   // Print handler
   const handlePrint = useReactToPrint({
@@ -1289,6 +1307,13 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
                   <p>{savedSale?.saleDate}</p>
                 </div>
               </div>
+
+              {posUser && (
+                <div className="mb-4 p-2 bg-gray-50 border border-gray-200 text-sm">
+                  <p className="font-semibold mb-0.5">Printed by:</p>
+                  <p>{posUser.name} at {printTime}</p>
+                </div>
+              )}
 
               {savedSale?.isCreditSale && savedSale?.customer && (
                 <div className="mb-4 p-2 bg-gray-100 border border-gray-300">
