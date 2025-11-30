@@ -1421,7 +1421,26 @@ export default function Payroll() {
                             {worker.code}
                           </TableCell>
                           <TableCell data-testid={`cell-name-${worker.id}`}>
-                            {worker.firstName} {worker.lastName}
+                            <div className="flex items-center gap-2">
+                              <span>{worker.firstName} {worker.lastName}</span>
+                              <ConfirmationDialog
+                                trigger={
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    data-testid={`button-delete-name-${worker.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                }
+                                title="Delete Worker"
+                                description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                confirmText="Delete"
+                                variant="destructive"
+                                onConfirm={() => handleDeleteWorker(worker)}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell data-testid={`cell-department-${worker.id}`}>
                             {worker.department || "-"}
