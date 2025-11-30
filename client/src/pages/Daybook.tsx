@@ -1225,8 +1225,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                           </div>
                         )}
                         
-                        {/* Purchase Items Table */}
-                        {purchaseItems.length > 0 ? (
+                        {/* Purchase Items + Charges Table */}
+                        {purchaseItems.length > 0 || ledgerEntries.length > 0 ? (
                           <div className="border rounded-md">
                             <Table>
                               <TableHeader>
@@ -1242,6 +1242,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
+                                {/* Purchase Items */}
                                 {purchaseItems.map((item) => {
                                   const qty = parseFloat(item.quantity || "0");
                                   const rate = item.rate != null ? parseFloat(item.rate) : 0;
@@ -1267,9 +1268,51 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     </TableRow>
                                   );
                                 })}
-                                {/* Totals Row */}
+                                
+                                {/* Items Subtotal */}
+                                {purchaseItems.length > 0 && (
+                                  <TableRow className="bg-muted/30">
+                                    <TableCell className="font-semibold">Items Subtotal</TableCell>
+                                    <TableCell className="text-right font-mono">
+                                      {Math.round(purchaseItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
+                                    </TableCell>
+                                    {!isPOSUser && (
+                                      <>
+                                        <TableCell></TableCell>
+                                        <TableCell className="text-right font-mono font-semibold">
+                                          ${purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0).toFixed(2)}
+                                        </TableCell>
+                                      </>
+                                    )}
+                                  </TableRow>
+                                )}
+                                
+                                {/* Charges/Adjustments */}
+                                {ledgerEntries.length > 0 && ledgerEntries.map((entry) => {
+                                  const amount = parseFloat(entry.debitAmount || "0") > 0 
+                                    ? parseFloat(entry.debitAmount)
+                                    : parseFloat(entry.creditAmount || "0");
+                                  return (
+                                    <TableRow key={entry.id} className="bg-muted/20">
+                                      <TableCell>
+                                        <div className="font-medium text-sm">{entry.accountName}</div>
+                                      </TableCell>
+                                      <TableCell></TableCell>
+                                      {!isPOSUser && (
+                                        <>
+                                          <TableCell></TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            ${amount.toFixed(2)}
+                                          </TableCell>
+                                        </>
+                                      )}
+                                    </TableRow>
+                                  );
+                                })}
+                                
+                                {/* Grand Total Row */}
                                 <TableRow className="font-bold bg-muted/50">
-                                  <TableCell>Total</TableCell>
+                                  <TableCell>GRAND TOTAL</TableCell>
                                   <TableCell className="text-right font-mono">
                                     {Math.round(purchaseItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
                                   </TableCell>
@@ -1277,7 +1320,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     <>
                                       <TableCell></TableCell>
                                       <TableCell className="text-right font-mono">
-                                        ${purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0).toFixed(2)}
+                                        ${(purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0) + 
+                                            ledgerEntries.reduce((sum, entry) => sum + (parseFloat(entry.debitAmount || "0") > 0 ? parseFloat(entry.debitAmount) : parseFloat(entry.creditAmount || "0")), 0)).toFixed(2)}
                                       </TableCell>
                                     </>
                                   )}
