@@ -16956,7 +16956,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: string;
         particulars: string;
         vchType: string;
-        vchNo: string;
         voucherId: number;
         inwardQty: number;
         inwardRate: number;
@@ -16992,7 +16991,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: item.date.toISOString().split('T')[0],
           particulars: item.supplierName,
           vchType: 'PURCHASE IMPORT',
-          vchNo: item.poNumber,
           voucherId: 0,
           inwardQty: parseFloat(item.quantity),
           inwardRate: parseFloat(item.rate),
@@ -17053,7 +17051,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: item.voucherDate,
           particulars: `To ${destName}`,
           vchType: `Stock Transfer - ${sourceName}`,
-          vchNo: item.voucherNumber,
           voucherId: item.voucherId,
           inwardQty: 0,
           inwardRate: 0,
@@ -17068,7 +17065,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: item.voucherDate,
           particulars: `From ${sourceName}`,
           vchType: `Stock Transfer - ${destName}`,
-          vchNo: item.voucherNumber,
           voucherId: item.voucherId,
           inwardQty: qty,
           inwardRate: rate,
@@ -17115,7 +17111,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: item.voucherDate,
           particulars: locName,
           vchType: isProduction ? 'Production' : 'Consumption',
-          vchNo: item.voucherNumber,
           voucherId: item.voucherId,
           inwardQty: isProduction ? qty : 0,
           inwardRate: isProduction ? rate : 0,
@@ -17181,7 +17176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: data.date,
           particulars: data.locationName,
           vchType: `POS - ${data.locationName}`,
-          vchNo: data.voucherNumber,
           voucherId: parseInt(vid),
           inwardQty: 0,
           inwardRate: 0,

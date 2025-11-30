@@ -18,7 +18,6 @@ interface Transaction {
   date: string;
   particulars: string;
   vchType: string;
-  vchNo: string;
   voucherId: number;
   inwardQty: number;
   inwardRate: number;
@@ -126,7 +125,6 @@ export default function StockItemVouchers() {
                   <TableHead rowSpan={2} className="align-bottom border-r w-[80px]">Date</TableHead>
                   <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
                   <TableHead rowSpan={2} className="align-bottom border-r">Vch Type</TableHead>
-                  <TableHead rowSpan={2} className="align-bottom border-r w-[80px]">Vch No.</TableHead>
                   <TableHead colSpan={3} className="text-center border-r">Inwards</TableHead>
                   <TableHead colSpan={3} className="text-center border-r">Outwards</TableHead>
                   <TableHead colSpan={3} className="text-center">Closing</TableHead>
@@ -149,7 +147,6 @@ export default function StockItemVouchers() {
                     <TableCell className="border-r tabular-nums">{formatDate(txn.date)}</TableCell>
                     <TableCell className="border-r">{txn.particulars}</TableCell>
                     <TableCell className="border-r text-xs">{txn.vchType}</TableCell>
-                    <TableCell className="border-r tabular-nums">{txn.vchNo}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardRate)}</TableCell>
                     <TableCell className="text-right tabular-nums border-r">{formatNumber(txn.inwardValue)}</TableCell>
@@ -164,7 +161,7 @@ export default function StockItemVouchers() {
                 
                 {data?.transactions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions found for this month
                     </TableCell>
                   </TableRow>
@@ -172,7 +169,7 @@ export default function StockItemVouchers() {
                 
                 {data && data.transactions.length > 0 && (
                   <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={4} className="border-r">Totals</TableCell>
+                    <TableCell colSpan={3} className="border-r">Totals</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardRate)}</TableCell>
                     <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</TableCell>
