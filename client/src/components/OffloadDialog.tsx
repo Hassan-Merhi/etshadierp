@@ -209,22 +209,13 @@ export function OffloadDialog({
     enabled: open && !!containerId,
   });
 
-  // Calculate PO charges (freight, document charges, etc.)
+  // Calculate PO charges (freight, document charges, etc.) from charges array
   let poChargesTotal = 0;
-  if (containerData?.purchaseOrders) {
-    containerData.purchaseOrders.forEach((po: any) => {
-      // Sum all charge entries from the vouchers
-      if (Array.isArray(po.vouchers)) {
-        po.vouchers.forEach((voucher: any) => {
-          if (Array.isArray(voucher.entries)) {
-            voucher.entries.forEach((entry: any) => {
-              // Add debit amounts for charges
-              if (parseFloat(entry.debitAmount || "0") > 0) {
-                poChargesTotal += parseFloat(entry.debitAmount);
-              }
-            });
-          }
-        });
+  if (containerData?.charges && Array.isArray(containerData.charges)) {
+    containerData.charges.forEach((charge: any) => {
+      const amount = parseFloat(charge.amount || "0");
+      if (amount > 0) {
+        poChargesTotal += amount;
       }
     });
   }
