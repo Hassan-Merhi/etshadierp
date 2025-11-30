@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Edit, Save, X, Package, Plus, Trash2 } from "lucide-react";
+import { Edit, Save, X, Package, Plus, Trash2, ExternalLink, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
-import type { Location } from "@shared/schema";
+import type { Location as LocationType } from "@shared/schema";
 
 interface StockItemDetailsDialogProps {
   open: boolean;
@@ -77,6 +78,7 @@ export function StockItemDetailsDialog({
   stockItemName,
 }: StockItemDetailsDialogProps) {
   const { toast } = useToast();
+  const [_location, navigate] = useLocation();
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [editedCode, setEditedCode] = useState("");
   const [editedName, setEditedName] = useState("");
@@ -130,7 +132,7 @@ export function StockItemDetailsDialog({
   });
 
   // Fetch locations
-  const { data: locations = [] } = useQuery<Location[]>({
+  const { data: locations = [] } = useQuery<LocationType[]>({
     queryKey: ["/api/locations"],
     enabled: open,
   });
@@ -781,144 +783,25 @@ export function StockItemDetailsDialog({
           </TabsContent>
 
           <TabsContent value="transactions" className="mt-4">
-            {loadingTransactions ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">Loading transactions...</p>
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <BarChart3 className="h-12 w-12 text-muted-foreground" />
+              <div className="text-center space-y-2">
+                <h3 className="font-semibold text-lg">Stock Item Monthly Summary</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  View monthly inwards, outwards, and closing balances for this stock item with detailed transaction history.
+                </p>
               </div>
-            ) : transactions.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">No transactions found</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {transactions.map((transaction) => {
-                  const isEditing = editingTransaction === transaction.id;
-                  return (
-                    <div
-                      key={transaction.id}
-                      className="border rounded-lg p-4 space-y-3"
-                      data-testid={`transaction-${transaction.id}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">
-                            {transaction.voucherNumber} ({transaction.type === "transfer" ? "Transfer" : "Adjustment"})
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {transaction.voucherDate ? format(new Date(transaction.voucherDate), "dd MMM yyyy") : "-"}
-                          </p>
-                          {transaction.notes && (
-                            <p className="text-xs text-muted-foreground italic">{transaction.notes}</p>
-                          )}
-                        </div>
-                        {!isEditing && (
-                          <Button
-                            onClick={() => handleEditTransaction(transaction)}
-                            variant="outline"
-                            size="sm"
-                            data-testid={`button-edit-transaction-${transaction.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-
-                      {isEditing ? (
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-2 col-span-3">
-                            <Label>Stock Item</Label>
-                            <Select
-                              value={editedStockItemId?.toString() || ""}
-                              onValueChange={(value) => setEditedStockItemId(parseInt(value))}
-                            >
-                              <SelectTrigger data-testid="select-transaction-stock-item">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {allStockItems.map((item) => (
-                                  <SelectItem key={item.id} value={item.id.toString()}>
-                                    {item.code} - {item.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Quantity</Label>
-                            <Input
-                              type="number"
-                              step="0.001"
-                              value={editedQuantity}
-                              onChange={(e) => setEditedQuantity(e.target.value)}
-                              data-testid="input-transaction-quantity"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Rate</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={editedRate}
-                              onChange={(e) => setEditedRate(e.target.value)}
-                              data-testid="input-transaction-rate"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Amount</Label>
-                            <Input
-                              value={(parseFloat(editedQuantity || "0") * parseFloat(editedRate || "0")).toFixed(2)}
-                              disabled
-                              className="bg-muted"
-                              data-testid="input-transaction-amount"
-                            />
-                          </div>
-
-                          <div className="col-span-3 flex gap-2 justify-end">
-                            <Button
-                              onClick={() => handleSaveTransaction(transaction)}
-                              size="sm"
-                              disabled={updateTransactionMutation.isPending}
-                              data-testid={`button-save-transaction-${transaction.id}`}
-                            >
-                              <Save className="h-4 w-4 mr-2" />
-                              Save
-                            </Button>
-                            <Button
-                              onClick={handleCancelTransactionEdit}
-                              variant="outline"
-                              size="sm"
-                              disabled={updateTransactionMutation.isPending}
-                              data-testid={`button-cancel-transaction-${transaction.id}`}
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Quantity</p>
-                            <p className="font-mono font-medium">{parseFloat(transaction.quantity).toFixed(3)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Rate</p>
-                            <p className="font-mono font-medium">{parseFloat(transaction.rate).toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Amount</p>
-                            <p className="font-mono font-medium">{parseFloat(transaction.totalAmount).toFixed(2)}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate(`/stock-items/${stockItemId}/history`);
+                }}
+                data-testid="button-view-history"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Monthly Summary
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

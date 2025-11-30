@@ -48,6 +48,8 @@ import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
 import OrphanedRecords from "@/pages/OrphanedRecords";
 import PurchaseOrderEdit from "@/pages/PurchaseOrderEdit";
+import StockItemHistory from "@/pages/StockItemHistory";
+import StockItemVouchers from "@/pages/StockItemVouchers";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -100,6 +102,8 @@ function Router({ user }: { user: any }) {
       <Route path="/import-stock-items" component={ImportStockItems} />
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
+      <Route path="/stock-items/:id/history" component={StockItemHistory} />
+      <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />

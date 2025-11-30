@@ -16734,6 +16734,517 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Item Monthly Summary - Get aggregated monthly data for a stock item
+  app.get("/api/stock-items/:id/monthly-summary", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const companyId = req.session.currentCompanyId;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      // Get the stock item info
+      const stockItem = await storage.getStockItemById(stockItemId);
+      if (!stockItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+      
+      // Initialize monthly data
+      const monthlyData: Array<{
+        month: number;
+        monthName: string;
+        inwardQty: number;
+        inwardValue: number;
+        outwardQty: number;
+        outwardValue: number;
+        closingQty: number;
+        closingValue: number;
+      }> = [];
+      
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      // Query all relevant transactions for this stock item in the year
+      // 1. PO Line Items (Inwards - container imports)
+      const poInwards = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${purchaseOrders.createdAt})`,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          lineTotal: poLineItems.lineTotal,
+        })
+        .from(poLineItems)
+        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(purchaseOrders.companyId, companyId),
+          sql`EXTRACT(YEAR FROM ${purchaseOrders.createdAt}) = ${year}`
+        ));
+      
+      // 2. Stock Transfers (both In and Out based on source/destination)
+      const stockTransfers = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
+          quantity: stockTransferItems.quantity,
+          rate: stockTransferItems.rate,
+          totalAmount: stockTransferItems.totalAmount,
+          sourceLocationId: stockTransferItems.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+          optional: vouchers.optional,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
+        ));
+      
+      // 3. Stock Adjustments (Production = In, Consumption = Out)
+      const stockAdjustments = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
+          quantity: stockAdjustmentItems.quantity,
+          rate: stockAdjustmentItems.rate,
+          totalAmount: stockAdjustmentItems.totalAmount,
+          adjustmentType: stockAdjustmentVouchers.adjustmentType,
+          optional: vouchers.optional,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
+        ));
+      
+      // 4. Sales (Outwards)
+      const salesData = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
+          quantity: salesItems.quantity,
+          costPrice: salesItems.costPrice,
+          totalCost: salesItems.totalCost,
+          optional: vouchers.optional,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(
+          eq(salesItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
+        ));
+      
+      // Initialize monthly buckets
+      const monthBuckets: Record<number, { inQty: number; inVal: number; outQty: number; outVal: number }> = {};
+      for (let m = 1; m <= 12; m++) {
+        monthBuckets[m] = { inQty: 0, inVal: 0, outQty: 0, outVal: 0 };
+      }
+      
+      // Process PO Inwards
+      for (const row of poInwards) {
+        const month = Number(row.month);
+        monthBuckets[month].inQty += parseFloat(row.quantity);
+        monthBuckets[month].inVal += parseFloat(row.lineTotal);
+      }
+      
+      // Process Stock Transfers (all count as movement - inward if receiving, outward if sending)
+      for (const row of stockTransfers) {
+        const month = Number(row.month);
+        const qty = parseFloat(row.quantity);
+        const val = parseFloat(row.totalAmount);
+        // Transfer OUT from source (outward)
+        monthBuckets[month].outQty += qty;
+        monthBuckets[month].outVal += val;
+        // Transfer IN to destination (inward)
+        monthBuckets[month].inQty += qty;
+        monthBuckets[month].inVal += val;
+      }
+      
+      // Process Stock Adjustments
+      for (const row of stockAdjustments) {
+        const month = Number(row.month);
+        const qty = Math.abs(parseFloat(row.quantity));
+        const val = parseFloat(row.totalAmount);
+        if (row.adjustmentType === 'Production' || parseFloat(row.quantity) > 0) {
+          monthBuckets[month].inQty += qty;
+          monthBuckets[month].inVal += val;
+        } else {
+          monthBuckets[month].outQty += qty;
+          monthBuckets[month].outVal += val;
+        }
+      }
+      
+      // Process Sales (always outward)
+      for (const row of salesData) {
+        const month = Number(row.month);
+        monthBuckets[month].outQty += parseFloat(row.quantity);
+        monthBuckets[month].outVal += parseFloat(row.totalCost);
+      }
+      
+      // Calculate running closing balance
+      let runningQty = 0;
+      let runningVal = 0;
+      
+      // Get opening balance from inventory or assume 0 for start of year
+      // For simplicity, we'll calculate it as prior year closing balance would be opening
+      
+      for (let m = 1; m <= 12; m++) {
+        const bucket = monthBuckets[m];
+        runningQty += bucket.inQty - bucket.outQty;
+        runningVal += bucket.inVal - bucket.outVal;
+        
+        monthlyData.push({
+          month: m,
+          monthName: monthNames[m - 1],
+          inwardQty: bucket.inQty,
+          inwardValue: bucket.inVal,
+          outwardQty: bucket.outQty,
+          outwardValue: bucket.outVal,
+          closingQty: runningQty,
+          closingValue: runningVal,
+        });
+      }
+      
+      // Calculate grand totals
+      const grandTotal = {
+        inwardQty: Object.values(monthBuckets).reduce((s, b) => s + b.inQty, 0),
+        inwardValue: Object.values(monthBuckets).reduce((s, b) => s + b.inVal, 0),
+        outwardQty: Object.values(monthBuckets).reduce((s, b) => s + b.outQty, 0),
+        outwardValue: Object.values(monthBuckets).reduce((s, b) => s + b.outVal, 0),
+        closingQty: runningQty,
+        closingValue: runningVal,
+      };
+      
+      res.json({
+        stockItem,
+        year,
+        monthlyData,
+        grandTotal,
+      });
+    } catch (error: any) {
+      console.error('Stock item monthly summary error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Stock Item Monthly Vouchers - Get detailed transactions for a specific month
+  app.get("/api/stock-items/:id/vouchers/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const stockItemId = parseInt(req.params.id);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      const companyId = req.session.currentCompanyId;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const stockItem = await storage.getStockItemById(stockItemId);
+      if (!stockItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+      
+      const transactions: Array<{
+        date: string;
+        particulars: string;
+        vchType: string;
+        vchNo: string;
+        voucherId: number;
+        inwardQty: number;
+        inwardRate: number;
+        inwardValue: number;
+        outwardQty: number;
+        outwardRate: number;
+        outwardValue: number;
+      }> = [];
+      
+      // 1. PO Line Items (Inwards)
+      const poItems = await db
+        .select({
+          date: purchaseOrders.createdAt,
+          poNumber: purchaseOrders.poNumber,
+          supplierName: suppliers.legalName,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          lineTotal: poLineItems.lineTotal,
+        })
+        .from(poLineItems)
+        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .innerJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(purchaseOrders.companyId, companyId),
+          sql`EXTRACT(YEAR FROM ${purchaseOrders.createdAt}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${purchaseOrders.createdAt}) = ${month}`
+        ))
+        .orderBy(purchaseOrders.createdAt);
+      
+      for (const item of poItems) {
+        transactions.push({
+          date: item.date.toISOString().split('T')[0],
+          particulars: item.supplierName,
+          vchType: 'PURCHASE IMPORT',
+          vchNo: item.poNumber,
+          voucherId: 0,
+          inwardQty: parseFloat(item.quantity),
+          inwardRate: parseFloat(item.rate),
+          inwardValue: parseFloat(item.lineTotal),
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
+        });
+      }
+      
+      // 2. Stock Transfers
+      const transferItems = await db
+        .select({
+          voucherDate: vouchers.voucherDate,
+          voucherNumber: vouchers.voucherNumber,
+          voucherId: vouchers.id,
+          quantity: stockTransferItems.quantity,
+          rate: stockTransferItems.rate,
+          totalAmount: stockTransferItems.totalAmount,
+          sourceLocationId: stockTransferItems.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+          optional: vouchers.optional,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
+        ))
+        .orderBy(vouchers.voucherDate);
+      
+      // Get location names for transfers
+      const locationIds = new Set<number>();
+      for (const item of transferItems) {
+        if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
+        if (item.destinationLocationId) locationIds.add(item.destinationLocationId);
+      }
+      
+      const locationMap: Record<number, string> = {};
+      for (const locId of Array.from(locationIds)) {
+        const loc = await storage.getLocationById(locId);
+        if (loc) locationMap[locId] = loc.name;
+      }
+      
+      for (const item of transferItems) {
+        const qty = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        const val = parseFloat(item.totalAmount);
+        const sourceName = item.sourceLocationId ? (locationMap[item.sourceLocationId] || 'Unknown') : 'Unknown';
+        const destName = locationMap[item.destinationLocationId] || 'Unknown';
+        
+        // Add as Outward from source
+        transactions.push({
+          date: item.voucherDate,
+          particulars: `To ${destName}`,
+          vchType: `Stock Transfer - ${sourceName}`,
+          vchNo: item.voucherNumber,
+          voucherId: item.voucherId,
+          inwardQty: 0,
+          inwardRate: 0,
+          inwardValue: 0,
+          outwardQty: qty,
+          outwardRate: rate,
+          outwardValue: val,
+        });
+        
+        // Add as Inward to destination
+        transactions.push({
+          date: item.voucherDate,
+          particulars: `From ${sourceName}`,
+          vchType: `Stock Transfer - ${destName}`,
+          vchNo: item.voucherNumber,
+          voucherId: item.voucherId,
+          inwardQty: qty,
+          inwardRate: rate,
+          inwardValue: val,
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
+        });
+      }
+      
+      // 3. Stock Adjustments
+      const adjustmentItems = await db
+        .select({
+          voucherDate: vouchers.voucherDate,
+          voucherNumber: vouchers.voucherNumber,
+          voucherId: vouchers.id,
+          quantity: stockAdjustmentItems.quantity,
+          rate: stockAdjustmentItems.rate,
+          totalAmount: stockAdjustmentItems.totalAmount,
+          adjustmentType: stockAdjustmentVouchers.adjustmentType,
+          locationId: stockAdjustmentVouchers.locationId,
+          optional: vouchers.optional,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
+        ))
+        .orderBy(vouchers.voucherDate);
+      
+      for (const item of adjustmentItems) {
+        const qty = Math.abs(parseFloat(item.quantity));
+        const rate = parseFloat(item.rate);
+        const val = parseFloat(item.totalAmount);
+        const locName = locationMap[item.locationId] || (await storage.getLocationById(item.locationId))?.name || 'Unknown';
+        const isProduction = item.adjustmentType === 'Production' || parseFloat(item.quantity) > 0;
+        
+        transactions.push({
+          date: item.voucherDate,
+          particulars: locName,
+          vchType: isProduction ? 'Production' : 'Consumption',
+          vchNo: item.voucherNumber,
+          voucherId: item.voucherId,
+          inwardQty: isProduction ? qty : 0,
+          inwardRate: isProduction ? rate : 0,
+          inwardValue: isProduction ? val : 0,
+          outwardQty: isProduction ? 0 : qty,
+          outwardRate: isProduction ? 0 : rate,
+          outwardValue: isProduction ? 0 : val,
+        });
+      }
+      
+      // 4. Sales (Outwards)
+      const salesData = await db
+        .select({
+          voucherDate: vouchers.voucherDate,
+          voucherNumber: vouchers.voucherNumber,
+          voucherId: vouchers.id,
+          locationId: vouchers.locationId,
+          locationName: vouchers.locationName,
+          quantity: salesItems.quantity,
+          costPrice: salesItems.costPrice,
+          totalCost: salesItems.totalCost,
+          optional: vouchers.optional,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(
+          eq(salesItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
+        ))
+        .orderBy(vouchers.voucherDate);
+      
+      // Group sales by voucher to calculate average rate
+      const salesByVoucher: Record<number, { 
+        date: string;
+        voucherNumber: string;
+        locationName: string;
+        totalQty: number;
+        totalValue: number;
+      }> = {};
+      
+      for (const item of salesData) {
+        const vid = item.voucherId;
+        if (!salesByVoucher[vid]) {
+          const locName = item.locationName || (item.locationId ? (await storage.getLocationById(item.locationId))?.name : null) || 'Cash';
+          salesByVoucher[vid] = {
+            date: item.voucherDate,
+            voucherNumber: item.voucherNumber,
+            locationName: locName,
+            totalQty: 0,
+            totalValue: 0,
+          };
+        }
+        salesByVoucher[vid].totalQty += parseFloat(item.quantity);
+        salesByVoucher[vid].totalValue += parseFloat(item.totalCost);
+      }
+      
+      for (const [vid, data] of Object.entries(salesByVoucher)) {
+        const avgRate = data.totalQty > 0 ? data.totalValue / data.totalQty : 0;
+        transactions.push({
+          date: data.date,
+          particulars: data.locationName,
+          vchType: `POS - ${data.locationName}`,
+          vchNo: data.voucherNumber,
+          voucherId: parseInt(vid),
+          inwardQty: 0,
+          inwardRate: 0,
+          inwardValue: 0,
+          outwardQty: data.totalQty,
+          outwardRate: avgRate,
+          outwardValue: data.totalValue,
+        });
+      }
+      
+      // Sort transactions by date
+      transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      // Calculate running balance (closing column)
+      let runningQty = 0;
+      let runningValue = 0;
+      const transactionsWithBalance = transactions.map(t => {
+        runningQty += t.inwardQty - t.outwardQty;
+        runningValue += t.inwardValue - t.outwardValue;
+        const avgClosingRate = runningQty > 0 ? runningValue / runningQty : 0;
+        return {
+          ...t,
+          closingQty: runningQty,
+          closingRate: avgClosingRate,
+          closingValue: runningValue,
+        };
+      });
+      
+      // Calculate totals
+      const inwardQtyTotal = transactions.reduce((s, t) => s + t.inwardQty, 0);
+      const inwardValueTotal = transactions.reduce((s, t) => s + t.inwardValue, 0);
+      const outwardQtyTotal = transactions.reduce((s, t) => s + t.outwardQty, 0);
+      const outwardValueTotal = transactions.reduce((s, t) => s + t.outwardValue, 0);
+      
+      const totals = {
+        inwardQty: inwardQtyTotal,
+        inwardRate: inwardQtyTotal > 0 ? inwardValueTotal / inwardQtyTotal : 0,
+        inwardValue: inwardValueTotal,
+        outwardQty: outwardQtyTotal,
+        outwardRate: outwardQtyTotal > 0 ? outwardValueTotal / outwardQtyTotal : 0,
+        outwardValue: outwardValueTotal,
+        closingQty: runningQty,
+        closingRate: runningQty > 0 ? runningValue / runningQty : 0,
+        closingValue: runningValue,
+      };
+      
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      res.json({
+        stockItem,
+        year,
+        month,
+        monthName: monthNames[month - 1],
+        transactions: transactionsWithBalance,
+        totals,
+      });
+    } catch (error: any) {
+      console.error('Stock item monthly vouchers error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
