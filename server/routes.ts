@@ -1410,6 +1410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const groupsWithMembers = await Promise.all(
         workerGroups.map(async (group: any) => {
           const memberRecords = await storage.getEmployeeGroupMembers(group.id);
+          console.log(`DEBUG: Group ${group.id} (${group.name}) memberRecords:`, JSON.stringify(memberRecords, null, 2));
           // Get full worker details for each member, ensuring they belong to the same company
           const members = await Promise.all(
             memberRecords.map(async (m: any) => {
@@ -1422,16 +1423,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     eq(employees.companyId, companyId)
                   )
                 );
+              console.log(`DEBUG: Looking for employee ${m.employeeId} in company ${companyId}, found:`, worker ? worker.id : "NOT FOUND");
               return worker;
             })
           );
-          return {
+          const finalResult = {
             ...group,
             members: members.filter(Boolean),
           };
+          console.log(`DEBUG: Final group response - id=${group.id}, members count=${finalResult.members.length}`);
+          return finalResult;
         })
       );
       
+      console.log(`DEBUG: Final response has ${groupsWithMembers.length} groups with members`);
       res.json(groupsWithMembers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
