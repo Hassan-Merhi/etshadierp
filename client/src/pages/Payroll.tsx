@@ -221,6 +221,28 @@ export default function Payroll() {
     enabled: !!selectedCompany,
   });
 
+  // Worker Groups query with members
+  interface WorkerGroupWithMembers {
+    id: number;
+    name: string;
+    description?: string;
+    members: Employee[];
+  }
+  
+  const { data: workerGroups = [] } = useQuery<WorkerGroupWithMembers[]>({
+    queryKey: ["/api/worker-groups/with-members", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Worker Groups state
+  const [workerGroupsExpanded, setWorkerGroupsExpanded] = useState<Record<number, boolean>>({});
+  const [newWorkerGroupName, setNewWorkerGroupName] = useState("");
+  const [newWorkerGroupDescription, setNewWorkerGroupDescription] = useState("");
+  const [createWorkerGroupDialogOpen, setCreateWorkerGroupDialogOpen] = useState(false);
+  const [selectedWorkerGroupForMembers, setSelectedWorkerGroupForMembers] = useState<WorkerGroupWithMembers | null>(null);
+  const [workerGroupMembersDialogOpen, setWorkerGroupMembersDialogOpen] = useState(false);
+  const [workerGroupMemberSelections, setWorkerGroupMemberSelections] = useState<Record<number, boolean>>({});
+
   // Employee Groups state
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -316,6 +338,94 @@ export default function Payroll() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete employee group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Worker Group mutations
+  const createWorkerGroupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/worker-groups", {
+        name: newWorkerGroupName,
+        description: newWorkerGroupDescription,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Worker group created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+      setNewWorkerGroupName("");
+      setNewWorkerGroupDescription("");
+      setCreateWorkerGroupDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create worker group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const addWorkerToWorkerGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
+      await apiRequest("POST", `/api/worker-groups/${groupId}/members/${workerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+      toast({
+        title: "Success",
+        description: "Worker added to group",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add worker to group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeWorkerFromWorkerGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
+      await apiRequest("DELETE", `/api/worker-groups/${groupId}/members/${workerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+      toast({
+        title: "Success",
+        description: "Worker removed from group",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove worker from group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWorkerGroupMutation = useMutation({
+    mutationFn: async (groupId: number) => {
+      await apiRequest("DELETE", `/api/worker-groups/${groupId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Worker group deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete worker group",
         variant: "destructive",
       });
     },
@@ -425,6 +535,17 @@ export default function Payroll() {
       return hasChanges ? cleaned : prev;
     });
   }, [workerStaff]);
+
+  // Compute ungrouped workers (not in any worker group)
+  const ungroupedWorkers = useMemo(() => {
+    const groupedWorkerIds = new Set<number>();
+    workerGroups.forEach(group => {
+      group.members.forEach(member => {
+        groupedWorkerIds.add(member.id);
+      });
+    });
+    return workerStaff.filter(worker => !groupedWorkerIds.has(worker.id));
+  }, [workerStaff, workerGroups]);
 
   // Worker forms
   const newWorkerForm = useForm<WorkerFormData>({
@@ -1589,21 +1710,31 @@ export default function Payroll() {
 
           <Card className="p-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h2 className="text-lg font-semibold">Bulk Worker Payments</h2>
                   <p className="text-sm text-muted-foreground">
                     Select workers and adjust amounts to process bulk salary payments
                   </p>
                 </div>
-                <Button
-                  onClick={() => setBulkPaymentDialogOpen(true)}
-                  disabled={selectedPayments.length === 0}
-                  data-testid="button-bulk-payment"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  Pay Selected ({selectedPayments.length})
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCreateWorkerGroupDialogOpen(true)}
+                    data-testid="button-create-worker-group"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Group
+                  </Button>
+                  <Button
+                    onClick={() => setBulkPaymentDialogOpen(true)}
+                    disabled={selectedPayments.length === 0}
+                    data-testid="button-bulk-payment"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Pay Selected ({selectedPayments.length})
+                  </Button>
+                </div>
               </div>
 
               {selectedPayments.length > 0 && (
@@ -1621,123 +1752,443 @@ export default function Payroll() {
                   <p className="text-sm mt-2">Create workers from the Create Master Data page</p>
                 </div>
               ) : (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Checkbox
-                            checked={Object.values(workerPayments).every(p => p.selected)}
-                            onCheckedChange={handleSelectAll}
-                            data-testid="checkbox-select-all"
-                          />
-                        </TableHead>
-                        <TableHead data-testid="header-code">Code</TableHead>
-                        <TableHead data-testid="header-name">Name</TableHead>
-                        <TableHead data-testid="header-department">Department</TableHead>
-                        <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
-                        <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
-                        <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
-                        <TableHead data-testid="header-status">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {workerStaff.map((worker) => {
-                        const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
-                        const monthlySalary = parseFloat(worker.monthlySalary || "0");
-                        const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
-                        const hasNegativePayment = paymentAmount < 0;
-                        
-                        return (
-                        <TableRow 
-                          key={worker.id} 
-                          data-testid={`row-worker-${worker.id}`}
-                          className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
-                        >
-                          <TableCell>
-                            <Checkbox
-                              checked={workerPayments[worker.id]?.selected || false}
-                              onCheckedChange={() => handleToggleWorker(worker.id)}
-                              data-testid={`checkbox-worker-${worker.id}`}
-                            />
-                          </TableCell>
-                          <TableCell data-testid={`cell-code-${worker.id}`}>
-                            {worker.code}
-                          </TableCell>
-                          <TableCell data-testid={`cell-name-${worker.id}`}>
-                            <div className="flex items-center gap-2">
-                              <span>{worker.firstName} {worker.lastName}</span>
-                              <ConfirmationDialog
-                                trigger={
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 text-destructive hover:text-destructive"
-                                    data-testid={`button-delete-name-${worker.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                }
-                                title="Delete Worker"
-                                description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
-                                confirmText="Delete"
-                                variant="destructive"
-                                onConfirm={() => handleDeleteWorker(worker)}
-                              />
+                <div className="space-y-4">
+                  {/* Worker Groups */}
+                  {workerGroups.map((group) => {
+                    const isExpanded = workerGroupsExpanded[group.id] ?? true;
+                    const groupMembers = group.members || [];
+                    const groupTotal = groupMembers.reduce((sum, member) => {
+                      const payment = workerPayments[member.id];
+                      return sum + (payment?.selected ? parseFloat(payment.amount || "0") : 0);
+                    }, 0);
+                    const selectedCount = groupMembers.filter(m => workerPayments[m.id]?.selected).length;
+                    
+                    return (
+                      <Collapsible
+                        key={group.id}
+                        open={isExpanded}
+                        onOpenChange={(open) => setWorkerGroupsExpanded(prev => ({ ...prev, [group.id]: open }))}
+                      >
+                        <Card className="border">
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center justify-between p-4 cursor-pointer hover-elevate">
+                              <div className="flex items-center gap-3">
+                                <ChevronDown className={cn("h-5 w-5 transition-transform", isExpanded && "rotate-180")} />
+                                <div>
+                                  <h3 className="font-semibold">{group.name}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {groupMembers.length} workers - {selectedCount} selected - Total: {groupTotal.toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedWorkerGroupForMembers(group);
+                                    setWorkerGroupMembersDialogOpen(true);
+                                    // Initialize selections
+                                    const selections: Record<number, boolean> = {};
+                                    groupMembers.forEach(m => { selections[m.id] = true; });
+                                    setWorkerGroupMemberSelections(selections);
+                                  }}
+                                  data-testid={`button-manage-group-${group.id}`}
+                                >
+                                  <Pencil className="h-4 w-4 mr-1" />
+                                  Manage
+                                </Button>
+                                <ConfirmationDialog
+                                  trigger={
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-destructive hover:text-destructive"
+                                      data-testid={`button-delete-group-${group.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  }
+                                  title="Delete Worker Group"
+                                  description={`Are you sure you want to delete the group "${group.name}"? Workers will not be deleted but will become ungrouped.`}
+                                  confirmText="Delete"
+                                  variant="destructive"
+                                  onConfirm={() => deleteWorkerGroupMutation.mutate(group.id)}
+                                />
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell data-testid={`cell-department-${worker.id}`}>
-                            {worker.department || "-"}
-                          </TableCell>
-                          <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                            {monthlySalary.toFixed(2)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
-                            {advanceInfo.total > 0 ? (
-                              <span className="text-destructive">
-                                {advanceInfo.total.toFixed(2)}
-                                {advanceInfo.count > 0 && (
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    ({advanceInfo.count})
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                          <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={workerPayments[worker.id]?.amount || "0"}
-                                onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
-                                className={cn(
-                                  "w-32 text-right font-mono",
-                                  hasNegativePayment && "border-destructive"
-                                )}
-                                data-testid={`input-amount-${worker.id}`}
-                              />
-                              {hasNegativePayment && (
-                                <AlertCircle className="h-4 w-4 text-destructive" />
-                              )}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="border-t">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-12">
+                                      <Checkbox
+                                        checked={groupMembers.every(m => workerPayments[m.id]?.selected)}
+                                        onCheckedChange={(checked) => {
+                                          groupMembers.forEach(member => {
+                                            setWorkerOverrides(prev => ({
+                                              ...prev,
+                                              [member.id]: {
+                                                ...prev[member.id],
+                                                selected: !!checked,
+                                              }
+                                            }));
+                                          });
+                                        }}
+                                        data-testid={`checkbox-select-all-group-${group.id}`}
+                                      />
+                                    </TableHead>
+                                    <TableHead data-testid="header-name">Name</TableHead>
+                                    <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
+                                    <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
+                                    <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
+                                    <TableHead data-testid="header-actions" className="w-16">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {groupMembers.map((worker) => {
+                                    const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                                    const monthlySalary = parseFloat(worker.monthlySalary || "0");
+                                    const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
+                                    const hasNegativePayment = paymentAmount < 0;
+                                    
+                                    return (
+                                      <TableRow 
+                                        key={worker.id} 
+                                        data-testid={`row-worker-${worker.id}`}
+                                        className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
+                                      >
+                                        <TableCell>
+                                          <Checkbox
+                                            checked={workerPayments[worker.id]?.selected || false}
+                                            onCheckedChange={() => handleToggleWorker(worker.id)}
+                                            data-testid={`checkbox-worker-${worker.id}`}
+                                          />
+                                        </TableCell>
+                                        <TableCell data-testid={`cell-name-${worker.id}`}>
+                                          {worker.firstName} {worker.lastName}
+                                        </TableCell>
+                                        <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
+                                          {monthlySalary.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
+                                          {advanceInfo.total > 0 ? (
+                                            <span className="text-destructive">
+                                              {advanceInfo.total.toFixed(2)}
+                                              {advanceInfo.count > 0 && (
+                                                <span className="text-xs text-muted-foreground ml-1">
+                                                  ({advanceInfo.count})
+                                                </span>
+                                              )}
+                                            </span>
+                                          ) : (
+                                            "-"
+                                          )}
+                                        </TableCell>
+                                        <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
+                                          <div className="flex items-center justify-end gap-2">
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              value={workerPayments[worker.id]?.amount || "0"}
+                                              onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                                              className={cn(
+                                                "w-32 text-right font-mono",
+                                                hasNegativePayment && "border-destructive"
+                                              )}
+                                              data-testid={`input-amount-${worker.id}`}
+                                            />
+                                            {hasNegativePayment && (
+                                              <AlertCircle className="h-4 w-4 text-destructive" />
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>
+                                          <ConfirmationDialog
+                                            trigger={
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="text-destructive hover:text-destructive"
+                                                data-testid={`button-delete-worker-${worker.id}`}
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            }
+                                            title="Delete Worker"
+                                            description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                            confirmText="Delete"
+                                            variant="destructive"
+                                            onConfirm={() => handleDeleteWorker(worker)}
+                                          />
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
                             </div>
-                          </TableCell>
-                          <TableCell data-testid={`cell-status-${worker.id}`}>
-                            <Badge variant={worker.active ? "default" : "secondary"}>
-                              {worker.active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
+                    );
+                  })}
+
+                  {/* Ungrouped Workers */}
+                  {ungroupedWorkers.length > 0 && (
+                    <Card className="border">
+                      <div className="p-4">
+                        <h3 className="font-semibold text-muted-foreground">Ungrouped Workers</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {ungroupedWorkers.length} workers not assigned to any group
+                        </p>
+                      </div>
+                      <div className="border-t">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={ungroupedWorkers.every(w => workerPayments[w.id]?.selected)}
+                                  onCheckedChange={(checked) => {
+                                    ungroupedWorkers.forEach(worker => {
+                                      setWorkerOverrides(prev => ({
+                                        ...prev,
+                                        [worker.id]: {
+                                          ...prev[worker.id],
+                                          selected: !!checked,
+                                        }
+                                      }));
+                                    });
+                                  }}
+                                  data-testid="checkbox-select-all-ungrouped"
+                                />
+                              </TableHead>
+                              <TableHead data-testid="header-name">Name</TableHead>
+                              <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
+                              <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
+                              <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
+                              <TableHead data-testid="header-actions" className="w-16">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ungroupedWorkers.map((worker) => {
+                              const advanceInfo = workerAdvances[worker.id] || { total: 0, count: 0 };
+                              const monthlySalary = parseFloat(worker.monthlySalary || "0");
+                              const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
+                              const hasNegativePayment = paymentAmount < 0;
+                              
+                              return (
+                                <TableRow 
+                                  key={worker.id} 
+                                  data-testid={`row-worker-${worker.id}`}
+                                  className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
+                                >
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={workerPayments[worker.id]?.selected || false}
+                                      onCheckedChange={() => handleToggleWorker(worker.id)}
+                                      data-testid={`checkbox-worker-${worker.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-name-${worker.id}`}>
+                                    {worker.firstName} {worker.lastName}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
+                                    {monthlySalary.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
+                                    {advanceInfo.total > 0 ? (
+                                      <span className="text-destructive">
+                                        {advanceInfo.total.toFixed(2)}
+                                        {advanceInfo.count > 0 && (
+                                          <span className="text-xs text-muted-foreground ml-1">
+                                            ({advanceInfo.count})
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </TableCell>
+                                  <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={workerPayments[worker.id]?.amount || "0"}
+                                        onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                                        className={cn(
+                                          "w-32 text-right font-mono",
+                                          hasNegativePayment && "border-destructive"
+                                        )}
+                                        data-testid={`input-amount-${worker.id}`}
+                                      />
+                                      {hasNegativePayment && (
+                                        <AlertCircle className="h-4 w-4 text-destructive" />
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <ConfirmationDialog
+                                      trigger={
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="text-destructive hover:text-destructive"
+                                          data-testid={`button-delete-worker-${worker.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      }
+                                      title="Delete Worker"
+                                      description={`Are you sure you want to delete ${worker.firstName} ${worker.lastName}? This action cannot be undone.`}
+                                      confirmText="Delete"
+                                      variant="destructive"
+                                      onConfirm={() => handleDeleteWorker(worker)}
+                                    />
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* If no groups and no ungrouped workers but workerStaff has items (edge case) */}
+                  {workerGroups.length === 0 && ungroupedWorkers.length === 0 && workerStaff.length > 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>Workers are being loaded...</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </Card>
+
+          {/* Create Worker Group Dialog */}
+          <Dialog open={createWorkerGroupDialogOpen} onOpenChange={setCreateWorkerGroupDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Worker Group</DialogTitle>
+                <DialogDescription>
+                  Create a new group to organize workers for bulk payments
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="worker-group-name">Group Name</Label>
+                  <Input
+                    id="worker-group-name"
+                    value={newWorkerGroupName}
+                    onChange={(e) => setNewWorkerGroupName(e.target.value)}
+                    placeholder="e.g., Factory A, Construction Team"
+                    data-testid="input-worker-group-name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="worker-group-description">Description (Optional)</Label>
+                  <Textarea
+                    id="worker-group-description"
+                    value={newWorkerGroupDescription}
+                    onChange={(e) => setNewWorkerGroupDescription(e.target.value)}
+                    placeholder="Brief description of this group"
+                    data-testid="input-worker-group-description"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setCreateWorkerGroupDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => createWorkerGroupMutation.mutate()}
+                    disabled={!newWorkerGroupName.trim() || createWorkerGroupMutation.isPending}
+                    data-testid="button-confirm-create-group"
+                  >
+                    {createWorkerGroupMutation.isPending ? "Creating..." : "Create Group"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Manage Worker Group Members Dialog */}
+          <Dialog open={workerGroupMembersDialogOpen} onOpenChange={setWorkerGroupMembersDialogOpen}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
+                <DialogDescription>
+                  Add or remove workers from this group
+                </DialogDescription>
+              </DialogHeader>
+              {(() => {
+                // Use live query data to get current group membership
+                const currentGroup = workerGroups.find(g => g.id === selectedWorkerGroupForMembers?.id);
+                const currentMembers = currentGroup?.members || [];
+                
+                return (
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Available Workers</h4>
+                    <div className="border rounded-md max-h-96 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">In Group</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead className="text-right">Monthly Salary</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workerStaff.map((worker) => {
+                            // Use live data to check membership
+                            const isInGroup = currentMembers.some(m => m.id === worker.id);
+                            
+                            return (
+                              <TableRow key={worker.id} data-testid={`row-member-${worker.id}`}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={isInGroup}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        addWorkerToWorkerGroupMutation.mutate({
+                                          groupId: selectedWorkerGroupForMembers!.id,
+                                          workerId: worker.id,
+                                        });
+                                      } else {
+                                        removeWorkerFromWorkerGroupMutation.mutate({
+                                          groupId: selectedWorkerGroupForMembers!.id,
+                                          workerId: worker.id,
+                                        });
+                                      }
+                                    }}
+                                    disabled={addWorkerToWorkerGroupMutation.isPending || removeWorkerFromWorkerGroupMutation.isPending}
+                                    data-testid={`checkbox-member-${worker.id}`}
+                                  />
+                                </TableCell>
+                                <TableCell>{worker.firstName} {worker.lastName}</TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {parseFloat(worker.monthlySalary || "0").toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={() => setWorkerGroupMembersDialogOpen(false)}>
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="advances">

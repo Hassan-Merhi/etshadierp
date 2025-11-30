@@ -1396,20 +1396,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
+      const companyId = req.session.currentCompanyId;
+      const allGroups = await storage.getAllEmployeeGroups(companyId);
       const workerGroups = allGroups.filter((g: any) => g.groupType === "Worker");
       
-      // Get members for each group
+      // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
         workerGroups.map(async (group: any) => {
           const memberRecords = await storage.getEmployeeGroupMembers(group.id);
-          // Get full worker details for each member
+          // Get full worker details for each member, ensuring they belong to the same company
           const members = await Promise.all(
             memberRecords.map(async (m: any) => {
               const [worker] = await db
                 .select()
                 .from(employees)
-                .where(eq(employees.id, m.employeeId));
+                .where(
+                  and(
+                    eq(employees.id, m.employeeId),
+                    eq(employees.companyId, companyId)
+                  )
+                );
               return worker;
             })
           );
@@ -1466,10 +1472,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAuth,
     async (req, res) => {
       try {
-        await storage.addEmployeeToGroup(
-          parseInt(req.params.groupId),
-          parseInt(req.params.workerId),
-        );
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const companyId = req.session.currentCompanyId;
+        const groupId = parseInt(req.params.groupId);
+        const workerId = parseInt(req.params.workerId);
+        
+        // Verify group belongs to company
+        const group = await storage.getEmployeeGroupById(groupId);
+        if (!group || group.companyId !== companyId) {
+          return res.status(403).json({ message: "Group not found or access denied" });
+        }
+        
+        // Verify worker belongs to company
+        const [worker] = await db
+          .select()
+          .from(employees)
+          .where(and(eq(employees.id, workerId), eq(employees.companyId, companyId)));
+        if (!worker) {
+          return res.status(404).json({ message: "Worker not found" });
+        }
+        
+        await storage.addEmployeeToGroup(groupId, workerId);
         res.status(201).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
@@ -1482,10 +1507,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAuth,
     async (req, res) => {
       try {
-        await storage.removeEmployeeFromGroup(
-          parseInt(req.params.groupId),
-          parseInt(req.params.workerId),
-        );
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+        const companyId = req.session.currentCompanyId;
+        const groupId = parseInt(req.params.groupId);
+        const workerId = parseInt(req.params.workerId);
+        
+        // Verify group belongs to company
+        const group = await storage.getEmployeeGroupById(groupId);
+        if (!group || group.companyId !== companyId) {
+          return res.status(403).json({ message: "Group not found or access denied" });
+        }
+        
+        await storage.removeEmployeeFromGroup(groupId, workerId);
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
