@@ -242,6 +242,14 @@ export default function Payroll() {
   const [bulkBonusNotes, setBulkBonusNotes] = useState("");
   const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
 
+  // Bulk Withdrawal state
+  const [bulkWithdrawalDialogOpen, setBulkWithdrawalDialogOpen] = useState(false);
+  const [bulkWithdrawalDate, setBulkWithdrawalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkWithdrawalNotes, setBulkWithdrawalNotes] = useState("");
+  const [bulkWithdrawalAmounts, setBulkWithdrawalAmounts] = useState<Record<number, string>>({});
+  const [bulkWithdrawalAccountType, setBulkWithdrawalAccountType] = useState<"bank" | "cash">("cash");
+  const [bulkWithdrawalAccountId, setBulkWithdrawalAccountId] = useState("");
+
   const { data: groupMembers = [] } = useQuery<any[]>({
     queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
     enabled: !!selectedGroupForMembers?.id,
@@ -704,6 +712,51 @@ export default function Payroll() {
       setBulkBonusDialogOpen(false);
       setBulkBonusAmounts({});
       setBulkBonusNotes("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkWithdrawalMutation = useMutation({
+    mutationFn: async () => {
+      const withdrawals = Object.entries(bulkWithdrawalAmounts)
+        .filter(([_, amount]) => {
+          const parsed = parseFloat(amount);
+          return !isNaN(parsed) && parsed > 0;
+        })
+        .map(([employeeId, amount]) => ({
+          employeeId: parseInt(employeeId),
+          amount,
+        }));
+      if (withdrawals.length === 0) {
+        throw new Error("No valid withdrawal amounts entered");
+      }
+      if (!bulkWithdrawalAccountId) {
+        throw new Error("Please select a payment account");
+      }
+      return await apiRequest("POST", "/api/payroll/bulk-withdraw-employees", {
+        withdrawals,
+        date: bulkWithdrawalDate,
+        notes: bulkWithdrawalNotes,
+        paymentAccountType: bulkWithdrawalAccountType,
+        paymentAccountId: bulkWithdrawalAccountId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bulk withdrawal processed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBulkWithdrawalDialogOpen(false);
+      setBulkWithdrawalAmounts({});
+      setBulkWithdrawalNotes("");
+      setBulkWithdrawalAccountId("");
     },
     onError: (error: Error) => {
       toast({
@@ -1218,9 +1271,9 @@ export default function Payroll() {
                 </Alert>
               )}
 
-              {/* Bulk Bonus Button */}
+              {/* Bulk Bonus & Withdrawal Buttons */}
               {employeeStaff.length > 0 && (
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -1231,6 +1284,18 @@ export default function Payroll() {
                   >
                     <DollarSign className="h-4 w-4 mr-1" />
                     Bulk Bonus Deposit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setBulkWithdrawalAmounts({});
+                      setBulkWithdrawalAccountId("");
+                      setBulkWithdrawalDialogOpen(true);
+                    }}
+                    data-testid="button-open-bulk-withdrawal"
+                  >
+                    <TrendingDown className="h-4 w-4 mr-1" />
+                    Bulk Withdrawal
                   </Button>
                 </div>
               )}
@@ -3317,6 +3382,142 @@ export default function Payroll() {
               >
                 {bulkDepositMutation.isPending ? "Processing..." : `Deposit All (${validSelectedEmployees.length})`}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Withdrawal Dialog */}
+      <Dialog open={bulkWithdrawalDialogOpen} onOpenChange={setBulkWithdrawalDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-withdrawal">
+          <DialogHeader>
+            <DialogTitle>Bulk Withdrawal</DialogTitle>
+            <DialogDescription>
+              Enter withdrawal amounts for each employee. Leave blank or zero to skip.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Withdrawal Date</Label>
+                <Input
+                  type="date"
+                  value={bulkWithdrawalDate}
+                  onChange={(e) => setBulkWithdrawalDate(e.target.value)}
+                  data-testid="input-bulk-withdrawal-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Type</Label>
+                <Select value={bulkWithdrawalAccountType} onValueChange={(val: any) => {
+                  setBulkWithdrawalAccountType(val);
+                  setBulkWithdrawalAccountId("");
+                }}>
+                  <SelectTrigger data-testid="select-withdrawal-account-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash Account</SelectItem>
+                    <SelectItem value="bank">Bank Account</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Account</Label>
+                <Select value={bulkWithdrawalAccountId} onValueChange={setBulkWithdrawalAccountId}>
+                  <SelectTrigger data-testid="select-withdrawal-account">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bulkWithdrawalAccountType === "cash" 
+                      ? cashAccounts?.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                        ))
+                      : bankAccounts?.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.accountName}</SelectItem>
+                        ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Input
+                placeholder="e.g., November 2025 withdrawal"
+                value={bulkWithdrawalNotes}
+                onChange={(e) => setBulkWithdrawalNotes(e.target.value)}
+                data-testid="input-bulk-withdrawal-notes"
+              />
+            </div>
+
+            <div className="border rounded-md flex-1 overflow-hidden">
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background">
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right w-40">Withdrawal Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employeeStaff.map((emp) => (
+                      <TableRow key={emp.id}>
+                        <TableCell>{emp.firstName} {emp.lastName}</TableCell>
+                        <TableCell className="text-right font-mono">{parseFloat(emp.calculatedBalance || "0").toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            className="text-right font-mono w-32 ml-auto"
+                            value={bulkWithdrawalAmounts[emp.id] || ""}
+                            onChange={(e) => setBulkWithdrawalAmounts(prev => ({
+                              ...prev,
+                              [emp.id]: e.target.value
+                            }))}
+                            data-testid={`input-withdrawal-${emp.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="text-sm">
+                <span className="text-muted-foreground">Total Withdrawal: </span>
+                <span className="font-semibold font-mono">
+                  {Object.values(bulkWithdrawalAmounts)
+                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0)
+                    .toFixed(2)}
+                </span>
+                <span className="text-muted-foreground ml-2">
+                  ({Object.values(bulkWithdrawalAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setBulkWithdrawalDialogOpen(false)}
+                  data-testid="button-cancel-bulk-withdrawal"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => bulkWithdrawalMutation.mutate()}
+                  disabled={bulkWithdrawalMutation.isPending || Object.values(bulkWithdrawalAmounts).filter(amt => parseFloat(amt) > 0).length === 0 || !bulkWithdrawalAccountId}
+                  data-testid="button-confirm-bulk-withdrawal"
+                >
+                  {bulkWithdrawalMutation.isPending ? "Processing..." : "Process Withdrawals"}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

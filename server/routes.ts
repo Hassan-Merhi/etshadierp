@@ -1833,6 +1833,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Payroll - Bulk Employee Withdrawal
+  app.post(
+    "/api/payroll/bulk-withdraw-employees",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { withdrawals, date, notes, paymentAccountType, paymentAccountId } = req.body;
+
+        if (!withdrawals || !Array.isArray(withdrawals) || withdrawals.length === 0) {
+          return res.status(400).json({ message: "No withdrawals provided" });
+        }
+
+        if (!date || !paymentAccountType || !paymentAccountId) {
+          return res.status(400).json({ message: "Date, account type, and account are required" });
+        }
+
+        // Filter out empty/zero amounts and validate
+        const validWithdrawals = withdrawals.filter((w: any) => {
+          const amount = parseFloat(w.amount);
+          return !isNaN(amount) && amount > 0;
+        });
+
+        if (validWithdrawals.length === 0) {
+          return res.status(400).json({ message: "No valid withdrawal amounts provided" });
+        }
+
+        // Verify all employees have sufficient balance
+        for (const withdrawal of validWithdrawals) {
+          const [employee] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, withdrawal.employeeId));
+
+          if (!employee) continue;
+          if (employee.companyId !== req.session.currentCompanyId) continue;
+
+          const balance = parseFloat(employee.currentBalance);
+          const withdrawAmount = parseFloat(withdrawal.amount);
+
+          if (balance < withdrawAmount) {
+            return res.status(400).json({
+              message: `${employee.firstName} ${employee.lastName} has insufficient balance. Balance: ${balance}, Requested: ${withdrawAmount}`,
+            });
+          }
+        }
+
+        // Calculate total amount
+        const totalAmount = validWithdrawals.reduce(
+          (sum: number, w: any) => sum + parseFloat(w.amount),
+          0,
+        );
+
+        // Get payment account (bank or cash)
+        let paymentAccount;
+        if (paymentAccountType === "bank") {
+          [paymentAccount] = await db
+            .select()
+            .from(bankAccounts)
+            .where(eq(bankAccounts.id, parseInt(paymentAccountId)));
+        } else {
+          const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+          paymentAccount = allAccounts.find((a: any) => a.id === parseInt(paymentAccountId));
+        }
+
+        if (!paymentAccount) {
+          return res.status(404).json({ message: "Payment account not found" });
+        }
+
+        // Create single voucher for all withdrawals
+        const voucherNumber = `WD-BULK-${Date.now()}`;
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description: notes || `Bulk withdrawal for ${validWithdrawals.length} employees`,
+            totalAmount: totalAmount.toFixed(2),
+            optional: false,
+          })
+          .returning();
+
+        // Create debit entry for payment account
+        const paymentAccountId_num = parseInt(paymentAccountId);
+        const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+        let paymentLedgerAccount;
+
+        if (paymentAccountType === "bank") {
+          // For bank accounts, find the corresponding ledger account
+          paymentLedgerAccount = allAccounts.find((a: any) => a.bankAccountId === paymentAccountId_num);
+          if (!paymentLedgerAccount) {
+            return res.status(404).json({ message: "Ledger account for bank account not found" });
+          }
+        } else {
+          // For cash accounts (ledger accounts), find directly
+          paymentLedgerAccount = allAccounts.find((a: any) => a.id === paymentAccountId_num);
+          if (!paymentLedgerAccount) {
+            return res.status(404).json({ message: "Cash account not found" });
+          }
+        }
+
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: paymentLedgerAccount.id,
+          debitAmount: totalAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Bulk withdrawal - ${validWithdrawals.length} employees - ${voucherNumber}`,
+        });
+
+        // Process each employee withdrawal
+        const results = [];
+        for (const withdrawal of validWithdrawals) {
+          const [employee] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, withdrawal.employeeId));
+
+          if (!employee) continue;
+          if (employee.companyId !== req.session.currentCompanyId) continue;
+
+          const withdrawAmount = parseFloat(withdrawal.amount);
+
+          // Get or create employee liability account
+          const employeeAccountCode = `EMP-${employee.code}`;
+          let employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+
+          if (!employeeAccount) {
+            employeeAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: employeeAccountCode,
+              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
+              accountType: "Liability",
+              openingBalance: "0",
+              active: true,
+            });
+            allAccounts.push(employeeAccount);
+          }
+
+          // Debit employee liability account
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: employeeAccount.id,
+            debitAmount: withdrawAmount.toFixed(2),
+            creditAmount: "0",
+            narration: `Withdrawal for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
+          });
+
+          // Update employee balance (decrease)
+          const newBalance = parseFloat(employee.currentBalance) - withdrawAmount;
+          const newTotalWithdrawals = parseFloat(employee.totalWithdrawals) + withdrawAmount;
+
+          await db
+            .update(employees)
+            .set({
+              currentBalance: newBalance.toFixed(2),
+              totalWithdrawals: newTotalWithdrawals.toFixed(2),
+            })
+            .where(eq(employees.id, withdrawal.employeeId));
+
+          results.push({
+            employeeId: employee.id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            amount: withdrawAmount,
+            newBalance,
+          });
+        }
+
+        res.json({
+          voucher,
+          withdrawals: results,
+          totalAmount,
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Payroll - Employee Bonus
   app.post(
     "/api/payroll/bonus-employee",
