@@ -1393,7 +1393,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     </TableCell>
                                   )}
                                   <TableCell className="text-right font-mono">
-                                    {Math.abs(qty).toFixed(3)}
+                                    {Math.round(Math.abs(qty)).toLocaleString()}
                                   </TableCell>
                                   {!isPOSUser && (
                                     <>
