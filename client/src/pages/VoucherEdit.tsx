@@ -809,8 +809,13 @@ export default function VoucherEdit() {
       const paymentEntry = voucher.entries[0];
       const paymentAccount = findAccountDetails(paymentEntry);
       
-      // Remaining entries are the voucher entries
-      const voucherEntries = voucher.entries.slice(1);
+      // Remaining entries are the voucher entries - filter out zero amount entries
+      const voucherEntries = voucher.entries.slice(1).filter(entry => {
+        const amount = voucherType === "Payment" 
+          ? parseFloat(entry.creditAmount || "0") 
+          : parseFloat(entry.debitAmount || "0");
+        return amount > 0;
+      });
 
       if (paymentAccount) {
         paymentForm.reset({
