@@ -232,7 +232,6 @@ export default function Payroll() {
   const { data: workerGroups = [] } = useQuery<WorkerGroupWithMembers[]>({
     queryKey: ["/api/worker-groups/with-members", selectedCompany?.id],
     enabled: !!selectedCompany,
-    staleTime: 0, // Force refetch on mount
   });
 
   // Worker Groups state

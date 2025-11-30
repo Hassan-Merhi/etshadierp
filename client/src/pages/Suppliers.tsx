@@ -31,7 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download, Edit } from "lucide-react";
+import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
@@ -53,6 +53,7 @@ interface SupplierWithStats {
 export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [hideZeroBalance, setHideZeroBalance] = useState(false);
   const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
   
@@ -80,10 +81,12 @@ export default function Suppliers() {
   const totalContainers = suppliers.reduce((sum, s) => sum + Number(s.containerCount || 0), 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0);
   
-  // Sort suppliers alphabetically by name
-  const sortedSuppliers = [...suppliers].sort((a, b) => 
-    a.legalName.localeCompare(b.legalName)
-  );
+  // Sort suppliers alphabetically by name and filter by balance if needed
+  const sortedSuppliers = [...suppliers]
+    .filter(s => hideZeroBalance ? s.balance !== 0 : true)
+    .sort((a, b) => 
+      a.legalName.localeCompare(b.legalName)
+    );
   
   const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
@@ -187,8 +190,21 @@ export default function Suppliers() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Supplier List</CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setHideZeroBalance(!hideZeroBalance)}
+            data-testid="button-toggle-zero-balance"
+            title={hideZeroBalance ? "Show all suppliers" : "Hide zero balance suppliers"}
+          >
+            {hideZeroBalance ? (
+              <><EyeOff className="h-4 w-4 mr-1" /> Hide Zero</>
+            ) : (
+              <><Eye className="h-4 w-4 mr-1" /> Show All</>
+            )}
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (
