@@ -1511,6 +1511,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Payroll - Bulk Employee Salary Deposit
+  app.post(
+    "/api/payroll/bulk-deposit-employees",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { deposits, date, notes } = req.body;
+
+        if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
+          return res.status(400).json({ message: "No deposits provided" });
+        }
+
+        if (!date) {
+          return res.status(400).json({ message: "Date is required" });
+        }
+
+        // Validate all deposit amounts
+        for (const deposit of deposits) {
+          const amount = parseFloat(deposit.amount);
+          if (isNaN(amount) || amount <= 0) {
+            return res.status(400).json({
+              message: "All deposit amounts must be positive numbers",
+            });
+          }
+        }
+
+        // Get or create SALARY_EXPENSE ledger account
+        const allAccounts = await storage.getAllLedgerAccounts(
+          req.session.currentCompanyId,
+        );
+        let salaryExpenseAccount = allAccounts.find(
+          (a: any) => a.code === "SALARY_EXPENSE",
+        );
+
+        if (!salaryExpenseAccount) {
+          salaryExpenseAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId,
+            code: "SALARY_EXPENSE",
+            name: "Salary Expense",
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        // Calculate total amount
+        const totalAmount = deposits.reduce(
+          (sum: number, d: any) => sum + parseFloat(d.amount),
+          0,
+        );
+
+        // Create single voucher for all deposits
+        const voucherNumber = `SAL-DEP-BULK-${Date.now()}`;
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description:
+              notes || `Bulk salary deposit for ${deposits.length} employees`,
+            totalAmount: totalAmount.toFixed(2),
+            optional: false,
+          })
+          .returning();
+
+        // Create debit entry for total salary expense
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salaryExpenseAccount.id,
+          debitAmount: totalAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`,
+        });
+
+        // Process each employee deposit
+        const results = [];
+        for (const deposit of deposits) {
+          const [employee] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, deposit.employeeId));
+
+          if (!employee) {
+            continue; // Skip if employee not found
+          }
+
+          // Verify employee belongs to current company
+          if (employee.companyId !== req.session.currentCompanyId) {
+            continue;
+          }
+
+          const depositAmount = parseFloat(deposit.amount);
+
+          // Get or create employee liability account
+          const employeeAccountCode = `EMP-${employee.code}`;
+          let employeeAccount = allAccounts.find(
+            (a: any) => a.code === employeeAccountCode,
+          );
+
+          if (!employeeAccount) {
+            employeeAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: employeeAccountCode,
+              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
+              accountType: "Liability",
+              openingBalance: "0",
+              active: true,
+            });
+            // Refresh accounts list
+            allAccounts.push(employeeAccount);
+          }
+
+          // Credit employee liability account
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: employeeAccount.id,
+            debitAmount: "0",
+            creditAmount: depositAmount.toFixed(2),
+            narration: `Salary deposit for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
+          });
+
+          // Update employee balance
+          const newBalance =
+            parseFloat(employee.currentBalance) + depositAmount;
+          const newTotalDeposits =
+            parseFloat(employee.totalDeposits) + depositAmount;
+
+          await db
+            .update(employees)
+            .set({
+              currentBalance: newBalance.toFixed(2),
+              totalDeposits: newTotalDeposits.toFixed(2),
+            })
+            .where(eq(employees.id, deposit.employeeId));
+
+          results.push({
+            employeeId: employee.id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            amount: depositAmount,
+            newBalance,
+          });
+        }
+
+        res.json({
+          voucher,
+          deposits: results,
+          totalAmount,
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Payroll - Employee Bonus
   app.post(
     "/api/payroll/bonus-employee",

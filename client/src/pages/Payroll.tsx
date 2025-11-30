@@ -53,6 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
@@ -228,6 +229,12 @@ export default function Payroll() {
   const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<any | null>(null);
   const [groupMembersDialogOpen, setGroupMembersDialogOpen] = useState(false);
   const [groupMemberSelections, setGroupMemberSelections] = useState<Record<number, boolean>>({});
+
+  // Bulk Deposit state
+  const [bulkDepositSelections, setBulkDepositSelections] = useState<Record<number, boolean>>({});
+  const [bulkDepositDialogOpen, setBulkDepositDialogOpen] = useState(false);
+  const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkDepositNotes, setBulkDepositNotes] = useState("");
 
   const { data: groupMembers = [] } = useQuery<any[]>({
     queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
@@ -622,6 +629,46 @@ export default function Payroll() {
     },
   });
 
+  const bulkDepositMutation = useMutation({
+    mutationFn: async () => {
+      // Only include employees with valid salaries
+      const selectedEmployees = employeeStaff.filter(emp => bulkDepositSelections[emp.id]);
+      const validEmployees = selectedEmployees.filter(emp => {
+        const salary = parseFloat(emp.monthlySalary || "0");
+        return !isNaN(salary) && salary > 0;
+      });
+      if (validEmployees.length === 0) {
+        throw new Error("No employees with valid salary amounts selected");
+      }
+      const deposits = validEmployees.map(emp => ({
+        employeeId: emp.id,
+        amount: emp.monthlySalary,
+      }));
+      return await apiRequest("POST", "/api/payroll/bulk-deposit-employees", {
+        deposits,
+        date: bulkDepositDate,
+        notes: bulkDepositNotes,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bulk salary deposit processed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBulkDepositDialogOpen(false);
+      setBulkDepositSelections({});
+      setBulkDepositNotes("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const advanceMutation = useMutation({
     mutationFn: async (data: SalaryAdvanceFormData) => {
       return await apiRequest("POST", "/api/salary-advances", {
@@ -937,6 +984,38 @@ export default function Payroll() {
   const selectedPayments = Object.values(workerPayments).filter(p => p.selected);
   const totalAmount = selectedPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
+  // Bulk Deposit helpers
+  const handleToggleEmployeeDeposit = (employeeId: number) => {
+    setBulkDepositSelections(prev => ({
+      ...prev,
+      [employeeId]: !prev[employeeId],
+    }));
+  };
+
+  const handleSelectAllEmployees = () => {
+    const allSelected = employeeStaff.every(emp => bulkDepositSelections[emp.id]);
+    if (allSelected) {
+      setBulkDepositSelections({});
+    } else {
+      const newSelections: Record<number, boolean> = {};
+      employeeStaff.forEach(emp => {
+        newSelections[emp.id] = true;
+      });
+      setBulkDepositSelections(newSelections);
+    }
+  };
+
+  const selectedEmployeesForDeposit = employeeStaff.filter(emp => bulkDepositSelections[emp.id]);
+  const validSelectedEmployees = selectedEmployeesForDeposit.filter(emp => {
+    const salary = parseFloat(emp.monthlySalary || "0");
+    return !isNaN(salary) && salary > 0;
+  });
+  const bulkDepositTotal = validSelectedEmployees.reduce(
+    (sum, emp) => sum + parseFloat(emp.monthlySalary || "0"),
+    0
+  );
+  const hasInvalidSalaries = selectedEmployeesForDeposit.length !== validSelectedEmployees.length;
+
   if (employeesLoading) {
     return (
       <div className="space-y-4">
@@ -1074,6 +1153,26 @@ export default function Payroll() {
                 </Card>
               </Collapsible>
 
+              {/* Bulk Deposit Section */}
+              {selectedEmployeesForDeposit.length > 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="flex items-center justify-between">
+                    <span>
+                      <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {bulkDepositTotal.toFixed(2)}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => setBulkDepositDialogOpen(true)}
+                      data-testid="button-bulk-deposit"
+                    >
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      Deposit Selected ({selectedEmployeesForDeposit.length})
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {employeeStaff.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No employees found</p>
@@ -1084,6 +1183,13 @@ export default function Payroll() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={employeeStaff.length > 0 && employeeStaff.every(emp => bulkDepositSelections[emp.id])}
+                            onCheckedChange={handleSelectAllEmployees}
+                            data-testid="checkbox-select-all-employees"
+                          />
+                        </TableHead>
                         <TableHead data-testid="header-name">Name</TableHead>
                         <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
                         <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
@@ -1099,7 +1205,18 @@ export default function Payroll() {
                         const balance = parseFloat(employee.calculatedBalance || "0");
                         
                         return (
-                        <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
+                        <TableRow 
+                          key={employee.id} 
+                          data-testid={`row-employee-${employee.id}`}
+                          className={bulkDepositSelections[employee.id] ? "bg-muted/50" : ""}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={bulkDepositSelections[employee.id] || false}
+                              onCheckedChange={() => handleToggleEmployeeDeposit(employee.id)}
+                              data-testid={`checkbox-employee-${employee.id}`}
+                            />
+                          </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
                             {employee.firstName} {employee.lastName}
                           </TableCell>
@@ -3065,6 +3182,80 @@ export default function Payroll() {
             >
               Done
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Deposit Dialog */}
+      <Dialog open={bulkDepositDialogOpen} onOpenChange={setBulkDepositDialogOpen}>
+        <DialogContent className="max-w-lg" data-testid="dialog-bulk-deposit">
+          <DialogHeader>
+            <DialogTitle>Bulk Salary Deposit</DialogTitle>
+            <DialogDescription>
+              Deposit monthly salary for {validSelectedEmployees.length} employees
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {hasInvalidSalaries && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Some selected employees have zero or invalid salaries and will be skipped.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label>Deposit Date</Label>
+              <Input
+                type="date"
+                value={bulkDepositDate}
+                onChange={(e) => setBulkDepositDate(e.target.value)}
+                data-testid="input-bulk-deposit-date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Input
+                placeholder="e.g., November 2025 salary"
+                value={bulkDepositNotes}
+                onChange={(e) => setBulkDepositNotes(e.target.value)}
+                data-testid="input-bulk-deposit-notes"
+              />
+            </div>
+
+            <div className="border rounded-md p-4 space-y-2 max-h-60 overflow-y-auto">
+              <div className="text-sm font-medium mb-2">Employees to receive deposit:</div>
+              {validSelectedEmployees.map((emp) => (
+                <div key={emp.id} className="flex justify-between text-sm">
+                  <span>{emp.firstName} {emp.lastName}</span>
+                  <span className="font-mono">{parseFloat(emp.monthlySalary).toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between font-semibold pt-2 border-t mt-2">
+                <span>Total</span>
+                <span className="font-mono">{bulkDepositTotal.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setBulkDepositDialogOpen(false)}
+                data-testid="button-cancel-bulk-deposit"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => bulkDepositMutation.mutate()}
+                disabled={bulkDepositMutation.isPending || validSelectedEmployees.length === 0}
+                data-testid="button-confirm-bulk-deposit"
+              >
+                {bulkDepositMutation.isPending ? "Processing..." : `Deposit All (${validSelectedEmployees.length})`}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
