@@ -1398,7 +1398,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const companyId = req.session.currentCompanyId;
       const allGroups = await storage.getAllEmployeeGroups(companyId);
-      const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
+      console.log(`[DEBUG] Worker groups - Company ID: ${companyId}, All groups: ${JSON.stringify(allGroups)}`);
+      const workerGroups = allGroups.filter((g: any) => {
+        const groupType = g.groupType || g.group_type;
+        const isWorker = groupType === "Worker";
+        console.log(`[DEBUG] Group ${g.id}: type=${groupType}, isWorker=${isWorker}`);
+        return isWorker;
+      });
       
       // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
