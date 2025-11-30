@@ -2015,7 +2015,11 @@ export class DbStorage implements IStorage {
   }
 
   async getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number> {
-    const conditions = [eq(schema.containers.supplierId, supplierId)];
+    const conditions = [
+      eq(schema.containers.supplierId, supplierId),
+      // Only count containers that are not yet offloaded or sold
+      sql`${schema.containers.status} NOT IN ('OFFLOADED', 'SOLD')`
+    ];
     
     if (companyId !== undefined) {
       conditions.push(eq(schema.containers.companyId, companyId));
