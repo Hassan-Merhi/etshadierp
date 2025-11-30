@@ -185,6 +185,7 @@ export const employeeGroups = pgTable("employee_groups", {
   companyId: integer("company_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
+  groupType: text("group_type").notNull().default("Employee"), // "Employee" or "Worker"
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -196,6 +197,7 @@ export const insertEmployeeGroupSchema = createInsertSchema(employeeGroups).omit
   companyId: z.number().min(1, "Company is required"),
   name: z.string().min(1, "Group name is required").refine(val => val.trim().length > 0, "Group name cannot be only whitespace"),
   description: z.string().optional(),
+  groupType: z.enum(["Employee", "Worker"]).default("Employee"),
 });
 
 export type InsertEmployeeGroup = z.infer<typeof insertEmployeeGroupSchema>;

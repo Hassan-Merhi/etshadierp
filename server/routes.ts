@@ -1377,6 +1377,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Worker Groups
+  app.get("/api/worker-groups", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
+      const workerGroups = allGroups.filter((g: any) => g.groupType === "Worker");
+      res.json(workerGroups);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/worker-groups/with-members", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
+      const workerGroups = allGroups.filter((g: any) => g.groupType === "Worker");
+      
+      // Get members for each group
+      const groupsWithMembers = await Promise.all(
+        workerGroups.map(async (group: any) => {
+          const memberRecords = await storage.getEmployeeGroupMembers(group.id);
+          // Get full worker details for each member
+          const members = await Promise.all(
+            memberRecords.map(async (m: any) => {
+              const [worker] = await db
+                .select()
+                .from(employees)
+                .where(eq(employees.id, m.employeeId));
+              return worker;
+            })
+          );
+          return {
+            ...group,
+            members: members.filter(Boolean),
+          };
+        })
+      );
+      
+      res.json(groupsWithMembers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/worker-groups", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const parsed = insertEmployeeGroupSchema.parse({
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+        groupType: "Worker",
+      });
+      const group = await storage.createEmployeeGroup(parsed);
+      res.status(201).json(group);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/worker-groups/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEmployeeGroup(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/worker-groups/:id/members", requireAuth, async (req, res) => {
+    try {
+      const members = await storage.getEmployeeGroupMembers(parseInt(req.params.id));
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post(
+    "/api/worker-groups/:groupId/members/:workerId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        await storage.addEmployeeToGroup(
+          parseInt(req.params.groupId),
+          parseInt(req.params.workerId),
+        );
+        res.status(201).send();
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/worker-groups/:groupId/members/:workerId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        await storage.removeEmployeeFromGroup(
+          parseInt(req.params.groupId),
+          parseInt(req.params.workerId),
+        );
+        res.status(204).send();
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
   // Payroll - Employee Balance Deposit
   app.post(
     "/api/payroll/deposit-employee",
