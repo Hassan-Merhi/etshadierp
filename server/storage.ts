@@ -621,19 +621,15 @@ export class DbStorage implements IStorage {
 
   // Employee Groups
   async getAllEmployeeGroups(companyId: number): Promise<any[]> {
-    const result = await db
-      .select({
-        id: schema.employeeGroups.id,
-        companyId: schema.employeeGroups.companyId,
-        name: schema.employeeGroups.name,
-        description: schema.employeeGroups.description,
-        groupType: schema.employeeGroups.groupType,
-        active: schema.employeeGroups.active,
-        createdAt: schema.employeeGroups.createdAt,
-      })
+    const results = await db
+      .select()
       .from(schema.employeeGroups)
       .where(eq(schema.employeeGroups.companyId, companyId));
-    return result;
+    // Explicitly map groupType for API compatibility
+    return results.map(g => ({
+      ...g,
+      groupType: (g as any).groupType || "Employee"
+    }));
   }
 
   async getEmployeeGroupById(id: number): Promise<schema.EmployeeGroup | undefined> {
