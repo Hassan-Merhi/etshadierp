@@ -1672,6 +1672,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Payroll - Bulk Employee Bonus Deposit
+  app.post(
+    "/api/payroll/bulk-bonus-employees",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { bonuses, date, notes } = req.body;
+
+        if (!bonuses || !Array.isArray(bonuses) || bonuses.length === 0) {
+          return res.status(400).json({ message: "No bonuses provided" });
+        }
+
+        if (!date) {
+          return res.status(400).json({ message: "Date is required" });
+        }
+
+        // Filter out empty/zero amounts and validate
+        const validBonuses = bonuses.filter((b: any) => {
+          const amount = parseFloat(b.amount);
+          return !isNaN(amount) && amount > 0;
+        });
+
+        if (validBonuses.length === 0) {
+          return res.status(400).json({ message: "No valid bonus amounts provided" });
+        }
+
+        // Get or create BONUS_EXPENSE ledger account
+        const allAccounts = await storage.getAllLedgerAccounts(
+          req.session.currentCompanyId,
+        );
+        let bonusExpenseAccount = allAccounts.find(
+          (a: any) => a.code === "BONUS_EXPENSE",
+        );
+
+        if (!bonusExpenseAccount) {
+          bonusExpenseAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId,
+            code: "BONUS_EXPENSE",
+            name: "Bonus Expense",
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+
+        // Calculate total amount
+        const totalAmount = validBonuses.reduce(
+          (sum: number, b: any) => sum + parseFloat(b.amount),
+          0,
+        );
+
+        // Create single voucher for all bonuses
+        const voucherNumber = `BONUS-BULK-${Date.now()}`;
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description:
+              notes || `Bulk bonus deposit for ${validBonuses.length} employees`,
+            totalAmount: totalAmount.toFixed(2),
+            optional: false,
+          })
+          .returning();
+
+        // Create debit entry for total bonus expense
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: bonusExpenseAccount.id,
+          debitAmount: totalAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Bulk bonus deposit - ${validBonuses.length} employees - ${voucherNumber}`,
+        });
+
+        // Process each employee bonus
+        const results = [];
+        for (const bonus of validBonuses) {
+          const [employee] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, bonus.employeeId));
+
+          if (!employee) {
+            continue; // Skip if employee not found
+          }
+
+          // Verify employee belongs to current company
+          if (employee.companyId !== req.session.currentCompanyId) {
+            continue;
+          }
+
+          const bonusAmount = parseFloat(bonus.amount);
+
+          // Get or create employee liability account
+          const employeeAccountCode = `EMP-${employee.code}`;
+          let employeeAccount = allAccounts.find(
+            (a: any) => a.code === employeeAccountCode,
+          );
+
+          if (!employeeAccount) {
+            employeeAccount = await storage.createLedgerAccount({
+              companyId: req.session.currentCompanyId,
+              code: employeeAccountCode,
+              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
+              accountType: "Liability",
+              openingBalance: "0",
+              active: true,
+            });
+            // Refresh accounts list
+            allAccounts.push(employeeAccount);
+          }
+
+          // Credit employee liability account
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: employeeAccount.id,
+            debitAmount: "0",
+            creditAmount: bonusAmount.toFixed(2),
+            narration: `Bonus for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
+          });
+
+          // Update employee balance (bonuses also add to deposits/balance)
+          const newBalance =
+            parseFloat(employee.currentBalance) + bonusAmount;
+          const newTotalDeposits =
+            parseFloat(employee.totalDeposits) + bonusAmount;
+
+          await db
+            .update(employees)
+            .set({
+              currentBalance: newBalance.toFixed(2),
+              totalDeposits: newTotalDeposits.toFixed(2),
+            })
+            .where(eq(employees.id, bonus.employeeId));
+
+          results.push({
+            employeeId: employee.id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            amount: bonusAmount,
+            newBalance,
+          });
+        }
+
+        res.json({
+          voucher,
+          bonuses: results,
+          totalAmount,
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Payroll - Employee Bonus
   app.post(
     "/api/payroll/bonus-employee",

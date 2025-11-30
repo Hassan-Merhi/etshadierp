@@ -236,6 +236,12 @@ export default function Payroll() {
   const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toISOString().split('T')[0]);
   const [bulkDepositNotes, setBulkDepositNotes] = useState("");
 
+  // Bulk Bonus state
+  const [bulkBonusDialogOpen, setBulkBonusDialogOpen] = useState(false);
+  const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkBonusNotes, setBulkBonusNotes] = useState("");
+  const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
+
   const { data: groupMembers = [] } = useQuery<any[]>({
     queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
     enabled: !!selectedGroupForMembers?.id,
@@ -659,6 +665,45 @@ export default function Payroll() {
       setBulkDepositDialogOpen(false);
       setBulkDepositSelections({});
       setBulkDepositNotes("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkBonusMutation = useMutation({
+    mutationFn: async () => {
+      const bonuses = Object.entries(bulkBonusAmounts)
+        .filter(([_, amount]) => {
+          const parsed = parseFloat(amount);
+          return !isNaN(parsed) && parsed > 0;
+        })
+        .map(([employeeId, amount]) => ({
+          employeeId: parseInt(employeeId),
+          amount,
+        }));
+      if (bonuses.length === 0) {
+        throw new Error("No valid bonus amounts entered");
+      }
+      return await apiRequest("POST", "/api/payroll/bulk-bonus-employees", {
+        bonuses,
+        date: bulkBonusDate,
+        notes: bulkBonusNotes,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bulk bonus deposit processed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBulkBonusDialogOpen(false);
+      setBulkBonusAmounts({});
+      setBulkBonusNotes("");
     },
     onError: (error: Error) => {
       toast({
@@ -1171,6 +1216,23 @@ export default function Payroll() {
                     </Button>
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Bulk Bonus Button */}
+              {employeeStaff.length > 0 && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setBulkBonusAmounts({});
+                      setBulkBonusDialogOpen(true);
+                    }}
+                    data-testid="button-open-bulk-bonus"
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Bulk Bonus Deposit
+                  </Button>
+                </div>
               )}
 
               {employeeStaff.length === 0 ? (
@@ -3255,6 +3317,106 @@ export default function Payroll() {
               >
                 {bulkDepositMutation.isPending ? "Processing..." : `Deposit All (${validSelectedEmployees.length})`}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Bonus Dialog */}
+      <Dialog open={bulkBonusDialogOpen} onOpenChange={setBulkBonusDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-bulk-bonus">
+          <DialogHeader>
+            <DialogTitle>Bulk Bonus Deposit</DialogTitle>
+            <DialogDescription>
+              Enter bonus amounts for each employee. Leave blank or zero to skip.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Bonus Date</Label>
+                <Input
+                  type="date"
+                  value={bulkBonusDate}
+                  onChange={(e) => setBulkBonusDate(e.target.value)}
+                  data-testid="input-bulk-bonus-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes (optional)</Label>
+                <Input
+                  placeholder="e.g., Q4 2025 performance bonus"
+                  value={bulkBonusNotes}
+                  onChange={(e) => setBulkBonusNotes(e.target.value)}
+                  data-testid="input-bulk-bonus-notes"
+                />
+              </div>
+            </div>
+
+            <div className="border rounded-md flex-1 overflow-hidden">
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background">
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead className="text-right w-40">Bonus Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employeeStaff.map((emp) => (
+                      <TableRow key={emp.id}>
+                        <TableCell>{emp.firstName} {emp.lastName}</TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            className="text-right font-mono w-32 ml-auto"
+                            value={bulkBonusAmounts[emp.id] || ""}
+                            onChange={(e) => setBulkBonusAmounts(prev => ({
+                              ...prev,
+                              [emp.id]: e.target.value
+                            }))}
+                            data-testid={`input-bonus-${emp.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <div className="text-sm">
+                <span className="text-muted-foreground">Total Bonus: </span>
+                <span className="font-semibold font-mono">
+                  {Object.values(bulkBonusAmounts)
+                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0)
+                    .toFixed(2)}
+                </span>
+                <span className="text-muted-foreground ml-2">
+                  ({Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setBulkBonusDialogOpen(false)}
+                  data-testid="button-cancel-bulk-bonus"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => bulkBonusMutation.mutate()}
+                  disabled={bulkBonusMutation.isPending || Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length === 0}
+                  data-testid="button-confirm-bulk-bonus"
+                >
+                  {bulkBonusMutation.isPending ? "Processing..." : "Deposit Bonuses"}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
