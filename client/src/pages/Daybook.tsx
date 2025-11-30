@@ -1304,28 +1304,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {ledgerEntries.map((entry) => {
-                                  const debitAmount = parseFloat(entry.debitAmount || "0");
-                                  const creditAmount = parseFloat(entry.creditAmount || "0");
-                                  const drcrPrefix = debitAmount > 0 ? "DR " : creditAmount > 0 ? "CR " : "";
-                                  return (
-                                    <TableRow key={entry.id}>
-                                      <TableCell>
-                                        <div className="font-medium">{drcrPrefix}{entry.accountName}</div>
-                                      </TableCell>
-                                      {!isPOSUser && (
-                                        <>
-                                          <TableCell className="text-right font-mono">
-                                            {debitAmount > 0 ? `$${formatAmount(entry.debitAmount)}` : "-"}
-                                          </TableCell>
-                                          <TableCell className="text-right font-mono">
-                                            {creditAmount > 0 ? `$${formatAmount(entry.creditAmount)}` : "-"}
-                                          </TableCell>
-                                        </>
-                                      )}
-                                    </TableRow>
-                                  );
-                                })}
+                                {ledgerEntries.map((entry) => (
+                                  <TableRow key={entry.id}>
+                                    <TableCell>
+                                      <div className="font-medium">{entry.accountName}</div>
+                                    </TableCell>
+                                    {!isPOSUser && (
+                                      <>
+                                        <TableCell className="text-right font-mono">
+                                          {parseFloat(entry.debitAmount) > 0 ? `$${formatAmount(entry.debitAmount)}` : "-"}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">
+                                          {parseFloat(entry.creditAmount) > 0 ? `$${formatAmount(entry.creditAmount)}` : "-"}
+                                        </TableCell>
+                                      </>
+                                    )}
+                                  </TableRow>
+                                ))}
                               </TableBody>
                             </Table>
                           </div>
@@ -1432,39 +1427,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               })
                             : viewVoucherEntries;
                           
-                          return displayEntries.map((entry) => {
-                            const debitAmount = parseFloat(entry.debitAmount || "0");
-                            const creditAmount = parseFloat(entry.creditAmount || "0");
-                            const drcrPrefix = debitAmount > 0 ? "DR " : creditAmount > 0 ? "CR " : "";
-                            return (
-                              <TableRow key={entry.id}>
-                                <TableCell>
-                                  <div className="font-medium">{drcrPrefix}{entry.accountName}</div>
+                          return displayEntries.map((entry) => (
+                            <TableRow key={entry.id}>
+                              <TableCell>
+                                <div className="font-medium">{entry.accountName}</div>
+                              </TableCell>
+                              {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") ? (
+                                <TableCell className="text-right font-mono">
+                                  ${formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
                                 </TableCell>
-                                {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") ? (
+                              ) : (
+                                <>
                                   <TableCell className="text-right font-mono">
-                                    ${formatAmount(Math.max(debitAmount, creditAmount))}
+                                    {parseFloat(entry.debitAmount) > 0
+                                      ? `$${formatAmount(entry.debitAmount)}`
+                                      : "-"}
                                   </TableCell>
-                                ) : (
-                                  <>
-                                    <TableCell className="text-right font-mono">
-                                      {debitAmount > 0
-                                        ? `$${formatAmount(entry.debitAmount)}`
-                                        : "-"}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {creditAmount > 0
-                                        ? `$${formatAmount(entry.creditAmount)}`
-                                        : "-"}
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                      {entry.narration || "-"}
-                                    </TableCell>
-                                  </>
-                                )}
-                              </TableRow>
-                            );
-                          });
+                                  <TableCell className="text-right font-mono">
+                                    {parseFloat(entry.creditAmount) > 0
+                                      ? `$${formatAmount(entry.creditAmount)}`
+                                      : "-"}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {entry.narration || "-"}
+                                  </TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          ));
                         })()}
                         {/* Totals Row */}
                         <TableRow className="font-bold bg-muted/50">
