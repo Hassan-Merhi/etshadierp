@@ -174,6 +174,8 @@ export default function Payroll() {
   const [editWorkerDialogOpen, setEditWorkerDialogOpen] = useState(false);
   const [selectedWorkerForEdit, setSelectedWorkerForEdit] = useState<Employee | null>(null);
   const [workerOverrides, setWorkerOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
+  const [employeeOverrides, setEmployeeOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
+  const [bulkEmployeePaymentDialogOpen, setBulkEmployeePaymentDialogOpen] = useState(false);
   const [createEmployeeDialogOpen, setCreateEmployeeDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [deleteConflict, setDeleteConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
@@ -388,6 +390,46 @@ export default function Payroll() {
     });
     return finalPayments;
   }, [computedPayments, workerOverrides]);
+
+  // Compute base employee payments from salary
+  const computedEmployeePayments = useMemo(() => {
+    const payments: Record<number, WorkerPayment> = {};
+    employeeStaff.forEach((employee) => {
+      const monthlySalary = parseFloat(employee.monthlySalary || "0");
+      payments[employee.id] = {
+        workerId: employee.id,
+        amount: monthlySalary.toFixed(2),
+        selected: true,
+        manuallyEdited: false,
+      };
+    });
+    return payments;
+  }, [employeeStaff]);
+
+  // Merge computed employee payments with manual overrides
+  const employeePayments = useMemo(() => {
+    const finalPayments: Record<number, WorkerPayment> = {};
+    Object.keys(computedEmployeePayments).forEach((id) => {
+      const employeeId = parseInt(id);
+      const computed = computedEmployeePayments[employeeId];
+      const override = employeeOverrides[employeeId];
+      
+      if (override?.manuallyEdited) {
+        finalPayments[employeeId] = {
+          ...computed,
+          amount: override.amount ?? computed.amount,
+          selected: override.selected ?? computed.selected,
+          manuallyEdited: true,
+        };
+      } else {
+        finalPayments[employeeId] = {
+          ...computed,
+          selected: override?.selected ?? computed.selected,
+        };
+      }
+    });
+    return finalPayments;
+  }, [computedEmployeePayments, employeeOverrides]);
 
   // Clean up overrides when workers are removed
   useEffect(() => {
@@ -607,10 +649,35 @@ export default function Payroll() {
         title: "Success",
         description: "Bulk payment processed successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/worker-payments-summary"] });
       setBulkPaymentDialogOpen(false);
+      bulkPaymentForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkEmployeePaymentMutation = useMutation({
+    mutationFn: async (data: BulkPaymentFormData) => {
+      const selectedPayments = Object.values(employeePayments).filter(p => p.selected);
+      return await apiRequest("POST", "/api/payroll/bulk-pay-employees", {
+        payments: selectedPayments,
+        ...data,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Bulk payment processed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      setBulkEmployeePaymentDialogOpen(false);
       bulkPaymentForm.reset();
     },
     onError: (error: Error) => {
@@ -937,6 +1004,45 @@ export default function Payroll() {
   const selectedPayments = Object.values(workerPayments).filter(p => p.selected);
   const totalAmount = selectedPayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
 
+  const handleToggleEmployee = (employeeId: number) => {
+    setEmployeeOverrides(prev => ({
+      ...prev,
+      [employeeId]: {
+        ...prev[employeeId],
+        selected: !(employeePayments[employeeId]?.selected ?? true),
+      },
+    }));
+  };
+
+  const handleUpdateEmployeeAmount = (employeeId: number, amount: string) => {
+    setEmployeeOverrides(prev => ({
+      ...prev,
+      [employeeId]: {
+        ...prev[employeeId],
+        amount,
+        manuallyEdited: true,
+      },
+    }));
+  };
+
+  const handleSelectAllEmployees = () => {
+    const allSelected = Object.values(employeePayments).every(p => p.selected);
+    const newSelected = !allSelected;
+    setEmployeeOverrides(prev => {
+      const updated = { ...prev };
+      Object.keys(employeePayments).forEach(id => {
+        updated[parseInt(id)] = {
+          ...updated[parseInt(id)],
+          selected: newSelected,
+        };
+      });
+      return updated;
+    });
+  };
+
+  const selectedEmployeePayments = Object.values(employeePayments).filter(p => p.selected);
+  const totalEmployeeAmount = selectedEmployeePayments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
+
   if (employeesLoading) {
     return (
       <div className="space-y-4">
@@ -1080,40 +1186,88 @@ export default function Payroll() {
                   <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
                 </div>
               ) : (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead data-testid="header-name">Name</TableHead>
+                <>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">Bulk Employee Payments</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Select employees and adjust amounts to process bulk salary payments
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => setBulkEmployeePaymentDialogOpen(true)}
+                      disabled={selectedEmployeePayments.length === 0}
+                      data-testid="button-bulk-employee-payment"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Pay Selected ({selectedEmployeePayments.length})
+                    </Button>
+                  </div>
+
+                  {selectedEmployeePayments.length > 0 && (
+                    <Alert className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>{selectedEmployeePayments.length} employees selected</strong> - Total payment: {totalEmployeeAmount.toFixed(2)}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox
+                              checked={Object.values(employeePayments).every(p => p.selected)}
+                              onCheckedChange={handleSelectAllEmployees}
+                              data-testid="checkbox-select-all-employees"
+                            />
+                          </TableHead>
+                          <TableHead data-testid="header-name">Name</TableHead>
                         <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
+                        <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
                         <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
-                        <TableHead data-testid="header-total-deposits" className="text-right">Total Deposits</TableHead>
-                        <TableHead data-testid="header-total-withdrawals" className="text-right">Total Withdrawals</TableHead>
                         <TableHead data-testid="header-status">Status</TableHead>
                         <TableHead data-testid="header-actions" className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {employeeStaff.map((employee) => {
-                        // Use the calculated balance from the API
                         const balance = parseFloat(employee.calculatedBalance || "0");
+                        const paymentAmount = parseFloat(employeePayments[employee.id]?.amount || "0");
                         
                         return (
-                        <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
+                        <TableRow 
+                          key={employee.id} 
+                          data-testid={`row-employee-${employee.id}`}
+                          className={employeePayments[employee.id]?.selected ? "bg-muted/50" : ""}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={employeePayments[employee.id]?.selected || false}
+                              onCheckedChange={() => handleToggleEmployee(employee.id)}
+                              data-testid={`checkbox-employee-${employee.id}`}
+                            />
+                          </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
                             {employee.firstName} {employee.lastName}
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
                             {parseFloat(employee.monthlySalary).toFixed(2)}
                           </TableCell>
+                          <TableCell data-testid={`cell-payment-amount-${employee.id}`} className="text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={employeePayments[employee.id]?.amount || "0"}
+                              onChange={(e) => handleUpdateEmployeeAmount(employee.id, e.target.value)}
+                              className="w-32 text-right font-mono"
+                              data-testid={`input-employee-amount-${employee.id}`}
+                            />
+                          </TableCell>
                           <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono">
                             {balance.toFixed(2)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalDeposits || "0").toFixed(2)}
-                          </TableCell>
-                          <TableCell data-testid={`cell-withdrawals-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalWithdrawals || "0").toFixed(2)}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${employee.id}`}>
                             <Badge variant={employee.active ? "default" : "secondary"}>
@@ -1174,7 +1328,8 @@ export default function Payroll() {
                       })}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </Card>
@@ -2192,6 +2347,154 @@ export default function Payroll() {
                 </Button>
                 <Button type="submit" disabled={bulkPaymentMutation.isPending} data-testid="button-submit-bulk">
                   {bulkPaymentMutation.isPending ? "Processing..." : `Pay ${selectedPayments.length} Workers`}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Employee Payment Dialog */}
+      <Dialog open={bulkEmployeePaymentDialogOpen} onOpenChange={setBulkEmployeePaymentDialogOpen}>
+        <DialogContent data-testid="dialog-bulk-employee-payment" className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Process Bulk Employee Payment</DialogTitle>
+            <DialogDescription>
+              Pay {selectedEmployeePayments.length} employees - Total amount: {totalEmployeeAmount.toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="border rounded-md p-4 mb-4 bg-muted/30 max-h-60 overflow-y-auto">
+            <h4 className="font-semibold mb-3">Payment Summary</h4>
+            <div className="space-y-2">
+              {selectedEmployeePayments.map((payment) => {
+                const employee = employeeStaff.find(e => e.id === payment.workerId);
+                return (
+                  <div key={payment.workerId} className="flex justify-between text-sm">
+                    <span>{employee?.firstName} {employee?.lastName} ({employee?.code})</span>
+                    <span className="font-mono">{parseFloat(payment.amount).toFixed(2)}</span>
+                  </div>
+                );
+              })}
+              <div className="pt-2 border-t mt-3 flex justify-between font-semibold">
+                <span>Total</span>
+                <span className="font-mono">{totalEmployeeAmount.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <Form {...bulkPaymentForm}>
+            <form onSubmit={bulkPaymentForm.handleSubmit((data) => bulkEmployeePaymentMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={bulkPaymentForm.control}
+                name="paymentAccountType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment From</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-bulk-employee-account-type">
+                          <SelectValue placeholder="Select account type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="bank">Bank Account</SelectItem>
+                        <SelectItem value="cash">Cash Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bulkPaymentForm.control}
+                name="paymentAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {bulkPaymentForm.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-bulk-employee-account">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {bulkPaymentForm.watch("paymentAccountType") === "cash" ? (
+                          cashAccounts.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No cash accounts available
+                            </SelectItem>
+                          ) : (
+                            cashAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id.toString()}>
+                                {account.name}
+                              </SelectItem>
+                            ))
+                          )
+                        ) : bankAccountsLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading...
+                          </SelectItem>
+                        ) : (
+                          bankAccounts?.map((account) => (
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name} ({account.accountNumber})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bulkPaymentForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-bulk-employee-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={bulkPaymentForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Additional notes..."
+                        {...field}
+                        data-testid="input-bulk-employee-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBulkEmployeePaymentDialogOpen(false)}
+                  data-testid="button-cancel-bulk-employee"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={bulkEmployeePaymentMutation.isPending} data-testid="button-submit-bulk-employee">
+                  {bulkEmployeePaymentMutation.isPending ? "Processing..." : `Pay ${selectedEmployeePayments.length} Employees`}
                 </Button>
               </div>
             </form>
