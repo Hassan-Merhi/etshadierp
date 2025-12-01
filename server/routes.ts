@@ -17234,7 +17234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // 4. Sales (Outwards)
+      // 4. Sales (Outwards) - show each line item individually for this stock item
       const salesData = await db
         .select({
           voucherDate: vouchers.voucherDate,
@@ -17258,44 +17258,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(vouchers.voucherDate);
       
-      // Group sales by voucher to calculate average rate
-      const salesByVoucher: Record<number, { 
-        date: string;
-        voucherNumber: string;
-        locationName: string;
-        totalQty: number;
-        totalValue: number;
-      }> = {};
-      
+      // Each sales item for this stock item gets its own row (not grouped)
       for (const item of salesData) {
-        const vid = item.voucherId;
-        if (!salesByVoucher[vid]) {
-          const locName = item.locationName || (item.locationId ? (await storage.getLocationById(item.locationId))?.name : null) || 'Cash';
-          salesByVoucher[vid] = {
-            date: item.voucherDate,
-            voucherNumber: item.voucherNumber,
-            locationName: locName,
-            totalQty: 0,
-            totalValue: 0,
-          };
-        }
-        salesByVoucher[vid].totalQty += parseFloat(item.quantity);
-        salesByVoucher[vid].totalValue += parseFloat(item.totalCost);
-      }
-      
-      for (const [vid, data] of Object.entries(salesByVoucher)) {
-        const avgRate = data.totalQty > 0 ? data.totalValue / data.totalQty : 0;
+        const locName = item.locationName || (item.locationId ? (await storage.getLocationById(item.locationId))?.name : null) || 'Cash';
+        const qty = parseFloat(item.quantity);
+        const cost = parseFloat(item.totalCost);
+        const rate = qty > 0 ? cost / qty : 0;
+        
         transactions.push({
-          date: data.date,
-          particulars: data.locationName,
-          vchType: `POS - ${data.locationName}`,
-          voucherId: parseInt(vid),
+          date: item.voucherDate,
+          particulars: locName,
+          vchType: `POS - ${locName}`,
+          voucherId: item.voucherId,
           inwardQty: 0,
           inwardRate: 0,
           inwardValue: 0,
-          outwardQty: data.totalQty,
-          outwardRate: avgRate,
-          outwardValue: data.totalValue,
+          outwardQty: qty,
+          outwardRate: rate,
+          outwardValue: cost,
         });
       }
       
