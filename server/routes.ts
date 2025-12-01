@@ -650,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Updates must be an array" });
         }
 
-        const result = await storage.updateCostPricesByBarcode(locationId, updates);
+        const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
         res.json(result);
       } catch (error: any) {
         console.error("Error updating cost prices:", error);

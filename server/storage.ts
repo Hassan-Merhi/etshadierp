@@ -184,7 +184,7 @@ export interface IStorage {
   getLocationInventory(locationId: number): Promise<any[]>;
   getCompanyInventory(companyId: number): Promise<any[]>;
   updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
-  updateCostPricesByBarcode(locationId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }>;
+  updateCostPricesByBarcode(locationId: number, companyId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }>;
 
   // Container Offload
   offloadContainer(
@@ -1422,14 +1422,14 @@ export class DbStorage implements IStorage {
     }
   }
 
-  async updateCostPricesByBarcode(locationId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }> {
+  async updateCostPricesByBarcode(locationId: number, companyId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }> {
     const errors: string[] = [];
     let updated = 0;
 
     for (const update of updates) {
       try {
         // Find stock item by barcode (code or alias)
-        const stockItem = await this.getStockItemByCodeOrAlias(update.barcode, 0);
+        const stockItem = await this.getStockItemByCodeOrAlias(update.barcode, companyId);
         if (!stockItem) {
           errors.push(`Barcode not found: ${update.barcode}`);
           continue;
