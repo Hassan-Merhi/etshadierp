@@ -18366,6 +18366,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Location Summary - Matrix view of all stock groups/items across selected locations
+  app.get("/api/location-summary", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : req.session.currentCompanyId;
+      const locationIds = req.query.locationIds ? (req.query.locationIds as string).split(',').map(id => parseInt(id)) : [];
+      const asOfDate = req.query.asOfDate as string || new Date().toISOString().split('T')[0];
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "Company ID is required" });
+      }
+      
+      if (locationIds.length === 0) {
+        return res.json({ stockGroups: [], grandTotals: {} });
+      }
+      
+      // Get all stock groups for the company
+      const allStockGroups = await db
+        .select()
+        .from(stockGroups)
+        .where(and(eq(stockGroups.companyId, companyId), eq(stockGroups.active, true)))
+        .orderBy(stockGroups.name);
+      
+      // Get all stock items with their groups
+      const allStockItems = await db
+        .select()
+        .from(stockItems)
+        .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true)))
+        .orderBy(stockItems.name);
+      
+      // Get inventory for the selected locations
+      const inventoryData = await db
+        .select({
+          locationId: inventory.locationId,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            inArray(inventory.locationId, locationIds)
+          )
+        );
+      
+      // Create lookup maps for inventory data
+      const inventoryMap = new Map<string, { quantity: number; rate: number; value: number }>();
+      for (const inv of inventoryData) {
+        const key = `${inv.locationId}-${inv.stockItemId}`;
+        inventoryMap.set(key, {
+          quantity: parseFloat(inv.quantity || "0"),
+          rate: parseFloat(inv.averageRate || "0"),
+          value: parseFloat(inv.totalValue || "0"),
+        });
+      }
+      
+      // Build response structure with stock groups containing items
+      const result: Array<{
+        id: number;
+        code: string;
+        name: string;
+        locationData: Record<number, { quantity: number; rate: number; value: number }>;
+        items: Array<{
+          id: number;
+          code: string;
+          name: string;
+          uom: string;
+          locationData: Record<number, { quantity: number; rate: number; value: number }>;
+        }>;
+      }> = [];
+      
+      // Group stock items by their stockGroupId
+      const itemsByGroup = new Map<number, typeof allStockItems>();
+      const ungroupedItems: typeof allStockItems = [];
+      
+      for (const item of allStockItems) {
+        if (item.stockGroupId) {
+          if (!itemsByGroup.has(item.stockGroupId)) {
+            itemsByGroup.set(item.stockGroupId, []);
+          }
+          itemsByGroup.get(item.stockGroupId)!.push(item);
+        } else {
+          ungroupedItems.push(item);
+        }
+      }
+      
+      // Build stock groups with their items and location data
+      for (const group of allStockGroups) {
+        const groupItems = itemsByGroup.get(group.id) || [];
+        
+        // Skip groups with no items that have inventory
+        const groupHasInventory = groupItems.some(item => 
+          locationIds.some(locId => {
+            const key = `${locId}-${item.id}`;
+            const inv = inventoryMap.get(key);
+            return inv && inv.quantity !== 0;
+          })
+        );
+        
+        if (!groupHasInventory) continue;
+        
+        const groupLocationData: Record<number, { quantity: number; rate: number; value: number }> = {};
+        
+        // Initialize location totals for the group
+        for (const locId of locationIds) {
+          groupLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
+        }
+        
+        const itemsData: Array<{
+          id: number;
+          code: string;
+          name: string;
+          uom: string;
+          locationData: Record<number, { quantity: number; rate: number; value: number }>;
+        }> = [];
+        
+        for (const item of groupItems) {
+          const itemLocationData: Record<number, { quantity: number; rate: number; value: number }> = {};
+          let itemHasInventory = false;
+          
+          for (const locId of locationIds) {
+            const key = `${locId}-${item.id}`;
+            const inv = inventoryMap.get(key);
+            
+            if (inv && inv.quantity !== 0) {
+              itemHasInventory = true;
+              itemLocationData[locId] = inv;
+              
+              // Add to group totals
+              groupLocationData[locId].quantity += inv.quantity;
+              groupLocationData[locId].value += inv.value;
+            } else {
+              itemLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
+            }
+          }
+          
+          if (itemHasInventory) {
+            itemsData.push({
+              id: item.id,
+              code: item.code,
+              name: item.name,
+              uom: item.uom,
+              locationData: itemLocationData,
+            });
+          }
+        }
+        
+        // Calculate average rate for group totals
+        for (const locId of locationIds) {
+          if (groupLocationData[locId].quantity > 0) {
+            groupLocationData[locId].rate = groupLocationData[locId].value / groupLocationData[locId].quantity;
+          }
+        }
+        
+        result.push({
+          id: group.id,
+          code: group.code,
+          name: group.name,
+          locationData: groupLocationData,
+          items: itemsData,
+        });
+      }
+      
+      // Handle ungrouped items
+      if (ungroupedItems.length > 0) {
+        const ungroupedLocationData: Record<number, { quantity: number; rate: number; value: number }> = {};
+        for (const locId of locationIds) {
+          ungroupedLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
+        }
+        
+        const ungroupedItemsData: Array<{
+          id: number;
+          code: string;
+          name: string;
+          uom: string;
+          locationData: Record<number, { quantity: number; rate: number; value: number }>;
+        }> = [];
+        
+        for (const item of ungroupedItems) {
+          const itemLocationData: Record<number, { quantity: number; rate: number; value: number }> = {};
+          let itemHasInventory = false;
+          
+          for (const locId of locationIds) {
+            const key = `${locId}-${item.id}`;
+            const inv = inventoryMap.get(key);
+            
+            if (inv && inv.quantity !== 0) {
+              itemHasInventory = true;
+              itemLocationData[locId] = inv;
+              ungroupedLocationData[locId].quantity += inv.quantity;
+              ungroupedLocationData[locId].value += inv.value;
+            } else {
+              itemLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
+            }
+          }
+          
+          if (itemHasInventory) {
+            ungroupedItemsData.push({
+              id: item.id,
+              code: item.code,
+              name: item.name,
+              uom: item.uom,
+              locationData: itemLocationData,
+            });
+          }
+        }
+        
+        if (ungroupedItemsData.length > 0) {
+          for (const locId of locationIds) {
+            if (ungroupedLocationData[locId].quantity > 0) {
+              ungroupedLocationData[locId].rate = ungroupedLocationData[locId].value / ungroupedLocationData[locId].quantity;
+            }
+          }
+          
+          result.push({
+            id: 0,
+            code: "UNGROUPED",
+            name: "Ungrouped Items",
+            locationData: ungroupedLocationData,
+            items: ungroupedItemsData,
+          });
+        }
+      }
+      
+      // Calculate grand totals per location
+      const grandTotals: Record<number, { quantity: number; rate: number; value: number }> = {};
+      for (const locId of locationIds) {
+        grandTotals[locId] = { quantity: 0, rate: 0, value: 0 };
+      }
+      
+      for (const group of result) {
+        for (const locId of locationIds) {
+          grandTotals[locId].quantity += group.locationData[locId]?.quantity || 0;
+          grandTotals[locId].value += group.locationData[locId]?.value || 0;
+        }
+      }
+      
+      // Calculate average rate for grand totals
+      for (const locId of locationIds) {
+        if (grandTotals[locId].quantity > 0) {
+          grandTotals[locId].rate = grandTotals[locId].value / grandTotals[locId].quantity;
+        }
+      }
+      
+      res.json({
+        stockGroups: result,
+        grandTotals,
+        asOfDate,
+      });
+    } catch (error: any) {
+      console.error('Location summary error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

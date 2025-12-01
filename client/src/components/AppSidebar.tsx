@@ -27,6 +27,7 @@ import {
   Barcode,
   Tags,
   AlertCircle,
+  Grid3X3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -148,6 +149,11 @@ const menuItems = [
     title: "Stock Query",
     url: "/stock-query",
     icon: Search,
+  },
+  {
+    title: "Location Summary",
+    url: "/location-summary",
+    icon: Grid3X3,
   },
   {
     title: "Sales Report",
