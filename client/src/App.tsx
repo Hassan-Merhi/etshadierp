@@ -53,6 +53,7 @@ import StockItemVouchers from "@/pages/StockItemVouchers";
 import LocationMonthlySummary from "@/pages/LocationMonthlySummary";
 import LocationVouchers from "@/pages/LocationVouchers";
 import LocationSummary from "@/pages/LocationSummary";
+import EditLocationCostPrices from "@/pages/EditLocationCostPrices";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -107,6 +108,7 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/location-summary" component={LocationSummary} />
+      <Route path="/edit-location-cost-prices" component={EditLocationCostPrices} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
       <Route path="/locations/:locationId/stock-items/:stockItemId/history" component={LocationMonthlySummary} />
