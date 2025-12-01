@@ -516,16 +516,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setIsImportingCostPrice(true);
 
     try {
-      const response = await apiRequest("POST", `/api/locations/${selectedLocationLocal.id}/import-cost-prices`, {
+      const res = await apiRequest("POST", `/api/locations/${selectedLocationLocal.id}/import-cost-prices`, {
         updates: costPricePreview,
-      }) as any;
+      });
+      const response = await res.json();
 
       queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationLocal.id}/inventory`] });
 
       setCostPriceImportComplete(true);
       toast({
         title: "Import Successful",
-        description: `Updated ${response.updated} cost prices. ${response.errors.length > 0 ? `${response.errors.length} errors encountered.` : ""}`,
+        description: `Updated ${response.updated} cost prices. ${response.errors?.length > 0 ? `${response.errors.length} errors encountered.` : ""}`,
       });
     } catch (error: any) {
       toast({
