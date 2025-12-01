@@ -81,6 +81,7 @@ function Router({ user }: { user: any }) {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
+      <Route path="/pos/edit/:id">{(params) => <POS editVoucherId={params.id} />}</Route>
       <Route path="/stock-items" component={StockItems} />
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />

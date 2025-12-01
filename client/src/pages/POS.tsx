@@ -69,13 +69,9 @@ interface Location {
   country: string | null;
 }
 
-export default function POS({ posUser }: { posUser?: any } = {}) {
+export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const [_location, navigate] = useLocation();
-  
-  // Check for edit mode from query parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const editVoucherId = urlParams.get('edit');
 
   // For POS users, fetch their assigned location
   const { data: posLocation, error: locationError, isLoading: locationLoading } = useQuery<Location>({

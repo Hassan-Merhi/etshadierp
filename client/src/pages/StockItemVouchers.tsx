@@ -98,7 +98,7 @@ export default function StockItemVouchers() {
     
     // POS sales - navigate to POS edit page
     if (vchType.startsWith('pos') || vchType.includes('pos')) {
-      return txn.voucherId ? `/pos?edit=${txn.voucherId}` : null;
+      return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
     }
     
     // Stock Transfer - navigate to voucher edit page
