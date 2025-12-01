@@ -102,7 +102,9 @@ export default function LocationMonthlySummary() {
     navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${selectedYear}/${month}`);
   };
   
-  const formatNumber = (num: number, decimals = 2) => {
+  const formatNumber = (num: number, decimals = 2, allowNegative = true) => {
+    // For closing balances, don't show negative or zero values
+    if (!allowNegative && (num <= 0)) return "";
     if (num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
@@ -200,10 +202,10 @@ export default function LocationMonthlySummary() {
                         {formatNumber(month.outwardValue)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {formatNumber(month.closingQty, 0)}
+                        {formatNumber(month.closingQty, 0, false)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {formatNumber(month.closingValue)}
+                        {formatNumber(month.closingValue, 2, false)}
                       </TableCell>
                     </TableRow>
                   );
@@ -224,10 +226,10 @@ export default function LocationMonthlySummary() {
                     {formatNumber(data?.grandTotal.outwardValue || 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatNumber(data?.grandTotal.closingQty || 0, 0)}
+                    {formatNumber(data?.grandTotal.closingQty || 0, 0, false)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatNumber(data?.grandTotal.closingValue || 0)}
+                    {formatNumber(data?.grandTotal.closingValue || 0, 2, false)}
                   </TableCell>
                 </TableRow>
               </TableBody>
