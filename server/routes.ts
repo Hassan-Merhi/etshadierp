@@ -17651,7 +17651,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const monthStartStr = monthStart.toISOString().split('T')[0];
       const monthEndStr = monthEnd.toISOString().split('T')[0];
       
-      // ============ GET CURRENT INVENTORY (SOURCE OF TRUTH) ============
+      // ============ CALCULATE OPENING BALANCE (all transactions BEFORE selected month) ============
+      // Query all prior movements and aggregate them to get opening balance
+      let priorInwardQty = 0;
+      let priorInwardValue = 0;
+      let priorOutwardQty = 0;
+      let priorOutwardValue = 0;
+      
+      // Prior Stock Transfers
+      const priorTransfers = await db
+        .select({
+          quantity: stockTransferItems.quantity,
+          totalAmount: stockTransferItems.totalAmount,
+          sourceLocationId: stockTransferItems.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`,
+          or(
+            eq(stockTransferItems.sourceLocationId, locationId),
+            eq(stockTransferVouchers.destinationLocationId, locationId)
+          )
+        ));
+      
+      for (const item of priorTransfers) {
+        const qty = parseFloat(item.quantity);
+        const val = parseFloat(item.totalAmount);
+        if (item.sourceLocationId === locationId) {
+          priorOutwardQty += qty;
+          priorOutwardValue += val;
+        }
+        if (item.destinationLocationId === locationId) {
+          priorInwardQty += qty;
+          priorInwardValue += val;
+        }
+      }
+      
+      // Prior Stock Adjustments (production adds, consumption subtracts)
+      const priorAdjustments = await db
+        .select({
+          quantity: stockAdjustmentItems.quantity,
+          totalAmount: stockAdjustmentItems.totalAmount,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          eq(stockAdjustmentVouchers.locationId, locationId),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorAdjustments) {
+        const qty = parseFloat(item.quantity);
+        const val = parseFloat(item.totalAmount);
+        if (qty > 0) {
+          priorInwardQty += qty;
+          priorInwardValue += val;
+        } else {
+          priorOutwardQty += Math.abs(qty);
+          priorOutwardValue += Math.abs(val);
+        }
+      }
+      
+      // Prior Sales
+      const priorSales = await db
+        .select({
+          quantity: salesItems.quantity,
+          costPrice: salesItems.costPrice,
+          totalCost: salesItems.totalCost,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(
+          eq(salesItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          eq(vouchers.locationId, locationId),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorSales) {
+        priorOutwardQty += parseFloat(item.quantity);
+        priorOutwardValue += parseFloat(item.totalCost);
+      }
+      
+      // Prior Container Offloads
+      const priorOffloads = await db
+        .select({
+          quantity: poLineItems.quantity,
+          lineTotal: poLineItems.lineTotal,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          eq(containerOffloads.locationId, locationId),
+          sql`${containerOffloads.offloadedAt}::date < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorOffloads) {
+        const qty = parseFloat(item.quantity);
+        const baseValue = parseFloat(item.lineTotal);
+        const additionalCost = parseFloat(item.additionalCostPerBale) * qty;
+        priorInwardQty += qty;
+        priorInwardValue += baseValue + additionalCost;
+      }
+      
+      // ============ GET CURRENT INVENTORY (to check for unexplained stock from imports) ============
       const [currentInventory] = await db
         .select({
           quantity: inventory.quantity,
@@ -17666,9 +17785,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const currentQty = currentInventory ? parseFloat(currentInventory.quantity) : 0;
       const currentValue = currentInventory ? parseFloat(currentInventory.totalValue) : 0;
+      const currentRate = currentInventory ? parseFloat(currentInventory.averageRate) : 0;
+      
+      // Calculate voucher-derived opening balance
+      let voucherOpeningQty = priorInwardQty - priorOutwardQty;
+      let voucherOpeningValue = priorInwardValue - priorOutwardValue;
+      const voucherOpeningRate = voucherOpeningQty > 0 ? voucherOpeningValue / voucherOpeningQty : 0;
       
       // ============ CALCULATE MOVEMENTS AFTER THE SELECTED MONTH ============
-      // We need to work backwards from current inventory to find opening balance
+      // To reconcile with inventory, we need to work backwards from current inventory
       let afterMonthNetQty = 0;
       let afterMonthNetValue = 0;
       
@@ -17776,9 +17901,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         afterMonthNetValue += baseValue + additionalCost;
       }
       
-      // End of month closing = Current inventory - after-month movements
-      const endOfMonthClosingQty = currentQty - afterMonthNetQty;
-      const endOfMonthClosingValue = currentValue - afterMonthNetValue;
+      // Calculate expected end-of-month closing from inventory (working backwards)
+      const expectedClosingQty = currentQty - afterMonthNetQty;
+      const expectedClosingValue = currentValue - afterMonthNetValue;
+      const expectedClosingRate = expectedClosingQty > 0 ? expectedClosingValue / expectedClosingQty : 0;
       
       // ============ COLLECT CURRENT MONTH TRANSACTIONS AT THIS LOCATION ============
       const transactions: Array<{
@@ -18043,29 +18169,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inMonthOutwardQty += t.outwardQty;
       }
       
-      // Derive opening balance from end-of-month closing and in-month movements
-      // Opening = Closing - Inward + Outward (using actual cost for outward)
-      // But we need to handle weighted average properly
-      // So we work backwards: Opening + InwardQty - OutwardQty = ClosingQty (endOfMonthClosingQty)
-      // Therefore: OpeningQty = ClosingQty - InwardQty + OutwardQty
-      const openingQty = endOfMonthClosingQty - inMonthInwardQty + inMonthOutwardQty;
+      // Calculate what the opening balance SHOULD be based on:
+      // expectedClosing = expectedOpening + inMonthInward - inMonthOutward
+      // Therefore: expectedOpening = expectedClosing - inMonthInward + inMonthOutward
+      const expectedOpeningQty = expectedClosingQty - inMonthInwardQty + inMonthOutwardQty;
+      const expectedOpeningRate = expectedClosingRate; // Use the expected rate
+      const expectedOpeningValue = expectedOpeningQty * expectedOpeningRate;
       
-      // For value, we need the opening value that when processed through WAC gives us the closing value
-      // This is complex, so we estimate: Opening value = Opening qty * (Closing value / Closing qty)
-      // But if closing qty is 0, use inward rate
-      let openingValue = 0;
-      let openingRate = 0;
-      if (openingQty > 0) {
-        // Estimate opening rate from closing rate or inward rate
-        if (endOfMonthClosingQty > 0) {
-          openingRate = endOfMonthClosingValue / endOfMonthClosingQty;
-        } else if (inMonthInwardQty > 0) {
-          openingRate = inMonthInwardValue / inMonthInwardQty;
-        }
-        openingValue = openingQty * openingRate;
+      // Compare voucher-derived opening with expected opening
+      // The difference represents imported/adjusted stock not captured by vouchers
+      const importedQty = expectedOpeningQty - voucherOpeningQty;
+      const importedValue = expectedOpeningValue - voucherOpeningValue;
+      const importedRate = importedQty > 0 ? importedValue / importedQty : 0;
+      
+      // Use the expected opening (which reconciles with inventory) as the actual opening
+      // For value, use the expected rate from inventory (this ensures consistency)
+      let openingQty = Math.round(expectedOpeningQty * 1000) / 1000;
+      let openingRate = expectedClosingRate; // Use inventory's rate for consistency
+      let openingValue = openingQty * openingRate;
+      
+      // Handle edge cases: if opening is negative, something is wrong
+      if (openingQty < 0) {
+        // Negative opening means more was sold than could have existed
+        // This indicates data issues - clamp to zero for display
+        openingQty = 0;
+        openingValue = 0;
+        openingRate = 0;
       }
       
-      // Calculate running balance
+      // Calculate running balance - start with the full expected opening (includes imports)
       let runningQty = openingQty;
       let runningValue = openingValue;
       
@@ -18131,7 +18263,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Calculate totals
+      // Use expected closing values (derived from inventory) for totals to ensure reconciliation
+      // This guarantees the report's closing balance matches actual inventory
+      const finalClosingQty = Math.round(expectedClosingQty * 1000) / 1000;
+      const finalClosingValue = expectedClosingValue;
+      const finalClosingRate = finalClosingQty > 0 ? finalClosingValue / finalClosingQty : 0;
+      
+      // Update last transaction's closing to match expected closing
+      if (transactionsWithBalance.length > 0) {
+        const lastTx = transactionsWithBalance[transactionsWithBalance.length - 1];
+        lastTx.closingQty = finalClosingQty;
+        lastTx.closingRate = finalClosingRate;
+        lastTx.closingValue = finalClosingValue;
+      }
+      
       const processedTransactions = transactionsWithBalance.filter(t => !t.isOpeningBalance);
       const totals = {
         inwardQty: processedTransactions.reduce((s, t) => s + t.inwardQty, 0),
@@ -18140,9 +18285,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outwardQty: processedTransactions.reduce((s, t) => s + t.outwardQty, 0),
         outwardRate: 0,
         outwardValue: processedTransactions.reduce((s, t) => s + t.outwardValue, 0),
-        closingQty: runningQty,
-        closingRate: runningQty > 0 ? runningValue / runningQty : 0,
-        closingValue: runningValue,
+        closingQty: finalClosingQty,
+        closingRate: finalClosingRate,
+        closingValue: finalClosingValue,
       };
       totals.inwardRate = totals.inwardQty > 0 ? totals.inwardValue / totals.inwardQty : 0;
       totals.outwardRate = totals.outwardQty > 0 ? totals.outwardValue / totals.outwardQty : 0;
