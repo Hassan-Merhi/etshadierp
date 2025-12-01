@@ -530,7 +530,8 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
 
   // Conditional renders after all hooks are called
   // Redirect to Location Inventory if no location is available (only for non-POS users)
-  if (!activeLocation && !posUser) {
+  // Skip redirect if in edit mode, as we can load and edit without location selection
+  if (!activeLocation && !posUser && !editVoucherId) {
     return <Redirect to="/location-inventory" />;
   }
 
