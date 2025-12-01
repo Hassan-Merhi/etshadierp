@@ -181,6 +181,16 @@ export default function POS({ posUser }: { posUser?: any } = {}) {
     }
   }, [posUser, assignedCashAccount, paymentAccountId]);
 
+  // Set location from edit voucher when in edit mode
+  useEffect(() => {
+    if (editVoucher && editVoucher.locationId && !selectedLocation && allLocations.length > 0) {
+      const voucherLocation = allLocations.find(loc => loc.id === editVoucher.locationId);
+      if (voucherLocation) {
+        setSelectedLocation(voucherLocation);
+      }
+    }
+  }, [editVoucher, allLocations, selectedLocation, setSelectedLocation]);
+
   // Auto-select first account when loaded based on account type (for non-POS users)
   useEffect(() => {
     // Skip auto-selection if POS user has assigned cash account
