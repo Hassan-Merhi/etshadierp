@@ -17647,14 +17647,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 0); // Last day of month
       const monthStartStr = monthStart.toISOString().split('T')[0];
+      const monthEndStr = monthEnd.toISOString().split('T')[0];
       
-      // ============ CALCULATE OPENING BALANCE (all transactions BEFORE selected month at this location) ============
-      let openingQty = 0;
-      let openingValue = 0;
+      // ============ GET CURRENT INVENTORY (SOURCE OF TRUTH) ============
+      const [currentInventory] = await db
+        .select({
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .where(and(
+          eq(inventory.locationId, locationId),
+          eq(inventory.stockItemId, stockItemId)
+        ));
       
-      // Opening from Stock Transfers
-      const priorTransfers = await db
+      const currentQty = currentInventory ? parseFloat(currentInventory.quantity) : 0;
+      const currentValue = currentInventory ? parseFloat(currentInventory.totalValue) : 0;
+      
+      // ============ CALCULATE MOVEMENTS AFTER THE SELECTED MONTH ============
+      // We need to work backwards from current inventory to find opening balance
+      let afterMonthNetQty = 0;
+      let afterMonthNetValue = 0;
+      
+      // After-month Stock Transfers
+      const afterTransfers = await db
         .select({
           quantity: stockTransferItems.quantity,
           totalAmount: stockTransferItems.totalAmount,
@@ -17668,28 +17687,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
           eq(vouchers.optional, false),
-          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`,
+          sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`,
           or(
             eq(stockTransferItems.sourceLocationId, locationId),
             eq(stockTransferVouchers.destinationLocationId, locationId)
           )
         ));
       
-      for (const item of priorTransfers) {
+      for (const item of afterTransfers) {
         const qty = parseFloat(item.quantity);
         const val = parseFloat(item.totalAmount);
         if (item.sourceLocationId === locationId) {
-          openingQty -= qty;
-          openingValue -= val;
+          afterMonthNetQty -= qty;
+          afterMonthNetValue -= val;
         }
         if (item.destinationLocationId === locationId) {
-          openingQty += qty;
-          openingValue += val;
+          afterMonthNetQty += qty;
+          afterMonthNetValue += val;
         }
       }
       
-      // Opening from Stock Adjustments at this location
-      const priorAdjustments = await db
+      // After-month Stock Adjustments
+      const afterAdjustments = await db
         .select({
           quantity: stockAdjustmentItems.quantity,
           totalAmount: stockAdjustmentItems.totalAmount,
@@ -17702,16 +17721,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(vouchers.companyId, companyId),
           eq(vouchers.optional, false),
           eq(stockAdjustmentVouchers.locationId, locationId),
-          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+          sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`
         ));
       
-      for (const item of priorAdjustments) {
-        openingQty += parseFloat(item.quantity);
-        openingValue += parseFloat(item.totalAmount);
+      for (const item of afterAdjustments) {
+        afterMonthNetQty += parseFloat(item.quantity);
+        afterMonthNetValue += parseFloat(item.totalAmount);
       }
       
-      // Opening from Sales at this location (reduces stock)
-      const priorSales = await db
+      // After-month Sales
+      const afterSales = await db
         .select({
           quantity: salesItems.quantity,
           totalCost: salesItems.totalCost,
@@ -17723,16 +17742,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(vouchers.companyId, companyId),
           eq(vouchers.optional, false),
           eq(vouchers.locationId, locationId),
-          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+          sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`
         ));
       
-      for (const item of priorSales) {
-        openingQty -= parseFloat(item.quantity);
-        openingValue -= parseFloat(item.totalCost);
+      for (const item of afterSales) {
+        afterMonthNetQty -= parseFloat(item.quantity);
+        afterMonthNetValue -= parseFloat(item.totalCost);
       }
       
-      // Opening from Container Offloads at this location (adds to stock)
-      const priorOffloads = await db
+      // After-month Container Offloads
+      const afterOffloads = await db
         .select({
           quantity: poLineItems.quantity,
           lineTotal: poLineItems.lineTotal,
@@ -17746,18 +17765,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(poLineItems.stockItemId, stockItemId),
           eq(containers.companyId, companyId),
           eq(containerOffloads.locationId, locationId),
-          sql`${containerOffloads.offloadedAt}::date < ${monthStartStr}::date`
+          sql`${containerOffloads.offloadedAt}::date > ${monthEndStr}::date`
         ));
       
-      for (const item of priorOffloads) {
+      for (const item of afterOffloads) {
         const qty = parseFloat(item.quantity);
         const baseValue = parseFloat(item.lineTotal);
         const additionalCost = parseFloat(item.additionalCostPerBale) * qty;
-        openingQty += qty;
-        openingValue += baseValue + additionalCost;
+        afterMonthNetQty += qty;
+        afterMonthNetValue += baseValue + additionalCost;
       }
       
-      const openingRate = openingQty > 0 ? openingValue / openingQty : 0;
+      // End of month closing = Current inventory - after-month movements
+      const endOfMonthClosingQty = currentQty - afterMonthNetQty;
+      const endOfMonthClosingValue = currentValue - afterMonthNetValue;
       
       // ============ COLLECT CURRENT MONTH TRANSACTIONS AT THIS LOCATION ============
       const transactions: Array<{
@@ -18001,8 +18022,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Sort transactions by date
-      transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      // Sort transactions by date, with inward transactions before outward on same date
+      transactions.sort((a, b) => {
+        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        // On same date, inward before outward (so opening stock shows first)
+        if (a.inwardQty > 0 && b.outwardQty > 0) return -1;
+        if (a.outwardQty > 0 && b.inwardQty > 0) return 1;
+        return 0;
+      });
+      
+      // Calculate in-month net movements from transactions
+      let inMonthInwardQty = 0;
+      let inMonthInwardValue = 0;
+      let inMonthOutwardQty = 0;
+      
+      for (const t of transactions) {
+        inMonthInwardQty += t.inwardQty;
+        inMonthInwardValue += t.inwardValue;
+        inMonthOutwardQty += t.outwardQty;
+      }
+      
+      // Derive opening balance from end-of-month closing and in-month movements
+      // Opening = Closing - Inward + Outward (using actual cost for outward)
+      // But we need to handle weighted average properly
+      // So we work backwards: Opening + InwardQty - OutwardQty = ClosingQty (endOfMonthClosingQty)
+      // Therefore: OpeningQty = ClosingQty - InwardQty + OutwardQty
+      const openingQty = endOfMonthClosingQty - inMonthInwardQty + inMonthOutwardQty;
+      
+      // For value, we need the opening value that when processed through WAC gives us the closing value
+      // This is complex, so we estimate: Opening value = Opening qty * (Closing value / Closing qty)
+      // But if closing qty is 0, use inward rate
+      let openingValue = 0;
+      let openingRate = 0;
+      if (openingQty > 0) {
+        // Estimate opening rate from closing rate or inward rate
+        if (endOfMonthClosingQty > 0) {
+          openingRate = endOfMonthClosingValue / endOfMonthClosingQty;
+        } else if (inMonthInwardQty > 0) {
+          openingRate = inMonthInwardValue / inMonthInwardQty;
+        }
+        openingValue = openingQty * openingRate;
+      }
       
       // Calculate running balance
       let runningQty = openingQty;
@@ -18029,16 +18090,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         posSellingValue?: number;
       }> = [];
       
-      // Add Opening Balance row
-      if (openingQty !== 0 || openingValue !== 0) {
+      // Add Opening Balance row if there's opening stock
+      if (openingQty > 0 || openingValue > 0) {
         transactionsWithBalance.push({
           date: monthStartStr,
           particulars: 'Opening Balance',
           vchType: '',
           voucherId: 0,
-          inwardQty: 0,
-          inwardRate: 0,
-          inwardValue: 0,
+          inwardQty: openingQty,
+          inwardRate: openingRate,
+          inwardValue: openingValue,
           outwardQty: 0,
           outwardRate: 0,
           outwardValue: 0,
