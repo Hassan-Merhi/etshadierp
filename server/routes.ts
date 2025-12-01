@@ -17063,6 +17063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         particulars: string;
         vchType: string;
         voucherId: number;
+        poId?: number;
         inwardQty: number;
         inwardRate: number;
         inwardValue: number;
@@ -17076,6 +17077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const poItems = await db
         .select({
           date: purchaseOrders.createdAt,
+          poId: purchaseOrders.id,
           poNumber: purchaseOrders.poNumber,
           supplierName: suppliers.legalName,
           quantity: poLineItems.quantity,
@@ -17099,6 +17101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           particulars: item.supplierName,
           vchType: 'PURCHASE IMPORT',
           voucherId: 0,
+          poId: item.poId,
           inwardQty: parseFloat(item.quantity),
           inwardRate: parseFloat(item.rate),
           inwardValue: parseFloat(item.lineTotal),

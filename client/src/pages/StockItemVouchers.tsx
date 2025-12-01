@@ -19,6 +19,7 @@ interface Transaction {
   particulars: string;
   vchType: string;
   voucherId: number;
+  poId?: number;
   inwardQty: number;
   inwardRate: number;
   inwardValue: number;
@@ -77,6 +78,46 @@ export default function StockItemVouchers() {
       return format(new Date(dateStr), "d/MMM/yy");
     } catch {
       return dateStr;
+    }
+  };
+  
+  const getTransactionEditUrl = (txn: Transaction): string | null => {
+    if (txn.isOpeningBalance) return null;
+    
+    const vchType = txn.vchType.toLowerCase();
+    
+    // Purchase Import - navigate to PO edit page
+    if (vchType === 'purchase import') {
+      return txn.poId ? `/purchase-orders/${txn.poId}/edit` : null;
+    }
+    
+    // Production/Consumption - navigate to voucher edit page
+    if (vchType === 'production' || vchType === 'consumption') {
+      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    }
+    
+    // POS sales - navigate to POS edit page
+    if (vchType.startsWith('pos') || vchType.includes('pos')) {
+      return txn.voucherId ? `/pos?edit=${txn.voucherId}` : null;
+    }
+    
+    // Stock Transfer - navigate to voucher edit page
+    if (vchType.startsWith('stock transfer')) {
+      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    }
+    
+    // Generic Sales - navigate to voucher edit page
+    if (vchType === 'sales') {
+      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    }
+    
+    return null;
+  };
+  
+  const handleParticularsClick = (txn: Transaction) => {
+    const url = getTransactionEditUrl(txn);
+    if (url) {
+      navigate(url);
     }
   };
   
@@ -153,7 +194,17 @@ export default function StockItemVouchers() {
                       {txn.isOpeningBalance ? "" : formatDate(txn.date)}
                     </TableCell>
                     <TableCell className={`border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
-                      {txn.particulars}
+                      {getTransactionEditUrl(txn) ? (
+                        <button
+                          onClick={() => handleParticularsClick(txn)}
+                          className="text-left text-primary hover:underline cursor-pointer"
+                          data-testid={`link-particulars-${idx}`}
+                        >
+                          {txn.particulars}
+                        </button>
+                      ) : (
+                        txn.particulars
+                      )}
                     </TableCell>
                     <TableCell className="border-r text-xs">{txn.vchType}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardQty, 0)}</TableCell>
