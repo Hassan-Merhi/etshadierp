@@ -17338,24 +17338,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // - Inward: add the actual transaction value (brings in inventory at transaction's rate)
         // - Outward: deduct at the CURRENT weighted average rate (not the stored transaction rate)
         // This ensures closing value = closingQty × closingRate (consistency)
-        runningValue += t.inwardValue - (t.outwardQty * currentAvgRate);
+        const actualOutwardValue = t.outwardQty * currentAvgRate;
+        runningValue += t.inwardValue - actualOutwardValue;
         
         // Weighted average rate after this transaction
         const avgClosingRate = runningQty > 0 ? runningValue / runningQty : 0;
         
+        // For outward transactions (POS, Consumption, Stock Transfer Out), display the weighted average rate/value
+        // This ensures the displayed values match the actual inventory deduction
+        // Handle both positive outward (sales) and negative outward (returns)
+        const displayOutwardRate = t.outwardQty !== 0 ? currentAvgRate : 0;
+        const displayOutwardValue = t.outwardQty !== 0 ? actualOutwardValue : 0;
+        
         transactionsWithBalance.push({
           ...t,
+          outwardRate: displayOutwardRate,
+          outwardValue: displayOutwardValue,
           closingQty: runningQty,
           closingRate: avgClosingRate,
           closingValue: runningValue,
         });
       }
       
-      // Calculate totals - inward/outward from current month only, closing is final running balance
-      const inwardQtyTotal = transactions.reduce((s, t) => s + t.inwardQty, 0);
-      const inwardValueTotal = transactions.reduce((s, t) => s + t.inwardValue, 0);
-      const outwardQtyTotal = transactions.reduce((s, t) => s + t.outwardQty, 0);
-      const outwardValueTotal = transactions.reduce((s, t) => s + t.outwardValue, 0);
+      // Calculate totals from the processed transactions (which have corrected outward values)
+      // Skip opening balance row which has isOpeningBalance flag
+      const processedTransactions = transactionsWithBalance.filter(t => !t.isOpeningBalance);
+      const inwardQtyTotal = processedTransactions.reduce((s, t) => s + t.inwardQty, 0);
+      const inwardValueTotal = processedTransactions.reduce((s, t) => s + t.inwardValue, 0);
+      const outwardQtyTotal = processedTransactions.reduce((s, t) => s + t.outwardQty, 0);
+      const outwardValueTotal = processedTransactions.reduce((s, t) => s + t.outwardValue, 0);
       
       // Closing totals should be the FINAL running balance (same as last row)
       const totals = {
