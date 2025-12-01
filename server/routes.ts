@@ -17072,6 +17072,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outwardRate: number;
         outwardValue: number;
         isOpeningBalance?: boolean;
+        isPOS?: boolean;
+        posSellingRate?: number;
+        posSellingValue?: number;
       }> = [];
       
       // 1. PO Line Items (Inwards)
@@ -17243,6 +17246,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationId: vouchers.locationId,
           locationName: vouchers.locationName,
           quantity: salesItems.quantity,
+          sellingPrice: salesItems.sellingPrice,
+          totalSales: salesItems.totalSales,
           costPrice: salesItems.costPrice,
           totalCost: salesItems.totalCost,
           optional: vouchers.optional,
@@ -17259,11 +17264,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(vouchers.voucherDate);
       
       // Each sales item for this stock item gets its own row (not grouped)
+      // Store selling price separately, use cost for balance calculations
       for (const item of salesData) {
         const locName = item.locationName || (item.locationId ? (await storage.getLocationById(item.locationId))?.name : null) || 'Cash';
         const qty = parseFloat(item.quantity);
-        const cost = parseFloat(item.totalCost);
-        const rate = qty > 0 ? cost / qty : 0;
+        const sellingRate = parseFloat(item.sellingPrice);
+        const totalSalesValue = parseFloat(item.totalSales);
         
         transactions.push({
           date: item.voucherDate,
@@ -17274,8 +17280,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inwardRate: 0,
           inwardValue: 0,
           outwardQty: qty,
-          outwardRate: rate,
-          outwardValue: cost,
+          outwardRate: 0, // Will be set to weighted avg cost in running balance loop
+          outwardValue: 0, // Will be set to weighted avg cost in running balance loop
+          isPOS: true,
+          posSellingRate: sellingRate,
+          posSellingValue: totalSalesValue,
         });
       }
       
@@ -17326,7 +17335,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Calculate running balance for each transaction
-      // Using weighted average cost method: outward items are valued at the current average rate
+      // Using weighted average cost method: outward items are valued at the current average rate for closing balance
+      // POS transactions have SEPARATE posSellingRate/posSellingValue fields for display
+      
       for (const t of transactions) {
         // Calculate current weighted average rate BEFORE processing this transaction
         const currentAvgRate = runningQty > 0 ? runningValue / runningQty : 0;
@@ -17338,17 +17349,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // - Inward: add the actual transaction value (brings in inventory at transaction's rate)
         // - Outward: deduct at the CURRENT weighted average rate (not the stored transaction rate)
         // This ensures closing value = closingQty × closingRate (consistency)
-        const actualOutwardValue = t.outwardQty * currentAvgRate;
-        runningValue += t.inwardValue - actualOutwardValue;
+        const actualOutwardCost = t.outwardQty * currentAvgRate;
+        runningValue += t.inwardValue - actualOutwardCost;
         
         // Weighted average rate after this transaction
         const avgClosingRate = runningQty > 0 ? runningValue / runningQty : 0;
         
-        // For outward transactions (POS, Consumption, Stock Transfer Out), display the weighted average rate/value
-        // This ensures the displayed values match the actual inventory deduction
-        // Handle both positive outward (sales) and negative outward (returns)
+        // ALL outward transactions use weighted average cost for rate/value
         const displayOutwardRate = t.outwardQty !== 0 ? currentAvgRate : 0;
-        const displayOutwardValue = t.outwardQty !== 0 ? actualOutwardValue : 0;
+        const displayOutwardValue = t.outwardQty !== 0 ? actualOutwardCost : 0;
         
         transactionsWithBalance.push({
           ...t,
@@ -17360,8 +17369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Calculate totals from the processed transactions (which have corrected outward values)
-      // Skip opening balance row which has isOpeningBalance flag
+      // Calculate totals from processed transactions (all now using cost basis)
       const processedTransactions = transactionsWithBalance.filter(t => !t.isOpeningBalance);
       const inwardQtyTotal = processedTransactions.reduce((s, t) => s + t.inwardQty, 0);
       const inwardValueTotal = processedTransactions.reduce((s, t) => s + t.inwardValue, 0);

@@ -30,6 +30,9 @@ interface Transaction {
   closingRate: number;
   closingValue: number;
   isOpeningBalance?: boolean;
+  isPOS?: boolean;
+  posSellingRate?: number;
+  posSellingValue?: number;
 }
 
 interface VouchersData {
@@ -211,8 +214,12 @@ export default function StockItemVouchers() {
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardRate)}</TableCell>
                     <TableCell className="text-right tabular-nums border-r">{formatNumber(txn.inwardValue)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.outwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.outwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(txn.outwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums border-r">
+                      {formatNumber(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.closingRate)}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingValue)}</TableCell>
