@@ -70,6 +70,18 @@ export default function LocationSummary() {
 
   const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
     queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(','), asOfDate }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedLocationIds.length > 0) {
+        params.append('locationIds', selectedLocationIds.join(','));
+      }
+      params.append('asOfDate', asOfDate);
+      const res = await fetch(`/api/location-summary?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch location summary');
+      return res.json();
+    },
     enabled: selectedLocationIds.length > 0,
   });
 
