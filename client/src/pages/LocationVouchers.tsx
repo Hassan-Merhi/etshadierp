@@ -77,9 +77,7 @@ export default function LocationVouchers() {
     enabled: locationId > 0 && stockItemId > 0 && year > 0 && month > 0,
   });
   
-  const formatNumber = (num: number, decimals = 2, allowNegative = true) => {
-    // For closing balances, don't show negative or zero values
-    if (!allowNegative && (num <= 0)) return "";
+  const formatNumber = (num: number, decimals = 2) => {
     if (num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
@@ -224,9 +222,9 @@ export default function LocationVouchers() {
                     <TableCell className="text-right tabular-nums border-r">
                       {formatNumber(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0, false)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.closingRate, 2, false)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingValue, 2, false)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(txn.closingRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingValue)}</TableCell>
                   </TableRow>
                 ))}
                 
@@ -242,14 +240,14 @@ export default function LocationVouchers() {
                   <TableRow className="bg-muted/50 font-bold">
                     <TableCell colSpan={3} className="border-r">Totals</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardRate, 2, false)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardRate)}</TableCell>
                     <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardRate, 2, false)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardRate)}</TableCell>
                     <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.outwardValue)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingQty, 0, false)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingRate, 2, false)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingValue, 2, false)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingQty, 0)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingValue)}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
