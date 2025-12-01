@@ -28,7 +28,6 @@ import {
   Tags,
   AlertCircle,
   Grid3X3,
-  Edit3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -155,11 +154,6 @@ const menuItems = [
     title: "Location Summary",
     url: "/location-summary",
     icon: Grid3X3,
-  },
-  {
-    title: "Edit Location Cost Prices",
-    url: "/edit-location-cost-prices",
-    icon: Edit3,
   },
   {
     title: "Sales Report",
