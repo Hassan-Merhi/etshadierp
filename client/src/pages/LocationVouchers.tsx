@@ -107,6 +107,10 @@ export default function LocationVouchers() {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
     
+    if (vchType === 'po offload') {
+      return txn.poId ? `/purchase-orders/${txn.poId}` : null;
+    }
+    
     return null;
   };
   

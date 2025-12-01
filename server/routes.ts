@@ -17538,6 +17538,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthBuckets[month].outVal += parseFloat(row.totalCost);
       }
       
+      // 4. Container Offloads at this location (Inwards - from PO imports)
+      const containerOffloadData = await db
+        .select({
+          month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
+          quantity: poLineItems.quantity,
+          lineTotal: poLineItems.lineTotal,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          eq(containerOffloads.locationId, locationId),
+          sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`
+        ));
+      
+      for (const row of containerOffloadData) {
+        const month = Number(row.month);
+        const qty = parseFloat(row.quantity);
+        const baseValue = parseFloat(row.lineTotal);
+        const additionalCost = parseFloat(row.additionalCostPerBale) * qty;
+        const landedValue = baseValue + additionalCost;
+        
+        monthBuckets[month].inQty += qty;
+        monthBuckets[month].inVal += landedValue;
+      }
+      
       // Calculate running closing balance
       let runningQty = 0;
       let runningVal = 0;
@@ -17699,6 +17729,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of priorSales) {
         openingQty -= parseFloat(item.quantity);
         openingValue -= parseFloat(item.totalCost);
+      }
+      
+      // Opening from Container Offloads at this location (adds to stock)
+      const priorOffloads = await db
+        .select({
+          quantity: poLineItems.quantity,
+          lineTotal: poLineItems.lineTotal,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          eq(containerOffloads.locationId, locationId),
+          sql`${containerOffloads.offloadedAt}::date < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorOffloads) {
+        const qty = parseFloat(item.quantity);
+        const baseValue = parseFloat(item.lineTotal);
+        const additionalCost = parseFloat(item.additionalCostPerBale) * qty;
+        openingQty += qty;
+        openingValue += baseValue + additionalCost;
       }
       
       const openingRate = openingQty > 0 ? openingValue / openingQty : 0;
@@ -17888,6 +17944,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isPOS: true,
           posSellingRate: sellingRate,
           posSellingValue: totalSalesValue,
+        });
+      }
+      
+      // 4. Container Offloads at this location (Inwards from PO imports)
+      const offloadData = await db
+        .select({
+          offloadedAt: containerOffloads.offloadedAt,
+          containerId: containerOffloads.containerId,
+          containerCode: containers.containerCode,
+          poId: purchaseOrders.id,
+          poNumber: purchaseOrders.poNumber,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          lineTotal: poLineItems.lineTotal,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          eq(containerOffloads.locationId, locationId),
+          sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`,
+          sql`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt}) = ${month}`
+        ))
+        .orderBy(containerOffloads.offloadedAt);
+      
+      for (const item of offloadData) {
+        const qty = parseFloat(item.quantity);
+        const baseRate = parseFloat(item.rate);
+        const baseValue = parseFloat(item.lineTotal);
+        const additionalCostPerBale = parseFloat(item.additionalCostPerBale);
+        const additionalCost = additionalCostPerBale * qty;
+        const landedValue = baseValue + additionalCost;
+        const landedRate = landedValue / qty;
+        
+        const offloadDateStr = item.offloadedAt instanceof Date 
+          ? item.offloadedAt.toISOString().split('T')[0] 
+          : String(item.offloadedAt).split('T')[0];
+        
+        transactions.push({
+          date: offloadDateStr,
+          particulars: `Container: ${item.containerCode} / PO: ${item.poNumber}`,
+          vchType: 'PO Offload',
+          voucherId: 0,
+          poId: item.poId,
+          inwardQty: qty,
+          inwardRate: landedRate,
+          inwardValue: landedValue,
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
         });
       }
       
