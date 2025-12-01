@@ -959,12 +959,23 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       <tr
                         key={item.inventoryId}
                         data-testid={`row-item-${item.stockItemId}`}
-                        className={`cursor-pointer border-t h-12 ${
+                        className={`border-t h-12 ${
                           index === selectedRowIndex ? "bg-accent" : "hover-elevate"
                         }`}
                         onClick={() => setSelectedRowIndex(index)}
                       >
-                        <td className="px-3 font-medium">{item.stockItemName}</td>
+                        <td className="px-3 font-medium">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/locations/${selectedLocationLocal?.id}/stock-items/${item.stockItemId}/history`);
+                            }}
+                            className="text-left text-primary hover:underline cursor-pointer"
+                            data-testid={`link-item-${item.stockItemId}`}
+                          >
+                            {item.stockItemName}
+                          </button>
+                        </td>
                         <td className="px-3 text-right font-mono">
                           {Math.floor(parseFloat(item.quantity))}
                         </td>
@@ -1156,7 +1167,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                     {/* Group items */}
                                     {items.map((item) => (
                                       <tr key={item.inventoryId} className="border-t hover-elevate">
-                                        <td className="px-3 py-2">{item.stockItemName}</td>
+                                        <td className="px-3 py-2">
+                                          <button
+                                            onClick={() => navigate(`/locations/${selectedLocationLocal?.id}/stock-items/${item.stockItemId}/history`)}
+                                            className="text-left text-primary hover:underline cursor-pointer"
+                                            data-testid={`link-all-item-${item.stockItemId}`}
+                                          >
+                                            {item.stockItemName}
+                                          </button>
+                                        </td>
                                         <td className="px-3 py-2 text-right font-mono">
                                           {Math.floor(parseFloat(item.quantity)).toLocaleString()}
                                         </td>

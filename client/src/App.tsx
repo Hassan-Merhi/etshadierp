@@ -50,6 +50,8 @@ import OrphanedRecords from "@/pages/OrphanedRecords";
 import PurchaseOrderEdit from "@/pages/PurchaseOrderEdit";
 import StockItemHistory from "@/pages/StockItemHistory";
 import StockItemVouchers from "@/pages/StockItemVouchers";
+import LocationMonthlySummary from "@/pages/LocationMonthlySummary";
+import LocationVouchers from "@/pages/LocationVouchers";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -105,6 +107,8 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
+      <Route path="/locations/:locationId/stock-items/:stockItemId/history" component={LocationMonthlySummary} />
+      <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month" component={LocationVouchers} />
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
