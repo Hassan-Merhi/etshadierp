@@ -618,6 +618,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update cost prices by barcode for a location
+  app.post(
+    "/api/locations/:locationId/import-cost-prices",
+    requireAuth,
+    checkPOSLocation,
+    async (req, res) => {
+      try {
+        const locationId = parseInt(req.params.locationId);
+        if (isNaN(locationId)) {
+          return res.status(400).json({ message: "Invalid location ID" });
+        }
+
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const location = await storage.getLocationById(locationId);
+        if (!location) {
+          return res.status(404).json({ message: "Location not found" });
+        }
+
+        if (location.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({
+            message: "Access denied: Location belongs to a different company",
+          });
+        }
+
+        const { updates } = req.body;
+        if (!Array.isArray(updates)) {
+          return res.status(400).json({ message: "Updates must be an array" });
+        }
+
+        const result = await storage.updateCostPricesByBarcode(locationId, updates);
+        res.json(result);
+      } catch (error: any) {
+        console.error("Error updating cost prices:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // Bulk import inventory for a location
   app.post(
     "/api/locations/:locationId/import-inventory",

@@ -104,6 +104,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [isImporting, setIsImporting] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
 
+  // Cost price import dialog state
+  const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
+  const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
+  const [costPricePreview, setCostPricePreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
+  const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
+  const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
+  const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
+
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -408,6 +416,137 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setImportComplete(false);
   };
 
+  const downloadCostPriceTemplate = () => {
+    const template = [
+      { barcode: "ITEM001", costPrice: "125.50" },
+      { barcode: "ITEM002", costPrice: "95.75" },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cost Price Import");
+    XLSX.writeFile(wb, "cost_price_import_template.xlsx");
+
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to update cost prices",
+    });
+  };
+
+  const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setCostPriceFile(selectedFile);
+    setCostPriceErrors([]);
+    setCostPricePreview([]);
+    setCostPriceImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      const errors: string[] = [];
+      const rows: Array<{ barcode: string; costPrice: number }> = [];
+
+      jsonData.forEach((row, index) => {
+        const rowNumber = index + 2;
+
+        if (!row.barcode || String(row.barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Barcode is required`);
+          return;
+        }
+
+        const costPrice = parseFloat(row.costPrice || "0");
+        if (isNaN(costPrice) || costPrice <= 0) {
+          errors.push(`Row ${rowNumber}: Cost price must be a valid number greater than 0`);
+          return;
+        }
+
+        rows.push({
+          barcode: String(row.barcode || "").trim(),
+          costPrice: costPrice,
+        });
+      });
+
+      setCostPricePreview(rows);
+      setCostPriceErrors(errors);
+
+      if (errors.length === 0) {
+        toast({
+          title: "File Validated",
+          description: `${rows.length} cost prices ready to import`,
+        });
+      } else {
+        toast({
+          title: "Validation Errors Found",
+          description: `Found ${errors.length} errors. Please fix them before importing.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error Reading File",
+        description: "Please ensure the file is a valid Excel file (.xlsx)",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCostPriceImport = async () => {
+    if (!selectedLocationLocal) {
+      toast({
+        title: "No Location Selected",
+        description: "Please select a location first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (costPriceErrors.length > 0) {
+      toast({
+        title: "Cannot Import",
+        description: "Please fix validation errors first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImportingCostPrice(true);
+
+    try {
+      const response = await apiRequest("POST", `/api/locations/${selectedLocationLocal.id}/import-cost-prices`, {
+        updates: costPricePreview,
+      });
+
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationLocal.id}/inventory`] });
+
+      setCostPriceImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Updated ${response.updated} cost prices. ${response.errors.length > 0 ? `${response.errors.length} errors encountered.` : ""}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to update cost prices",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImportingCostPrice(false);
+    }
+  };
+
+  const handleCostPriceDialogClose = () => {
+    setCostPriceImportOpen(false);
+    setCostPriceFile(null);
+    setCostPricePreview([]);
+    setCostPriceErrors([]);
+    setCostPriceImportComplete(false);
+  };
+
   const handleDeleteLocation = async () => {
     if (!selectedLocationLocal) return;
 
@@ -612,6 +751,110 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               {selectedLocationLocal.name} - Stock Groups
             </h1>
             <div className="flex items-center gap-2">
+              <Dialog open={costPriceImportOpen} onOpenChange={setCostPriceImportOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    data-testid="button-import-cost-prices"
+                    className="gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import Cost Prices
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Import Cost Prices from Excel</DialogTitle>
+                    <DialogDescription>
+                      Upload an Excel file with barcode and cost price columns
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Button
+                        variant="outline"
+                        onClick={downloadCostPriceTemplate}
+                        data-testid="button-download-cost-price-template"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Template
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cost-price-file-upload">Select Excel File</Label>
+                      <Input
+                        id="cost-price-file-upload"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleCostPriceFileChange}
+                        disabled={isImportingCostPrice || costPriceImportComplete}
+                        data-testid="input-cost-price-file-upload"
+                      />
+                      {costPriceFile && (
+                        <p className="text-sm text-muted-foreground">
+                          Selected: {costPriceFile.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {costPriceErrors.length > 0 && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="font-semibold mb-2">
+                            {costPriceErrors.length} validation error{costPriceErrors.length > 1 ? "s" : ""} found:
+                          </div>
+                          <ul className="list-disc list-inside space-y-1">
+                            {costPriceErrors.slice(0, 5).map((error, index) => (
+                              <li key={index} className="text-sm">{error}</li>
+                            ))}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {costPricePreview.length > 0 && costPriceErrors.length === 0 && (
+                      <Alert>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertDescription>
+                          {costPricePreview.length} cost price records ready to import
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {costPriceImportComplete && (
+                      <Alert>
+                        <CheckCircle2 className="h-4 w-4" />
+                        <AlertDescription>
+                          Cost prices imported successfully
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="flex gap-2 justify-end">
+                      <Button
+                        variant="outline"
+                        onClick={handleCostPriceDialogClose}
+                        disabled={isImportingCostPrice}
+                        data-testid="button-cancel-cost-price"
+                      >
+                        Close
+                      </Button>
+                      <Button
+                        onClick={handleCostPriceImport}
+                        disabled={costPricePreview.length === 0 || costPriceErrors.length > 0 || isImportingCostPrice || costPriceImportComplete}
+                        data-testid="button-submit-cost-price-import"
+                      >
+                        {isImportingCostPrice ? "Importing..." : "Import Cost Prices"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button

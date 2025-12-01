@@ -184,6 +184,7 @@ export interface IStorage {
   getLocationInventory(locationId: number): Promise<any[]>;
   getCompanyInventory(companyId: number): Promise<any[]>;
   updateInventory(locationId: number, stockItemId: number, quantity: string, averageRate: string, totalValue: string): Promise<void>;
+  updateCostPricesByBarcode(locationId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }>;
 
   // Container Offload
   offloadContainer(
@@ -1419,6 +1420,50 @@ export class DbStorage implements IStorage {
         lastUpdated: new Date(),
       });
     }
+  }
+
+  async updateCostPricesByBarcode(locationId: number, updates: Array<{ barcode: string; costPrice: number }>): Promise<{ updated: number; errors: string[] }> {
+    const errors: string[] = [];
+    let updated = 0;
+
+    for (const update of updates) {
+      try {
+        // Find stock item by barcode (code or alias)
+        const stockItem = await this.getStockItemByCodeOrAlias(update.barcode, 0);
+        if (!stockItem) {
+          errors.push(`Barcode not found: ${update.barcode}`);
+          continue;
+        }
+
+        // Find inventory record
+        const [inventory] = await db
+          .select()
+          .from(schema.inventory)
+          .where(and(
+            eq(schema.inventory.locationId, locationId),
+            eq(schema.inventory.stockItemId, stockItem.id)
+          ));
+
+        if (inventory) {
+          const newTotalValue = (parseFloat(inventory.quantity) * update.costPrice).toFixed(2);
+          await db
+            .update(schema.inventory)
+            .set({
+              averageRate: update.costPrice.toFixed(2),
+              totalValue: newTotalValue,
+              lastUpdated: new Date(),
+            })
+            .where(eq(schema.inventory.id, inventory.id));
+          updated++;
+        } else {
+          errors.push(`No inventory found for barcode: ${update.barcode}`);
+        }
+      } catch (err: any) {
+        errors.push(`Error processing ${update.barcode}: ${err.message}`);
+      }
+    }
+
+    return { updated, errors };
   }
 
   // Container Offload
