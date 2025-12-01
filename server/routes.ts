@@ -17568,9 +17568,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         monthBuckets[month].inVal += landedValue;
       }
       
-      // Calculate running closing balance
-      let runningQty = 0;
-      let runningVal = 0;
+      // Get ACTUAL current inventory for this location and item (source of truth)
+      const currentInventoryResult = await db
+        .select({
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .where(and(
+          eq(inventory.stockItemId, stockItemId),
+          eq(inventory.locationId, locationId)
+        ))
+        .limit(1);
+      
+      const actualQty = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].quantity) : 0;
+      const actualRate = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].averageRate) : 0;
+      const actualValue = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].totalValue) : 0;
+      
+      // Calculate total movements for the year from vouchers
+      const totalYearInQty = Object.values(monthBuckets).reduce((s, b) => s + b.inQty, 0);
+      const totalYearInVal = Object.values(monthBuckets).reduce((s, b) => s + b.inVal, 0);
+      const totalYearOutQty = Object.values(monthBuckets).reduce((s, b) => s + b.outQty, 0);
+      const totalYearOutVal = Object.values(monthBuckets).reduce((s, b) => s + b.outVal, 0);
+      const totalYearNetQty = totalYearInQty - totalYearOutQty;
+      const totalYearNetVal = totalYearInVal - totalYearOutVal;
+      
+      const currentYear = new Date().getFullYear();
+      
+      // For current year: work backwards from actual inventory to derive opening
+      // For past years: we use voucher-based calculation (no inventory history)
+      let derivedOpeningQty: number;
+      let derivedOpeningVal: number;
+      
+      if (year === currentYear) {
+        // Current Inventory = Opening + YearNetMovements
+        // Opening = Current Inventory - YearNetMovements
+        derivedOpeningQty = actualQty - totalYearNetQty;
+        derivedOpeningVal = actualValue - totalYearNetVal;
+      } else {
+        // For past years, start from 0 (no inventory history available)
+        derivedOpeningQty = 0;
+        derivedOpeningVal = 0;
+      }
+      
+      // Calculate running closing balance starting from derived opening
+      let runningQty = derivedOpeningQty;
+      let runningVal = derivedOpeningVal;
       
       const monthlyData: Array<{
         month: number;
@@ -17595,19 +17639,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inwardValue: bucket.inVal,
           outwardQty: bucket.outQty,
           outwardValue: bucket.outVal,
-          closingQty: runningQty,
+          closingQty: Math.round(runningQty * 1000) / 1000,
           closingValue: runningVal,
         });
       }
       
-      // Calculate grand totals
+      // For current year: force December closing to match actual inventory
+      // This ensures the final closing reconciles to inventory
+      if (year === currentYear) {
+        monthlyData[11].closingQty = Math.round(actualQty * 1000) / 1000;
+        monthlyData[11].closingValue = actualValue;
+      }
+      
+      // Grand total closing should match actual inventory for current year
       const grandTotal = {
-        inwardQty: Object.values(monthBuckets).reduce((s, b) => s + b.inQty, 0),
-        inwardValue: Object.values(monthBuckets).reduce((s, b) => s + b.inVal, 0),
-        outwardQty: Object.values(monthBuckets).reduce((s, b) => s + b.outQty, 0),
-        outwardValue: Object.values(monthBuckets).reduce((s, b) => s + b.outVal, 0),
-        closingQty: runningQty,
-        closingValue: runningVal,
+        inwardQty: totalYearInQty,
+        inwardValue: totalYearInVal,
+        outwardQty: totalYearOutQty,
+        outwardValue: totalYearOutVal,
+        closingQty: year === currentYear ? Math.round(actualQty * 1000) / 1000 : Math.round(runningQty * 1000) / 1000,
+        closingValue: year === currentYear ? actualValue : runningVal,
       };
       
       res.json({
