@@ -1445,7 +1445,7 @@ export class DbStorage implements IStorage {
           ));
 
         if (inventory) {
-          // Update existing inventory record
+          // Update existing inventory record (including those with 0 quantity from POS sales)
           const newTotalValue = (parseFloat(inventory.quantity) * update.costPrice).toFixed(2);
           await db
             .update(schema.inventory)
@@ -1457,17 +1457,7 @@ export class DbStorage implements IStorage {
             .where(eq(schema.inventory.id, inventory.id));
           updated++;
         } else {
-          // Create new inventory record for out-of-stock items with 0 quantity
-          await db.insert(schema.inventory).values({
-            companyId,
-            locationId,
-            stockItemId: stockItem.id,
-            quantity: "0",
-            averageRate: update.costPrice.toFixed(2),
-            totalValue: "0",
-            lastUpdated: new Date(),
-          });
-          updated++;
+          errors.push(`Item not found in inventory for barcode: ${update.barcode}`);
         }
       } catch (err: any) {
         errors.push(`Error processing ${update.barcode}: ${err.message}`);
