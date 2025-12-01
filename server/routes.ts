@@ -16968,6 +16968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(poLineItems)
         .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .innerJoin(containers, eq(purchaseOrders.containerId, containers.id))
         .where(and(
           eq(poLineItems.stockItemId, stockItemId),
           eq(purchaseOrders.companyId, companyId),
@@ -17079,14 +17080,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date: purchaseOrders.createdAt,
           poId: purchaseOrders.id,
           poNumber: purchaseOrders.poNumber,
-          supplierName: suppliers.legalName,
+          containerNumber: containers.containerNumber,
           quantity: poLineItems.quantity,
           rate: poLineItems.rate,
           lineTotal: poLineItems.lineTotal,
         })
         .from(poLineItems)
         .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
-        .innerJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+        .innerJoin(containers, eq(purchaseOrders.containerId, containers.id))
         .where(and(
           eq(poLineItems.stockItemId, stockItemId),
           eq(purchaseOrders.companyId, companyId),
@@ -17098,7 +17099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const item of poItems) {
         transactions.push({
           date: item.date.toISOString().split('T')[0],
-          particulars: item.supplierName,
+          particulars: item.containerNumber,
           vchType: 'PURCHASE IMPORT',
           voucherId: 0,
           poId: item.poId,
