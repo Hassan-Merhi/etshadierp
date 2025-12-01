@@ -17952,7 +17952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           offloadedAt: containerOffloads.offloadedAt,
           containerId: containerOffloads.containerId,
-          containerCode: containers.containerCode,
+          containerCode: containers.containerNumber,
           poId: purchaseOrders.id,
           poNumber: purchaseOrders.poNumber,
           quantity: poLineItems.quantity,
