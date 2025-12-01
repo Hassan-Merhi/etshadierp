@@ -17345,11 +17345,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Calculate running balance for each transaction
+      // Using weighted average cost method: outward items are valued at the current average rate
       for (const t of transactions) {
+        // Calculate current weighted average rate BEFORE processing this transaction
+        const currentAvgRate = runningQty > 0 ? runningValue / runningQty : 0;
+        
+        // Update running quantity
         runningQty += t.inwardQty - t.outwardQty;
-        runningValue += t.inwardValue - t.outwardValue;
-        // Weighted average rate: total value / total qty (only when qty > 0)
+        
+        // For value: 
+        // - Inward: add the actual transaction value (brings in inventory at transaction's rate)
+        // - Outward: deduct at the CURRENT weighted average rate (not the stored transaction rate)
+        // This ensures closing value = closingQty × closingRate (consistency)
+        runningValue += t.inwardValue - (t.outwardQty * currentAvgRate);
+        
+        // Weighted average rate after this transaction
         const avgClosingRate = runningQty > 0 ? runningValue / runningQty : 0;
+        
         transactionsWithBalance.push({
           ...t,
           closingQty: runningQty,
