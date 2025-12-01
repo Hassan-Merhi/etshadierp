@@ -16952,6 +16952,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Stock item not found" });
       }
       
+      // Calculate the first day of the selected month for opening balance cutoff
+      const monthStart = new Date(year, month - 1, 1);
+      const monthStartStr = monthStart.toISOString().split('T')[0];
+      
+      // ============ CALCULATE OPENING BALANCE (all transactions BEFORE selected month) ============
+      let openingQty = 0;
+      let openingValue = 0;
+      
+      // Opening from PO Line Items
+      const priorPOItems = await db
+        .select({
+          quantity: poLineItems.quantity,
+          lineTotal: poLineItems.lineTotal,
+        })
+        .from(poLineItems)
+        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .where(and(
+          eq(poLineItems.stockItemId, stockItemId),
+          eq(purchaseOrders.companyId, companyId),
+          sql`${purchaseOrders.createdAt} < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorPOItems) {
+        openingQty += parseFloat(item.quantity);
+        openingValue += parseFloat(item.lineTotal);
+      }
+      
+      // Opening from Stock Transfers (net effect - transfers IN minus transfers OUT)
+      const priorTransfers = await db
+        .select({
+          quantity: stockTransferItems.quantity,
+          totalAmount: stockTransferItems.totalAmount,
+          sourceLocationId: stockTransferItems.sourceLocationId,
+          destinationLocationId: stockTransferVouchers.destinationLocationId,
+        })
+        .from(stockTransferItems)
+        .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+        .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockTransferItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+        ));
+      
+      // Stock transfers: each transfer creates both an outward (from source) and inward (to destination)
+      // For company-wide view, these cancel out (net zero) but we process them for consistency
+      // This mirrors how in-month transfers are handled in the running balance calculation
+      for (const item of priorTransfers) {
+        const qty = parseFloat(item.quantity);
+        const val = parseFloat(item.totalAmount);
+        // Outward from source: -qty, -val
+        openingQty -= qty;
+        openingValue -= val;
+        // Inward to destination: +qty, +val
+        openingQty += qty;
+        openingValue += val;
+        // Net effect: 0 (correct for company-wide view)
+      }
+      
+      // Opening from Stock Adjustments (Production adds, Consumption subtracts)
+      const priorAdjustments = await db
+        .select({
+          quantity: stockAdjustmentItems.quantity,
+          totalAmount: stockAdjustmentItems.totalAmount,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(and(
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+        ));
+      
+      // totalAmount is already signed (positive for production, negative for consumption)
+      // Just add the signed values directly
+      for (const item of priorAdjustments) {
+        openingQty += parseFloat(item.quantity);
+        openingValue += parseFloat(item.totalAmount);
+      }
+      
+      // Opening from Sales (reduces stock)
+      const priorSales = await db
+        .select({
+          quantity: salesItems.quantity,
+          totalCost: salesItems.totalCost,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(
+          eq(salesItems.stockItemId, stockItemId),
+          eq(vouchers.companyId, companyId),
+          eq(vouchers.optional, false),
+          sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
+        ));
+      
+      for (const item of priorSales) {
+        openingQty -= parseFloat(item.quantity);
+        openingValue -= parseFloat(item.totalCost);
+      }
+      
+      const openingRate = openingQty > 0 ? openingValue / openingQty : 0;
+      
+      // ============ COLLECT CURRENT MONTH TRANSACTIONS ============
       const transactions: Array<{
         date: string;
         particulars: string;
@@ -16963,6 +17069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outwardQty: number;
         outwardRate: number;
         outwardValue: number;
+        isOpeningBalance?: boolean;
       }> = [];
       
       // 1. PO Line Items (Inwards)
@@ -17101,11 +17208,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(vouchers.voucherDate);
       
       for (const item of adjustmentItems) {
-        const qty = Math.abs(parseFloat(item.quantity));
+        const rawQty = parseFloat(item.quantity);
+        const rawValue = parseFloat(item.totalAmount);
+        const qty = Math.abs(rawQty);
         const rate = parseFloat(item.rate);
-        const val = parseFloat(item.totalAmount);
+        const value = Math.abs(rawValue); // Use absolute value for outward
         const locName = locationMap[item.locationId] || (await storage.getLocationById(item.locationId))?.name || 'Unknown';
-        const isProduction = item.adjustmentType === 'Production' || parseFloat(item.quantity) > 0;
+        const isProduction = rawQty > 0;
         
         transactions.push({
           date: item.voucherDate,
@@ -17114,10 +17223,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherId: item.voucherId,
           inwardQty: isProduction ? qty : 0,
           inwardRate: isProduction ? rate : 0,
-          inwardValue: isProduction ? val : 0,
+          inwardValue: isProduction ? rawValue : 0, // Use raw (positive) value for production
           outwardQty: isProduction ? 0 : qty,
           outwardRate: isProduction ? 0 : rate,
-          outwardValue: isProduction ? 0 : val,
+          outwardValue: isProduction ? 0 : value, // Use absolute value for consumption
         });
       }
       
@@ -17189,27 +17298,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sort transactions by date
       transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      // Calculate running balance (closing column)
-      let runningQty = 0;
-      let runningValue = 0;
-      const transactionsWithBalance = transactions.map(t => {
+      // START running balance from OPENING BALANCE (not zero!)
+      let runningQty = openingQty;
+      let runningValue = openingValue;
+      
+      // Build final transaction list with Opening Balance row first
+      const transactionsWithBalance: Array<{
+        date: string;
+        particulars: string;
+        vchType: string;
+        voucherId: number;
+        inwardQty: number;
+        inwardRate: number;
+        inwardValue: number;
+        outwardQty: number;
+        outwardRate: number;
+        outwardValue: number;
+        closingQty: number;
+        closingRate: number;
+        closingValue: number;
+        isOpeningBalance?: boolean;
+      }> = [];
+      
+      // Add Opening Balance row (only if there's a prior balance or prior transactions)
+      // Per Tally's format: Opening Balance shows values in CLOSING columns only, not Inwards/Outwards
+      if (openingQty !== 0 || openingValue !== 0) {
+        transactionsWithBalance.push({
+          date: monthStartStr,
+          particulars: 'Opening Balance',
+          vchType: '',
+          voucherId: 0,
+          inwardQty: 0,  // Tally shows nothing in Inwards for opening
+          inwardRate: 0,
+          inwardValue: 0,
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
+          closingQty: openingQty,  // Only Closing columns show values
+          closingRate: openingRate,
+          closingValue: openingValue,
+          isOpeningBalance: true,
+        });
+      }
+      
+      // Calculate running balance for each transaction
+      for (const t of transactions) {
         runningQty += t.inwardQty - t.outwardQty;
         runningValue += t.inwardValue - t.outwardValue;
+        // Weighted average rate: total value / total qty (only when qty > 0)
         const avgClosingRate = runningQty > 0 ? runningValue / runningQty : 0;
-        return {
+        transactionsWithBalance.push({
           ...t,
           closingQty: runningQty,
           closingRate: avgClosingRate,
           closingValue: runningValue,
-        };
-      });
+        });
+      }
       
-      // Calculate totals
+      // Calculate totals - inward/outward from current month only, closing is final running balance
       const inwardQtyTotal = transactions.reduce((s, t) => s + t.inwardQty, 0);
       const inwardValueTotal = transactions.reduce((s, t) => s + t.inwardValue, 0);
       const outwardQtyTotal = transactions.reduce((s, t) => s + t.outwardQty, 0);
       const outwardValueTotal = transactions.reduce((s, t) => s + t.outwardValue, 0);
       
+      // Closing totals should be the FINAL running balance (same as last row)
       const totals = {
         inwardQty: inwardQtyTotal,
         inwardRate: inwardQtyTotal > 0 ? inwardValueTotal / inwardQtyTotal : 0,
@@ -17230,6 +17382,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         year,
         month,
         monthName: monthNames[month - 1],
+        openingBalance: {
+          qty: openingQty,
+          rate: openingRate,
+          value: openingValue,
+        },
         transactions: transactionsWithBalance,
         totals,
       });

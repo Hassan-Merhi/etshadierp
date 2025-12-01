@@ -28,6 +28,7 @@ interface Transaction {
   closingQty: number;
   closingRate: number;
   closingValue: number;
+  isOpeningBalance?: boolean;
 }
 
 interface VouchersData {
@@ -143,9 +144,17 @@ export default function StockItemVouchers() {
               </TableHeader>
               <TableBody>
                 {data?.transactions.map((txn, idx) => (
-                  <TableRow key={idx} data-testid={`row-txn-${idx}`}>
-                    <TableCell className="border-r tabular-nums">{formatDate(txn.date)}</TableCell>
-                    <TableCell className="border-r">{txn.particulars}</TableCell>
+                  <TableRow 
+                    key={idx} 
+                    data-testid={`row-txn-${idx}`}
+                    className={txn.isOpeningBalance ? "bg-muted/30 font-medium" : ""}
+                  >
+                    <TableCell className="border-r tabular-nums">
+                      {txn.isOpeningBalance ? "" : formatDate(txn.date)}
+                    </TableCell>
+                    <TableCell className={`border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
+                      {txn.particulars}
+                    </TableCell>
                     <TableCell className="border-r text-xs">{txn.vchType}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardRate)}</TableCell>
