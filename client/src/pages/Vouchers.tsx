@@ -1956,7 +1956,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
   });
 
-  const onStockTransferSubmit = (data: StockTransferFormData) => {
+  const onStockTransferSubmit = async (data: StockTransferFormData) => {
     // Validate entries
     const validEntries = data.entries.filter(
       (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) > 0
@@ -1966,6 +1966,49 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       toast({
         title: "Validation Error",
         description: "Please add at least one valid entry with source location",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for zero quantity entries
+    const zeroQtyEntry = data.entries.find(
+      (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) === 0
+    );
+    if (zeroQtyEntry) {
+      const item = stockItems.find(s => s.id === zeroQtyEntry.stockItemId);
+      toast({
+        title: "Validation Error",
+        description: `Cannot add ${item?.name} with zero quantity`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate quantities against available inventory
+    const inventoryValidationPromises = validEntries.map(entry =>
+      fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
+        .then(res => res.json())
+        .then(inventory => {
+          const availableItem = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
+          const availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
+          const requestedQty = parseFloat(entry.quantity);
+          
+          if (requestedQty > availableQty) {
+            const item = stockItems.find(s => s.id === entry.stockItemId);
+            const sourceLocation = locations.find(l => l.id === entry.sourceLocationId);
+            throw new Error(`${item?.name} has only ${availableQty} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`);
+          }
+          return true;
+        })
+    );
+
+    try {
+      await Promise.all(inventoryValidationPromises);
+    } catch (err: any) {
+      toast({
+        title: "Insufficient Stock",
+        description: err.message,
         variant: "destructive",
       });
       return;
