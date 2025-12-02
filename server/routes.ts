@@ -8514,6 +8514,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get payable accounts (creditors - suppliers with positive balance)
+  app.get("/api/accounts/payables", requireAuth, async (req, res) => {
+    try {
+      const suppliers = await storage.getAllSuppliers();
+
+      const payableAccounts = suppliers
+        .map((supplier) => {
+          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          // Positive balance = we owe them
+          return {
+            id: supplier.id,
+            accountId: supplier.id,
+            code: supplier.code,
+            name: supplier.legalName,
+            balance: openingBalance,
+          };
+        })
+        .filter((account) => account.balance > 0)
+        .sort((a, b) => b.balance - a.balance);
+
+      res.json(payableAccounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all accounts for voucher sidebar (optimized format with balances)
   app.get("/api/accounts/voucher-sidebar", requireAuth, async (req, res) => {
     try {

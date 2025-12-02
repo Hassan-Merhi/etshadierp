@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, TrendingUp, Plus, X, Wallet } from "lucide-react";
+import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
@@ -58,6 +58,14 @@ type Account = {
   balance: number;
 };
 
+type PayableAccount = {
+  id: number;
+  accountId: number;
+  code: string;
+  name: string;
+  balance: number;
+};
+
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -96,6 +104,17 @@ export default function Dashboard() {
   // Fetch all accounts for selection
   const { data: allAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch payable accounts (creditors)
+  const { data: payableAccounts = [] } = useQuery<PayableAccount[]>({
+    queryKey: ["/api/accounts/payables", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/accounts/payables", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch payable accounts");
+      return await response.json();
+    },
     enabled: !!selectedCompany,
   });
 
@@ -267,123 +286,177 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Cash in Hand Section */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            Cash in Hand
-          </h3>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" data-testid="button-add-cash-account">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Account
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Cash Account to Dashboard</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Account Type</label>
-                  <Select
-                    value={selectedAccountType}
-                    onValueChange={(value: "ledger" | "bank") => {
-                      setSelectedAccountType(value);
-                      setSelectedAccountId(0);
-                    }}
-                  >
-                    <SelectTrigger data-testid="select-account-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ledger">Ledger Account</SelectItem>
-                      <SelectItem value="bank">Bank Account</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Account</label>
-                  <Select
-                    value={selectedAccountId.toString()}
-                    onValueChange={(value) => setSelectedAccountId(parseInt(value))}
-                  >
-                    <SelectTrigger data-testid="select-account">
-                      <SelectValue placeholder="Select an account..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredAvailableAccounts.length === 0 ? (
-                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                          No available accounts
-                        </div>
-                      ) : (
-                        filteredAvailableAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.accountId.toString()}>
-                            {account.name} ({account.code})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  onClick={() => {
-                    if (selectedAccountId > 0) {
-                      addAccountMutation.mutate({
-                        accountType: selectedAccountType,
-                        accountId: selectedAccountId,
-                      });
-                    }
-                  }}
-                  disabled={selectedAccountId === 0 || addAccountMutation.isPending}
-                  className="w-full"
-                  data-testid="button-save-cash-account"
-                >
-                  {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+      {/* Daily Cash Analysis Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Available Money (Left) */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <ArrowDownLeft className="h-5 w-5 text-green-600" />
+              Available
+            </h3>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-cash-account">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-        
-        {displayedCashAccounts.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No cash accounts added yet</p>
-            <p className="text-sm mt-1">Click "Add Account" to track cash accounts on your dashboard</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayedCashAccounts.map((dca) => {
-              const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
-              return (
-                <Card key={dca.id} className="p-4 relative" data-testid={`card-cash-account-${dca.id}`}>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="absolute top-2 right-2 h-6 w-6"
-                    onClick={() => removeAccountMutation.mutate(dca.id)}
-                    data-testid={`button-remove-cash-account-${dca.id}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Cash Account to Dashboard</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">{dca.account.name}</p>
-                    <p className="text-xs text-muted-foreground">{dca.account.code}</p>
-                    <p className="text-2xl font-bold font-mono mt-2" data-testid={`text-balance-${dca.id}`}>
-                      {formatCurrency(balance)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {dca.account.type} Account
+                    <label className="text-sm font-medium mb-2 block">Account Type</label>
+                    <Select
+                      value={selectedAccountType}
+                      onValueChange={(value: "ledger" | "bank") => {
+                        setSelectedAccountType(value);
+                        setSelectedAccountId(0);
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-account-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ledger">Ledger Account</SelectItem>
+                        <SelectItem value="bank">Bank Account</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Account</label>
+                    <Select
+                      value={selectedAccountId.toString()}
+                      onValueChange={(value) => setSelectedAccountId(parseInt(value))}
+                    >
+                      <SelectTrigger data-testid="select-account">
+                        <SelectValue placeholder="Select an account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredAvailableAccounts.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                            No available accounts
+                          </div>
+                        ) : (
+                          filteredAvailableAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.accountId.toString()}>
+                              {account.name} ({account.code})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (selectedAccountId > 0) {
+                        addAccountMutation.mutate({
+                          accountType: selectedAccountType,
+                          accountId: selectedAccountId,
+                        });
+                      }
+                    }}
+                    disabled={selectedAccountId === 0 || addAccountMutation.isPending}
+                    className="w-full"
+                    data-testid="button-save-cash-account"
+                  >
+                    {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          
+          {displayedCashAccounts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">No accounts added</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {displayedCashAccounts.map((dca) => {
+                const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
+                return (
+                  <div key={dca.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`cash-account-row-${dca.id}`}>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{dca.account.name}</p>
+                      <p className="text-xs text-muted-foreground">{dca.account.code}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${dca.id}`}>
+                        {formatCurrency(balance)}
+                      </p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeAccountMutation.mutate(dca.id)}
+                      data-testid={`button-remove-cash-account-${dca.id}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {displayedCashAccounts.length > 0 && (
+                <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-green-50 dark:bg-green-950/30 rounded font-bold">
+                  <span>Total</span>
+                  <span className="text-green-600 font-mono" data-testid="text-total-available">
+                    {formatCurrency(
+                      displayedCashAccounts.reduce((sum, dca) => {
+                        const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
+                        return sum + balance;
+                      }, 0)
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* To Pay (Right) */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+            <ArrowUpRight className="h-5 w-5 text-red-600" />
+            To Pay
+          </h3>
+          
+          {payableAccounts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">No creditors</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {payableAccounts.map((account) => (
+                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate" data-testid={`payable-account-row-${account.id}`}>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{account.name}</p>
+                    <p className="text-xs text-muted-foreground">{account.code}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold font-mono text-red-600" data-testid={`text-payable-${account.id}`}>
+                      {formatCurrency(Math.abs(account.balance))}
                     </p>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                </div>
+              ))}
+              {payableAccounts.length > 0 && (
+                <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-red-50 dark:bg-red-950/30 rounded font-bold">
+                  <span>Total</span>
+                  <span className="text-red-600 font-mono" data-testid="text-total-payable">
+                    {formatCurrency(
+                      payableAccounts.reduce((sum, acc) => sum + Math.abs(acc.balance), 0)
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
