@@ -59,6 +59,8 @@ export default function LocationSummary() {
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
+  const [highlightedRows, setHighlightedRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -84,6 +86,30 @@ export default function LocationSummary() {
     },
     enabled: selectedLocationIds.length > 0,
   });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
+      
+      if (e.key === " ") {
+        e.preventDefault();
+        if (selectedRowKey) {
+          setHighlightedRows(prev => {
+            const next = new Set(prev);
+            if (next.has(selectedRowKey)) {
+              next.delete(selectedRowKey);
+            } else {
+              next.add(selectedRowKey);
+            }
+            return next;
+          });
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedRowKey, summaryData, locationDialogOpen]);
 
   const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
   const selectedLocations = sortedLocations.filter(loc => selectedLocationIds.includes(loc.id));
@@ -120,8 +146,55 @@ export default function LocationSummary() {
   const colsPerLocation = 3;
   const totalCols = 1 + (selectedLocations.length * colsPerLocation);
 
+  const buildRowKey = (groupId: number | string, itemId?: number | string) => 
+    itemId ? `${groupId}-item-${itemId}` : `group-${groupId}`;
+
+  const getAllRows = () => {
+    if (!summaryData?.stockGroups?.length) return [];
+    const rows: Array<{ key: string; groupId: number; itemId?: number; groupIndex: number; itemIndex?: number }> = [];
+    
+    summaryData.stockGroups.forEach((group, groupIndex) => {
+      rows.push({ key: buildRowKey(group.id), groupId: group.id, groupIndex });
+      if (expandedGroups.has(group.id)) {
+        group.items.forEach((item, itemIndex) => {
+          rows.push({ key: buildRowKey(group.id, item.id), groupId: group.id, itemId: item.id, groupIndex, itemIndex });
+        });
+      }
+    });
+    
+    return rows;
+  };
+
+  const handleTableKeyDown = (e: KeyboardEvent) => {
+    if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
+    
+    const allRows = getAllRows();
+    if (allRows.length === 0) return;
+    
+    const currentIndex = selectedRowKey ? allRows.findIndex(r => r.key === selectedRowKey) : -1;
+    
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (currentIndex > 0) {
+        setSelectedRowKey(allRows[currentIndex - 1].key);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (currentIndex === -1) {
+        setSelectedRowKey(allRows[0].key);
+      } else if (currentIndex < allRows.length - 1) {
+        setSelectedRowKey(allRows[currentIndex + 1].key);
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleTableKeyDown);
+    return () => window.removeEventListener("keydown", handleTableKeyDown);
+  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen]);
+
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4" data-testid="location-summary-container">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Summary</h1>
@@ -275,9 +348,15 @@ export default function LocationSummary() {
                           className={cn(
                             "cursor-pointer",
                             "bg-accent/30 hover:bg-accent/50",
-                            groupIndex > 0 && "border-t"
+                            groupIndex > 0 && "border-t",
+                            selectedRowKey === buildRowKey(group.id) && "ring-2 ring-primary",
+                            highlightedRows.has(buildRowKey(group.id)) && "bg-primary/20"
                           )}
-                          onClick={() => toggleGroup(group.id)}
+                          onClick={() => {
+                            toggleGroup(group.id);
+                            setSelectedRowKey(buildRowKey(group.id));
+                          }}
+                          onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id))}
                           data-testid={`row-group-${group.id}`}
                         >
                           <td className="py-1 px-2 border-r sticky left-0 bg-accent/30 z-10 font-semibold">
@@ -312,8 +391,12 @@ export default function LocationSummary() {
                             key={`item-${item.id}`}
                             className={cn(
                               itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30",
-                              "hover:bg-accent/20"
+                              "hover:bg-accent/20 cursor-pointer",
+                              selectedRowKey === buildRowKey(group.id, item.id) && "ring-2 ring-primary",
+                              highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-primary/20"
                             )}
+                            onClick={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
+                            onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
                             data-testid={`row-item-${item.id}`}
                           >
                             <td className={cn(
