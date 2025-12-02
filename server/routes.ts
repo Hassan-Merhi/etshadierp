@@ -8579,7 +8579,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();
       const bankBalances = new Map<number, { debits: number; credits: number }>();
       const assetBalances = new Map<number, { debits: number; credits: number }>();
-      const supplierBalances = new Map<number, { debits: number; credits: number }>();
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -8608,22 +8607,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             credits: existing.credits + credit,
           });
         }
-
-        if (entry.supplierId) {
-          const existing = supplierBalances.get(entry.supplierId) || { debits: 0, credits: 0 };
+      }
+      
+      // For suppliers, calculate balance across ALL companies (matching /api/suppliers/stats)
+      const supplierBalances = new Map<number, number>();
+      for (const supplier of suppliers) {
+        const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+        const openingBalance = parseFloat(supplier.openingBalance || "0");
+        
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
+          
           // Only count pure credit or pure debit entries to prevent double-counting
           if (credit > 0 && debit === 0) {
-            supplierBalances.set(entry.supplierId, {
-              debits: existing.debits,
-              credits: existing.credits + credit,
-            });
+            return sum + credit; // Increase payable
           } else if (debit > 0 && credit === 0) {
-            supplierBalances.set(entry.supplierId, {
-              debits: existing.debits + debit,
-              credits: existing.credits,
-            });
+            return sum - debit; // Decrease payable
           }
-        }
+          return sum;
+        }, openingBalance);
+        
+        supplierBalances.set(supplier.id, balance);
       }
 
       // Helper function to calculate signed balance (positive = Dr, negative = Cr)
@@ -8682,12 +8687,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
           };
         }),
-        // Suppliers
+        // Suppliers (balance already calculated across all companies)
         ...suppliers.map((supplier) => {
-          const movements = supplierBalances.get(supplier.id) || { debits: 0, credits: 0 };
-          // Suppliers: Credits increase payable (negative balance), Debits decrease payable
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
-          const balance = -(openingBalance + movements.credits - movements.debits);
+          const balance = supplierBalances.get(supplier.id) || 0;
 
           return {
             id: supplier.id,
