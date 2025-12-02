@@ -684,13 +684,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const updateRow = (index: number, field: keyof SaleRow, value: string | number) => {
     const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value };
     
-    // Auto-calculate amount
+    // Convert numeric fields properly - keep as number even during typing
     if (field === "quantity" || field === "rate") {
-      const qty = field === "quantity" ? Number(value) : newRows[index].quantity;
-      const rate = field === "rate" ? Number(value) : newRows[index].rate;
+      const numValue = value === "" || value === "-" ? 0 : parseFloat(String(value)) || 0;
+      newRows[index] = { ...newRows[index], [field]: numValue };
+      
+      // Auto-calculate amount
+      const qty = field === "quantity" ? numValue : newRows[index].quantity;
+      const rate = field === "rate" ? numValue : newRows[index].rate;
       newRows[index].amount = qty * rate;
+    } else {
+      newRows[index] = { ...newRows[index], [field]: value };
     }
     
     // Update search term when typing in item name
@@ -701,8 +706,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     
     setRows(newRows);
 
-    // Add new row if last row is being edited
-    if (index === rows.length - 1 && value !== "" && field !== "itemName") {
+    // Add new row if last row is being edited (only for non-empty numeric values)
+    if (index === rows.length - 1 && value !== "" && value !== 0 && field !== "itemName") {
       setRows([
         ...newRows,
         {
@@ -1149,7 +1154,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                             value={
                               col.key === "amount"
                                 ? row.amount.toFixed(2)
-                                : row[col.key as keyof SaleRow]
+                                : col.key === "quantity" || col.key === "rate"
+                                  ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
+                                  : row[col.key as keyof SaleRow]
                             }
                             onChange={(e) => {
                               if (col.key !== "amount") {
