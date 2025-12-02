@@ -3315,13 +3315,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 onFocus={() => {
                                   setActiveTransferRow(index);
                                   setTransferHighlightedIndex(0);
-                                  setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
+                                  setTransferSearchTerm("");
                                   setShowItemSidebar(true);
                                   setShowSourceSidebar(false);
                                   if (transferEntries[index]?.sourceLocationId > 0) {
                                     setTransferInventorySource(transferEntries[index].sourceLocationId);
                                   } else if (isPOS && posLocationId) {
                                     setTransferInventorySource(posLocationId);
+                                  } else {
+                                    setTransferInventorySource(0);
                                   }
                                 }}
                                 onBlur={() => {
@@ -3458,8 +3460,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     e.preventDefault();
                                     if (index === transferFields.length - 1) {
                                       appendTransfer({
-                                        sourceLocationId: transferInventorySource || 0,
-                                        sourceLocationName: locations.find(l => l.id === transferInventorySource)?.name || "",
+                                        sourceLocationId: 0,
+                                        sourceLocationName: "",
                                         stockItemId: 0,
                                         stockItemName: "",
                                         quantity: "",
@@ -3522,8 +3524,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         e.preventDefault();
                                         if (index === transferFields.length - 1) {
                                           appendTransfer({
-                                            sourceLocationId: transferInventorySource || 0,
-                                            sourceLocationName: locations.find(l => l.id === transferInventorySource)?.name || "",
+                                            sourceLocationId: 0,
+                                            sourceLocationName: "",
                                             stockItemId: 0,
                                             stockItemName: "",
                                             quantity: "",
