@@ -12769,7 +12769,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Wrap balance sync and deletion in a transaction
         await db.transaction(async (tx) => {
           // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
-          if (voucher.voucherType === "Stock Transfer" && !voucher.optional) {
+          // Note: Database stores as "StockTransfer" (no space), but some code uses "Stock Transfer"
+          if ((voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") && !voucher.optional) {
             // Get the stock transfer record
             const [transferVoucher] = await tx
               .select()
@@ -12992,10 +12993,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // IMPORTANT: Reverse inventory movements for POS Sales vouchers
+          // IMPORTANT: Reverse inventory movements for POS Sales vouchers (Receipt type with sales items)
+          // Also handle "Sales" voucher type for completeness
           // POS Sale forward logic: subtracts qty, keeps existing rate
           // Reversal: add back qty at existing rate
-          if (voucher.voucherType === "Receipt" && !voucher.optional && voucher.locationId) {
+          if ((voucher.voucherType === "Receipt" || voucher.voucherType === "Sales") && !voucher.optional) {
             // Check if this is a POS sale by looking for sales items
             const saleItems = await tx
               .select()
@@ -13003,53 +13005,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(salesItems.voucherId, id));
 
             if (saleItems.length > 0) {
-              const voucherLocationId = voucher.locationId;
-              // This is a POS sale - add sold items back to inventory
-              for (const item of saleItems) {
-                const qty = parseFloat(item.quantity);
-                const costPrice = parseFloat(item.costPrice || "0");
+              // Only reverse inventory if we have a definite location from the voucher
+              // We don't guess the location to avoid restoring stock to the wrong place
+              if (voucher.locationId) {
+                const targetLocationId = voucher.locationId;
+                // This is a POS sale - add sold items back to inventory
+                for (const item of saleItems) {
+                  const qty = parseFloat(item.quantity);
+                  const costPrice = parseFloat(item.costPrice || "0");
 
-                // Get inventory at voucher's location
-                const [inv] = await tx
-                  .select()
-                  .from(inventory)
-                  .where(
-                    and(
-                      eq(inventory.stockItemId, item.stockItemId),
-                      eq(inventory.locationId, voucherLocationId),
-                    ),
-                  )
-                  .limit(1);
+                  // Get inventory at target location
+                  const [inv] = await tx
+                    .select()
+                    .from(inventory)
+                    .where(
+                      and(
+                        eq(inventory.stockItemId, item.stockItemId),
+                        eq(inventory.locationId, targetLocationId),
+                      ),
+                    )
+                    .limit(1);
 
-                if (inv) {
-                  // Add quantity back at existing rate (forward sale didn't change rate)
-                  const existingQty = parseFloat(inv.quantity);
-                  const existingRate = parseFloat(inv.averageRate || "0");
-                  const newQty = existingQty + qty;
-                  // Keep the same rate - POS sale forward logic doesn't change it
-                  const newValue = newQty * existingRate;
+                  if (inv) {
+                    // Add quantity back at existing rate (forward sale didn't change rate)
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingRate = parseFloat(inv.averageRate || "0");
+                    const newQty = existingQty + qty;
+                    // Keep the same rate - POS sale forward logic doesn't change it
+                    const newValue = newQty * existingRate;
 
-                  await tx
-                    .update(inventory)
-                    .set({
-                      quantity: newQty.toString(),
-                      totalValue: newValue.toString(),
-                    })
-                    .where(eq(inventory.id, inv.id));
-                } else {
-                  // Create inventory record - use the costPrice as basis since no existing record
-                  await tx.insert(inventory).values({
-                    companyId: req.session.currentCompanyId!,
-                    locationId: voucherLocationId,
-                    stockItemId: item.stockItemId,
-                    quantity: qty.toString(),
-                    averageRate: costPrice.toString(),
-                    totalValue: (qty * costPrice).toString(),
-                  });
+                    await tx
+                      .update(inventory)
+                      .set({
+                        quantity: newQty.toString(),
+                        totalValue: newValue.toString(),
+                      })
+                      .where(eq(inventory.id, inv.id));
+                  } else {
+                    // Create inventory record - use the costPrice as basis since no existing record
+                    await tx.insert(inventory).values({
+                      companyId: req.session.currentCompanyId!,
+                      locationId: targetLocationId,
+                      stockItemId: item.stockItemId,
+                      quantity: qty.toString(),
+                      averageRate: costPrice.toString(),
+                      totalValue: (qty * costPrice).toString(),
+                    });
+                  }
                 }
+              } else {
+                // Log warning: can't reverse inventory without location
+                console.warn(`Voucher ${id} deletion: Cannot reverse inventory - no locationId on voucher`);
               }
 
-              // Delete sales items
+              // Delete sales items regardless of whether inventory was reversed
               await tx
                 .delete(salesItems)
                 .where(eq(salesItems.voucherId, id));
