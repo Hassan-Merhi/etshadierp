@@ -398,10 +398,7 @@ export default function LocationSummary() {
                     <th 
                       key={location.id} 
                       colSpan={3} 
-                      className={cn(
-                        "text-center py-1 px-1 font-semibold border-b border-r",
-                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted"
-                      )}
+                      className="text-center py-1 px-1 font-semibold border-b border-r bg-muted"
                     >
                       <span className="truncate block" title={location.name}>
                         {location.name}
@@ -409,21 +406,12 @@ export default function LocationSummary() {
                     </th>
                   ))}
                 </tr>
-                <tr>
+                <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className={cn(
-                        "text-right py-1 px-1 font-medium border-b w-56",
-                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
-                      )}>Qty (BL)</th>
-                      <th className={cn(
-                        "text-right py-1 px-1 font-medium border-b w-20",
-                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
-                      )}>Rate ($)</th>
-                      <th className={cn(
-                        "text-right py-1 px-1 font-medium border-b border-r w-24",
-                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
-                      )}>Value ($)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-56 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
@@ -475,24 +463,24 @@ export default function LocationSummary() {
                           </td>
                           {selectedLocations.map((location, locIndex) => {
                             const data = group.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
-                            const isSelectedLoc = locIndex === selectedLocationIndex;
+                            const isSelectedCell = locIndex === selectedLocationIndex && selectedRowKey === buildRowKey(group.id);
                             return (
                               <Fragment key={`group-${group.id}-loc-${location.id}`}>
                                 <td className={cn(
                                   "text-right py-1 px-1 tabular-nums font-medium",
-                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                  isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
                                 <td className={cn(
                                   "text-right py-1 px-1 tabular-nums text-foreground",
-                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                  isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className={cn(
                                   "text-right py-1 px-1 border-r tabular-nums font-semibold",
-                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                  isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                                 </td>
@@ -536,13 +524,14 @@ export default function LocationSummary() {
                             </td>
                             {selectedLocations.map((location, locIndex) => {
                               const data = item.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
-                              const isSelectedLoc = locIndex === selectedLocationIndex;
+                              const isSelectedCell = locIndex === selectedLocationIndex && selectedRowKey === buildRowKey(group.id, item.id);
+                              const isHighlighted = highlightedRows.has(buildRowKey(group.id, item.id));
                               return (
                                 <Fragment key={`item-${item.id}-loc-${location.id}`}>
                                   <td 
                                     className={cn(
                                       "text-right py-0.5 px-1 tabular-nums cursor-pointer hover:bg-accent/30",
-                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                      isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-qty-${item.id}-${location.id}`}
@@ -552,7 +541,7 @@ export default function LocationSummary() {
                                   <td 
                                     className={cn(
                                       "text-right py-0.5 px-1 tabular-nums text-foreground cursor-pointer hover:bg-accent/30",
-                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                      isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-rate-${item.id}-${location.id}`}
@@ -562,7 +551,7 @@ export default function LocationSummary() {
                                   <td 
                                     className={cn(
                                       "text-right py-0.5 px-1 border-r tabular-nums cursor-pointer hover:bg-accent/30",
-                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                      isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-value-${item.id}-${location.id}`}
@@ -582,25 +571,15 @@ export default function LocationSummary() {
                       </td>
                       {selectedLocations.map((location, locIndex) => {
                         const data = summaryData.grandTotals[location.id] || { quantity: 0, rate: 0, value: 0 };
-                        const isSelectedLoc = locIndex === selectedLocationIndex;
                         return (
                           <Fragment key={`grand-${location.id}`}>
-                            <td className={cn(
-                              "text-right py-1 px-1 tabular-nums",
-                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
-                            )} data-testid={`text-grand-qty-${location.id}`}>
+                            <td className="text-right py-1 px-1 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
-                            <td className={cn(
-                              "text-right py-1 px-1 tabular-nums text-foreground",
-                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
-                            )}>
+                            <td className="text-right py-1 px-1 tabular-nums text-foreground">
                               {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                             </td>
-                            <td className={cn(
-                              "text-right py-1 px-1 border-r tabular-nums",
-                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
-                            )} data-testid={`text-grand-value-${location.id}`}>
+                            <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
                               {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                             </td>
                           </Fragment>
