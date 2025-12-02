@@ -3235,7 +3235,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   onFocus={() => {
                                     setActiveTransferRow(index);
                                     setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
+                                    setTransferSourceHighlightedIndex(0);
                                     setShowSourceSidebar(true);
+                                    setShowItemSidebar(false);
                                   }}
                                   onBlur={() => {
                                     setTimeout(() => {
@@ -3352,6 +3354,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }
                                   } else if (e.key === "ArrowLeft" && !isPOS) {
                                     e.preventDefault();
+                                    setShowItemSidebar(false);
+                                    setTransferSearchTerm("");
                                     setTimeout(() => {
                                       const sourceInput = document.querySelector(`[data-testid="input-source-${index}"]`) as HTMLInputElement;
                                       if (sourceInput) { sourceInput.focus(); sourceInput.select(); }
@@ -3468,7 +3472,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         rate: "",
                                       });
                                       setTimeout(() => {
-                                        const newInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                        const newInput = isPOS 
+                                          ? document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement
+                                          : document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
                                         if (newInput) newInput.focus();
                                       }, 100);
                                     }
@@ -3532,7 +3538,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             rate: "",
                                           });
                                           setTimeout(() => {
-                                            const newInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                            const newInput = document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
                                             if (newInput) newInput.focus();
                                           }, 100);
                                         }
