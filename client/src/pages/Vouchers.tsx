@@ -3244,7 +3244,33 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }, 200);
                                   }}
                                   onKeyDown={(e) => {
-                                    if (e.key === "ArrowUp") {
+                                    const filteredLocs = locations
+                                      .filter(loc => {
+                                        if (!transferSourceSearchTerm.trim()) return true;
+                                        const term = transferSourceSearchTerm.toLowerCase();
+                                        return loc.name.toLowerCase().includes(term) || loc.code.toLowerCase().includes(term);
+                                      })
+                                      .sort((a, b) => a.name.localeCompare(b.name));
+                                    
+                                    if (e.key === "Enter" && filteredLocs.length > 0) {
+                                      e.preventDefault();
+                                      const selectedLoc = filteredLocs[transferSourceHighlightedIndex] || filteredLocs[0];
+                                      stockTransferForm.setValue(`entries.${index}.sourceLocationId`, selectedLoc.id);
+                                      stockTransferForm.setValue(`entries.${index}.sourceLocationName`, selectedLoc.name);
+                                      setTransferInventorySource(selectedLoc.id);
+                                      setTransferSourceSearchTerm("");
+                                      setShowSourceSidebar(false);
+                                      setTimeout(() => {
+                                        const itemInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
+                                        if (itemInput) { itemInput.focus(); itemInput.select(); }
+                                      }, 50);
+                                    } else if (e.key === "ArrowUp" && e.shiftKey) {
+                                      e.preventDefault();
+                                      setTransferSourceHighlightedIndex(Math.max(0, transferSourceHighlightedIndex - 1));
+                                    } else if (e.key === "ArrowDown" && e.shiftKey) {
+                                      e.preventDefault();
+                                      setTransferSourceHighlightedIndex(Math.min(filteredLocs.length - 1, transferSourceHighlightedIndex + 1));
+                                    } else if (e.key === "ArrowUp") {
                                       e.preventDefault();
                                       if (index > 0) {
                                         setTimeout(() => {
