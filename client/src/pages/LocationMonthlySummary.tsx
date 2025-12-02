@@ -145,8 +145,39 @@ export default function LocationMonthlySummary() {
   };
 
   useEffect(() => {
-    window.addEventListener("keydown", handleTableKeyDown);
-    return () => window.removeEventListener("keydown", handleTableKeyDown);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        window.history.back();
+        return;
+      }
+      
+      if (!data?.monthlyData?.length) return;
+      
+      const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
+      if (rows.length === 0) return;
+      
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedRowIndex(prev => Math.max(-1, prev - 1));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (selectedRowIndex === -1) {
+          setSelectedRowIndex(0);
+        } else if (selectedRowIndex < rows.length - 1) {
+          setSelectedRowIndex(prev => prev + 1);
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!isAllLocationsMode && selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
+          const month = rows[selectedRowIndex].month;
+          handleMonthClick(month);
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedRowIndex, data, isAllLocationsMode]);
 
   useEffect(() => {
