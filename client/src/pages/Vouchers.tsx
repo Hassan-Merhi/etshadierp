@@ -3225,17 +3225,53 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             {!isPOS && (
                               <div className="w-40 border-r h-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
+                                <input
+                                  type="text"
+                                  value={activeTransferRow === index && transferSourceSearchTerm ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
+                                  onChange={(e) => {
+                                    setTransferSourceSearchTerm(e.target.value);
+                                    setTransferSourceHighlightedIndex(0);
+                                  }}
+                                  onFocus={() => {
                                     setActiveTransferRow(index);
+                                    setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
                                     setShowSourceSidebar(true);
                                   }}
-                                  className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 text-left text-sm hover:bg-accent/10"
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      setActiveTransferRow(null);
+                                      setTransferSourceSearchTerm("");
+                                    }, 200);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "ArrowUp") {
+                                      e.preventDefault();
+                                      if (index > 0) {
+                                        setTimeout(() => {
+                                          const prevInput = document.querySelector(`[data-testid="input-source-${index - 1}"]`) as HTMLInputElement;
+                                          if (prevInput) { prevInput.focus(); prevInput.select(); }
+                                        }, 50);
+                                      }
+                                    } else if (e.key === "ArrowDown") {
+                                      e.preventDefault();
+                                      if (index < transferFields.length - 1) {
+                                        setTimeout(() => {
+                                          const nextInput = document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
+                                          if (nextInput) { nextInput.focus(); nextInput.select(); }
+                                        }, 50);
+                                      }
+                                    } else if (e.key === "ArrowRight" || (e.key === "Tab" && !e.shiftKey)) {
+                                      e.preventDefault();
+                                      setTimeout(() => {
+                                        const itemInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
+                                        if (itemInput) { itemInput.focus(); itemInput.select(); }
+                                      }, 50);
+                                    }
+                                  }}
+                                  placeholder="Type location..."
+                                  className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
                                   data-testid={`input-source-${index}`}
-                                >
-                                  {transferEntries[index]?.sourceLocationName || "Click to select..."}
-                                </button>
+                                />
                               </div>
                             )}
                             <div className="flex-1 min-w-[200px] border-r h-10">
@@ -3255,6 +3291,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setTransferHighlightedIndex(0);
                                   setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
                                   setShowItemSidebar(true);
+                                  setShowSourceSidebar(false);
                                   if (transferEntries[index]?.sourceLocationId > 0) {
                                     setTransferInventorySource(transferEntries[index].sourceLocationId);
                                   } else if (isPOS && posLocationId) {
@@ -3516,8 +3553,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </div>
                       {!isPOS && (
                         <>
-                          <div className="text-lg font-semibold">Grand Total:</div>
-                          <div className="text-2xl font-bold font-mono" data-testid="text-transfer-total">
+                          <div className="text-xs font-semibold">Grand Total:</div>
+                          <div className="text-sm font-bold font-mono" data-testid="text-transfer-total">
                             ${transferTotal.toFixed(2)}
                           </div>
                         </>
@@ -3697,6 +3734,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, loc.name);
                                     setTransferInventorySource(loc.id);
                                     setTransferSourceSearchTerm("");
+                                    setShowSourceSidebar(false);
                                     
                                     setTimeout(() => {
                                       const itemInput = document.querySelector(`[data-testid="input-item-name-${activeTransferRow}"]`) as HTMLInputElement;
