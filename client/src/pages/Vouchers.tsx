@@ -3090,46 +3090,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)}>
               {/* Header Row */}
               <div className="flex items-center gap-4 mb-4">
-                {isPOS ? (
+                {isPOS && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">From:</span>
                     <span className="font-medium">{posLocationName}</span>
                   </div>
-                ) : (
-                  <FormField
-                    control={stockTransferForm.control}
-                    name="entries.0.sourceLocationId"
-                    render={() => (
-                      <FormItem className="flex items-center gap-2 space-y-0">
-                        <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">Source:</FormLabel>
-                        <Select
-                          value={transferInventorySource?.toString() || ""}
-                          onValueChange={(value) => {
-                            const locId = parseInt(value);
-                            setTransferInventorySource(locId);
-                            const loc = locations.find(l => l.id === locId);
-                            transferEntries.forEach((_, idx) => {
-                              stockTransferForm.setValue(`entries.${idx}.sourceLocationId`, locId);
-                              stockTransferForm.setValue(`entries.${idx}.sourceLocationName`, loc?.name || "");
-                            });
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="w-[200px]" data-testid="select-source-location">
-                              <SelectValue placeholder="Select source..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
-                              <SelectItem key={location.id} value={location.id.toString()}>
-                                {location.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
                 )}
                 
                 <FormField
@@ -3223,6 +3188,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
                           #
                         </div>
+                        {!isPOS && (
+                          <div className="w-40 flex items-center px-3 border-r h-10 font-medium text-sm">
+                            Source
+                          </div>
+                        )}
                         <div className="flex-1 min-w-[200px] flex items-center px-3 border-r h-10 font-medium text-sm">
                           Item Name
                         </div>
@@ -3249,21 +3219,103 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
                               {index + 1}
                             </div>
+                            {!isPOS && (
+                              <div className="w-40 border-r h-10">
+                                <input
+                                  type="text"
+                                  value={transferEntries[index]?.sourceLocationName || ""}
+                                  onChange={(e) => {
+                                    stockTransferForm.setValue(`entries.${index}.sourceLocationName`, e.target.value);
+                                    const matchingLoc = locations.find(l => 
+                                      l.name.toLowerCase() === e.target.value.toLowerCase()
+                                    );
+                                    if (matchingLoc) {
+                                      stockTransferForm.setValue(`entries.${index}.sourceLocationId`, matchingLoc.id);
+                                      setTransferInventorySource(matchingLoc.id);
+                                    }
+                                  }}
+                                  onFocus={() => {
+                                    setActiveTransferRow(index);
+                                    if (transferEntries[index]?.sourceLocationId > 0) {
+                                      setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const entry = transferEntries[index];
+                                    if (entry?.sourceLocationName) {
+                                      const matchingLoc = locations.find(l => 
+                                        l.name.toLowerCase().startsWith(entry.sourceLocationName.toLowerCase())
+                                      );
+                                      if (matchingLoc) {
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, matchingLoc.id);
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, matchingLoc.name);
+                                        setTransferInventorySource(matchingLoc.id);
+                                      }
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "ArrowUp") {
+                                      e.preventDefault();
+                                      if (index > 0) {
+                                        setTimeout(() => {
+                                          const prevInput = document.querySelector(`[data-testid="input-source-${index - 1}"]`) as HTMLInputElement;
+                                          if (prevInput) { prevInput.focus(); prevInput.select(); }
+                                        }, 50);
+                                      }
+                                    } else if (e.key === "ArrowDown") {
+                                      e.preventDefault();
+                                      if (index < transferFields.length - 1) {
+                                        setTimeout(() => {
+                                          const nextInput = document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
+                                          if (nextInput) { nextInput.focus(); nextInput.select(); }
+                                        }, 50);
+                                      }
+                                    } else if (e.key === "ArrowRight" || (e.key === "Tab" && !e.shiftKey)) {
+                                      e.preventDefault();
+                                      setTimeout(() => {
+                                        const itemInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
+                                        if (itemInput) { itemInput.focus(); itemInput.select(); }
+                                      }, 50);
+                                    }
+                                  }}
+                                  placeholder="Source loc..."
+                                  className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
+                                  data-testid={`input-source-${index}`}
+                                  list={`source-locations-${index}`}
+                                />
+                                <datalist id={`source-locations-${index}`}>
+                                  {locations.map(loc => (
+                                    <option key={loc.id} value={loc.name} />
+                                  ))}
+                                </datalist>
+                              </div>
+                            )}
                             <div className="flex-1 min-w-[200px] border-r h-10">
                               <input
                                 type="text"
-                                value={transferEntries[index]?.stockItemName || ""}
+                                value={activeTransferRow === index && transferSearchTerm ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
                                 onChange={(e) => {
                                   setTransferSearchTerm(e.target.value);
                                   setTransferHighlightedIndex(0);
+                                  if (!e.target.value) {
+                                    stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                    stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
+                                  }
                                 }}
                                 onFocus={() => {
                                   setActiveTransferRow(index);
                                   setTransferHighlightedIndex(0);
+                                  setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
+                                  if (transferEntries[index]?.sourceLocationId > 0) {
+                                    setTransferInventorySource(transferEntries[index].sourceLocationId);
+                                  } else if (isPOS && posLocationId) {
+                                    setTransferInventorySource(posLocationId);
+                                  }
                                 }}
                                 onBlur={() => {
                                   setTimeout(() => {
                                     setActiveTransferRow(null);
+                                    setTransferSearchTerm("");
                                   }, 200);
                                 }}
                                 onKeyDown={(e) => {
@@ -3283,6 +3335,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         if (nextInput) { nextInput.focus(); nextInput.select(); }
                                       }, 50);
                                     }
+                                  } else if (e.key === "ArrowLeft" && !isPOS) {
+                                    e.preventDefault();
+                                    setTimeout(() => {
+                                      const sourceInput = document.querySelector(`[data-testid="input-source-${index}"]`) as HTMLInputElement;
+                                      if (sourceInput) { sourceInput.focus(); sourceInput.select(); }
+                                    }, 50);
                                   } else if (e.key === "ArrowRight") {
                                     e.preventDefault();
                                     setTimeout(() => {
