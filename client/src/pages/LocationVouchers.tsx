@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { useState, useEffect, useRef } from "react";
 
 interface Transaction {
   date: string;
@@ -63,6 +64,8 @@ export default function LocationVouchers() {
   const year = parseInt(params.year || "0");
   const month = parseInt(params.month || "0");
   const [_location, navigate] = useLocation();
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
+  const tableScrollContainer = useRef<HTMLDivElement>(null);
   
   const { data, isLoading } = useQuery<LocationVouchersData>({
     queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`],
@@ -112,6 +115,49 @@ export default function LocationVouchers() {
       navigate(url);
     }
   };
+
+  const getNavigableRows = () => {
+    return data?.transactions?.filter((_, idx) => idx > 0) || []; // Skip opening balance row (index 0)
+  };
+
+  const handleTableKeyDown = (e: KeyboardEvent) => {
+    const rows = getNavigableRows();
+    if (rows.length === 0) return;
+    
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedRowIndex(prev => Math.max(-1, prev - 1));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (selectedRowIndex === -1) {
+        setSelectedRowIndex(0);
+      } else if (selectedRowIndex < rows.length - 1) {
+        setSelectedRowIndex(prev => prev + 1);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
+        const txn = rows[selectedRowIndex];
+        const url = getTransactionEditUrl(txn);
+        if (url) {
+          navigate(url);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleTableKeyDown);
+    return () => window.removeEventListener("keydown", handleTableKeyDown);
+  }, [selectedRowIndex, data]);
+
+  useEffect(() => {
+    if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
+    const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
+    if (rowElement) {
+      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedRowIndex]);
   
   if (isLoading) {
     return (
@@ -156,7 +202,7 @@ export default function LocationVouchers() {
             Transactions - {data?.monthName} {data?.year}
           </CardTitle>
         </CardHeader>
-        <CardContent className="overflow-auto flex-1 p-0">
+        <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10 bg-muted">
               <tr className="bg-muted border-b">
@@ -180,11 +226,16 @@ export default function LocationVouchers() {
               </tr>
             </thead>
             <tbody>
-                {data?.transactions.map((txn, idx) => (
+                {data?.transactions.map((txn, idx) => {
+                  const displayIndex = idx > 0 ? idx - 1 : -1; // Skip opening balance in navigation
+                  const isSelected = displayIndex >= 0 && selectedRowIndex === displayIndex;
+                  
+                  return (
                   <tr 
                     key={idx} 
                     data-testid={`row-txn-${idx}`}
-                    className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : ""}`}
+                    className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : ""}`}
+                    data-row-index={displayIndex >= 0 ? displayIndex : undefined}
                   >
                     <td className="px-4 py-3 border-r tabular-nums">
                       {txn.isOpeningBalance ? "" : formatDate(txn.date)}
@@ -217,7 +268,8 @@ export default function LocationVouchers() {
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.closingRate)}</td>
                     <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingValue)}</td>
                   </tr>
-                ))}
+                  );
+                })}
                 
                 {data?.transactions.length === 0 && (
                   <tr>

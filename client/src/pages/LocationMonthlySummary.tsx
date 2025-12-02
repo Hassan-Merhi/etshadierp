@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -66,6 +66,8 @@ export default function LocationMonthlySummary() {
   
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
+  const tableScrollContainer = useRef<HTMLDivElement>(null);
   
   const { data, isLoading } = useQuery<LocationMonthlySummaryData>({
     queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }],
@@ -98,6 +100,44 @@ export default function LocationMonthlySummary() {
     if (num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
+
+  const handleTableKeyDown = (e: KeyboardEvent) => {
+    if (!data?.monthlyData?.length) return;
+    
+    const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
+    if (rows.length === 0) return;
+    
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedRowIndex(prev => Math.max(-1, prev - 1));
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (selectedRowIndex === -1) {
+        setSelectedRowIndex(0);
+      } else if (selectedRowIndex < rows.length - 1) {
+        setSelectedRowIndex(prev => prev + 1);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
+        const month = rows[selectedRowIndex].month;
+        handleMonthClick(month);
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleTableKeyDown);
+    return () => window.removeEventListener("keydown", handleTableKeyDown);
+  }, [selectedRowIndex, data]);
+
+  useEffect(() => {
+    if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
+    const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
+    if (rowElement) {
+      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedRowIndex]);
   
   if (isLoading) {
     return (
@@ -149,7 +189,7 @@ export default function LocationMonthlySummary() {
         <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-auto flex-1 p-0">
+        <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-10 bg-muted">
               <tr className="bg-muted border-b">
@@ -168,14 +208,18 @@ export default function LocationMonthlySummary() {
               </tr>
             </thead>
             <tbody>
-                {data?.monthlyData.map((month) => {
+                {data?.monthlyData.map((month, idx) => {
                   const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
-                  return (
+                  const displayIndex = data.monthlyData.slice(0, idx).filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0).length;
+                  const isSelected = hasData && selectedRowIndex === displayIndex;
+                  
+                  return hasData ? (
                     <tr 
                       key={month.month}
-                      className={`border-b ${hasData ? "cursor-pointer hover:bg-muted/50" : ""}`}
-                      onClick={() => hasData && handleMonthClick(month.month)}
+                      className={`border-b cursor-pointer ${isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : "hover:bg-muted/50"}`}
+                      onClick={() => handleMonthClick(month.month)}
                       data-testid={`row-month-${month.month}`}
+                      data-row-index={displayIndex}
                     >
                       <td className="font-medium px-4 py-3 border-r">{month.monthName}</td>
                       <td className="text-right px-4 py-3 tabular-nums">
@@ -197,7 +241,7 @@ export default function LocationMonthlySummary() {
                         {formatNumber(month.closingValue)}
                       </td>
                     </tr>
-                  );
+                  ) : null;
                 })}
                 
                 <tr className="bg-muted/50 font-bold border-t">
