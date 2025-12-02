@@ -10839,6 +10839,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(vouchers.id, id));
         });
 
+        // Sync employee balances when optional status changes
+        if (wasOptional !== willBeOptional && req.session.currentCompanyId) {
+          const entries = await storage.getVoucherEntriesByVoucher(id);
+          if (willBeOptional) {
+            // Voucher is becoming optional - reverse entries' effects
+            await syncEmployeeBalancesFromEntries(
+              entries.map(e => ({
+                ledgerAccountId: e.ledgerAccountId,
+                debitAmount: e.debitAmount,
+                creditAmount: e.creditAmount,
+              })),
+              req.session.currentCompanyId,
+              true // reverse
+            );
+          } else {
+            // Voucher is becoming active - apply entries' effects
+            await syncEmployeeBalancesFromEntries(
+              entries.map(e => ({
+                ledgerAccountId: e.ledgerAccountId,
+                debitAmount: e.debitAmount,
+                creditAmount: e.creditAmount,
+              })),
+              req.session.currentCompanyId
+            );
+          }
+        }
+
         // Fetch updated voucher outside transaction
         const updated = await storage.getVoucherById(id);
         res.json(updated);
@@ -12697,23 +12724,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid voucher ID" });
         }
 
-        // Get voucher and entries before deleting for balance sync
-        const voucher = await storage.getVoucherById(id);
-        if (voucher && !voucher.optional && req.session.currentCompanyId) {
-          const entries = await storage.getVoucherEntriesByVoucher(id);
-          // Reverse the entries' effect on employee balances
-          await syncEmployeeBalancesFromEntries(
-            entries.map(e => ({
-              ledgerAccountId: e.ledgerAccountId,
-              debitAmount: e.debitAmount,
-              creditAmount: e.creditAmount,
-            })),
-            req.session.currentCompanyId,
-            true // reverse
-          );
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
         }
 
-        await storage.deleteVoucher(id);
+        // Get voucher and entries before deleting for balance sync
+        const voucher = await storage.getVoucherById(id);
+        if (!voucher) {
+          return res.status(404).json({ message: "Voucher not found" });
+        }
+
+        // Wrap balance sync and deletion in a transaction
+        await db.transaction(async (tx) => {
+          if (!voucher.optional) {
+            const entries = await tx
+              .select()
+              .from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, id));
+            
+            // Reverse the entries' effect on employee balances
+            await syncEmployeeBalancesFromEntries(
+              entries.map(e => ({
+                ledgerAccountId: e.ledgerAccountId,
+                debitAmount: e.debitAmount,
+                creditAmount: e.creditAmount,
+              })),
+              req.session.currentCompanyId!,
+              true // reverse
+            );
+          }
+
+          // Delete voucher entries first (foreign key constraint)
+          await tx
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, id));
+          
+          // Delete voucher
+          await tx
+            .delete(vouchers)
+            .where(eq(vouchers.id, id));
+        });
+
         res.json({ message: "Voucher deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
