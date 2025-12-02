@@ -14,6 +14,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronRight, Settings2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface LocationData {
   quantity: number;
@@ -62,7 +63,9 @@ export default function LocationSummary() {
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
   const [highlightedRows, setHighlightedRows] = useState<Set<string>>(new Set());
   const [selectedLocationIndex, setSelectedLocationIndex] = useState<number>(0);
+  const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
   const tableScrollContainer = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -187,13 +190,28 @@ export default function LocationSummary() {
           return next;
         });
       }
+    } else if ((e.altKey || e.metaKey) && e.key.toLowerCase() === "r") {
+      e.preventDefault();
+      if (selectedRowKey) {
+        setHiddenRows(prev => {
+          const next = new Set(prev);
+          if (next.has(selectedRowKey)) {
+            next.delete(selectedRowKey);
+            toast({ title: "Row unhidden" });
+          } else {
+            next.add(selectedRowKey);
+            toast({ title: "Row hidden (Alt+R)" });
+          }
+          return next;
+        });
+      }
     }
   };
 
   useEffect(() => {
     window.addEventListener("keydown", handleTableKeyDown);
     return () => window.removeEventListener("keydown", handleTableKeyDown);
-  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations]);
+  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows]);
 
   useEffect(() => {
     if (!tableScrollContainer.current) return;
@@ -333,7 +351,7 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-28 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-40 bg-muted/80">Qty (BL)</th>
                       <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
                       <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
                     </Fragment>
@@ -363,7 +381,8 @@ export default function LocationSummary() {
                             "bg-accent/30 hover:bg-accent/50",
                             groupIndex > 0 && "border-t",
                             selectedRowKey === buildRowKey(group.id) && "ring-2 ring-primary",
-                            highlightedRows.has(buildRowKey(group.id)) && "bg-primary/20"
+                            highlightedRows.has(buildRowKey(group.id)) && "bg-primary/20",
+                            hiddenRows.has(buildRowKey(group.id)) && "hidden"
                           )}
                           onClick={() => {
                             toggleGroup(group.id);
@@ -399,14 +418,15 @@ export default function LocationSummary() {
                             );
                           })}
                         </tr>
-                        {expandedGroups.has(group.id) && group.items.map((item, itemIndex) => (
+                        {expandedGroups.has(group.id) && [...group.items].sort((a, b) => a.name.localeCompare(b.name)).map((item, itemIndex) => (
                           <tr 
                             key={`item-${item.id}`}
                             className={cn(
                               itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30",
                               "hover:bg-accent/20 cursor-pointer",
                               selectedRowKey === buildRowKey(group.id, item.id) && "ring-2 ring-primary",
-                              highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-primary/20"
+                              highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-primary/20",
+                              hiddenRows.has(buildRowKey(group.id, item.id)) && "hidden"
                             )}
                             onClick={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
                             onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
