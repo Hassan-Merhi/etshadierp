@@ -1487,6 +1487,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferInventorySource, setTransferInventorySource] = useState<number | null>(isPOS && posLocationId ? posLocationId : null);
   const [transferSearchTerm, setTransferSearchTerm] = useState("");
   const [transferHighlightedIndex, setTransferHighlightedIndex] = useState(0);
+  const [transferSourceSearchTerm, setTransferSourceSearchTerm] = useState("");
+  const [transferSourceHighlightedIndex, setTransferSourceHighlightedIndex] = useState(0);
   const transferSidebarRef = useRef<HTMLDivElement>(null);
 
   // For POS users, auto-set source location to their assigned location when locations load
@@ -3224,34 +3226,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 <input
                                   type="text"
                                   value={transferEntries[index]?.sourceLocationName || ""}
-                                  onChange={(e) => {
-                                    stockTransferForm.setValue(`entries.${index}.sourceLocationName`, e.target.value);
-                                    const matchingLoc = locations.find(l => 
-                                      l.name.toLowerCase() === e.target.value.toLowerCase()
-                                    );
-                                    if (matchingLoc) {
-                                      stockTransferForm.setValue(`entries.${index}.sourceLocationId`, matchingLoc.id);
-                                      setTransferInventorySource(matchingLoc.id);
-                                    }
-                                  }}
                                   onFocus={() => {
                                     setActiveTransferRow(index);
+                                    setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
                                     if (transferEntries[index]?.sourceLocationId > 0) {
                                       setTransferInventorySource(transferEntries[index].sourceLocationId);
                                     }
                                   }}
                                   onBlur={() => {
-                                    const entry = transferEntries[index];
-                                    if (entry?.sourceLocationName) {
-                                      const matchingLoc = locations.find(l => 
-                                        l.name.toLowerCase().startsWith(entry.sourceLocationName.toLowerCase())
-                                      );
-                                      if (matchingLoc) {
-                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, matchingLoc.id);
-                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, matchingLoc.name);
-                                        setTransferInventorySource(matchingLoc.id);
-                                      }
-                                    }
+                                    setTimeout(() => {
+                                      setActiveTransferRow(null);
+                                      setTransferSourceSearchTerm("");
+                                    }, 200);
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === "ArrowUp") {
@@ -3278,16 +3264,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       }, 50);
                                     }
                                   }}
-                                  placeholder="Source loc..."
+                                  placeholder="Click to select..."
                                   className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
                                   data-testid={`input-source-${index}`}
-                                  list={`source-locations-${index}`}
+                                  readOnly
                                 />
-                                <datalist id={`source-locations-${index}`}>
-                                  {locations.map(loc => (
-                                    <option key={loc.id} value={loc.name} />
-                                  ))}
-                                </datalist>
                               </div>
                             )}
                             <div className="flex-1 min-w-[200px] border-r h-10">
@@ -3353,6 +3334,37 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       const qtyInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
                                       if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
                                     }, 50);
+                                  } else if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const filteredInventory = transferInventory
+                                      .filter((item: any) => {
+                                        if (!transferSearchTerm.trim()) return true;
+                                        const term = transferSearchTerm.toLowerCase();
+                                        return (
+                                          item.stockItemName?.toLowerCase().includes(term) ||
+                                          item.stockItemCode?.toLowerCase().includes(term)
+                                        );
+                                      })
+                                      .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                                    
+                                    if (filteredInventory.length > 0) {
+                                      const item = filteredInventory[transferHighlightedIndex] || filteredInventory[0];
+                                      const stockItem = stockItems.find(s => s.id === item.stockItemId);
+                                      if (stockItem) {
+                                        stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
+                                        stockTransferForm.setValue(`entries.${index}.stockItemName`, stockItem.name);
+                                        stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
+                                        setTransferSearchTerm("");
+                                        
+                                        setTimeout(() => {
+                                          const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                          if (quantityInput) {
+                                            quantityInput.focus();
+                                            quantityInput.select();
+                                          }
+                                        }, 50);
+                                      }
+                                    }
                                   }
                                 }}
                                 placeholder="Type to search..."
@@ -3525,12 +3537,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   {/* Total Section */}
                   <div className="border-t bg-muted/20 p-4">
                     <div className="flex justify-end items-center gap-8 max-w-lg ml-auto">
-                      <div className="text-sm text-muted-foreground">Total Items:</div>
-                      <div className="text-sm font-mono font-medium">
+                      <div className="text-xs text-muted-foreground">Total Items:</div>
+                      <div className="text-xs font-mono font-medium">
                         {transferEntries.filter(e => e.stockItemId > 0).length}
                       </div>
-                      <div className="text-sm text-muted-foreground">Total Qty:</div>
-                      <div className="text-sm font-mono font-medium">
+                      <div className="text-xs text-muted-foreground">Total Qty:</div>
+                      <div className="text-xs font-mono font-medium">
                         {transferEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0).toFixed(2)}
                       </div>
                       {!isPOS && (
@@ -3652,6 +3664,83 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     </div>
                   </div>
                 </Card>
+
+                {/* Right Panel - Source Location Search */}
+                {!isPOS && (
+                  <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                    <div className="p-4 border-b">
+                      <h3 className="text-sm font-semibold mb-2">Select Source</h3>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search locations..."
+                          value={transferSourceSearchTerm}
+                          onChange={(e) => {
+                            setTransferSourceSearchTerm(e.target.value);
+                            setTransferSourceHighlightedIndex(0);
+                          }}
+                          className="pl-9"
+                          data-testid="input-transfer-source-search"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                      <div className="space-y-1">
+                        {(() => {
+                          const filteredLocations = locations
+                            .filter(loc => {
+                              if (!transferSourceSearchTerm.trim()) return true;
+                              const term = transferSourceSearchTerm.toLowerCase();
+                              return loc.name.toLowerCase().includes(term) || loc.code.toLowerCase().includes(term);
+                            })
+                            .sort((a, b) => a.name.localeCompare(b.name));
+                          
+                          if (filteredLocations.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-sm text-muted-foreground">
+                                No locations found
+                              </div>
+                            );
+                          }
+                          
+                          return filteredLocations.map((loc, idx) => {
+                            const isHighlighted = idx === transferSourceHighlightedIndex && activeTransferRow !== null;
+                            
+                            return (
+                              <button
+                                key={loc.id}
+                                type="button"
+                                className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
+                                  isHighlighted ? "bg-accent" : ""
+                                }`}
+                                data-testid={`button-select-source-location-${loc.id}`}
+                                onClick={() => {
+                                  if (activeTransferRow !== null) {
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationId`, loc.id);
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, loc.name);
+                                    setTransferInventorySource(loc.id);
+                                    setTransferSourceSearchTerm("");
+                                    
+                                    setTimeout(() => {
+                                      const itemInput = document.querySelector(`[data-testid="input-item-name-${activeTransferRow}"]`) as HTMLInputElement;
+                                      if (itemInput) {
+                                        itemInput.focus();
+                                        itemInput.select();
+                                      }
+                                    }, 50);
+                                  }
+                                }}
+                              >
+                                <div className="text-sm font-medium">{loc.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{loc.code}</div>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  </Card>
+                )}
               </div>
 
               {/* Notes and Options */}
