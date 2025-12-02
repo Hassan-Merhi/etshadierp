@@ -274,13 +274,23 @@ export default function LocationSummary() {
   useEffect(() => {
     if (!tableScrollContainer.current) return;
     
-    // Scroll to the focused location
-    const colWidth = 60; // approx width of each column (3 columns per location)
-    const locationWidth = colWidth * 3 + 20; // 3 cols + border
+    // Scroll to the focused location (horizontal)
+    const colWidth = 60;
+    const locationWidth = colWidth * 3 + 20;
     const scrollPosition = selectedLocationIndex * locationWidth;
     
     tableScrollContainer.current.scrollLeft = scrollPosition;
   }, [selectedLocationIndex]);
+
+  // Scroll to selected row when it changes (vertical)
+  useEffect(() => {
+    if (!selectedRowKey || !tableScrollContainer.current) return;
+    
+    const rowElement = tableScrollContainer.current.querySelector(`[data-row-key="${selectedRowKey}"]`);
+    if (rowElement) {
+      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedRowKey]);
 
   return (
     <div className="p-4 space-y-4" data-testid="location-summary-container">
@@ -447,6 +457,7 @@ export default function LocationSummary() {
                           }}
                           onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id))}
                           data-testid={`row-group-${group.id}`}
+                          data-row-key={buildRowKey(group.id)}
                         >
                           <td className={cn(
                             "py-1 px-2 border-r sticky left-0 z-10 font-semibold",
@@ -502,6 +513,7 @@ export default function LocationSummary() {
                             onClick={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
                             onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
                             data-testid={`row-item-${item.id}`}
+                            data-row-key={buildRowKey(group.id, item.id)}
                           >
                             <td className={cn(
                               "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10 cursor-pointer hover:underline",

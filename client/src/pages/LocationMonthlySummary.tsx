@@ -4,14 +4,6 @@ import { ArrowLeft, Calendar, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -158,79 +150,79 @@ export default function LocationMonthlySummary() {
           <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow className="bg-muted">
-                <TableHead rowSpan={2} className="align-bottom border-r bg-muted">Particulars</TableHead>
-                <TableHead colSpan={2} className="text-center border-r bg-muted">Inwards</TableHead>
-                <TableHead colSpan={2} className="text-center border-r bg-muted">Outwards</TableHead>
-                <TableHead colSpan={2} className="text-center bg-muted">Closing Balance</TableHead>
-              </TableRow>
-              <TableRow className="bg-muted/80">
-                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
-                <TableHead className="text-right border-r bg-muted/80">Value</TableHead>
-                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
-                <TableHead className="text-right border-r bg-muted/80">Value</TableHead>
-                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
-                <TableHead className="text-right bg-muted/80">Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <table className="w-full text-sm border-collapse">
+            <thead className="sticky top-0 z-10 bg-muted">
+              <tr className="bg-muted border-b">
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
+                <th colSpan={2} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
+                <th colSpan={2} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
+                <th colSpan={2} className="text-center px-4 py-2 bg-muted font-medium">Closing Balance</th>
+              </tr>
+              <tr className="bg-muted/80 border-b">
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
+                <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
+                <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Value</th>
+              </tr>
+            </thead>
+            <tbody>
                 {data?.monthlyData.map((month) => {
                   const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
                   return (
-                    <TableRow 
+                    <tr 
                       key={month.month}
-                      className={hasData ? "cursor-pointer hover:bg-muted/50" : ""}
+                      className={`border-b ${hasData ? "cursor-pointer hover:bg-muted/50" : ""}`}
                       onClick={() => hasData && handleMonthClick(month.month)}
                       data-testid={`row-month-${month.month}`}
                     >
-                      <TableCell className="font-medium border-r">{month.monthName}</TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <td className="font-medium px-4 py-3 border-r">{month.monthName}</td>
+                      <td className="text-right px-4 py-3 tabular-nums">
                         {formatNumber(month.inwardQty, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums border-r">
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums border-r">
                         {formatNumber(month.inwardValue)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums">
                         {formatNumber(month.outwardQty, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums border-r">
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums border-r">
                         {formatNumber(month.outwardValue)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums font-medium">
                         {formatNumber(month.closingQty, 0)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      </td>
+                      <td className="text-right px-4 py-3 tabular-nums font-medium">
                         {formatNumber(month.closingValue)}
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   );
                 })}
                 
-                <TableRow className="bg-muted/50 font-bold">
-                  <TableCell className="border-r">Grand Total</TableCell>
-                  <TableCell className="text-right tabular-nums">
+                <tr className="bg-muted/50 font-bold border-t">
+                  <td className="px-4 py-3 border-r">Grand Total</td>
+                  <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums border-r">
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums border-r">
                     {formatNumber(data?.grandTotal.inwardValue || 0)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums border-r">
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums border-r">
                     {formatNumber(data?.grandTotal.outwardValue || 0)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.closingQty || 0, 0)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  </td>
+                  <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.closingValue || 0)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
         </CardContent>
       </Card>
       

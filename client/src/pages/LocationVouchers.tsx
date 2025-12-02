@@ -3,14 +3,6 @@ import { useParams, useLocation } from "wouter";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
@@ -165,39 +157,39 @@ export default function LocationVouchers() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow className="bg-muted">
-                <TableHead rowSpan={2} className="align-bottom border-r w-[100px] bg-muted">Date</TableHead>
-                <TableHead rowSpan={2} className="align-bottom border-r bg-muted">Particulars</TableHead>
-                <TableHead rowSpan={2} className="align-bottom border-r w-[120px] bg-muted">Vch Type</TableHead>
-                <TableHead colSpan={3} className="text-center border-r bg-muted">Inwards</TableHead>
-                <TableHead colSpan={3} className="text-center border-r bg-muted">Outwards</TableHead>
-                <TableHead colSpan={3} className="text-center bg-muted">Closing</TableHead>
-              </TableRow>
-              <TableRow className="bg-muted/80">
-                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
-                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
-                <TableHead className="text-right border-r w-[80px] bg-muted/80">Value</TableHead>
-                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
-                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
-                <TableHead className="text-right border-r w-[80px] bg-muted/80">Value</TableHead>
-                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
-                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
-                <TableHead className="text-right w-[80px] bg-muted/80">Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <table className="w-full text-sm border-collapse">
+            <thead className="sticky top-0 z-10 bg-muted">
+              <tr className="bg-muted border-b">
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[100px] bg-muted font-medium">Date</th>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[120px] bg-muted font-medium">Vch Type</th>
+                <th colSpan={3} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
+                <th colSpan={3} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
+                <th colSpan={3} className="text-center px-4 py-2 bg-muted font-medium">Closing</th>
+              </tr>
+              <tr className="bg-muted/80 border-b">
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
+                <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
+                <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
+                <th className="text-right px-2 py-2 w-[80px] bg-muted/80 font-medium">Value</th>
+              </tr>
+            </thead>
+            <tbody>
                 {data?.transactions.map((txn, idx) => (
-                  <TableRow 
+                  <tr 
                     key={idx} 
                     data-testid={`row-txn-${idx}`}
-                    className={txn.isOpeningBalance ? "bg-muted/30 font-medium" : ""}
+                    className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : ""}`}
                   >
-                    <TableCell className="border-r tabular-nums">
+                    <td className="px-4 py-3 border-r tabular-nums">
                       {txn.isOpeningBalance ? "" : formatDate(txn.date)}
-                    </TableCell>
-                    <TableCell className={`border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
+                    </td>
+                    <td className={`px-4 py-3 border-r ${txn.isOpeningBalance ? "font-semibold" : ""}`}>
                       {getTransactionEditUrl(txn) ? (
                         <button
                           onClick={() => handleParticularsClick(txn)}
@@ -209,48 +201,48 @@ export default function LocationVouchers() {
                       ) : (
                         txn.particulars
                       )}
-                    </TableCell>
-                    <TableCell className="border-r text-xs">{txn.vchType}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(txn.inwardValue)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.outwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    </td>
+                    <td className="px-4 py-3 border-r text-xs">{txn.vchType}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.inwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.inwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.inwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.outwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">
                       {formatNumber(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums border-r">
+                    </td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">
                       {formatNumber(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.closingRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingValue)}</TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.closingRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingValue)}</td>
+                  </tr>
                 ))}
                 
                 {data?.transactions.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                  <tr>
+                    <td colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions found for this month
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 )}
                 
                 {data && data.transactions.length > 0 && (
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3} className="border-r">Totals</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.outwardValue)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingValue)}</TableCell>
-                  </TableRow>
+                  <tr className="bg-muted/50 font-bold border-t">
+                    <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.inwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.outwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(data.totals.outwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingValue)}</td>
+                  </tr>
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
         </CardContent>
       </Card>
     </div>
