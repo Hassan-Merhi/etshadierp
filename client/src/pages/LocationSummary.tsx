@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ interface Location {
 const STORAGE_KEY = "locationSummary_selectedLocations";
 
 export default function LocationSummary() {
+  const [_location, navigate] = useLocation();
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
@@ -206,6 +208,16 @@ export default function LocationSummary() {
           }
           return next;
         });
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      // Navigate to LocationMonthlySummary if item row is selected
+      if (selectedRowKey && summaryData) {
+        const row = allRows.find(r => r.key === selectedRowKey);
+        if (row && row.itemId && selectedLocationIndex >= 0 && selectedLocationIndex < selectedLocations.length) {
+          const locationId = selectedLocations[selectedLocationIndex].id;
+          navigate(`/locations/${locationId}/stock-items/${row.itemId}/history`);
+        }
       }
     }
   };
@@ -435,10 +447,21 @@ export default function LocationSummary() {
                             data-testid={`row-item-${item.id}`}
                           >
                             <td className={cn(
-                              "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10",
+                              "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10 cursor-pointer hover:underline",
                               itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30"
                             )}>
-                              <span className="text-foreground truncate block">{item.name}</span>
+                              <span
+                                className="text-blue-500 dark:text-blue-400 truncate block"
+                                onClick={() => {
+                                  const locationId = selectedLocations[selectedLocationIndex]?.id;
+                                  if (locationId) {
+                                    navigate(`/locations/${locationId}/stock-items/${item.id}/history`);
+                                  }
+                                }}
+                                data-testid={`link-item-${item.id}`}
+                              >
+                                {item.name}
+                              </span>
                             </td>
                             {selectedLocations.map((location, locIndex) => {
                               const data = item.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
