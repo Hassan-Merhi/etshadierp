@@ -1492,6 +1492,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [showSourceSidebar, setShowSourceSidebar] = useState(false);
   const [showItemSidebar, setShowItemSidebar] = useState(false);
   const transferSidebarRef = useRef<HTMLDivElement>(null);
+  const transferFocusIdRef = useRef(0);
 
   // For POS users, auto-set source location to their assigned location when locations load
   useEffect(() => {
@@ -3233,6 +3234,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     setTransferSourceHighlightedIndex(0);
                                   }}
                                   onFocus={() => {
+                                    transferFocusIdRef.current += 1;
                                     setActiveTransferRow(index);
                                     setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
                                     setTransferSourceHighlightedIndex(0);
@@ -3240,9 +3242,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     setShowItemSidebar(false);
                                   }}
                                   onBlur={() => {
+                                    const focusIdAtBlur = transferFocusIdRef.current;
                                     setTimeout(() => {
-                                      setActiveTransferRow(null);
-                                      setTransferSourceSearchTerm("");
+                                      if (transferFocusIdRef.current === focusIdAtBlur) {
+                                        setActiveTransferRow(null);
+                                        setTransferSourceSearchTerm("");
+                                      }
                                     }, 200);
                                   }}
                                   onKeyDown={(e) => {
@@ -3315,6 +3320,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }
                                 }}
                                 onFocus={() => {
+                                  transferFocusIdRef.current += 1;
                                   setActiveTransferRow(index);
                                   setTransferHighlightedIndex(0);
                                   setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
@@ -3329,10 +3335,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }
                                 }}
                                 onBlur={() => {
+                                  const focusIdAtBlur = transferFocusIdRef.current;
                                   setTimeout(() => {
-                                    setActiveTransferRow(null);
-                                    setTransferSearchTerm("");
-                                    setShowItemSidebar(false);
+                                    if (transferFocusIdRef.current === focusIdAtBlur) {
+                                      setActiveTransferRow(null);
+                                      setTransferSearchTerm("");
+                                      setShowItemSidebar(false);
+                                    }
                                   }, 200);
                                 }}
                                 onKeyDown={(e) => {
