@@ -80,6 +80,83 @@ function hashPassword(password: string): string {
   return crypto.SHA256(password).toString();
 }
 
+// Helper function to sync employee payroll balances from voucher entries
+// When an employee account (EMP-xxx) is debited, decrease their balance
+// When an employee account (EMP-xxx) is credited, increase their balance
+async function syncEmployeeBalancesFromEntries(
+  entries: Array<{ ledgerAccountId: number | null; debitAmount: string; creditAmount: string }>,
+  companyId: number,
+  reverse: boolean = false
+): Promise<void> {
+  // Get all ledger accounts for the company
+  const allAccounts = await storage.getAllLedgerAccounts(companyId);
+  
+  // Find employee accounts (code starts with EMP-)
+  const employeeAccountMap = new Map<number, { code: string; employeeCode: string }>();
+  for (const account of allAccounts) {
+    if (account.code.startsWith("EMP-")) {
+      const employeeCode = account.code.replace("EMP-", "");
+      employeeAccountMap.set(account.id, { code: account.code, employeeCode });
+    }
+  }
+  
+  // Track balance changes per employee
+  const employeeBalanceChanges = new Map<string, number>();
+  
+  for (const entry of entries) {
+    if (!entry.ledgerAccountId) continue;
+    
+    const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
+    if (!employeeAccount) continue;
+    
+    const debit = parseFloat(entry.debitAmount || "0");
+    const credit = parseFloat(entry.creditAmount || "0");
+    
+    // For normal operations:
+    // - Debit to employee account = decrease balance (money going out/payment to employee)
+    // - Credit to employee account = increase balance (owed to employee)
+    // When reversing (e.g., deleting voucher), flip the signs
+    let change = credit - debit;
+    if (reverse) {
+      change = -change;
+    }
+    
+    const current = employeeBalanceChanges.get(employeeAccount.employeeCode) || 0;
+    employeeBalanceChanges.set(employeeAccount.employeeCode, current + change);
+  }
+  
+  // Apply balance changes to employees
+  for (const [employeeCode, change] of employeeBalanceChanges) {
+    if (change === 0) continue;
+    
+    // Find employee by code
+    const employee = await storage.getEmployeeByCode(employeeCode);
+    if (!employee) continue;
+    
+    const currentBalance = parseFloat(employee.currentBalance || "0");
+    const newBalance = currentBalance + change;
+    
+    // Update deposits or withdrawals based on change direction
+    if (change > 0) {
+      // Positive change = credit, treated like a deposit
+      const currentDeposits = parseFloat(employee.totalDeposits || "0");
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalDeposits: (currentDeposits + change).toFixed(2),
+      }).where(eq(employees.id, employee.id));
+    } else {
+      // Negative change = debit, treated like a withdrawal
+      const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalWithdrawals: (currentWithdrawals + Math.abs(change)).toFixed(2),
+      }).where(eq(employees.id, employee.id));
+    }
+    
+    console.log(`[Payroll Sync] Employee ${employeeCode}: balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Database health check endpoint
   app.get("/api/health/db", async (_req, res) => {
@@ -9242,6 +9319,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw error;
         }
 
+        // Sync employee balances from voucher entries (only for non-optional vouchers)
+        if (!createdVoucher.optional) {
+          await syncEmployeeBalancesFromEntries(
+            createdEntries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!
+          );
+        }
+
         const result = { voucher: createdVoucher, entries: createdEntries };
 
         res.json(result);
@@ -9387,6 +9476,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { voucher: createdVoucher, entries: createdEntries };
         });
 
+        // Sync employee balances from voucher entries (only for non-optional vouchers)
+        if (!result.voucher.optional) {
+          await syncEmployeeBalancesFromEntries(
+            result.entries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!
+          );
+        }
+
         res.json(result);
       } catch (error: any) {
         console.error("Error creating payment/receipt voucher:", error);
@@ -9449,6 +9550,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingVoucher.companyId !== req.session.currentCompanyId) {
             throw new Error("Access denied: Voucher belongs to a different company");
           }
+
+          // Get existing entries before deleting (for balance sync)
+          const oldEntries = await tx
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucherId));
 
           // Update voucher
           const [updatedVoucher] = await tx
@@ -9548,10 +9655,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .values(voucherEntriesToCreate)
             .returning();
 
-          return { voucher: updatedVoucher, entries: createdEntries };
+          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, wasOptional: existingVoucher.optional };
         });
 
-        res.json(result);
+        // Sync employee balances: reverse old entries if voucher was non-optional
+        if (!result.wasOptional) {
+          await syncEmployeeBalancesFromEntries(
+            result.oldEntries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!,
+            true // reverse
+          );
+        }
+
+        // Apply new entries if voucher is non-optional
+        if (!result.voucher.optional) {
+          await syncEmployeeBalancesFromEntries(
+            result.entries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!
+          );
+        }
+
+        res.json({ voucher: result.voucher, entries: result.entries });
       } catch (error: any) {
         console.error("Error updating payment/receipt voucher:", error);
         res.status(500).json({ message: error.message });
@@ -9657,6 +9789,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return { voucher: createdVoucher, entries: createdEntries };
         });
 
+        // Sync employee balances from voucher entries (only for non-optional vouchers)
+        if (!result.voucher.optional) {
+          await syncEmployeeBalancesFromEntries(
+            result.entries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!
+          );
+        }
+
         res.json(result);
       } catch (error: any) {
         console.error("Error creating journal voucher:", error);
@@ -9726,6 +9870,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error("Access denied: Voucher belongs to a different company");
           }
 
+          // Get existing entries before deleting (for balance sync)
+          const oldEntries = await tx
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, voucherId));
+
           // Update voucher
           const [updatedVoucher] = await tx
             .update(vouchers)
@@ -9779,10 +9929,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .values(voucherEntriesToCreate)
             .returning();
 
-          return { voucher: updatedVoucher, entries: createdEntries };
+          return { voucher: updatedVoucher, entries: createdEntries, oldEntries, wasOptional: existingVoucher.optional };
         });
 
-        res.json(result);
+        // Sync employee balances: reverse old entries if voucher was non-optional
+        if (!result.wasOptional) {
+          await syncEmployeeBalancesFromEntries(
+            result.oldEntries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!,
+            true // reverse
+          );
+        }
+
+        // Apply new entries if voucher is non-optional
+        if (!result.voucher.optional) {
+          await syncEmployeeBalancesFromEntries(
+            result.entries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId!
+          );
+        }
+
+        res.json({ voucher: result.voucher, entries: result.entries });
       } catch (error: any) {
         console.error("Error updating journal voucher:", error);
         res.status(500).json({ message: error.message });
@@ -10041,6 +10216,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .json({ message: "Insufficient permissions to edit vouchers" });
           }
         }
+
+        // Get old entries before updating (for balance sync)
+        const oldEntries = await storage.getVoucherEntriesByVoucher(id);
+        const wasOptional = existingVoucher.optional;
 
         // Update voucher and entries in a transaction
         await db.transaction(async (tx) => {
@@ -10323,9 +10502,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Fetch updated voucher with entries
         const updated = await storage.getVoucherById(id);
-        const entries = await storage.getVoucherEntriesByVoucher(id);
+        const newEntries = await storage.getVoucherEntriesByVoucher(id);
 
-        res.json({ ...updated, entries });
+        // Sync employee balances: reverse old entries if voucher was non-optional
+        if (!wasOptional && req.session.currentCompanyId) {
+          await syncEmployeeBalancesFromEntries(
+            oldEntries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId,
+            true // reverse
+          );
+        }
+
+        // Apply new entries if voucher is now non-optional
+        const isNowOptional = req.body.optional !== undefined ? req.body.optional : wasOptional;
+        if (!isNowOptional && req.session.currentCompanyId) {
+          await syncEmployeeBalancesFromEntries(
+            newEntries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId
+          );
+        }
+
+        res.json({ ...updated, entries: newEntries });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
@@ -12490,6 +12695,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
+        }
+
+        // Get voucher and entries before deleting for balance sync
+        const voucher = await storage.getVoucherById(id);
+        if (voucher && !voucher.optional && req.session.currentCompanyId) {
+          const entries = await storage.getVoucherEntriesByVoucher(id);
+          // Reverse the entries' effect on employee balances
+          await syncEmployeeBalancesFromEntries(
+            entries.map(e => ({
+              ledgerAccountId: e.ledgerAccountId,
+              debitAmount: e.debitAmount,
+              creditAmount: e.creditAmount,
+            })),
+            req.session.currentCompanyId,
+            true // reverse
+          );
         }
 
         await storage.deleteVoucher(id);
