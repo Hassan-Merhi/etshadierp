@@ -1491,6 +1491,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferSourceHighlightedIndex, setTransferSourceHighlightedIndex] = useState(0);
   const [showSourceSidebar, setShowSourceSidebar] = useState(false);
   const [showItemSidebar, setShowItemSidebar] = useState(false);
+  const [activeFieldType, setActiveFieldType] = useState<'source' | 'item' | null>(null);
   const transferSidebarRef = useRef<HTMLDivElement>(null);
   const transferFocusIdRef = useRef(0);
 
@@ -3228,7 +3229,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               <div className="w-40 border-r h-10">
                                 <input
                                   type="text"
-                                  value={activeTransferRow === index ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
+                                  value={activeTransferRow === index && activeFieldType === 'source' ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
                                   onChange={(e) => {
                                     setTransferSourceSearchTerm(e.target.value);
                                     setTransferSourceHighlightedIndex(0);
@@ -3236,6 +3237,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   onFocus={() => {
                                     transferFocusIdRef.current += 1;
                                     setActiveTransferRow(index);
+                                    setActiveFieldType('source');
                                     setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
                                     setTransferSourceHighlightedIndex(0);
                                     setShowSourceSidebar(true);
@@ -3246,6 +3248,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     setTimeout(() => {
                                       if (transferFocusIdRef.current === focusIdAtBlur) {
                                         setActiveTransferRow(null);
+                                        setActiveFieldType(null);
                                         setTransferSourceSearchTerm("");
                                       }
                                     }, 200);
@@ -3310,7 +3313,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <div className="flex-1 min-w-[200px] border-r h-10">
                               <input
                                 type="text"
-                                value={activeTransferRow === index ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
+                                value={activeTransferRow === index && activeFieldType === 'item' ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
                                 onChange={(e) => {
                                   setTransferSearchTerm(e.target.value);
                                   setTransferHighlightedIndex(0);
@@ -3322,6 +3325,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 onFocus={() => {
                                   transferFocusIdRef.current += 1;
                                   setActiveTransferRow(index);
+                                  setActiveFieldType('item');
                                   setTransferHighlightedIndex(0);
                                   setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
                                   setShowItemSidebar(true);
@@ -3339,6 +3343,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setTimeout(() => {
                                     if (transferFocusIdRef.current === focusIdAtBlur) {
                                       setActiveTransferRow(null);
+                                      setActiveFieldType(null);
                                       setTransferSearchTerm("");
                                       setShowItemSidebar(false);
                                     }
