@@ -19,9 +19,11 @@ interface StockItemAutocompleteProps {
   onArrowRight?: () => void;
   onTab?: () => void;
   onEnter?: () => void;
+  onSearchChange?: (searchTerm: string) => void;
   rowIndex?: number;
   placeholder?: string;
   testId?: string;
+  hideDropdown?: boolean;
 }
 
 export function StockItemAutocomplete({
@@ -35,8 +37,10 @@ export function StockItemAutocomplete({
   onArrowRight,
   onTab,
   onEnter,
+  onSearchChange,
   placeholder = "Type item name...",
   testId,
+  hideDropdown = false,
 }: StockItemAutocompleteProps) {
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -130,6 +134,7 @@ export function StockItemAutocomplete({
           setSearchTerm(e.target.value);
           setIsOpen(true);
           setSelectedIndex(0);
+          if (onSearchChange) onSearchChange(e.target.value);
         }}
         onFocus={() => {
           setIsOpen(true);
@@ -148,7 +153,7 @@ export function StockItemAutocomplete({
         className="w-full"
       />
 
-      {isOpen && filteredItems.length > 0 && (
+      {isOpen && filteredItems.length > 0 && !hideDropdown && (
         <div
           ref={dropdownRef}
           className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md"

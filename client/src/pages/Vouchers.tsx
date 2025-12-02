@@ -75,7 +75,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -1485,6 +1485,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Track active transfer row for showing suggestions
   const [activeTransferRow, setActiveTransferRow] = useState<number | null>(null);
   const [transferInventorySource, setTransferInventorySource] = useState<number | null>(isPOS && posLocationId ? posLocationId : null);
+  const [transferSearchTerm, setTransferSearchTerm] = useState("");
+  const [transferHighlightedIndex, setTransferHighlightedIndex] = useState(0);
+  const transferSidebarRef = useRef<HTMLDivElement>(null);
 
   // For POS users, auto-set source location to their assigned location when locations load
   useEffect(() => {
@@ -3277,6 +3280,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         onChange={(id, name) => {
                                           stockTransferForm.setValue(`entries.${index}.stockItemId`, id);
                                           stockTransferForm.setValue(`entries.${index}.stockItemName`, name);
+                                          setTransferSearchTerm("");
                                           
                                           // Auto-fill rate from inventory if source location is selected
                                           if (transferEntries[index].sourceLocationId > 0) {
@@ -3294,10 +3298,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         stockItems={stockItems}
                                         onFocus={() => {
                                           setActiveTransferRow(index);
+                                          setTransferHighlightedIndex(0);
                                           if (transferEntries[index].sourceLocationId > 0) {
                                             setTransferInventorySource(transferEntries[index].sourceLocationId);
                                           }
                                         }}
+                                        onSearchChange={(term) => {
+                                          setTransferSearchTerm(term);
+                                          setTransferHighlightedIndex(0);
+                                        }}
+                                        hideDropdown={true}
                                         onArrowUp={() => {
                                           if (index > 0) {
                                             setTimeout(() => {
@@ -3528,27 +3538,60 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </Card>
 
           {/* Right side panel - Stock Item Suggestions */}
-          {activeTransferRow !== null && transferInventorySource && (
-            <Card className="w-80">
-              <CardHeader>
-                <CardTitle className="text-sm">Available Items</CardTitle>
-                <p className="text-xs text-muted-foreground">
+          {transferInventorySource && (
+            <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+              <div className="p-4 border-b">
+                <h3 className="text-sm font-semibold mb-2">Search Items</h3>
+                <p className="text-xs text-muted-foreground mb-3">
                   {locations.find(l => l.id === transferInventorySource)?.name}
                 </p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="max-h-[600px] overflow-y-auto">
-                  {transferInventory.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                      No inventory at this location
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {transferInventory.map((item: any) => (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or code..."
+                    value={transferSearchTerm}
+                    onChange={(e) => {
+                      setTransferSearchTerm(e.target.value);
+                      setTransferHighlightedIndex(0);
+                    }}
+                    className="pl-9"
+                    data-testid="input-transfer-sidebar-search"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2" ref={transferSidebarRef}>
+                <div className="space-y-1">
+                  {(() => {
+                    const filteredInventory = transferInventory
+                      .filter((item: any) => {
+                        if (!transferSearchTerm.trim()) return true;
+                        const term = transferSearchTerm.toLowerCase();
+                        return (
+                          item.stockItemName?.toLowerCase().includes(term) ||
+                          item.stockItemCode?.toLowerCase().includes(term)
+                        );
+                      })
+                      .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                    
+                    if (filteredInventory.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No items found
+                        </div>
+                      );
+                    }
+                    
+                    return filteredInventory.map((item: any, idx: number) => {
+                      const stock = parseFloat(item.quantity || "0");
+                      const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
+                      
+                      return (
                         <button
                           key={item.stockItemId}
                           type="button"
-                          className="w-full p-3 text-left hover-elevate active-elevate-2 transition-colors"
+                          className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
+                            stock === 0 ? "opacity-60" : ""
+                          } ${isHighlighted ? "bg-accent" : ""}`}
                           data-testid={`button-suggest-item-${item.stockItemId}`}
                           onClick={() => {
                             if (activeTransferRow !== null) {
@@ -3557,8 +3600,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
                                 stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
                                 stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
+                                setTransferSearchTerm("");
                                 
-                                // Move focus to quantity field
                                 setTimeout(() => {
                                   const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${activeTransferRow}"]`) as HTMLInputElement;
                                   if (quantityInput) {
@@ -3570,30 +3613,31 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             }
                           }}
                         >
-                          <div className="flex justify-between items-start gap-2">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">
-                                {item.stockItemName}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-sm font-medium mb-1 truncate">{item.stockItemName}</div>
+                              <div className="text-xs text-muted-foreground font-mono">
                                 {item.stockItemCode}
                               </div>
                             </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="text-sm font-medium">
-                                ${parseFloat(item.averageRate || "0").toFixed(2)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Qty: {parseFloat(item.quantity || "0").toFixed(2)}
+                            <div className="flex items-center">
+                              <div className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                stock === 0 
+                                  ? "bg-destructive/10 text-destructive" 
+                                  : stock < 10
+                                  ? "bg-chart-3/10 text-chart-3"
+                                  : "bg-chart-2/10 text-chart-2"
+                              }`}>
+                                {stock === 0 ? "Out" : `${stock.toFixed(0)}`}
                               </div>
                             </div>
                           </div>
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    });
+                  })()}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           )}
         </div>
