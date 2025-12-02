@@ -121,6 +121,12 @@ export default function LocationVouchers() {
   };
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      window.history.back();
+      return;
+    }
+    
     const rows = getNavigableRows();
     if (rows.length === 0) return;
     

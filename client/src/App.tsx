@@ -109,6 +109,7 @@ function Router({ user }: { user: any }) {
       <Route path="/location-summary" component={LocationSummary} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
+      <Route path="/stock-items/:stockItemId/monthly-summary" component={LocationMonthlySummary} />
       <Route path="/locations/:locationId/stock-items/:stockItemId/history" component={LocationMonthlySummary} />
       <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month" component={LocationVouchers} />
       <Route path="/sales-report" component={SalesReport} />

@@ -262,6 +262,9 @@ export default function LocationSummary() {
           navigate(`/locations/${locationId}/stock-items/${row.itemId}/history`);
         }
       }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      window.history.back();
     }
   };
 
@@ -523,11 +526,9 @@ export default function LocationSummary() {
                             )}>
                               <span
                                 className="text-blue-500 dark:text-blue-400 truncate block"
-                                onClick={() => {
-                                  const locationId = selectedLocations[selectedLocationIndex]?.id;
-                                  if (locationId) {
-                                    navigate(`/locations/${locationId}/stock-items/${item.id}/history`);
-                                  }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/stock-items/${item.id}/monthly-summary`);
                                 }}
                                 data-testid={`link-item-${item.id}`}
                               >

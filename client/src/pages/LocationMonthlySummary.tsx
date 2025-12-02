@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Calendar, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -41,7 +41,7 @@ interface LocationMonthlySummaryData {
     name: string;
     uom: string;
   };
-  location: {
+  location?: {
     id: number;
     code: string;
     name: string;
@@ -64,21 +64,31 @@ export default function LocationMonthlySummary() {
   const stockItemId = parseInt(params.stockItemId || "0");
   const [_location, navigate] = useLocation();
   
+  const isAllLocationsMode = locationId === 0;
+  
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
   
+  const apiUrl = isAllLocationsMode
+    ? `/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`
+    : `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`;
+  
+  const queryKey = isAllLocationsMode
+    ? [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }]
+    : [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }];
+  
   const { data, isLoading } = useQuery<LocationMonthlySummaryData>({
-    queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }],
+    queryKey,
     queryFn: async () => {
-      const response = await fetch(`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`, {
+      const response = await fetch(apiUrl, {
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to fetch');
       return response.json();
     },
-    enabled: locationId > 0 && stockItemId > 0,
+    enabled: stockItemId > 0,
   });
   
   const years = [];
@@ -93,7 +103,9 @@ export default function LocationMonthlySummary() {
   })) || [];
   
   const handleMonthClick = (month: number) => {
-    navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${selectedYear}/${month}`);
+    if (!isAllLocationsMode) {
+      navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${selectedYear}/${month}`);
+    }
   };
   
   const formatNumber = (num: number, decimals = 2) => {
@@ -102,6 +114,12 @@ export default function LocationMonthlySummary() {
   };
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      window.history.back();
+      return;
+    }
+    
     if (!data?.monthlyData?.length) return;
     
     const rows = data.monthlyData.filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0);
@@ -119,7 +137,7 @@ export default function LocationMonthlySummary() {
       }
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
+      if (!isAllLocationsMode && selectedRowIndex >= 0 && selectedRowIndex < rows.length) {
         const month = rows[selectedRowIndex].month;
         handleMonthClick(month);
       }
@@ -129,7 +147,7 @@ export default function LocationMonthlySummary() {
   useEffect(() => {
     window.addEventListener("keydown", handleTableKeyDown);
     return () => window.removeEventListener("keydown", handleTableKeyDown);
-  }, [selectedRowIndex, data]);
+  }, [selectedRowIndex, data, isAllLocationsMode]);
 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
@@ -152,19 +170,33 @@ export default function LocationMonthlySummary() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/location-inventory")} data-testid="button-back">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => window.history.back()} 
+            data-testid="button-back"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">
-              Location Monthly Summary
+              {isAllLocationsMode ? "Item Monthly Summary" : "Location Monthly Summary"}
             </h1>
-            {data?.stockItem && data?.location && (
+            {data?.stockItem && (
               <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
                 <span>{data.stockItem.name} ({data.stockItem.code})</span>
                 <span>•</span>
-                <MapPin className="h-4 w-4" />
-                <span>{data.location.name}</span>
+                {isAllLocationsMode ? (
+                  <>
+                    <Globe className="h-4 w-4" />
+                    <span>All Locations</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4" />
+                    <span>{data.location?.name || 'Unknown Location'}</span>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -212,12 +244,13 @@ export default function LocationMonthlySummary() {
                   const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
                   const displayIndex = data.monthlyData.slice(0, idx).filter(m => m.inwardQty > 0 || m.outwardQty > 0 || m.closingQty !== 0).length;
                   const isSelected = hasData && selectedRowIndex === displayIndex;
+                  const isClickable = !isAllLocationsMode;
                   
                   return hasData ? (
                     <tr 
                       key={month.month}
-                      className={`border-b cursor-pointer ${isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : "hover:bg-muted/50"}`}
-                      onClick={() => handleMonthClick(month.month)}
+                      className={`border-b ${isClickable ? 'cursor-pointer' : ''} ${isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : isClickable ? "hover:bg-muted/50" : ""}`}
+                      onClick={() => isClickable && handleMonthClick(month.month)}
                       data-testid={`row-month-${month.month}`}
                       data-row-index={displayIndex}
                     >
