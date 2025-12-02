@@ -3841,16 +3841,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   isHighlighted ? "bg-accent" : ""
                                 }`}
                                 data-testid={`button-select-source-location-${loc.id}`}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  transferFocusIdRef.current += 1;
+                                }}
                                 onClick={() => {
                                   if (activeTransferRow !== null) {
-                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationId`, loc.id);
-                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, loc.name);
+                                    const rowIndex = activeTransferRow;
+                                    stockTransferForm.setValue(`entries.${rowIndex}.sourceLocationId`, loc.id);
+                                    stockTransferForm.setValue(`entries.${rowIndex}.sourceLocationName`, loc.name);
                                     setTransferInventorySource(loc.id);
                                     setTransferSourceSearchTerm("");
                                     setShowSourceSidebar(false);
+                                    setActiveTransferRow(null);
+                                    setActiveFieldType(null);
                                     
                                     setTimeout(() => {
-                                      const itemInput = document.querySelector(`[data-testid="input-item-name-${activeTransferRow}"]`) as HTMLInputElement;
+                                      const itemInput = document.querySelector(`[data-testid="input-item-name-${rowIndex}"]`) as HTMLInputElement;
                                       if (itemInput) {
                                         itemInput.focus();
                                         itemInput.select();
