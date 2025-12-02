@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, parse } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type DateFormatType = "MM/DD/YYYY" | "DD/MM/YYYY";
@@ -21,6 +21,17 @@ const getDateFnsFormat = (format: DateFormatType, style: "full" | "short" = "ful
     return format === "DD/MM/YYYY" ? "d/MMM/yy" : "MMM d, yy";
   }
   return format === "DD/MM/YYYY" ? "dd/MM/yyyy" : "MM/dd/yyyy";
+};
+
+const parseDateString = (dateStr: string): Date => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr)) {
+    return parseISO(dateStr);
+  }
+  return new Date(dateStr);
 };
 
 export function DateFormatProvider({ children }: { children: ReactNode }) {
@@ -52,7 +63,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
 
   const formatDisplayDate = (date: Date | string): string => {
     try {
-      const dateObj = typeof date === "string" ? new Date(date) : date;
+      const dateObj = typeof date === "string" ? parseDateString(date) : date;
       if (isNaN(dateObj.getTime())) return String(date);
       return format(dateObj, getDateFnsFormat(localFormat, "full"));
     } catch {
@@ -62,7 +73,7 @@ export function DateFormatProvider({ children }: { children: ReactNode }) {
 
   const formatShortDate = (date: Date | string): string => {
     try {
-      const dateObj = typeof date === "string" ? new Date(date) : date;
+      const dateObj = typeof date === "string" ? parseDateString(date) : date;
       if (isNaN(dateObj.getTime())) return String(date);
       return format(dateObj, getDateFnsFormat(localFormat, "short"));
     } catch {
