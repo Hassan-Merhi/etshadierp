@@ -108,12 +108,12 @@ export default function LocationSummary() {
     );
   };
 
-  const formatNumber = (num: number, decimals: number = 2) => {
-    if (num === 0) return "-";
+  const formatNumber = (num: number, decimals: number = 2, suffix: string = "") => {
+    if (num === 0) return suffix || "-";
     return num.toLocaleString('en-US', { 
       minimumFractionDigits: decimals, 
       maximumFractionDigits: decimals 
-    });
+    }) + suffix;
   };
 
   const colsPerLocation = 3;
@@ -246,9 +246,9 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map(location => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Qty</th>
-                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Rate</th>
-                      <th className="text-right py-1 px-1 font-medium border-b border-r w-20 bg-muted/80">Value</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Rate ($)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b border-r w-20 bg-muted/80">Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
@@ -294,13 +294,13 @@ export default function LocationSummary() {
                             return (
                               <Fragment key={`group-${group.id}-loc-${location.id}`}>
                                 <td className="text-right py-1 px-1 tabular-nums font-medium">
-                                  {formatNumber(data.quantity, 0)}
+                                  {formatNumber(data.quantity, 0, "BL")}
                                 </td>
                                 <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                                  {formatNumber(data.rate)}
+                                  {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className="text-right py-1 px-1 border-r tabular-nums font-semibold">
-                                  {formatNumber(data.value)}
+                                  {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
                                 </td>
                               </Fragment>
                             );
@@ -326,13 +326,13 @@ export default function LocationSummary() {
                               return (
                                 <Fragment key={`item-${item.id}-loc-${location.id}`}>
                                   <td className="text-right py-0.5 px-1 tabular-nums">
-                                    {formatNumber(data.quantity, 0)}
+                                    {formatNumber(data.quantity, 0, "BL")}
                                   </td>
                                   <td className="text-right py-0.5 px-1 tabular-nums text-muted-foreground">
-                                    {formatNumber(data.rate)}
+                                    {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
                                   </td>
                                   <td className="text-right py-0.5 px-1 border-r tabular-nums">
-                                    {formatNumber(data.value)}
+                                    {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
                                   </td>
                                 </Fragment>
                               );
@@ -350,13 +350,13 @@ export default function LocationSummary() {
                         return (
                           <Fragment key={`grand-${location.id}`}>
                             <td className="text-right py-1 px-1 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
-                              {formatNumber(data.quantity, 0)}
+                              {formatNumber(data.quantity, 0, "BL")}
                             </td>
                             <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                              {formatNumber(data.rate)}
+                              {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
                             </td>
                             <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
-                              {formatNumber(data.value)}
+                              {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
                             </td>
                           </Fragment>
                         );
