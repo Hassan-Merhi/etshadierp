@@ -3274,15 +3274,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         const itemInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
                                         if (itemInput) { itemInput.focus(); itemInput.select(); }
                                       }, 50);
-                                    } else if (e.key === "ArrowUp" && e.shiftKey) {
-                                      e.preventDefault();
-                                      setTransferSourceHighlightedIndex(Math.max(0, transferSourceHighlightedIndex - 1));
-                                    } else if (e.key === "ArrowDown" && e.shiftKey) {
-                                      e.preventDefault();
-                                      setTransferSourceHighlightedIndex(Math.min(filteredLocs.length - 1, transferSourceHighlightedIndex + 1));
                                     } else if (e.key === "ArrowUp") {
                                       e.preventDefault();
-                                      if (index > 0) {
+                                      if (showSourceSidebar && filteredLocs.length > 0) {
+                                        setTransferSourceHighlightedIndex(Math.max(0, transferSourceHighlightedIndex - 1));
+                                      } else if (index > 0) {
                                         setTimeout(() => {
                                           const prevInput = document.querySelector(`[data-testid="input-source-${index - 1}"]`) as HTMLInputElement;
                                           if (prevInput) { prevInput.focus(); prevInput.select(); }
@@ -3290,7 +3286,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       }
                                     } else if (e.key === "ArrowDown") {
                                       e.preventDefault();
-                                      if (index < transferFields.length - 1) {
+                                      if (showSourceSidebar && filteredLocs.length > 0) {
+                                        setTransferSourceHighlightedIndex(Math.min(filteredLocs.length - 1, transferSourceHighlightedIndex + 1));
+                                      } else if (index < transferFields.length - 1) {
                                         setTimeout(() => {
                                           const nextInput = document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
                                           if (nextInput) { nextInput.focus(); nextInput.select(); }
@@ -3350,9 +3348,22 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   }, 200);
                                 }}
                                 onKeyDown={(e) => {
+                                  const filteredInventory = transferInventory
+                                    .filter((item: any) => {
+                                      if (!transferSearchTerm.trim()) return true;
+                                      const term = transferSearchTerm.toLowerCase();
+                                      return (
+                                        item.stockItemName?.toLowerCase().includes(term) ||
+                                        item.stockItemCode?.toLowerCase().includes(term)
+                                      );
+                                    })
+                                    .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+
                                   if (e.key === "ArrowUp" && !e.shiftKey) {
                                     e.preventDefault();
-                                    if (index > 0) {
+                                    if (showItemSidebar && filteredInventory.length > 0) {
+                                      setTransferHighlightedIndex(Math.max(0, transferHighlightedIndex - 1));
+                                    } else if (index > 0) {
                                       setTimeout(() => {
                                         const prevInput = document.querySelector(`[data-testid="input-item-name-${index - 1}"]`) as HTMLInputElement;
                                         if (prevInput) { prevInput.focus(); prevInput.select(); }
@@ -3360,7 +3371,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     }
                                   } else if (e.key === "ArrowDown" && !e.shiftKey) {
                                     e.preventDefault();
-                                    if (index < transferFields.length - 1) {
+                                    if (showItemSidebar && filteredInventory.length > 0) {
+                                      setTransferHighlightedIndex(Math.min(filteredInventory.length - 1, transferHighlightedIndex + 1));
+                                    } else if (index < transferFields.length - 1) {
                                       setTimeout(() => {
                                         const nextInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
                                         if (nextInput) { nextInput.focus(); nextInput.select(); }
