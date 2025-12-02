@@ -173,14 +173,10 @@ export default function LocationSummary() {
       }
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
-      if (selectedLocationIndex > 0) {
-        setSelectedLocationIndex(selectedLocationIndex - 1);
-      }
+      setSelectedLocationIndex(prev => Math.max(0, prev - 1));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
-      if (selectedLocationIndex < selectedLocations.length - 1) {
-        setSelectedLocationIndex(selectedLocationIndex + 1);
-      }
+      setSelectedLocationIndex(prev => Math.min(selectedLocations.length - 1, prev + 1))
     } else if (e.key === " ") {
       e.preventDefault();
       if (selectedRowKey) {
@@ -223,9 +219,10 @@ export default function LocationSummary() {
   };
 
   useEffect(() => {
-    window.addEventListener("keydown", handleTableKeyDown);
-    return () => window.removeEventListener("keydown", handleTableKeyDown);
-  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows]);
+    const handler = (e: KeyboardEvent) => handleTableKeyDown(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectedRowKey, summaryData, expandedGroups, locationDialogOpen, selectedLocationIndex, selectedLocations, hiddenRows, summaryData]);
 
   useEffect(() => {
     if (!tableScrollContainer.current) return;
@@ -340,7 +337,7 @@ export default function LocationSummary() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto" ref={tableScrollContainer}>
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)]" ref={tableScrollContainer}>
             <table className="w-full text-xs border-collapse">
               <thead className="sticky top-0 z-20">
                 <tr className="bg-muted">
@@ -392,10 +389,9 @@ export default function LocationSummary() {
                         <tr 
                           className={cn(
                             "cursor-pointer",
-                            "bg-accent/30 hover:bg-accent/50",
+                            highlightedRows.has(buildRowKey(group.id)) ? "bg-blue-400 dark:bg-blue-800" : "bg-accent/30 hover:bg-accent/50",
                             groupIndex > 0 && "border-t",
                             selectedRowKey === buildRowKey(group.id) && "ring-2 ring-primary",
-                            highlightedRows.has(buildRowKey(group.id)) && "bg-primary/20",
                             hiddenRows.has(buildRowKey(group.id)) && "hidden"
                           )}
                           onClick={() => {
@@ -405,7 +401,10 @@ export default function LocationSummary() {
                           onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id))}
                           data-testid={`row-group-${group.id}`}
                         >
-                          <td className="py-1 px-2 border-r sticky left-0 bg-accent/30 z-10 font-semibold">
+                          <td className={cn(
+                            "py-1 px-2 border-r sticky left-0 z-10 font-semibold",
+                            highlightedRows.has(buildRowKey(group.id)) ? "bg-blue-400 dark:bg-blue-800" : "bg-accent/30"
+                          )}>
                             <div className="flex items-center gap-1">
                               {expandedGroups.has(group.id) ? (
                                 <ChevronDown className="h-3 w-3 flex-shrink-0" />
@@ -470,13 +469,25 @@ export default function LocationSummary() {
                               const data = item.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
                               return (
                                 <Fragment key={`item-${item.id}-loc-${location.id}`}>
-                                  <td className="text-right py-0.5 px-1 tabular-nums">
+                                  <td 
+                                    className="text-right py-0.5 px-1 tabular-nums cursor-pointer hover:bg-accent/30"
+                                    onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
+                                    data-testid={`cell-qty-${item.id}-${location.id}`}
+                                  >
                                     {formatNumber(data.quantity, 0, "BL")}
                                   </td>
-                                  <td className="text-right py-0.5 px-1 tabular-nums text-foreground">
+                                  <td 
+                                    className="text-right py-0.5 px-1 tabular-nums text-foreground cursor-pointer hover:bg-accent/30"
+                                    onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
+                                    data-testid={`cell-rate-${item.id}-${location.id}`}
+                                  >
                                     {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                   </td>
-                                  <td className="text-right py-0.5 px-1 border-r tabular-nums">
+                                  <td 
+                                    className="text-right py-0.5 px-1 border-r tabular-nums cursor-pointer hover:bg-accent/30"
+                                    onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
+                                    data-testid={`cell-value-${item.id}-${location.id}`}
+                                  >
                                     {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                                   </td>
                                 </Fragment>
