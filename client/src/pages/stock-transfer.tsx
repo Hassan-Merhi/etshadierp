@@ -22,13 +22,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload } from "lucide-react";
+import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
-import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
 
 interface StockTransferPageProps {
   posUser?: any;
@@ -71,7 +80,6 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const [_location, navigate] = useLocation();
   const isPOS = !!posUser;
   
-  // For POS users, always use their assigned location as source
   const posSourceLocation = isPOS ? posUser?.assignedLocationId : null;
   
   const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(posSourceLocation);
@@ -84,7 +92,18 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTransfer, setViewingTransfer] = useState<StockTransferVoucher | null>(null);
 
-  // Ensure POS source location is set when posUser changes
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const itemListRef = useRef<HTMLDivElement>(null);
+  const inputRefs = useRef<{ [key: number]: HTMLInputElement }>({});
+
+  const [zeroStockAlert, setZeroStockAlert] = useState(false);
+  const [zeroStockItem, setZeroStockItem] = useState("");
+
+  const [negativeStockWarning, setNegativeStockWarning] = useState(false);
+  const [negativeStockItems, setNegativeStockItems] = useState<Array<{ name: string; available: number; requested: number }>>([]);
+
   useEffect(() => {
     if (isPOS && posUser?.assignedLocationId) {
       setSelectedSourceLocation(posUser.assignedLocationId);
@@ -99,7 +118,6 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/stock-items"],
   });
 
-  // Determine the active source location for inventory query
   const activeSourceLocation = isPOS ? (posUser?.assignedLocationId || selectedSourceLocation) : selectedSourceLocation;
 
   const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
@@ -153,6 +171,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     setSelectedDestLocation(null);
     setNotes("");
     setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
+    setSearchTerm("");
+    setActiveRowIndex(null);
     if (!isPOS) {
       setSelectedSourceLocation(null);
     }
@@ -164,20 +184,58 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const handleItemChange = (index: number, stockItemId: number, stockItemName: string) => {
+    const availableQty = getAvailableQty(stockItemId);
+    
+    if (stockItemId > 0 && availableQty === 0) {
+      setZeroStockItem(stockItemName);
+      setZeroStockAlert(true);
+      return;
+    }
+    
     const newEntries = [...entries];
     newEntries[index] = {
       ...newEntries[index],
       stockItemId,
       stockItemName,
-      availableQty: getAvailableQty(stockItemId),
+      availableQty,
     };
     setEntries(newEntries);
+    setActiveRowIndex(null);
+    setSearchTerm("");
+    
+    setTimeout(() => {
+      const qtyInput = document.querySelector(`[data-testid="input-quantity-${index}"]`) as HTMLInputElement;
+      if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+      }
+    }, 50);
   };
 
   const handleQuantityChange = (index: number, quantity: string) => {
     const newEntries = [...entries];
     newEntries[index] = { ...newEntries[index], quantity };
     setEntries(newEntries);
+  };
+
+  const handleItemNameChange = (index: number, value: string) => {
+    const newEntries = [...entries];
+    newEntries[index] = { ...newEntries[index], stockItemName: value, stockItemId: 0, availableQty: 0 };
+    setEntries(newEntries);
+    setSearchTerm(value);
+    setHighlightedIndex(0);
+  };
+
+  const handleItemInputFocus = (index: number) => {
+    setActiveRowIndex(index);
+    setSearchTerm(entries[index].stockItemName || "");
+    setHighlightedIndex(0);
+  };
+
+  const handleItemInputBlur = () => {
+    setTimeout(() => {
+      setActiveRowIndex(null);
+    }, 200);
   };
 
   const addNewRow = () => {
@@ -190,7 +248,83 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
-  const handleSubmit = () => {
+  const getFilteredInventory = () => {
+    if (!searchTerm.trim()) {
+      return inventoryItems.map(inv => {
+        const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
+        return {
+          stockItemId: inv.stockItemId,
+          name: inv.stockItemName || stockItem?.name || "",
+          code: inv.stockItemCode || stockItem?.code || "",
+          stock: parseFloat(inv.quantity),
+        };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    const term = searchTerm.toLowerCase();
+    return inventoryItems
+      .filter(inv => {
+        const name = inv.stockItemName?.toLowerCase() || "";
+        const code = inv.stockItemCode?.toLowerCase() || "";
+        return name.includes(term) || code.includes(term);
+      })
+      .map(inv => {
+        const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
+        return {
+          stockItemId: inv.stockItemId,
+          name: inv.stockItemName || stockItem?.name || "",
+          code: inv.stockItemCode || stockItem?.code || "",
+          stock: parseFloat(inv.quantity),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const selectItem = (item: { stockItemId: number; name: string; code: string; stock: number }) => {
+    if (activeRowIndex === null) return;
+    
+    if (item.stock === 0) {
+      setZeroStockItem(item.name);
+      setZeroStockAlert(true);
+      return;
+    }
+    
+    handleItemChange(activeRowIndex, item.stockItemId, item.name);
+  };
+
+  const handleItemKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const filteredItems = getFilteredInventory();
+    
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex(prev => Math.min(prev + 1, filteredItems.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredItems[highlightedIndex]) {
+        selectItem(filteredItems[highlightedIndex]);
+      }
+    } else if (e.key === "Tab" && !e.shiftKey && entries[index].stockItemId > 0) {
+      const qtyInput = document.querySelector(`[data-testid="input-quantity-${index}"]`) as HTMLInputElement;
+      if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (itemListRef.current && activeRowIndex !== null) {
+      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
+      if (highlightedElement) {
+        highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [highlightedIndex, activeRowIndex]);
+
+  const validateAndSubmit = (skipWarning = false) => {
     if (!activeSourceLocation || !selectedDestLocation) {
       toast({ title: "Error", description: "Please select source and destination locations", variant: "destructive" });
       return;
@@ -201,7 +335,6 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       return;
     }
 
-    // Filter to only valid entries with stockItemId > 0 and quantity > 0
     const validEntries = entries.filter(e => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0);
     
     if (validEntries.length === 0) {
@@ -209,23 +342,48 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       return;
     }
 
+    const itemsWithNegativeStock: Array<{ name: string; available: number; requested: number }> = [];
+    
     for (const entry of validEntries) {
       const transferQty = parseFloat(entry.quantity || "0");
-      if (transferQty > entry.availableQty) {
+      
+      if (entry.availableQty === 0) {
         toast({ 
           title: "Error", 
-          description: `Insufficient stock for ${entry.stockItemName}. Available: ${entry.availableQty}`, 
+          description: `${entry.stockItemName} has 0 stock available and cannot be transferred.`, 
           variant: "destructive" 
         });
         return;
       }
+      
+      if (transferQty > entry.availableQty) {
+        itemsWithNegativeStock.push({
+          name: entry.stockItemName,
+          available: entry.availableQty,
+          requested: transferQty,
+        });
+      }
     }
 
-    // Only submit valid entries to the backend
+    if (itemsWithNegativeStock.length > 0 && !skipWarning) {
+      setNegativeStockItems(itemsWithNegativeStock);
+      setNegativeStockWarning(true);
+      return;
+    }
+
     createTransferMutation.mutate({
       notes,
       items: validEntries,
     });
+  };
+
+  const handleSubmit = () => {
+    validateAndSubmit(false);
+  };
+
+  const handleProceedWithNegative = () => {
+    setNegativeStockWarning(false);
+    validateAndSubmit(true);
   };
 
   const handleViewTransfer = async (voucher: any) => {
@@ -252,11 +410,14 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
+  const filteredItems = getFilteredInventory();
 
-  const availableStockItems = stockItems.filter((item: any) => {
-    const invItem = inventoryItems.find(i => i.stockItemId === item.id);
-    return invItem && parseFloat(invItem.quantity) > 0;
-  });
+  const calculateTotal = () => {
+    return entries.reduce((sum, entry) => {
+      const qty = parseFloat(entry.quantity || "0");
+      return sum + (isNaN(qty) ? 0 : qty);
+    }, 0);
+  };
 
   return (
     <div className="space-y-6">
@@ -275,161 +436,233 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>New Transfer</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label data-testid="label-source-location">Source Location</Label>
-              {isPOS ? (
-                <div className="p-3 bg-muted rounded-md">
-                  <span className="font-medium">{sourceLocationName || "Your Location"}</span>
-                </div>
-              ) : (
+      <div className="flex gap-4">
+        <Card className="flex-1">
+          <CardHeader>
+            <CardTitle>New Transfer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label data-testid="label-source-location">Source Location</Label>
+                {isPOS ? (
+                  <div className="p-3 bg-muted rounded-md">
+                    <span className="font-medium">{sourceLocationName || "Your Location"}</span>
+                  </div>
+                ) : (
+                  <Select 
+                    value={selectedSourceLocation?.toString() || ""} 
+                    onValueChange={(v) => {
+                      setSelectedSourceLocation(parseInt(v));
+                      setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-source-location">
+                      <SelectValue placeholder="Select source location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc: any) => (
+                        <SelectItem key={loc.id} value={loc.id.toString()}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label data-testid="label-dest-location">Destination Location</Label>
                 <Select 
-                  value={selectedSourceLocation?.toString() || ""} 
-                  onValueChange={(v) => {
-                    setSelectedSourceLocation(parseInt(v));
-                    setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
-                  }}
+                  value={selectedDestLocation?.toString() || ""} 
+                  onValueChange={(v) => setSelectedDestLocation(parseInt(v))}
                 >
-                  <SelectTrigger data-testid="select-source-location">
-                    <SelectValue placeholder="Select source location" />
+                  <SelectTrigger data-testid="select-dest-location">
+                    <SelectValue placeholder="Select destination location" />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations.map((loc: any) => (
-                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
+                    {locations
+                      .filter((loc: any) => loc.id !== activeSourceLocation)
+                      .map((loc: any) => (
+                        <SelectItem key={loc.id} value={loc.id.toString()}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label data-testid="label-dest-location">Destination Location</Label>
-              <Select 
-                value={selectedDestLocation?.toString() || ""} 
-                onValueChange={(v) => setSelectedDestLocation(parseInt(v))}
-              >
-                <SelectTrigger data-testid="select-dest-location">
-                  <SelectValue placeholder="Select destination location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations
-                    .filter((loc: any) => loc.id !== activeSourceLocation)
-                    .map((loc: any) => (
-                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {activeSourceLocation && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Items to Transfer</Label>
-                {inventoryLoading && <Skeleton className="h-4 w-24" />}
               </div>
-              
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50%]">Item Name (type to search)</TableHead>
-                      <TableHead className="text-right w-32">Quantity</TableHead>
-                      <TableHead className="text-right w-32">Available</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entries.map((entry, index) => (
-                      <TableRow key={index} data-testid={`transfer-entry-row-${index}`}>
-                        <TableCell>
-                          <StockItemAutocomplete
-                            value={entry.stockItemId > 0 ? { id: entry.stockItemId, name: entry.stockItemName } : null}
-                            onChange={(id, name) => handleItemChange(index, id, name)}
-                            stockItems={availableStockItems.map((item: any) => ({
-                              id: item.id,
-                              name: item.name,
-                              code: item.code,
-                            }))}
-                            placeholder="Type item name..."
-                            testId={`input-item-${index}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min="0.001"
-                            step="0.001"
-                            value={entry.quantity}
-                            onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            className="w-24 text-right ml-auto"
-                            placeholder="0"
-                            data-testid={`input-quantity-${index}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {entry.stockItemId > 0 ? entry.availableQty.toFixed(2) : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeRow(index)}
-                            disabled={entries.length === 1}
-                            data-testid={`button-remove-row-${index}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+            </div>
+
+            {activeSourceLocation && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Items to Transfer</Label>
+                  {inventoryLoading && <Skeleton className="h-4 w-24" />}
+                </div>
+                
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50%]">Item Name (type to search)</TableHead>
+                        <TableHead className="text-right w-32">Quantity</TableHead>
+                        <TableHead className="text-right w-32">Available</TableHead>
+                        <TableHead className="w-12"></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {entries.map((entry, index) => (
+                        <TableRow key={index} data-testid={`transfer-entry-row-${index}`}>
+                          <TableCell>
+                            <Input
+                              ref={(el) => {
+                                if (el) inputRefs.current[index] = el;
+                              }}
+                              type="text"
+                              value={entry.stockItemName}
+                              onChange={(e) => handleItemNameChange(index, e.target.value)}
+                              onFocus={() => handleItemInputFocus(index)}
+                              onBlur={handleItemInputBlur}
+                              onKeyDown={(e) => handleItemKeyDown(e, index)}
+                              placeholder="Type to search..."
+                              className="w-full"
+                              data-testid={`input-item-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              value={entry.quantity}
+                              onChange={(e) => handleQuantityChange(index, e.target.value)}
+                              className="w-24 text-right ml-auto"
+                              placeholder="0"
+                              data-testid={`input-quantity-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {entry.stockItemId > 0 ? entry.availableQty.toFixed(2) : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeRow(index)}
+                              disabled={entries.length === 1}
+                              data-testid={`button-remove-row-${index}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addNewRow}
+                    className="mt-2"
+                    data-testid="button-add-row"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Total Qty: <span className="font-mono font-medium">{calculateTotal().toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addNewRow}
-                className="mt-2"
-                data-testid="button-add-row"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
+            <div className="space-y-2">
+              <Label data-testid="label-notes">Notes</Label>
+              <Textarea 
+                value={notes} 
+                onChange={(e) => setNotes(e.target.value)} 
+                placeholder="Optional notes for this transfer" 
+                data-testid="input-notes" 
+              />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label data-testid="label-notes">Notes</Label>
-            <Textarea 
-              value={notes} 
-              onChange={(e) => setNotes(e.target.value)} 
-              placeholder="Optional notes for this transfer" 
-              data-testid="input-notes" 
-            />
-          </div>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation} 
+              className="w-full"
+              data-testid="button-submit-transfer"
+            >
+              {createTransferMutation.isPending ? "Processing..." : "Create Transfer"}
+            </Button>
+          </CardContent>
+        </Card>
 
-          <Button 
-            onClick={handleSubmit} 
-            disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation} 
-            className="w-full"
-            data-testid="button-submit-transfer"
-          >
-            {createTransferMutation.isPending ? "Processing..." : "Create Transfer"}
-          </Button>
-        </CardContent>
-      </Card>
+        {activeSourceLocation && (
+          <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+            <div className="p-4 border-b">
+              <h3 className="text-sm font-semibold mb-3">Search Items</h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or code..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setHighlightedIndex(0);
+                  }}
+                  className="pl-9"
+                  data-testid="input-sidebar-search"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2" ref={itemListRef}>
+              <div className="space-y-1">
+                {filteredItems.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    {inventoryLoading ? "Loading..." : "No items found"}
+                  </div>
+                ) : (
+                  filteredItems.map((item, idx) => (
+                    <button
+                      key={item.stockItemId}
+                      onClick={() => selectItem(item)}
+                      className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
+                        item.stock === 0 ? "opacity-60" : ""
+                      } ${idx === highlightedIndex && activeRowIndex !== null ? "bg-accent" : ""}`}
+                      data-testid={`sidebar-item-${idx}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium mb-1 truncate">{item.name}</div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            {item.code}
+                          </div>
+                        </div>
+                        <div className="flex items-center">
+                          <div className={`text-xs font-medium px-2 py-0.5 rounded ${
+                            item.stock === 0 
+                              ? "bg-destructive/10 text-destructive" 
+                              : item.stock < 10
+                              ? "bg-chart-3/10 text-chart-3"
+                              : "bg-chart-2/10 text-chart-2"
+                          }`}>
+                            {item.stock === 0 ? "Out" : `${item.stock.toFixed(0)}`}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
 
       <Card>
         <CardHeader>
@@ -478,6 +711,63 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={zeroStockAlert} onOpenChange={setZeroStockAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Out of Stock
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{zeroStockItem}</span> has 0 stock available and cannot be added to the transfer.
+              Please select a different item.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button onClick={() => setZeroStockAlert(false)} data-testid="button-close-zero-stock-alert">
+              OK
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={negativeStockWarning} onOpenChange={setNegativeStockWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-chart-3" />
+              Insufficient Stock Warning
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>The following items will go into negative stock after this transfer:</p>
+                <div className="border rounded-md p-3 bg-muted/50">
+                  {negativeStockItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-sm py-1">
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-destructive font-mono">
+                        Available: {item.available.toFixed(2)} / Requested: {item.requested.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm">Do you want to proceed anyway?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-negative-stock">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleProceedWithNegative}
+              className="bg-chart-3 hover:bg-chart-3/90"
+              data-testid="button-proceed-negative-stock"
+            >
+              Proceed Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-2xl">
