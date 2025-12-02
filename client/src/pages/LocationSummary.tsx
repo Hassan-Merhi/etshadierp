@@ -353,7 +353,7 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-40 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-56 bg-muted/80">Qty (BL)</th>
                       <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
                       <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
                     </Fragment>
