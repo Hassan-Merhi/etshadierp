@@ -10,6 +10,7 @@ import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
+import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -273,13 +274,15 @@ export default function App() {
         <ThemeProvider>
           <CompanyProvider>
             <LocationProvider>
-              <Switch>
-                <Route path="/login" component={Login} />
-                <Route>
-                  <AuthenticatedApp />
-                </Route>
-              </Switch>
-              <Toaster />
+              <DateFormatProvider>
+                <Switch>
+                  <Route path="/login" component={Login} />
+                  <Route>
+                    <AuthenticatedApp />
+                  </Route>
+                </Switch>
+                <Toaster />
+              </DateFormatProvider>
             </LocationProvider>
           </CompanyProvider>
         </ThemeProvider>

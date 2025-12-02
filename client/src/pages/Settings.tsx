@@ -43,7 +43,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange } from "lucide-react";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2 } from "lucide-react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -71,6 +72,7 @@ type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 export default function Settings() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { dateFormat, setDateFormat, isPending: isDateFormatPending } = useDateFormat();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
@@ -461,6 +463,10 @@ export default function Settings() {
           <TabsTrigger value="fiscal" data-testid="tab-fiscal">
             <CalendarRange className="h-4 w-4 mr-2" />
             Fiscal Period
+          </TabsTrigger>
+          <TabsTrigger value="preferences" data-testid="tab-preferences">
+            <Settings2 className="h-4 w-4 mr-2" />
+            Preferences
           </TabsTrigger>
         </TabsList>
 
@@ -970,6 +976,48 @@ export default function Settings() {
             currentCompanyId={selectedCompany?.id} 
             userRole={undefined} 
           />
+        </TabsContent>
+
+        {/* Preferences Tab */}
+        <TabsContent value="preferences" className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              <h2 className="text-2xl font-semibold">User Preferences</h2>
+            </div>
+
+            <Card className="p-6">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="date-format" className="text-base font-medium">
+                    Date Format
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose how dates are displayed throughout the application.
+                  </p>
+                  <Select
+                    value={dateFormat}
+                    onValueChange={(value: "MM/DD/YYYY" | "DD/MM/YYYY") => {
+                      setDateFormat(value);
+                      toast({
+                        title: "Date format updated",
+                        description: `Dates will now be displayed as ${value}`,
+                      });
+                    }}
+                    disabled={isDateFormatPending}
+                  >
+                    <SelectTrigger id="date-format" className="w-64" data-testid="select-date-format">
+                      <SelectValue placeholder="Select date format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (e.g., 12/31/2025)</SelectItem>
+                      <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (e.g., 31/12/2025)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

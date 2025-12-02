@@ -1451,3 +1451,24 @@ export const insertStockItemLocationPriceSchema = createInsertSchema(stockItemLo
 
 export type InsertStockItemLocationPrice = z.infer<typeof insertStockItemLocationPriceSchema>;
 export type StockItemLocationPrice = typeof stockItemLocationPrices.$inferSelect;
+
+// User Preferences - stores user-specific settings like date format
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  userId: z.string().min(1, "User ID is required"),
+  dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY"]).default("MM/DD/YYYY"),
+});
+
+export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
+export type UserPreferences = typeof userPreferences.$inferSelect;

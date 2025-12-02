@@ -66,6 +66,8 @@ import {
   salaryAdvances,
   salaryAdvanceDeductions,
   stockItemLocationPrices,
+  userPreferences,
+  insertUserPreferencesSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or } from "drizzle-orm";
@@ -312,6 +314,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // User Preferences routes
+  app.get("/api/user-preferences", requireAuth, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const prefs = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
+      
+      if (prefs.length === 0) {
+        // Return default preferences if none exist
+        return res.json({ dateFormat: "MM/DD/YYYY" });
+      }
+      
+      res.json(prefs[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/user-preferences", requireAuth, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { dateFormat } = req.body;
+      
+      // Validate date format
+      if (!["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+      
+      // Check if preferences exist
+      const existing = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
+      
+      if (existing.length === 0) {
+        // Create new preferences
+        const newPrefs = await db.insert(userPreferences).values({
+          userId: req.user.id,
+          dateFormat,
+        }).returning();
+        return res.json(newPrefs[0]);
+      }
+      
+      // Update existing preferences
+      const updated = await db.update(userPreferences)
+        .set({ dateFormat, updatedAt: new Date() })
+        .where(eq(userPreferences.userId, req.user.id))
+        .returning();
+      
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Company management routes
   app.get("/api/companies", requireAuth, async (req, res) => {
