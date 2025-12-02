@@ -806,7 +806,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                         <TableRow key={idx}>
                           <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(item.quantity).toFixed(2)}
+                            {parseFloat(item.quantity || "0").toFixed(2)}
                           </TableCell>
                         </TableRow>
                       ))}

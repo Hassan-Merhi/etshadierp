@@ -1,5 +1,16 @@
 # ERP POS System
 
+## Recent Changes (Dec 2, 2025)
+
+- **Voucher Deletion Now Reverses Inventory**: Deleting vouchers now properly restores inventory movements
+  - **Stock Transfer**: Deleting a stock transfer voucher adds quantity back to source location and removes from destination
+  - **Production**: Deleting a production voucher subtracts the produced quantity from inventory
+  - **Consumption**: Deleting a consumption voucher adds the consumed quantity back to inventory
+  - **POS Sales (Receipt)**: Deleting a POS sale voucher adds sold items back to inventory
+  - All reversals maintain proper weighted average cost calculations
+  - Cleanup also removes related records (stockTransferItems, stockAdjustmentItems, salesItems)
+- **Fixed Quantity Input Crash**: Fixed parseFloat crash when quantity field is empty in stock transfer view dialog
+
 ## Recent Changes (Nov 26, 2025)
 
 - **Stock Transfer Consolidated to Vouchers Page**: POS users now access stock transfer through the Vouchers page

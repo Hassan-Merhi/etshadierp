@@ -12768,6 +12768,294 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Wrap balance sync and deletion in a transaction
         await db.transaction(async (tx) => {
+          // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
+          if (voucher.voucherType === "Stock Transfer" && !voucher.optional) {
+            // Get the stock transfer record
+            const [transferVoucher] = await tx
+              .select()
+              .from(stockTransferVouchers)
+              .where(eq(stockTransferVouchers.voucherId, id))
+              .limit(1);
+
+            if (transferVoucher) {
+              // Get the transfer items
+              const transferItemsList = await tx
+                .select()
+                .from(stockTransferItems)
+                .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+              // Reverse each item's inventory movement
+              // NOTE: The forward transfer logic:
+              // - Source: reduces qty, keeps existing averageRate
+              // - Destination: adds qty with weighted average calculation
+              // Reversal must be the exact inverse:
+              // - Source: add back qty at existing rate (no average change needed)
+              // - Destination: subtract qty and reverse the weighted average
+              for (const item of transferItemsList) {
+                const qty = parseFloat(item.quantity);
+                const transferRate = parseFloat(item.rate);
+
+                // Add back to source location (reverse the deduction)
+                // Forward logic kept source's averageRate unchanged, so we do the same on reversal
+                const [sourceInv] = await tx
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, transferVoucher.sourceLocationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (sourceInv) {
+                  // Add quantity back to source at source's existing rate
+                  const existingQty = parseFloat(sourceInv.quantity);
+                  const existingRate = parseFloat(sourceInv.averageRate || "0");
+                  const newQty = existingQty + qty;
+                  // Keep the same average rate - forward didn't change it
+                  const newValue = newQty * existingRate;
+
+                  await tx
+                    .update(inventory)
+                    .set({
+                      quantity: newQty.toString(),
+                      totalValue: newValue.toString(),
+                    })
+                    .where(eq(inventory.id, sourceInv.id));
+                } else {
+                  // Create inventory record at source (was fully transferred out)
+                  // Use the transfer rate as the cost basis
+                  await tx.insert(inventory).values({
+                    companyId: req.session.currentCompanyId!,
+                    locationId: transferVoucher.sourceLocationId,
+                    stockItemId: item.stockItemId,
+                    quantity: qty.toString(),
+                    averageRate: transferRate.toString(),
+                    totalValue: (qty * transferRate).toString(),
+                  });
+                }
+
+                // Remove from destination location (reverse the weighted average addition)
+                const [destInv] = await tx
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, transferVoucher.destinationLocationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (destInv) {
+                  const existingQty = parseFloat(destInv.quantity);
+                  const existingValue = parseFloat(destInv.totalValue || "0");
+                  const newQty = existingQty - qty;
+
+                  if (newQty <= 0) {
+                    // Delete inventory record if nothing left
+                    await tx.delete(inventory).where(eq(inventory.id, destInv.id));
+                  } else {
+                    // Reverse weighted average: subtract the value that was added
+                    // Forward added: (qty * transferRate) to total value
+                    // Reverse: subtract that same value and recalculate average
+                    const valueToRemove = qty * transferRate;
+                    let newValue = existingValue - valueToRemove;
+                    // Guard against negative values (shouldn't happen but be safe)
+                    if (newValue < 0) newValue = 0;
+                    const newAvgRate = newQty > 0 && newValue > 0 ? newValue / newQty : 0;
+
+                    await tx
+                      .update(inventory)
+                      .set({
+                        quantity: newQty.toString(),
+                        averageRate: newAvgRate.toString(),
+                        totalValue: newValue.toString(),
+                      })
+                      .where(eq(inventory.id, destInv.id));
+                  }
+                }
+              }
+
+              // Delete stock transfer items
+              await tx
+                .delete(stockTransferItems)
+                .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+              // Delete stock transfer voucher record
+              await tx
+                .delete(stockTransferVouchers)
+                .where(eq(stockTransferVouchers.id, transferVoucher.id));
+            }
+          }
+
+          // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption) vouchers
+          if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption") && !voucher.optional) {
+            // Get the stock adjustment record
+            const [adjustmentVoucher] = await tx
+              .select()
+              .from(stockAdjustmentVouchers)
+              .where(eq(stockAdjustmentVouchers.voucherId, id))
+              .limit(1);
+
+            if (adjustmentVoucher) {
+              // Get the adjustment items
+              const adjustmentItemsList = await tx
+                .select()
+                .from(stockAdjustmentItems)
+                .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+              // Reverse each item's inventory movement
+              // Production forward logic: adds qty with weighted average
+              // Consumption forward logic: subtracts qty, keeps rate
+              for (const item of adjustmentItemsList) {
+                const qty = parseFloat(item.quantity);
+                const adjustmentRate = parseFloat(item.rate);
+                const adjustmentValue = qty * adjustmentRate;
+
+                const [inv] = await tx
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, adjustmentVoucher.locationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (adjustmentVoucher.adjustmentType === "Production") {
+                  // Production added inventory with weighted average, so reverse it
+                  if (inv) {
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingValue = parseFloat(inv.totalValue || "0");
+                    const newQty = existingQty - qty;
+
+                    if (newQty <= 0) {
+                      await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                    } else {
+                      // Reverse the weighted average by subtracting the added value
+                      let newValue = existingValue - adjustmentValue;
+                      // Guard against negative values
+                      if (newValue < 0) newValue = 0;
+                      const newRate = newQty > 0 && newValue > 0 ? newValue / newQty : 0;
+                      await tx
+                        .update(inventory)
+                        .set({
+                          quantity: newQty.toString(),
+                          averageRate: newRate.toString(),
+                          totalValue: newValue.toString(),
+                        })
+                        .where(eq(inventory.id, inv.id));
+                    }
+                  }
+                } else {
+                  // Consumption subtracted inventory (kept rate), so add back at existing rate
+                  if (inv) {
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingRate = parseFloat(inv.averageRate || "0");
+                    const newQty = existingQty + qty;
+                    // Keep the same rate - consumption didn't change it
+                    const newValue = newQty * existingRate;
+
+                    await tx
+                      .update(inventory)
+                      .set({
+                        quantity: newQty.toString(),
+                        totalValue: newValue.toString(),
+                      })
+                      .where(eq(inventory.id, inv.id));
+                  } else {
+                    // Create inventory record - use the consumption rate as basis
+                    await tx.insert(inventory).values({
+                      companyId: req.session.currentCompanyId!,
+                      locationId: adjustmentVoucher.locationId,
+                      stockItemId: item.stockItemId,
+                      quantity: qty.toString(),
+                      averageRate: adjustmentRate.toString(),
+                      totalValue: (qty * adjustmentRate).toString(),
+                    });
+                  }
+                }
+              }
+
+              // Delete stock adjustment items
+              await tx
+                .delete(stockAdjustmentItems)
+                .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+              // Delete stock adjustment voucher record
+              await tx
+                .delete(stockAdjustmentVouchers)
+                .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
+            }
+          }
+
+          // IMPORTANT: Reverse inventory movements for POS Sales vouchers
+          // POS Sale forward logic: subtracts qty, keeps existing rate
+          // Reversal: add back qty at existing rate
+          if (voucher.voucherType === "Receipt" && !voucher.optional && voucher.locationId) {
+            // Check if this is a POS sale by looking for sales items
+            const saleItems = await tx
+              .select()
+              .from(salesItems)
+              .where(eq(salesItems.voucherId, id));
+
+            if (saleItems.length > 0) {
+              const voucherLocationId = voucher.locationId;
+              // This is a POS sale - add sold items back to inventory
+              for (const item of saleItems) {
+                const qty = parseFloat(item.quantity);
+                const costPrice = parseFloat(item.costPrice || "0");
+
+                // Get inventory at voucher's location
+                const [inv] = await tx
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, voucherLocationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (inv) {
+                  // Add quantity back at existing rate (forward sale didn't change rate)
+                  const existingQty = parseFloat(inv.quantity);
+                  const existingRate = parseFloat(inv.averageRate || "0");
+                  const newQty = existingQty + qty;
+                  // Keep the same rate - POS sale forward logic doesn't change it
+                  const newValue = newQty * existingRate;
+
+                  await tx
+                    .update(inventory)
+                    .set({
+                      quantity: newQty.toString(),
+                      totalValue: newValue.toString(),
+                    })
+                    .where(eq(inventory.id, inv.id));
+                } else {
+                  // Create inventory record - use the costPrice as basis since no existing record
+                  await tx.insert(inventory).values({
+                    companyId: req.session.currentCompanyId!,
+                    locationId: voucherLocationId,
+                    stockItemId: item.stockItemId,
+                    quantity: qty.toString(),
+                    averageRate: costPrice.toString(),
+                    totalValue: (qty * costPrice).toString(),
+                  });
+                }
+              }
+
+              // Delete sales items
+              await tx
+                .delete(salesItems)
+                .where(eq(salesItems.voucherId, id));
+            }
+          }
+
           if (!voucher.optional) {
             const entries = await tx
               .select()
