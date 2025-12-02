@@ -234,7 +234,7 @@ export default function Dashboard() {
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   // Filter payable accounts with non-zero balance
-  const displayedPayableAccounts = dashboardPayableAccounts.filter(acc => {
+  const displayedPayableAccounts = allPayableAccounts.filter(acc => {
     const balance = Math.abs(acc.balance);
     return balance !== 0;
   });
@@ -466,69 +466,16 @@ export default function Dashboard() {
               <ArrowUpRight className="h-5 w-5 text-red-600" />
               To Pay
             </h3>
-            <Dialog open={isAddPayableDialogOpen} onOpenChange={setIsAddPayableDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" data-testid="button-add-payable-account">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Payable Account to Dashboard</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Payable Account</label>
-                    <Select
-                      value={selectedPayableAccountId.toString()}
-                      onValueChange={(value) => setSelectedPayableAccountId(parseInt(value))}
-                    >
-                      <SelectTrigger data-testid="select-payable-account">
-                        <SelectValue placeholder="Select a payable account..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePayableAccounts.length === 0 ? (
-                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                            No available payable accounts
-                          </div>
-                        ) : (
-                          availablePayableAccounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      if (selectedPayableAccountId > 0) {
-                        addPayableAccountMutation.mutate({
-                          supplierId: selectedPayableAccountId,
-                        });
-                      }
-                    }}
-                    disabled={selectedPayableAccountId === 0 || addPayableAccountMutation.isPending}
-                    className="w-full"
-                    data-testid="button-save-payable-account"
-                  >
-                    {addPayableAccountMutation.isPending ? "Adding..." : "Add Account"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
           
           {displayedPayableAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No payable accounts added</p>
+              <p className="text-sm">No payable accounts</p>
             </div>
           ) : (
             <div className="space-y-2">
               {displayedPayableAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`payable-account-row-${account.id}`}>
+                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate" data-testid={`payable-account-row-${account.id}`}>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{account.name}</p>
                     <p className="text-xs text-muted-foreground">{account.code}</p>
@@ -538,15 +485,6 @@ export default function Dashboard() {
                       {formatCurrency(Math.abs(account.balance))}
                     </p>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removePayableAccountMutation.mutate(account.id)}
-                    data-testid={`button-remove-payable-account-${account.id}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
                 </div>
               ))}
               {displayedPayableAccounts.length > 0 && (
