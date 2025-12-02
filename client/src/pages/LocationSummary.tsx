@@ -52,22 +52,69 @@ interface Location {
 }
 
 const STORAGE_KEY = "locationSummary_selectedLocations";
+const STATE_KEY = "locationSummary_pageState";
 
 export default function LocationSummary() {
   const [_location, navigate] = useLocation();
+  
+  // Load saved state from sessionStorage
+  const getSavedState = () => {
+    try {
+      const saved = sessionStorage.getItem(STATE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+  
+  const savedState = getSavedState();
+  
   const [selectedLocationIds, setSelectedLocationIds] = useState<number[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : [];
   });
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
-  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(() => 
+    new Set(savedState?.expandedGroups || [])
+  );
+  const [asOfDate, setAsOfDate] = useState(() => savedState?.asOfDate || new Date().toISOString().split('T')[0]);
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
-  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
-  const [highlightedRows, setHighlightedRows] = useState<Set<string>>(new Set());
-  const [selectedLocationIndex, setSelectedLocationIndex] = useState<number>(0);
-  const [hiddenRows, setHiddenRows] = useState<Set<string>>(new Set());
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(savedState?.selectedRowKey || null);
+  const [highlightedRows, setHighlightedRows] = useState<Set<string>>(() => 
+    new Set(savedState?.highlightedRows || [])
+  );
+  const [selectedLocationIndex, setSelectedLocationIndex] = useState<number>(savedState?.selectedLocationIndex || 0);
+  const [hiddenRows, setHiddenRows] = useState<Set<string>>(() => 
+    new Set(savedState?.hiddenRows || [])
+  );
   const tableScrollContainer = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  
+  // Save state to sessionStorage whenever it changes
+  useEffect(() => {
+    const state = {
+      expandedGroups: Array.from(expandedGroups),
+      asOfDate,
+      selectedRowKey,
+      highlightedRows: Array.from(highlightedRows),
+      selectedLocationIndex,
+      hiddenRows: Array.from(hiddenRows),
+      scrollTop: tableScrollContainer.current?.scrollTop || 0,
+      scrollLeft: tableScrollContainer.current?.scrollLeft || 0,
+    };
+    sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
+  }, [expandedGroups, asOfDate, selectedRowKey, highlightedRows, selectedLocationIndex, hiddenRows]);
+  
+  // Restore scroll position on mount
+  useEffect(() => {
+    if (savedState && tableScrollContainer.current) {
+      setTimeout(() => {
+        if (tableScrollContainer.current) {
+          tableScrollContainer.current.scrollTop = savedState.scrollTop || 0;
+          tableScrollContainer.current.scrollLeft = savedState.scrollLeft || 0;
+        }
+      }, 100);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -336,10 +383,10 @@ export default function LocationSummary() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)]" ref={tableScrollContainer}>
+        <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+          <div className="overflow-auto flex-1" ref={tableScrollContainer}>
             <table className="w-full text-xs border-collapse">
-              <thead className="sticky top-0 z-20">
+              <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="bg-muted">
                   <th 
                     className="text-left py-1 px-2 font-semibold border-b border-r sticky left-0 bg-muted z-30 min-w-[180px]"
@@ -347,11 +394,14 @@ export default function LocationSummary() {
                   >
                     Particulars
                   </th>
-                  {selectedLocations.map(location => (
+                  {selectedLocations.map((location, locIndex) => (
                     <th 
                       key={location.id} 
                       colSpan={3} 
-                      className="text-center py-1 px-1 font-semibold border-b border-r bg-muted"
+                      className={cn(
+                        "text-center py-1 px-1 font-semibold border-b border-r",
+                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted"
+                      )}
                     >
                       <span className="truncate block" title={location.name}>
                         {location.name}
@@ -359,12 +409,21 @@ export default function LocationSummary() {
                     </th>
                   ))}
                 </tr>
-                <tr className="bg-muted/80">
+                <tr>
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-56 bg-muted/80">Qty (BL)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
+                      <th className={cn(
+                        "text-right py-1 px-1 font-medium border-b w-56",
+                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
+                      )}>Qty (BL)</th>
+                      <th className={cn(
+                        "text-right py-1 px-1 font-medium border-b w-20",
+                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
+                      )}>Rate ($)</th>
+                      <th className={cn(
+                        "text-right py-1 px-1 font-medium border-b border-r w-24",
+                        locIndex === selectedLocationIndex ? "bg-blue-200 dark:bg-blue-900" : "bg-muted/80"
+                      )}>Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
@@ -416,15 +475,25 @@ export default function LocationSummary() {
                           </td>
                           {selectedLocations.map((location, locIndex) => {
                             const data = group.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
+                            const isSelectedLoc = locIndex === selectedLocationIndex;
                             return (
                               <Fragment key={`group-${group.id}-loc-${location.id}`}>
-                                <td className="text-right py-1 px-1 tabular-nums font-medium">
+                                <td className={cn(
+                                  "text-right py-1 px-1 tabular-nums font-medium",
+                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                )}>
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
-                                <td className="text-right py-1 px-1 tabular-nums text-foreground">
+                                <td className={cn(
+                                  "text-right py-1 px-1 tabular-nums text-foreground",
+                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                )}>
                                   {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                 </td>
-                                <td className="text-right py-1 px-1 border-r tabular-nums font-semibold">
+                                <td className={cn(
+                                  "text-right py-1 px-1 border-r tabular-nums font-semibold",
+                                  isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                                )}>
                                   {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                                 </td>
                               </Fragment>
@@ -467,24 +536,34 @@ export default function LocationSummary() {
                             </td>
                             {selectedLocations.map((location, locIndex) => {
                               const data = item.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
+                              const isSelectedLoc = locIndex === selectedLocationIndex;
                               return (
                                 <Fragment key={`item-${item.id}-loc-${location.id}`}>
                                   <td 
-                                    className="text-right py-0.5 px-1 tabular-nums cursor-pointer hover:bg-accent/30"
+                                    className={cn(
+                                      "text-right py-0.5 px-1 tabular-nums cursor-pointer hover:bg-accent/30",
+                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                    )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-qty-${item.id}-${location.id}`}
                                   >
                                     {formatNumber(data.quantity, 0, "BL")}
                                   </td>
                                   <td 
-                                    className="text-right py-0.5 px-1 tabular-nums text-foreground cursor-pointer hover:bg-accent/30"
+                                    className={cn(
+                                      "text-right py-0.5 px-1 tabular-nums text-foreground cursor-pointer hover:bg-accent/30",
+                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                    )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-rate-${item.id}-${location.id}`}
                                   >
                                     {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                   </td>
                                   <td 
-                                    className="text-right py-0.5 px-1 border-r tabular-nums cursor-pointer hover:bg-accent/30"
+                                    className={cn(
+                                      "text-right py-0.5 px-1 border-r tabular-nums cursor-pointer hover:bg-accent/30",
+                                      isSelectedLoc && !highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-blue-100 dark:bg-blue-900/50"
+                                    )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-value-${item.id}-${location.id}`}
                                   >
@@ -503,15 +582,25 @@ export default function LocationSummary() {
                       </td>
                       {selectedLocations.map((location, locIndex) => {
                         const data = summaryData.grandTotals[location.id] || { quantity: 0, rate: 0, value: 0 };
+                        const isSelectedLoc = locIndex === selectedLocationIndex;
                         return (
                           <Fragment key={`grand-${location.id}`}>
-                            <td className="text-right py-1 px-1 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
+                            <td className={cn(
+                              "text-right py-1 px-1 tabular-nums",
+                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                            )} data-testid={`text-grand-qty-${location.id}`}>
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
-                            <td className="text-right py-1 px-1 tabular-nums text-foreground">
+                            <td className={cn(
+                              "text-right py-1 px-1 tabular-nums text-foreground",
+                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                            )}>
                               {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                             </td>
-                            <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
+                            <td className={cn(
+                              "text-right py-1 px-1 border-r tabular-nums",
+                              isSelectedLoc && "bg-blue-100 dark:bg-blue-900/50"
+                            )} data-testid={`text-grand-value-${location.id}`}>
                               {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                             </td>
                           </Fragment>
