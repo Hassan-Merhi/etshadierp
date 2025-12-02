@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Form,
   FormControl,
@@ -828,21 +829,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="start-date">Start Date</Label>
-              <Input
-                id="start-date"
-                type="date"
+              <DatePickerInput
                 value={filters.startDate}
-                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, startDate: value })}
+                placeholder="Start date"
                 data-testid="input-start-date"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="end-date">End Date</Label>
-              <Input
-                id="end-date"
-                type="date"
+              <DatePickerInput
                 value={filters.endDate}
-                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                onChange={(value) => setFilters({ ...filters, endDate: value })}
+                placeholder="End date"
                 data-testid="input-end-date"
               />
             </div>

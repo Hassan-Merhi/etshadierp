@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Select,
   SelectContent,
@@ -1114,29 +1115,27 @@ export default function Accounts() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start-date">Start Date</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
+                    <DatePickerInput
                       value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
+                      onChange={(value) => {
+                        setStartDate(value);
                         setSelectedMonth("");
                         setSelectedYear("");
                       }}
+                      placeholder="Start date"
                       data-testid="input-start-date"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="end-date">End Date</Label>
-                    <Input
-                      id="end-date"
-                      type="date"
+                    <DatePickerInput
                       value={endDate}
-                      onChange={(e) => {
-                        setEndDate(e.target.value);
+                      onChange={(value) => {
+                        setEndDate(value);
                         setSelectedMonth("");
                         setSelectedYear("");
                       }}
+                      placeholder="End date"
                       data-testid="input-end-date"
                     />
                   </div>

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -1302,20 +1303,18 @@ export default function Analytics() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
                 <Label htmlFor="stock-start-date">Start Date</Label>
-                <Input
-                  id="stock-start-date"
-                  type="date"
+                <DatePickerInput
                   value={reportStartDate}
-                  onChange={(e) => setReportStartDate(e.target.value)}
+                  onChange={setReportStartDate}
+                  placeholder="Start date"
                 />
               </div>
               <div>
                 <Label htmlFor="stock-end-date">End Date</Label>
-                <Input
-                  id="stock-end-date"
-                  type="date"
+                <DatePickerInput
                   value={reportEndDate}
-                  onChange={(e) => setReportEndDate(e.target.value)}
+                  onChange={setReportEndDate}
+                  placeholder="End date"
                 />
               </div>
               <div>
@@ -1417,20 +1416,18 @@ export default function Analytics() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div>
                 <Label htmlFor="container-start-date">Start Date</Label>
-                <Input
-                  id="container-start-date"
-                  type="date"
+                <DatePickerInput
                   value={reportStartDate}
-                  onChange={(e) => setReportStartDate(e.target.value)}
+                  onChange={setReportStartDate}
+                  placeholder="Start date"
                 />
               </div>
               <div>
                 <Label htmlFor="container-end-date">End Date</Label>
-                <Input
-                  id="container-end-date"
-                  type="date"
+                <DatePickerInput
                   value={reportEndDate}
-                  onChange={(e) => setReportEndDate(e.target.value)}
+                  onChange={setReportEndDate}
+                  placeholder="End date"
                 />
               </div>
               <div>
@@ -1558,20 +1555,18 @@ export default function Analytics() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <Label htmlFor="start-date">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
+                <DatePickerInput
                   value={ratiosStartDate}
-                  onChange={(e) => setRatiosStartDate(e.target.value)}
+                  onChange={setRatiosStartDate}
+                  placeholder="Start date"
                 />
               </div>
               <div>
                 <Label htmlFor="end-date">End Date</Label>
-                <Input
-                  id="end-date"
-                  type="date"
+                <DatePickerInput
                   value={ratiosEndDate}
-                  onChange={(e) => setRatiosEndDate(e.target.value)}
+                  onChange={setRatiosEndDate}
+                  placeholder="End date"
                 />
               </div>
             </div>

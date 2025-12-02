@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, CalendarIcon } from "lucide-react";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -999,12 +1000,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Date Picker */}
         <div className="flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          <Input
-            type="date"
+          <DatePickerInput
             value={saleDate}
-            onChange={(e) => setSaleDate(e.target.value)}
-            className="w-40"
+            onChange={setSaleDate}
+            placeholder="Sale date"
+            className="w-48"
             data-testid="input-sale-date"
           />
         </div>

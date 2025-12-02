@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Dialog,
   DialogContent,
@@ -307,17 +308,13 @@ export default function LocationSummary() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Label htmlFor="asOfDate" className="text-sm whitespace-nowrap">As of:</Label>
-            <div className="relative">
-              <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="asOfDate"
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="pl-8 w-40"
-                data-testid="input-as-of-date"
-              />
-            </div>
+            <DatePickerInput
+              value={asOfDate}
+              onChange={setAsOfDate}
+              placeholder="Select date"
+              className="w-48"
+              data-testid="input-as-of-date"
+            />
           </div>
           <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
             <DialogTrigger asChild>
