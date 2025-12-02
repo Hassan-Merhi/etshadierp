@@ -917,6 +917,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0);
+  const totalQty = rows.reduce((sum, row) => sum + (row.quantity || 0), 0);
   const filteredItems = getFilteredInventory();
 
   return (
@@ -1199,6 +1200,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div className="text-sm text-muted-foreground">Total Items:</div>
               <div className="text-sm font-mono font-medium">
                 {rows.filter((r) => r.amount > 0).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Total Qty:</div>
+              <div className="text-sm font-mono font-medium" data-testid="text-total-qty">
+                {totalQty > 0 ? totalQty.toFixed(3) : "0"}
               </div>
               <div className="text-lg font-semibold">Grand Total:</div>
               <div className="text-2xl font-bold font-mono" data-testid="text-grand-total">
