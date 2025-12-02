@@ -3312,7 +3312,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       .filter(loc => {
                                         if (!transferSourceSearchTerm.trim()) return true;
                                         const term = transferSourceSearchTerm.toLowerCase();
-                                        return loc.name.toLowerCase().includes(term) || loc.code.toLowerCase().includes(term);
+                                        return loc.name.toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
                                       })
                                       .sort((a, b) => a.name.localeCompare(b.name));
                                     
@@ -3820,7 +3820,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             .filter(loc => {
                               if (!transferSourceSearchTerm.trim()) return true;
                               const term = transferSourceSearchTerm.toLowerCase();
-                              return loc.name.toLowerCase().includes(term) || loc.code.toLowerCase().includes(term);
+                              return loc.name.toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
                             })
                             .sort((a, b) => a.name.localeCompare(b.name));
                           
