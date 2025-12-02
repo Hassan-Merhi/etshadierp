@@ -114,6 +114,7 @@ export default function LocationSummary() {
   };
 
   const formatNumber = (num: number, decimals: number = 2, suffix: string = "") => {
+    if (num === 0) return "";
     const formatted = num.toLocaleString('en-US', { 
       minimumFractionDigits: decimals, 
       maximumFractionDigits: decimals 
@@ -389,10 +390,10 @@ export default function LocationSummary() {
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
                                 <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                                  {"$" + formatNumber(data.rate, 2)}
+                                  {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className="text-right py-1 px-1 border-r tabular-nums font-semibold">
-                                  {"$" + formatNumber(data.value, 2)}
+                                  {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                                 </td>
                               </Fragment>
                             );
@@ -425,10 +426,10 @@ export default function LocationSummary() {
                                     {formatNumber(data.quantity, 0, "BL")}
                                   </td>
                                   <td className="text-right py-0.5 px-1 tabular-nums text-muted-foreground">
-                                    {"$" + formatNumber(data.rate, 2)}
+                                    {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                   </td>
                                   <td className="text-right py-0.5 px-1 border-r tabular-nums">
-                                    {"$" + formatNumber(data.value, 2)}
+                                    {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                                   </td>
                                 </Fragment>
                               );
@@ -449,10 +450,10 @@ export default function LocationSummary() {
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
                             <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                              {"$" + formatNumber(data.rate, 2)}
+                              {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                             </td>
                             <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
-                              {"$" + formatNumber(data.value, 2)}
+                              {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
                             </td>
                           </Fragment>
                         );
