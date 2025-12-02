@@ -1489,6 +1489,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [transferHighlightedIndex, setTransferHighlightedIndex] = useState(0);
   const [transferSourceSearchTerm, setTransferSourceSearchTerm] = useState("");
   const [transferSourceHighlightedIndex, setTransferSourceHighlightedIndex] = useState(0);
+  const [showSourceSidebar, setShowSourceSidebar] = useState(false);
+  const [showItemSidebar, setShowItemSidebar] = useState(false);
   const transferSidebarRef = useRef<HTMLDivElement>(null);
 
   // For POS users, auto-set source location to their assigned location when locations load
@@ -3223,52 +3225,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             {!isPOS && (
                               <div className="w-40 border-r h-10">
-                                <input
-                                  type="text"
-                                  value={transferEntries[index]?.sourceLocationName || ""}
-                                  onFocus={() => {
+                                <button
+                                  type="button"
+                                  onClick={() => {
                                     setActiveTransferRow(index);
-                                    setTransferSourceSearchTerm(transferEntries[index]?.sourceLocationName || "");
-                                    if (transferEntries[index]?.sourceLocationId > 0) {
-                                      setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                    }
+                                    setShowSourceSidebar(true);
                                   }}
-                                  onBlur={() => {
-                                    setTimeout(() => {
-                                      setActiveTransferRow(null);
-                                      setTransferSourceSearchTerm("");
-                                    }, 200);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "ArrowUp") {
-                                      e.preventDefault();
-                                      if (index > 0) {
-                                        setTimeout(() => {
-                                          const prevInput = document.querySelector(`[data-testid="input-source-${index - 1}"]`) as HTMLInputElement;
-                                          if (prevInput) { prevInput.focus(); prevInput.select(); }
-                                        }, 50);
-                                      }
-                                    } else if (e.key === "ArrowDown") {
-                                      e.preventDefault();
-                                      if (index < transferFields.length - 1) {
-                                        setTimeout(() => {
-                                          const nextInput = document.querySelector(`[data-testid="input-source-${index + 1}"]`) as HTMLInputElement;
-                                          if (nextInput) { nextInput.focus(); nextInput.select(); }
-                                        }, 50);
-                                      }
-                                    } else if (e.key === "ArrowRight" || (e.key === "Tab" && !e.shiftKey)) {
-                                      e.preventDefault();
-                                      setTimeout(() => {
-                                        const itemInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
-                                        if (itemInput) { itemInput.focus(); itemInput.select(); }
-                                      }, 50);
-                                    }
-                                  }}
-                                  placeholder="Click to select..."
-                                  className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
+                                  className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 text-left text-sm hover:bg-accent/10"
                                   data-testid={`input-source-${index}`}
-                                  readOnly
-                                />
+                                >
+                                  {transferEntries[index]?.sourceLocationName || "Click to select..."}
+                                </button>
                               </div>
                             )}
                             <div className="flex-1 min-w-[200px] border-r h-10">
@@ -3287,6 +3254,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setActiveTransferRow(index);
                                   setTransferHighlightedIndex(0);
                                   setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
+                                  setShowItemSidebar(true);
                                   if (transferEntries[index]?.sourceLocationId > 0) {
                                     setTransferInventorySource(transferEntries[index].sourceLocationId);
                                   } else if (isPOS && posLocationId) {
@@ -3297,6 +3265,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setTimeout(() => {
                                     setActiveTransferRow(null);
                                     setTransferSearchTerm("");
+                                    setShowItemSidebar(false);
                                   }, 200);
                                 }}
                                 onKeyDown={(e) => {
@@ -3543,7 +3512,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </div>
                       <div className="text-xs text-muted-foreground">Total Qty:</div>
                       <div className="text-xs font-mono font-medium">
-                        {transferEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0).toFixed(2)}
+                        {Math.floor(transferEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0))}
                       </div>
                       {!isPOS && (
                         <>
@@ -3558,9 +3527,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 </Card>
 
                 {/* Right Panel - Item Search */}
+                {showItemSidebar && (
                 <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
                   <div className="p-4 border-b">
-                    <h3 className="text-sm font-semibold mb-2">Search Items</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold">Search Items</h3>
+                      <button onClick={() => setShowItemSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-item-sidebar">✕</button>
+                    </div>
                     {transferInventorySource && (
                       <p className="text-xs text-muted-foreground mb-3">
                         {locations.find(l => l.id === transferInventorySource)?.name}
@@ -3664,12 +3637,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     </div>
                   </div>
                 </Card>
+                )}
 
                 {/* Right Panel - Source Location Search */}
-                {!isPOS && (
+                {!isPOS && showSourceSidebar && (
                   <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
                     <div className="p-4 border-b">
-                      <h3 className="text-sm font-semibold mb-2">Select Source</h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-semibold">Select Source</h3>
+                        <button onClick={() => setShowSourceSidebar(false)} className="text-xs text-muted-foreground hover:text-foreground" data-testid="button-close-source-sidebar">✕</button>
+                      </div>
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
