@@ -550,48 +550,50 @@ export default function SalesReport() {
           
           {selectedDaySummary && (
             <div className="space-y-4">
-              {/* Summary Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardDescription className="text-xs">Total Sales</CardDescription>
-                    <CardTitle className="text-lg">
-                      ${selectedDaySummary.totalSales.toFixed(2)}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardDescription className="text-xs">Cost Total</CardDescription>
-                    <CardTitle className="text-lg">
-                      ${selectedDaySummary.totalCost.toFixed(2)}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardDescription className="text-xs">Cost Profit</CardDescription>
-                    <CardTitle className={`text-lg ${selectedDaySummary.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      ${selectedDaySummary.costProfit.toFixed(2)}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardDescription className="text-xs">Configured Total</CardDescription>
-                    <CardTitle className="text-lg">
-                      ${selectedDaySummary.totalConfiguredCost.toFixed(2)}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardDescription className="text-xs">Configured Profit</CardDescription>
-                    <CardTitle className={`text-lg ${selectedDaySummary.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      ${selectedDaySummary.configuredProfit.toFixed(2)}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
+              {/* Summary Cards - Sticky Header */}
+              <div className="sticky top-0 z-10 bg-background pt-2 pb-3 -mx-6 px-6 border-b">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Total Sales</CardDescription>
+                      <CardTitle className="text-lg">
+                        ${selectedDaySummary.totalSales.toFixed(2)}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Cost Total</CardDescription>
+                      <CardTitle className="text-lg">
+                        ${selectedDaySummary.totalCost.toFixed(2)}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Cost Profit</CardDescription>
+                      <CardTitle className={`text-lg ${selectedDaySummary.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        ${selectedDaySummary.costProfit.toFixed(2)}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Hassan's Total</CardDescription>
+                      <CardTitle className="text-lg">
+                        ${selectedDaySummary.totalConfiguredCost.toFixed(2)}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Hassan's Profit</CardDescription>
+                      <CardTitle className={`text-lg ${selectedDaySummary.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        ${selectedDaySummary.configuredProfit.toFixed(2)}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                </div>
               </div>
 
               {/* Items Table */}
@@ -602,50 +604,57 @@ export default function SalesReport() {
                       <TableHead>Item Name</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Actual Price</TableHead>
+                      <TableHead className="text-right">Sold Price</TableHead>
                       <TableHead className="text-right">Cost Price</TableHead>
-                      <TableHead className="text-right">Configured Price</TableHead>
-                      <TableHead className="text-right">Total Sales</TableHead>
+                      <TableHead className="text-right">Hassan's Price</TableHead>
+                      <TableHead className="text-right">Unit Profit</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Cost Profit</TableHead>
                       <TableHead className="text-right">Cost %</TableHead>
-                      <TableHead className="text-right">Configured Profit</TableHead>
-                      <TableHead className="text-right">Configured %</TableHead>
+                      <TableHead className="text-right">Hassan's Profit</TableHead>
+                      <TableHead className="text-right">Hassan's %</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedDaySummary.items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.stockItemName}</TableCell>
-                        <TableCell>{item.locationName || "-"}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatSmartNumber(item.quantity)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${parseFloat(item.actualSellingPrice).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${parseFloat(item.costPrice).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${parseFloat(item.configuredSellingPrice).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${parseFloat(item.totalSales).toFixed(2)}
-                        </TableCell>
-                        <TableCell className={`text-right font-mono ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          ${parseFloat(item.costProfit).toFixed(2)}
-                        </TableCell>
-                        <TableCell className={`text-right font-mono text-sm ${item.costProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {item.costProfitPercentage.toFixed(1)}%
-                        </TableCell>
-                        <TableCell className={`text-right font-mono ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          ${item.configuredProfit.toFixed(2)}
-                        </TableCell>
-                        <TableCell className={`text-right font-mono text-sm ${item.configuredProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {item.configuredProfitPercentage.toFixed(1)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {selectedDaySummary.items.map((item) => {
+                      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.stockItemName}</TableCell>
+                          <TableCell>{item.locationName || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatSmartNumber(item.quantity)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(item.actualSellingPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(item.costPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(item.configuredSellingPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono ${unitProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${unitProfit.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(item.totalCost).toFixed(2)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${parseFloat(item.costProfit).toFixed(2)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono text-sm ${item.costProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {item.costProfitPercentage.toFixed(1)}%
+                          </TableCell>
+                          <TableCell className={`text-right font-mono ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${item.configuredProfit.toFixed(2)}
+                          </TableCell>
+                          <TableCell className={`text-right font-mono text-sm ${item.configuredProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {item.configuredProfitPercentage.toFixed(1)}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
