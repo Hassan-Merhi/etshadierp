@@ -1,8 +1,14 @@
 import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
-import { DollarSign, TrendingUp, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   LineChart,
   Line,
@@ -62,6 +68,11 @@ type PayableAccount = {
 
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
+  const [selectedPayableAccountId, setSelectedPayableAccountId] = useState<number>(0);
   
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
@@ -114,14 +125,116 @@ export default function Dashboard() {
     enabled: !!selectedCompany,
   });
 
+  // Add dashboard cash account mutation
+  const addAccountMutation = useMutation({
+    mutationFn: async (data: { accountType: string; accountId: number }) => {
+      return await apiRequest("POST", "/api/dashboard-cash-accounts", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-cash-accounts"] });
+      setIsAddDialogOpen(false);
+      setSelectedAccountId(0);
+      toast({
+        title: "Success",
+        description: "Account added to dashboard",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Remove dashboard cash account mutation
+  const removeAccountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/dashboard-cash-accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-cash-accounts"] });
+      toast({
+        title: "Success",
+        description: "Account removed from dashboard",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Add dashboard payable account mutation
+  const addPayableAccountMutation = useMutation({
+    mutationFn: async (data: { supplierId: number }) => {
+      return await apiRequest("POST", "/api/dashboard-payable-accounts", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-payable-accounts"] });
+      setIsAddPayableDialogOpen(false);
+      setSelectedPayableAccountId(0);
+      toast({
+        title: "Success",
+        description: "Payable account added to dashboard",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add payable account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Remove dashboard payable account mutation
+  const removePayableAccountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/dashboard-payable-accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-payable-accounts"] });
+      toast({
+        title: "Success",
+        description: "Payable account removed from dashboard",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove payable account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Get available cash accounts (excluding ones already added)
+  const availableCashAccounts = allAccounts.filter(acc => {
+    const alreadyAdded = dashboardCashAccounts.some(
+      dca => dca.accountType === acc.type.toLowerCase() && dca.accountId === acc.accountId
+    );
+    return !alreadyAdded;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
   // Filter cash accounts with non-zero balance
-  const displayedCashAccounts = allAccounts.filter(acc => {
-    const balance = parseFloat(String(acc.balance || 0));
+  const displayedCashAccounts = dashboardCashAccounts.filter(dca => {
+    const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
     return balance !== 0;
   });
 
+  // Get available payable accounts (excluding ones already added)
+  const availablePayableAccounts = allPayableAccounts.filter(acc => {
+    const alreadyAdded = dashboardPayableAccounts.some(dpa => dpa.id === acc.id);
+    return !alreadyAdded;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
   // Filter payable accounts with non-zero balance
-  const displayedPayableAccounts = allPayableAccounts.filter(acc => {
+  const displayedPayableAccounts = dashboardPayableAccounts.filter(acc => {
     const balance = Math.abs(acc.balance);
     return balance !== 0;
   });
@@ -241,27 +354,91 @@ export default function Dashboard() {
               <ArrowDownLeft className="h-5 w-5 text-green-600" />
               Available
             </h3>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-cash-account">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Cash Account to Dashboard</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Account</label>
+                    <Select
+                      value={selectedAccountId.toString()}
+                      onValueChange={(value) => setSelectedAccountId(parseInt(value))}
+                    >
+                      <SelectTrigger data-testid="select-account">
+                        <SelectValue placeholder="Select an account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCashAccounts.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                            No available accounts
+                          </div>
+                        ) : (
+                          availableCashAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.accountId.toString()}>
+                              {account.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (selectedAccountId > 0) {
+                        const account = allAccounts.find(a => a.accountId === selectedAccountId);
+                        addAccountMutation.mutate({
+                          accountType: account?.type.toLowerCase() || "ledger",
+                          accountId: selectedAccountId,
+                        });
+                      }
+                    }}
+                    disabled={selectedAccountId === 0 || addAccountMutation.isPending}
+                    className="w-full"
+                    data-testid="button-save-cash-account"
+                  >
+                    {addAccountMutation.isPending ? "Adding..." : "Add Account"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
           
           {displayedCashAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No cash accounts</p>
+              <p className="text-sm">No accounts added</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {displayedCashAccounts.map((account) => {
-                const balance = parseFloat(String(account.balance || 0));
+              {displayedCashAccounts.map((dca) => {
+                const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
                 return (
-                  <div key={account.accountId} className="flex items-center justify-between py-2 px-3 rounded hover-elevate" data-testid={`cash-account-row-${account.accountId}`}>
+                  <div key={dca.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`cash-account-row-${dca.id}`}>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{account.name}</p>
-                      <p className="text-xs text-muted-foreground">{account.code}</p>
+                      <p className="text-sm font-medium">{dca.account.name}</p>
+                      <p className="text-xs text-muted-foreground">{dca.account.code}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${account.accountId}`}>
+                      <p className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${dca.id}`}>
                         {formatCurrency(balance)}
                       </p>
                     </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeAccountMutation.mutate(dca.id)}
+                      data-testid={`button-remove-cash-account-${dca.id}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 );
               })}
@@ -270,8 +447,8 @@ export default function Dashboard() {
                   <span>Total</span>
                   <span className="text-green-600 font-mono" data-testid="text-total-available">
                     {formatCurrency(
-                      displayedCashAccounts.reduce((sum, account) => {
-                        const balance = parseFloat(String(account.balance || 0));
+                      displayedCashAccounts.reduce((sum, dca) => {
+                        const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
                         return sum + balance;
                       }, 0)
                     )}
@@ -289,16 +466,69 @@ export default function Dashboard() {
               <ArrowUpRight className="h-5 w-5 text-red-600" />
               To Pay
             </h3>
+            <Dialog open={isAddPayableDialogOpen} onOpenChange={setIsAddPayableDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-payable-account">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Payable Account to Dashboard</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Payable Account</label>
+                    <Select
+                      value={selectedPayableAccountId.toString()}
+                      onValueChange={(value) => setSelectedPayableAccountId(parseInt(value))}
+                    >
+                      <SelectTrigger data-testid="select-payable-account">
+                        <SelectValue placeholder="Select a payable account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePayableAccounts.length === 0 ? (
+                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                            No available payable accounts
+                          </div>
+                        ) : (
+                          availablePayableAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (selectedPayableAccountId > 0) {
+                        addPayableAccountMutation.mutate({
+                          supplierId: selectedPayableAccountId,
+                        });
+                      }
+                    }}
+                    disabled={selectedPayableAccountId === 0 || addPayableAccountMutation.isPending}
+                    className="w-full"
+                    data-testid="button-save-payable-account"
+                  >
+                    {addPayableAccountMutation.isPending ? "Adding..." : "Add Account"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
           
           {displayedPayableAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No payable accounts</p>
+              <p className="text-sm">No payable accounts added</p>
             </div>
           ) : (
             <div className="space-y-2">
               {displayedPayableAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate" data-testid={`payable-account-row-${account.id}`}>
+                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`payable-account-row-${account.id}`}>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{account.name}</p>
                     <p className="text-xs text-muted-foreground">{account.code}</p>
@@ -308,6 +538,15 @@ export default function Dashboard() {
                       {formatCurrency(Math.abs(account.balance))}
                     </p>
                   </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removePayableAccountMutation.mutate(account.id)}
+                    data-testid={`button-remove-payable-account-${account.id}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
               {displayedPayableAccounts.length > 0 && (
