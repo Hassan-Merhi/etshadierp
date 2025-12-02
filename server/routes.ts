@@ -81,14 +81,21 @@ function hashPassword(password: string): string {
 }
 
 // Helper function to sync employee payroll balances from voucher entries
-// When an employee account (EMP-xxx) is debited, decrease their balance
-// When an employee account (EMP-xxx) is credited, increase their balance
+// Handles both:
+// 1. Entries with ledgerAccountId pointing to EMP-* accounts
+// 2. Entries with employeeId set directly
+// When debited, decrease balance; when credited, increase balance
 async function syncEmployeeBalancesFromEntries(
-  entries: Array<{ ledgerAccountId: number | null; debitAmount: string; creditAmount: string }>,
+  entries: Array<{ 
+    ledgerAccountId: number | null; 
+    employeeId?: number | null;
+    debitAmount: string; 
+    creditAmount: string 
+  }>,
   companyId: number,
   reverse: boolean = false
 ): Promise<void> {
-  // Get all ledger accounts for the company
+  // Get all ledger accounts for the company to find EMP-* accounts
   const allAccounts = await storage.getAllLedgerAccounts(companyId);
   
   // Find employee accounts (code starts with EMP-)
@@ -100,15 +107,11 @@ async function syncEmployeeBalancesFromEntries(
     }
   }
   
-  // Track balance changes per employee
-  const employeeBalanceChanges = new Map<string, number>();
+  // Track balance changes per employee (by employee ID for direct entries, by code for ledger account entries)
+  const employeeBalanceChangesById = new Map<number, number>();
+  const employeeBalanceChangesByCode = new Map<string, number>();
   
   for (const entry of entries) {
-    if (!entry.ledgerAccountId) continue;
-    
-    const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
-    if (!employeeAccount) continue;
-    
     const debit = parseFloat(entry.debitAmount || "0");
     const credit = parseFloat(entry.creditAmount || "0");
     
@@ -121,31 +124,67 @@ async function syncEmployeeBalancesFromEntries(
       change = -change;
     }
     
-    const current = employeeBalanceChanges.get(employeeAccount.employeeCode) || 0;
-    employeeBalanceChanges.set(employeeAccount.employeeCode, current + change);
+    // Check if entry has direct employeeId
+    if (entry.employeeId) {
+      const current = employeeBalanceChangesById.get(entry.employeeId) || 0;
+      employeeBalanceChangesById.set(entry.employeeId, current + change);
+      continue;
+    }
+    
+    // Check if entry has ledgerAccountId pointing to EMP-* account
+    if (entry.ledgerAccountId) {
+      const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
+      if (employeeAccount) {
+        const current = employeeBalanceChangesByCode.get(employeeAccount.employeeCode) || 0;
+        employeeBalanceChangesByCode.set(employeeAccount.employeeCode, current + change);
+      }
+    }
   }
   
-  // Apply balance changes to employees
-  for (const [employeeCode, change] of employeeBalanceChanges) {
+  // Apply balance changes for direct employee entries (by ID)
+  for (const [employeeId, change] of employeeBalanceChangesById) {
     if (change === 0) continue;
     
-    // Find employee by code
-    const employee = await storage.getEmployeeByCode(employeeCode);
+    const employee = await storage.getEmployeeById(employeeId);
     if (!employee) continue;
     
     const currentBalance = parseFloat(employee.currentBalance || "0");
     const newBalance = currentBalance + change;
     
-    // Update deposits or withdrawals based on change direction
     if (change > 0) {
-      // Positive change = credit, treated like a deposit
       const currentDeposits = parseFloat(employee.totalDeposits || "0");
       await db.update(employees).set({
         currentBalance: newBalance.toFixed(2),
         totalDeposits: (currentDeposits + change).toFixed(2),
       }).where(eq(employees.id, employee.id));
     } else {
-      // Negative change = debit, treated like a withdrawal
+      const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalWithdrawals: (currentWithdrawals + Math.abs(change)).toFixed(2),
+      }).where(eq(employees.id, employee.id));
+    }
+    
+    console.log(`[Payroll Sync] Employee ID ${employeeId} (${employee.code}): balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
+  }
+  
+  // Apply balance changes for ledger account entries (by code)
+  for (const [employeeCode, change] of employeeBalanceChangesByCode) {
+    if (change === 0) continue;
+    
+    const employee = await storage.getEmployeeByCode(employeeCode);
+    if (!employee) continue;
+    
+    const currentBalance = parseFloat(employee.currentBalance || "0");
+    const newBalance = currentBalance + change;
+    
+    if (change > 0) {
+      const currentDeposits = parseFloat(employee.totalDeposits || "0");
+      await db.update(employees).set({
+        currentBalance: newBalance.toFixed(2),
+        totalDeposits: (currentDeposits + change).toFixed(2),
+      }).where(eq(employees.id, employee.id));
+    } else {
       const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
       await db.update(employees).set({
         currentBalance: newBalance.toFixed(2),
@@ -9324,6 +9363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             createdEntries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9481,6 +9521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.entries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9663,6 +9704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.oldEntries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9676,6 +9718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.entries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9794,6 +9837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.entries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9937,6 +9981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.oldEntries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -9950,6 +9995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             result.entries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -10509,6 +10555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             oldEntries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -10523,6 +10570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await syncEmployeeBalancesFromEntries(
             newEntries.map(e => ({
               ledgerAccountId: e.ledgerAccountId,
+              employeeId: e.employeeId,
               debitAmount: e.debitAmount,
               creditAmount: e.creditAmount,
             })),
@@ -10847,6 +10895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await syncEmployeeBalancesFromEntries(
               entries.map(e => ({
                 ledgerAccountId: e.ledgerAccountId,
+                employeeId: e.employeeId,
                 debitAmount: e.debitAmount,
                 creditAmount: e.creditAmount,
               })),
@@ -10858,6 +10907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await syncEmployeeBalancesFromEntries(
               entries.map(e => ({
                 ledgerAccountId: e.ledgerAccountId,
+                employeeId: e.employeeId,
                 debitAmount: e.debitAmount,
                 creditAmount: e.creditAmount,
               })),
@@ -12746,6 +12796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await syncEmployeeBalancesFromEntries(
               entries.map(e => ({
                 ledgerAccountId: e.ledgerAccountId,
+                employeeId: e.employeeId,
                 debitAmount: e.debitAmount,
                 creditAmount: e.creditAmount,
               })),
