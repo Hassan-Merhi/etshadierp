@@ -552,7 +552,15 @@ export default function SalesReport() {
             <div className="space-y-4">
               {/* Summary Cards - Sticky Header */}
               <div className="sticky top-0 z-10 bg-background pt-2 pb-3 -mx-6 px-6 border-b">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-xs">Total Qty</CardDescription>
+                      <CardTitle className="text-lg">
+                        {formatSmartNumber(selectedDaySummary.items.reduce((sum, item) => sum + parseFloat(item.quantity), 0).toString())}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
                   <Card>
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Total Sales</CardDescription>
