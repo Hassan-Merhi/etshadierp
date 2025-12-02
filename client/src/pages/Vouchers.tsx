@@ -1997,18 +1997,26 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           if (requestedQty > availableQty) {
             const item = stockItems.find(s => s.id === entry.stockItemId);
             const sourceLocation = locations.find(l => l.id === entry.sourceLocationId);
-            throw new Error(`${item?.name} has only ${availableQty} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`);
+            return {
+              success: false,
+              error: `${item?.name} has only ${availableQty} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
+            };
           }
-          return true;
+          return { success: true };
         })
+        .catch(err => ({
+          success: false,
+          error: `Failed to validate inventory: ${err.message}`
+        }))
     );
 
-    try {
-      await Promise.all(inventoryValidationPromises);
-    } catch (err: any) {
+    const results = await Promise.all(inventoryValidationPromises);
+    const failedValidation = results.find(r => !r.success);
+    
+    if (failedValidation) {
       toast({
         title: "Insufficient Stock",
-        description: err.message,
+        description: failedValidation.error,
         variant: "destructive",
       });
       return;
