@@ -3227,7 +3227,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               <div className="w-40 border-r h-10">
                                 <input
                                   type="text"
-                                  value={activeTransferRow === index && transferSourceSearchTerm ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
+                                  value={activeTransferRow === index ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
                                   onChange={(e) => {
                                     setTransferSourceSearchTerm(e.target.value);
                                     setTransferSourceHighlightedIndex(0);
@@ -3305,7 +3305,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <div className="flex-1 min-w-[200px] border-r h-10">
                               <input
                                 type="text"
-                                value={activeTransferRow === index && transferSearchTerm ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
+                                value={activeTransferRow === index ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
                                 onChange={(e) => {
                                   setTransferSearchTerm(e.target.value);
                                   setTransferHighlightedIndex(0);
@@ -3317,7 +3317,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 onFocus={() => {
                                   setActiveTransferRow(index);
                                   setTransferHighlightedIndex(0);
-                                  setTransferSearchTerm("");
+                                  setTransferSearchTerm(transferEntries[index]?.stockItemName || "");
                                   setShowItemSidebar(true);
                                   setShowSourceSidebar(false);
                                   if (transferEntries[index]?.sourceLocationId > 0) {
