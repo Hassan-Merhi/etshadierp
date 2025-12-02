@@ -142,6 +142,7 @@ async function syncEmployeeBalancesFromEntries(
   }
   
   // Apply balance changes for direct employee entries (by ID)
+  // Only update currentBalance - do NOT touch totalDeposits/totalWithdrawals
   for (const [employeeId, change] of employeeBalanceChangesById) {
     if (change === 0) continue;
     
@@ -151,24 +152,15 @@ async function syncEmployeeBalancesFromEntries(
     const currentBalance = parseFloat(employee.currentBalance || "0");
     const newBalance = currentBalance + change;
     
-    if (change > 0) {
-      const currentDeposits = parseFloat(employee.totalDeposits || "0");
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalDeposits: (currentDeposits + change).toFixed(2),
-      }).where(eq(employees.id, employee.id));
-    } else {
-      const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalWithdrawals: (currentWithdrawals + Math.abs(change)).toFixed(2),
-      }).where(eq(employees.id, employee.id));
-    }
+    await db.update(employees).set({
+      currentBalance: newBalance.toFixed(2),
+    }).where(eq(employees.id, employee.id));
     
     console.log(`[Payroll Sync] Employee ID ${employeeId} (${employee.code}): balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
   }
   
   // Apply balance changes for ledger account entries (by code)
+  // Only update currentBalance - do NOT touch totalDeposits/totalWithdrawals
   for (const [employeeCode, change] of employeeBalanceChangesByCode) {
     if (change === 0) continue;
     
@@ -178,19 +170,9 @@ async function syncEmployeeBalancesFromEntries(
     const currentBalance = parseFloat(employee.currentBalance || "0");
     const newBalance = currentBalance + change;
     
-    if (change > 0) {
-      const currentDeposits = parseFloat(employee.totalDeposits || "0");
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalDeposits: (currentDeposits + change).toFixed(2),
-      }).where(eq(employees.id, employee.id));
-    } else {
-      const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-      await db.update(employees).set({
-        currentBalance: newBalance.toFixed(2),
-        totalWithdrawals: (currentWithdrawals + Math.abs(change)).toFixed(2),
-      }).where(eq(employees.id, employee.id));
-    }
+    await db.update(employees).set({
+      currentBalance: newBalance.toFixed(2),
+    }).where(eq(employees.id, employee.id));
     
     console.log(`[Payroll Sync] Employee ${employeeCode}: balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
   }
