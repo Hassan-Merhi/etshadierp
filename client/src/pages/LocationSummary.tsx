@@ -93,8 +93,10 @@ export default function LocationSummary() {
   });
 
 
-  const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
-  const selectedLocations = sortedLocations.filter(loc => selectedLocationIds.includes(loc.id));
+  // Keep locations in the order they were selected
+  const selectedLocations = selectedLocationIds
+    .map(id => locations.find(loc => loc.id === id))
+    .filter((loc): loc is Location => loc !== undefined);
 
   const toggleGroup = (groupId: number) => {
     setExpandedGroups(prev => {
@@ -260,7 +262,7 @@ export default function LocationSummary() {
                 <DialogTitle>Select Locations to Display</DialogTitle>
               </DialogHeader>
               <div className="space-y-1 max-h-80 overflow-y-auto">
-                {sortedLocations.map(location => (
+                {locations.map((location: Location) => (
                   <div 
                     key={location.id} 
                     className="flex items-center gap-2 p-2 rounded hover-elevate"
