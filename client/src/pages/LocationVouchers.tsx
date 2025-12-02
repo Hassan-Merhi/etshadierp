@@ -158,37 +158,36 @@ export default function LocationVouchers() {
         </div>
       </div>
       
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+        <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-lg">
             Transactions - {data?.monthName} {data?.year}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead rowSpan={2} className="align-bottom border-r w-[100px]">Date</TableHead>
-                  <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
-                  <TableHead rowSpan={2} className="align-bottom border-r w-[120px]">Vch Type</TableHead>
-                  <TableHead colSpan={3} className="text-center border-r">Inwards</TableHead>
-                  <TableHead colSpan={3} className="text-center border-r">Outwards</TableHead>
-                  <TableHead colSpan={3} className="text-center">Closing</TableHead>
-                </TableRow>
-                <TableRow>
-                  <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right border-r w-[80px]">Value</TableHead>
-                  <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right border-r w-[80px]">Value</TableHead>
-                  <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right w-[80px]">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <CardContent className="overflow-auto flex-1 p-0">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableRow className="bg-muted">
+                <TableHead rowSpan={2} className="align-bottom border-r w-[100px] bg-muted">Date</TableHead>
+                <TableHead rowSpan={2} className="align-bottom border-r bg-muted">Particulars</TableHead>
+                <TableHead rowSpan={2} className="align-bottom border-r w-[120px] bg-muted">Vch Type</TableHead>
+                <TableHead colSpan={3} className="text-center border-r bg-muted">Inwards</TableHead>
+                <TableHead colSpan={3} className="text-center border-r bg-muted">Outwards</TableHead>
+                <TableHead colSpan={3} className="text-center bg-muted">Closing</TableHead>
+              </TableRow>
+              <TableRow className="bg-muted/80">
+                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
+                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
+                <TableHead className="text-right border-r w-[80px] bg-muted/80">Value</TableHead>
+                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
+                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
+                <TableHead className="text-right border-r w-[80px] bg-muted/80">Value</TableHead>
+                <TableHead className="text-right w-[60px] bg-muted/80">Qty</TableHead>
+                <TableHead className="text-right w-[60px] bg-muted/80">Rate</TableHead>
+                <TableHead className="text-right w-[80px] bg-muted/80">Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                 {data?.transactions.map((txn, idx) => (
                   <TableRow 
                     key={idx} 
@@ -252,7 +251,6 @@ export default function LocationVouchers() {
                 )}
               </TableBody>
             </Table>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -153,30 +153,29 @@ export default function LocationMonthlySummary() {
         </div>
       </div>
       
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">Inwards</TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">Outwards</TableHead>
-                  <TableHead colSpan={2} className="text-center">Closing Balance</TableHead>
-                </TableRow>
-                <TableRow>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+        <CardContent className="overflow-auto flex-1 p-0">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableRow className="bg-muted">
+                <TableHead rowSpan={2} className="align-bottom border-r bg-muted">Particulars</TableHead>
+                <TableHead colSpan={2} className="text-center border-r bg-muted">Inwards</TableHead>
+                <TableHead colSpan={2} className="text-center border-r bg-muted">Outwards</TableHead>
+                <TableHead colSpan={2} className="text-center bg-muted">Closing Balance</TableHead>
+              </TableRow>
+              <TableRow className="bg-muted/80">
+                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
+                <TableHead className="text-right border-r bg-muted/80">Value</TableHead>
+                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
+                <TableHead className="text-right border-r bg-muted/80">Value</TableHead>
+                <TableHead className="text-right bg-muted/80">Quantity</TableHead>
+                <TableHead className="text-right bg-muted/80">Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                 {data?.monthlyData.map((month) => {
                   const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
                   return (
@@ -232,7 +231,6 @@ export default function LocationMonthlySummary() {
                 </TableRow>
               </TableBody>
             </Table>
-          </div>
         </CardContent>
       </Card>
       
