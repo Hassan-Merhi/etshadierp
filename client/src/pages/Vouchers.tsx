@@ -294,7 +294,7 @@ function AccountCombobox({
       id: s.id,
       name: s.legalName,
     })),
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -367,7 +367,7 @@ function StockItemCombobox({
 }) {
   const [open, setOpen] = useState(false);
 
-  const sortedStockItems = [...stockItems].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedStockItems = [...stockItems].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -684,7 +684,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         openingBalance: f.openingBalance,
       })),
     ];
-    return accounts.sort((a, b) => a.name.localeCompare(b.name));
+    return accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [ledgerAccounts, bankAccounts, suppliers, employees, fixedAssets]);
 
   const form = useForm<VoucherFormData>({
@@ -845,7 +845,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         acc.name.toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
         acc.code.toLowerCase().includes(sidebarSearchValue.toLowerCase())
       )
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [sidebarAccounts, sidebarSearchValue]);
 
   // Track active row's account for sync
@@ -3174,7 +3174,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <SelectContent>
                           {[...locations]
                             .filter(l => l.id !== transferInventorySource)
-                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                             .map((location) => (
                               <SelectItem key={location.id} value={location.id.toString()}>
                                 {location.name}
@@ -3312,9 +3312,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       .filter(loc => {
                                         if (!transferSourceSearchTerm.trim()) return true;
                                         const term = transferSourceSearchTerm.toLowerCase();
-                                        return loc.name.toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
+                                        return (loc.name || '').toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
                                       })
-                                      .sort((a, b) => a.name.localeCompare(b.name));
+                                      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                                     
                                     if (e.key === "Enter" && filteredLocs.length > 0) {
                                       e.preventDefault();
@@ -3411,7 +3411,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         item.stockItemCode?.toLowerCase().includes(term)
                                       );
                                     })
-                                    .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                                    .sort((a: any, b: any) => (a.stockItemName || '').localeCompare(b.stockItemName || ''));
 
                                   if (e.key === "ArrowUp" && !e.shiftKey) {
                                     e.preventDefault();
@@ -3464,7 +3464,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                           item.stockItemCode?.toLowerCase().includes(term)
                                         );
                                       })
-                                      .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                                      .sort((a: any, b: any) => (a.stockItemName || '').localeCompare(b.stockItemName || ''));
                                     
                                     if (filteredInventory.length > 0) {
                                       const item = filteredInventory[transferHighlightedIndex] || filteredInventory[0];
@@ -3721,7 +3721,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               item.stockItemCode?.toLowerCase().includes(term)
                             );
                           })
-                          .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                          .sort((a: any, b: any) => (a.stockItemName || '').localeCompare(b.stockItemName || ''));
                         
                         if (filteredInventory.length === 0) {
                           return (
@@ -3820,9 +3820,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             .filter(loc => {
                               if (!transferSourceSearchTerm.trim()) return true;
                               const term = transferSourceSearchTerm.toLowerCase();
-                              return loc.name.toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
+                              return (loc.name || '').toLowerCase().includes(term) || (loc.code && loc.code.toLowerCase().includes(term));
                             })
-                            .sort((a, b) => a.name.localeCompare(b.name));
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                           
                           if (filteredLocations.length === 0) {
                             return (
@@ -3955,7 +3955,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
+                              {[...locations].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((location) => (
                                 <SelectItem key={location.id} value={location.id.toString()}>
                                   {location.name}
                                 </SelectItem>
@@ -4313,7 +4313,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <SelectValue placeholder="Select destination..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
+                    {[...locations].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((location) => (
                       <SelectItem key={location.id} value={location.id.toString()}>
                         {location.name}
                       </SelectItem>
