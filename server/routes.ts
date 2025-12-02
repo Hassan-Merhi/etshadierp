@@ -8688,8 +8688,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }),
         // Suppliers (balance already calculated across all companies)
+        // Negate balance so positive (we owe them) shows as credit in sidebar
         ...suppliers.map((supplier) => {
-          const balance = supplierBalances.get(supplier.id) || 0;
+          const rawBalance = supplierBalances.get(supplier.id) || 0;
+          // Negate: positive payable becomes negative (shown as credit in sidebar)
+          const balance = -rawBalance;
 
           return {
             id: supplier.id,
