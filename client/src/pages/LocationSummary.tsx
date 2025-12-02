@@ -89,29 +89,6 @@ export default function LocationSummary() {
     enabled: selectedLocationIds.length > 0,
   });
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
-      
-      if (e.key === " ") {
-        e.preventDefault();
-        if (selectedRowKey) {
-          setHighlightedRows(prev => {
-            const next = new Set(prev);
-            if (next.has(selectedRowKey)) {
-              next.delete(selectedRowKey);
-            } else {
-              next.add(selectedRowKey);
-            }
-            return next;
-          });
-        }
-      }
-    };
-    
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedRowKey, summaryData, locationDialogOpen]);
 
   const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
   const selectedLocations = sortedLocations.filter(loc => selectedLocationIds.includes(loc.id));
@@ -137,7 +114,6 @@ export default function LocationSummary() {
   };
 
   const formatNumber = (num: number, decimals: number = 2, suffix: string = "") => {
-    if (num === 0) return suffix || "-";
     const formatted = num.toLocaleString('en-US', { 
       minimumFractionDigits: decimals, 
       maximumFractionDigits: decimals 
@@ -196,6 +172,19 @@ export default function LocationSummary() {
       e.preventDefault();
       if (selectedLocationIndex < selectedLocations.length - 1) {
         setSelectedLocationIndex(selectedLocationIndex + 1);
+      }
+    } else if (e.key === " ") {
+      e.preventDefault();
+      if (selectedRowKey) {
+        setHighlightedRows(prev => {
+          const next = new Set(prev);
+          if (next.has(selectedRowKey)) {
+            next.delete(selectedRowKey);
+          } else {
+            next.add(selectedRowKey);
+          }
+          return next;
+        });
       }
     }
   };
@@ -343,9 +332,9 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Qty (BL)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b w-16 bg-muted/80">Rate ($)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b border-r w-20 bg-muted/80">Value ($)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-28 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
+                      <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
@@ -400,10 +389,10 @@ export default function LocationSummary() {
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
                                 <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                                  {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
+                                  {"$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className="text-right py-1 px-1 border-r tabular-nums font-semibold">
-                                  {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
+                                  {"$" + formatNumber(data.value, 2)}
                                 </td>
                               </Fragment>
                             );
@@ -436,10 +425,10 @@ export default function LocationSummary() {
                                     {formatNumber(data.quantity, 0, "BL")}
                                   </td>
                                   <td className="text-right py-0.5 px-1 tabular-nums text-muted-foreground">
-                                    {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
+                                    {"$" + formatNumber(data.rate, 2)}
                                   </td>
                                   <td className="text-right py-0.5 px-1 border-r tabular-nums">
-                                    {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
+                                    {"$" + formatNumber(data.value, 2)}
                                   </td>
                                 </Fragment>
                               );
@@ -460,10 +449,10 @@ export default function LocationSummary() {
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
                             <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
-                              {data.rate === 0 ? "-" : "$" + formatNumber(data.rate, 2)}
+                              {"$" + formatNumber(data.rate, 2)}
                             </td>
                             <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
-                              {data.value === 0 ? "-" : "$" + formatNumber(data.value, 2)}
+                              {"$" + formatNumber(data.value, 2)}
                             </td>
                           </Fragment>
                         );
