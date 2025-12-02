@@ -110,10 +110,11 @@ export default function LocationSummary() {
 
   const formatNumber = (num: number, decimals: number = 2, suffix: string = "") => {
     if (num === 0) return suffix || "-";
-    return num.toLocaleString('en-US', { 
+    const formatted = num.toLocaleString('en-US', { 
       minimumFractionDigits: decimals, 
       maximumFractionDigits: decimals 
-    }) + suffix;
+    });
+    return suffix ? `${formatted} ${suffix}` : formatted;
   };
 
   const colsPerLocation = 3;
