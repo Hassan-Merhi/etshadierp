@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StockItem {
@@ -57,6 +58,7 @@ const formatSmartNumber = (value: string | number) => {
 };
 
 export default function StockItemDetail() {
+  const { formatDisplayDate } = useDateFormat();
   const [_match, params] = useRoute("/stock-query/:id");
   const [_location, navigate] = useLocation();
   const itemId = params?.id ? parseInt(params.id) : null;
@@ -238,7 +240,7 @@ export default function StockItemDetail() {
                           className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
                           data-testid={`row-sale-${idx}`}
                         >
-                          <TableCell>{format(new Date(sale.saleDate), "MMM dd, yyyy")}</TableCell>
+                          <TableCell>{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
                           <TableCell>{sale.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
                           <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useState, useEffect, useRef } from "react";
 
 interface Transaction {
@@ -58,6 +59,7 @@ interface LocationVouchersData {
 }
 
 export default function LocationVouchers() {
+  const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
@@ -79,7 +81,7 @@ export default function LocationVouchers() {
   
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d/MMM/yy");
+      return formatDisplayDate(new Date(dateStr));
     } catch {
       return dateStr;
     }

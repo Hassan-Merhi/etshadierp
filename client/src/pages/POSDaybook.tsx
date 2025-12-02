@@ -31,6 +31,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar, DollarSign, Package, Eye, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight } from "lucide-react";
 import { format, startOfDay, endOfDay, isValid, parseISO } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -72,6 +73,7 @@ interface InventoryItem {
 }
 
 export default function POSDaybook() {
+  const { formatDisplayDate } = useDateFormat();
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
@@ -301,7 +303,7 @@ export default function POSDaybook() {
             POS Daybook
           </h1>
           <p className="text-muted-foreground mt-1">
-            Sales transactions - {format(targetDate, "MMMM dd, yyyy")}
+            Sales transactions - {formatDisplayDate(targetDate)}
           </p>
         </div>
       </div>
@@ -470,7 +472,7 @@ export default function POSDaybook() {
               Transaction Details - {selectedVoucher?.voucherNumber}
             </DialogTitle>
             <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
-              <span>{selectedVoucher && format(new Date(selectedVoucher.createdAt), "MMM dd, yyyy 'at' hh:mm a")}</span>
+              <span>{selectedVoucher && `${formatDisplayDate(new Date(selectedVoucher.createdAt))} at ${format(new Date(selectedVoucher.createdAt), "hh:mm a")}`}</span>
               <span>•</span>
               <span>{selectedVoucher?.locationName || `Location ${selectedVoucher?.locationId}`}</span>
             </div>

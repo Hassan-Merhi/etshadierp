@@ -5,6 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import {
   Card,
@@ -503,6 +504,7 @@ function formatNumber(value: number): string {
 }
 
 export default function VoucherEdit() {
+  const { formatDisplayDate } = useDateFormat();
   const { id } = useParams<{ id: string }>();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
@@ -1326,7 +1328,7 @@ export default function VoucherEdit() {
                                 data-testid="button-date-picker"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -1631,7 +1633,7 @@ export default function VoucherEdit() {
                                 data-testid="button-date-picker"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -1956,7 +1958,7 @@ export default function VoucherEdit() {
                                 data-testid="button-date-picker"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -2316,7 +2318,7 @@ export default function VoucherEdit() {
                                 data-testid="button-date-picker"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -2673,7 +2675,7 @@ export default function VoucherEdit() {
                                 data-testid="button-date-picker"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
@@ -2882,7 +2884,7 @@ export default function VoucherEdit() {
                               data-testid="button-date-picker"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>

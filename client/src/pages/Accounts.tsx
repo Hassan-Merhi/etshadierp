@@ -26,6 +26,7 @@ import {
 import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertLedgerAccountSchema, updateLedgerAccountSchema, insertBankAccountSchema } from "@shared/schema";
@@ -70,6 +71,7 @@ interface Transaction {
 export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -1184,7 +1186,7 @@ export default function Accounts() {
                         >
                           <TableCell className="font-mono text-sm">
                             {transaction.voucherDate
-                              ? format(new Date(transaction.voucherDate), "MMM dd, yyyy")
+                              ? formatDisplayDate(new Date(transaction.voucherDate))
                               : "-"}
                           </TableCell>
                           <TableCell className="font-mono text-sm">

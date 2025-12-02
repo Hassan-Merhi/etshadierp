@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface Transaction {
   date: string;
@@ -60,6 +61,7 @@ interface VouchersData {
 }
 
 export default function StockItemVouchers() {
+  const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const stockItemId = parseInt(params.id || "0");
   const year = parseInt(params.year || "0");
@@ -78,7 +80,7 @@ export default function StockItemVouchers() {
   
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr), "d/MMM/yy");
+      return formatDisplayDate(new Date(dateStr));
     } catch {
       return dateStr;
     }

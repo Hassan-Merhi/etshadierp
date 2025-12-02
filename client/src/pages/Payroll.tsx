@@ -68,6 +68,7 @@ import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
 import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 
 const depositSchema = z.object({
@@ -162,6 +163,7 @@ interface SalaryAdvance {
 }
 
 export default function Payroll() {
+  const { formatDisplayDate } = useDateFormat();
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
@@ -2189,7 +2191,7 @@ export default function Payroll() {
                                   </div>
                                 </TableCell>
                                 <TableCell data-testid={`cell-date-${advance.id}`}>
-                                  {format(new Date(advance.advanceDate), "MMM dd, yyyy")}
+                                  {formatDisplayDate(new Date(advance.advanceDate))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
                                   ${parseFloat(advance.amount).toFixed(2)}
@@ -2775,7 +2777,7 @@ export default function Payroll() {
                             data-testid="button-advance-date"
                           >
                             {field.value ? (
-                              format(field.value, "PPP")
+                              formatDisplayDate(field.value)
                             ) : (
                               <span>Pick a date</span>
                             )}

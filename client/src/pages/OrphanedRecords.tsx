@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import {
   Table,
@@ -30,6 +31,7 @@ interface OrphanedVoucher {
 }
 
 export default function OrphanedRecordsPage() {
+  const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedVouchers, setSelectedVouchers] = useState<number[]>([]);

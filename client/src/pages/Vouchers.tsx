@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -524,6 +525,7 @@ interface VouchersProps {
 export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { formatDisplayDate } = useDateFormat();
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -2859,7 +2861,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   data-testid="button-journal-date-picker"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                  {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
@@ -3202,7 +3204,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               data-testid="button-transfer-date-picker"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "PP") : "Pick date"}
+                              {field.value ? formatDisplayDate(field.value) : "Pick date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -3983,7 +3985,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   data-testid="button-adjustment-date-picker"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? format(field.value, "PPP") : "Pick a date"}
+                                  {field.value ? formatDisplayDate(field.value) : "Pick a date"}
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>

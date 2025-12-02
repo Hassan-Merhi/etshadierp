@@ -76,6 +76,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Book, Filter, X, Eye, Edit, Trash2, Plus, ChevronDown, Check, ChevronsUpDown, FileDown } from "lucide-react";
 import { format, parseISO, isToday } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { utils, writeFile } from "xlsx";
 
@@ -284,6 +285,7 @@ function AccountCombobox({
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
   const [filters, setFilters] = useState({
     startDate: format(new Date(), "yyyy-MM-dd"),
@@ -936,7 +938,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       data-testid={`row-voucher-${voucher.id}`}
                     >
                       <TableCell className="font-medium">
-                        {format(parseISO(voucher.voucherDate), "MMM dd, yyyy")}
+                        {formatDisplayDate(parseISO(voucher.voucherDate))}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -1023,7 +1025,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
                   <p className="font-medium">
-                    {format(parseISO(selectedVoucher.voucherDate), "MMM dd, yyyy")}
+                    {formatDisplayDate(parseISO(selectedVoucher.voucherDate))}
                   </p>
                 </div>
                 <div>

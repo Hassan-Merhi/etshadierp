@@ -31,6 +31,7 @@ import {
 import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface SalesReportItem {
   id: number;
@@ -86,6 +87,7 @@ export default function SalesReport() {
   const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
 
   // Mutation to recalculate cost prices
   const recalculateMutation = useMutation({
@@ -147,7 +149,7 @@ export default function SalesReport() {
 
     if (grouping === "daily") {
       groupKey = format(startOfDay(itemDate), "yyyy-MM-dd");
-      displayDate = format(itemDate, "MMM dd, yyyy");
+      displayDate = formatDisplayDate(itemDate);
     } else if (grouping === "monthly") {
       groupKey = format(startOfMonth(itemDate), "yyyy-MM");
       displayDate = format(itemDate, "MMMM yyyy");
