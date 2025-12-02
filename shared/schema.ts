@@ -1086,6 +1086,27 @@ export const insertDashboardCashAccountSchema = createInsertSchema(dashboardCash
 export type InsertDashboardCashAccount = z.infer<typeof insertDashboardCashAccountSchema>;
 export type DashboardCashAccount = typeof dashboardCashAccounts.$inferSelect;
 
+// Dashboard Payable Accounts - user-selected payable accounts to display in dashboard
+export const dashboardPayableAccounts = pgTable("dashboard_payable_accounts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  supplierId: integer("supplier_id").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDashboardPayableAccountSchema = createInsertSchema(dashboardPayableAccounts).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  supplierId: z.number().min(1, "Supplier is required"),
+  displayOrder: z.number().optional(),
+});
+
+export type InsertDashboardPayableAccount = z.infer<typeof insertDashboardPayableAccountSchema>;
+export type DashboardPayableAccount = typeof dashboardPayableAccounts.$inferSelect;
+
 // Company Settings - stores company-specific configuration like logos
 export const companySettings = pgTable("company_settings", {
   id: serial("id").primaryKey(),

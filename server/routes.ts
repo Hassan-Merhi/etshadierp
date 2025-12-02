@@ -15404,6 +15404,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard Payable Accounts - user-selected payable accounts for dashboard display
+  app.get("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardPayableAccounts, suppliers } = await import("@shared/schema");
+      
+      const accounts = await db
+        .select()
+        .from(dashboardPayableAccounts)
+        .where(eq(dashboardPayableAccounts.companyId, companyId))
+        .orderBy(dashboardPayableAccounts.displayOrder)
+        .execute();
+
+      // Enrich with supplier details
+      const enrichedAccounts = await Promise.all(
+        accounts.map(async (account) => {
+          const [supplier] = await db
+            .select()
+            .from(suppliers)
+            .where(eq(suppliers.id, account.supplierId))
+            .execute();
+          
+          return {
+            id: account.supplierId,
+            accountId: account.supplierId,
+            code: supplier?.code || "",
+            name: supplier?.legalName || "",
+            balance: parseFloat(supplier?.openingBalance || "0"),
+          };
+        })
+      );
+
+      // Filter out deleted suppliers
+      const validAccounts = enrichedAccounts.filter((a) => a.name !== "");
+      res.json(validAccounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardPayableAccounts, insertDashboardPayableAccountSchema } = await import("@shared/schema");
+      
+      const data = insertDashboardPayableAccountSchema.parse({
+        ...req.body,
+        companyId,
+      });
+
+      const [account] = await db
+        .insert(dashboardPayableAccounts)
+        .values(data)
+        .returning()
+        .execute();
+
+      res.json(account);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/dashboard-payable-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { dashboardPayableAccounts } = await import("@shared/schema");
+      const supplierId = parseInt(req.params.id);
+
+      await db
+        .delete(dashboardPayableAccounts)
+        .where(
+          and(
+            eq(dashboardPayableAccounts.supplierId, supplierId),
+            eq(dashboardPayableAccounts.companyId, companyId)
+          )
+        )
+        .execute();
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bales API Routes
   app.get("/api/bales", requireAuth, async (req, res) => {
     try {
