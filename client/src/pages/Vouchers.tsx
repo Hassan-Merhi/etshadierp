@@ -3301,8 +3301,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         setActiveTransferRow(null);
                                         setActiveFieldType(null);
                                         setTransferSourceSearchTerm("");
+                                        setShowSourceSidebar(false);
                                       }
-                                    }, 200);
+                                    }, 250);
                                   }}
                                   onKeyDown={(e) => {
                                     const filteredLocs = locations
