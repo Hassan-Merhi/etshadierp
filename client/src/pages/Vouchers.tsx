@@ -156,7 +156,7 @@ interface StockItem {
 
 interface Location {
   id: number;
-  code: string;
+  code?: string;
   name: string;
 }
 
@@ -1839,7 +1839,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Helper function to lookup location by code
   const lookupLocationByCode = (code: string) => {
     const location = locations.find(
-      (l) => l.code.toLowerCase() === code.toLowerCase()
+      (l) => l.code && l.code.toLowerCase() === code.toLowerCase()
     );
     return location;
   };
