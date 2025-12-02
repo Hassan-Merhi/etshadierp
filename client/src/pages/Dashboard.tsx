@@ -62,7 +62,6 @@ type PayableAccount = {
 
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
-  const { toast } = useToast();
   
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
