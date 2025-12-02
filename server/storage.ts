@@ -86,6 +86,7 @@ export interface IStorage {
   getAllEmployees(companyId: number): Promise<Employee[]>;
   getEmployeesWithBalances(companyId: number): Promise<Array<Employee & { calculatedBalance: string }>>;
   getEmployeeByCode(code: string): Promise<Employee | undefined>;
+  getEmployeeById(id: number): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   deleteEmployee(id: number, forceDelete?: boolean): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}>;
 
@@ -517,6 +518,11 @@ export class DbStorage implements IStorage {
 
   async getEmployeeByCode(code: string): Promise<Employee | undefined> {
     const [employee] = await db.select().from(schema.employees).where(eq(schema.employees.code, code));
+    return employee;
+  }
+
+  async getEmployeeById(id: number): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(schema.employees).where(eq(schema.employees.id, id));
     return employee;
   }
 

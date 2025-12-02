@@ -143,7 +143,7 @@ async function syncEmployeeBalancesFromEntries(
   
   // Apply balance changes for direct employee entries (by ID)
   // Only update currentBalance - do NOT touch totalDeposits/totalWithdrawals
-  for (const [employeeId, change] of employeeBalanceChangesById) {
+  for (const [employeeId, change] of Array.from(employeeBalanceChangesById.entries())) {
     if (change === 0) continue;
     
     const employee = await storage.getEmployeeById(employeeId);
@@ -161,7 +161,7 @@ async function syncEmployeeBalancesFromEntries(
   
   // Apply balance changes for ledger account entries (by code)
   // Only update currentBalance - do NOT touch totalDeposits/totalWithdrawals
-  for (const [employeeCode, change] of employeeBalanceChangesByCode) {
+  for (const [employeeCode, change] of Array.from(employeeBalanceChangesByCode.entries())) {
     if (change === 0) continue;
     
     const employee = await storage.getEmployeeByCode(employeeCode);
