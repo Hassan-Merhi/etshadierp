@@ -410,7 +410,7 @@ export default function LocationSummary() {
                                 <td className="text-right py-1 px-1 tabular-nums font-medium">
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
-                                <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
+                                <td className="text-right py-1 px-1 tabular-nums text-foreground">
                                   {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className="text-right py-1 px-1 border-r tabular-nums font-semibold">
@@ -438,7 +438,7 @@ export default function LocationSummary() {
                               "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10",
                               itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30"
                             )}>
-                              <span className="text-muted-foreground truncate block">{item.name}</span>
+                              <span className="text-foreground truncate block">{item.name}</span>
                             </td>
                             {selectedLocations.map((location, locIndex) => {
                               const data = item.locationData[location.id] || { quantity: 0, rate: 0, value: 0 };
@@ -447,7 +447,7 @@ export default function LocationSummary() {
                                   <td className="text-right py-0.5 px-1 tabular-nums">
                                     {formatNumber(data.quantity, 0, "BL")}
                                   </td>
-                                  <td className="text-right py-0.5 px-1 tabular-nums text-muted-foreground">
+                                  <td className="text-right py-0.5 px-1 tabular-nums text-foreground">
                                     {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                   </td>
                                   <td className="text-right py-0.5 px-1 border-r tabular-nums">
@@ -471,7 +471,7 @@ export default function LocationSummary() {
                             <td className="text-right py-1 px-1 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
-                            <td className="text-right py-1 px-1 tabular-nums text-muted-foreground">
+                            <td className="text-right py-1 px-1 tabular-nums text-foreground">
                               {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                             </td>
                             <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
