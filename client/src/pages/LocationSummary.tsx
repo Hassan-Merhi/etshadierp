@@ -436,10 +436,11 @@ export default function LocationSummary() {
                           <tr 
                             key={`item-${item.id}`}
                             className={cn(
-                              itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30",
+                              highlightedRows.has(buildRowKey(group.id, item.id)) 
+                                ? "bg-blue-300 dark:bg-blue-700" 
+                                : (itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30"),
                               "hover:bg-accent/20 cursor-pointer",
                               selectedRowKey === buildRowKey(group.id, item.id) && "ring-2 ring-primary",
-                              highlightedRows.has(buildRowKey(group.id, item.id)) && "bg-primary/20",
                               hiddenRows.has(buildRowKey(group.id, item.id)) && "hidden"
                             )}
                             onClick={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
@@ -448,7 +449,9 @@ export default function LocationSummary() {
                           >
                             <td className={cn(
                               "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10 cursor-pointer hover:underline",
-                              itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30"
+                              highlightedRows.has(buildRowKey(group.id, item.id)) 
+                                ? "bg-blue-300 dark:bg-blue-700" 
+                                : (itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30")
                             )}>
                               <span
                                 className="text-blue-500 dark:text-blue-400 truncate block"
