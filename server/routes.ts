@@ -89,8 +89,8 @@ async function syncEmployeeBalancesFromEntries(
   entries: Array<{ 
     ledgerAccountId: number | null; 
     employeeId?: number | null;
-    debitAmount: string; 
-    creditAmount: string 
+    debitAmount: string | null; 
+    creditAmount: string | null;
   }>,
   companyId: number,
   reverse: boolean = false
