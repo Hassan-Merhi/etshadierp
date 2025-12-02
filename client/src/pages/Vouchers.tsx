@@ -3086,561 +3086,562 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         )}
 
         <TabsContent value="transfer" className="space-y-4">
-          <div className="flex gap-4">
-            {/* Main Form Area */}
-            <Card className="flex-1">
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <CardTitle>Stock Transfer Voucher</CardTitle>
+          <Form {...stockTransferForm}>
+            <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)}>
+              {/* Header Row */}
+              <div className="flex items-center gap-4 mb-4">
+                {isPOS ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">From:</span>
+                    <span className="font-medium">{posLocationName}</span>
+                  </div>
+                ) : (
+                  <FormField
+                    control={stockTransferForm.control}
+                    name="entries.0.sourceLocationId"
+                    render={() => (
+                      <FormItem className="flex items-center gap-2 space-y-0">
+                        <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">Source:</FormLabel>
+                        <Select
+                          value={transferInventorySource?.toString() || ""}
+                          onValueChange={(value) => {
+                            const locId = parseInt(value);
+                            setTransferInventorySource(locId);
+                            const loc = locations.find(l => l.id === locId);
+                            transferEntries.forEach((_, idx) => {
+                              stockTransferForm.setValue(`entries.${idx}.sourceLocationId`, locId);
+                              stockTransferForm.setValue(`entries.${idx}.sourceLocationName`, loc?.name || "");
+                            });
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-[200px]" data-testid="select-source-location">
+                              <SelectValue placeholder="Select source..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
+                              <SelectItem key={location.id} value={location.id.toString()}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                <FormField
+                  control={stockTransferForm.control}
+                  name="destinationLocationId"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">To:</FormLabel>
+                      <Select
+                        value={field.value > 0 ? field.value.toString() : ""}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-[200px]" data-testid="select-destination-location">
+                            <SelectValue placeholder="Select destination..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[...locations]
+                            .filter(l => l.id !== transferInventorySource)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((location) => (
+                              <SelectItem key={location.id} value={location.id.toString()}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={stockTransferForm.control}
+                  name="voucherDate"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">Date:</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-[160px] justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              data-testid="button-transfer-date-picker"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value ? format(field.value, "PP") : "Pick date"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex-1" />
+
                 {!isPOS && (
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setImportDialogOpen(true)}
                     data-testid="button-open-import-dialog"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Import from Excel
+                    Import
                   </Button>
                 )}
-              </CardHeader>
-              <CardContent>
-                <Form {...stockTransferForm}>
-                  <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)} className="space-y-6">
-                    {/* Header section */}
-                    <div className="flex items-start justify-between gap-4">
-                      <FormField
-                        control={stockTransferForm.control}
-                        name="destinationLocationId"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Destination Location</FormLabel>
-                            <Select
-                              value={field.value > 0 ? field.value.toString() : ""}
-                              onValueChange={(value) => field.onChange(parseInt(value))}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-destination-location">
-                                  <SelectValue placeholder="Select destination location..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {[...locations].sort((a, b) => a.name.localeCompare(b.name)).map((location) => (
-                                  <SelectItem key={location.id} value={location.id.toString()}>
-                                    {location.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+              </div>
 
-                      {/* Right: Date picker */}
-                      <FormField
-                        control={stockTransferForm.control}
-                        name="voucherDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Date</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
-                                      "w-[200px] justify-start text-left font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                    data-testid="button-transfer-date-picker"
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP") : "Pick a date"}
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
+              <div className="flex gap-4">
+                {/* Main Spreadsheet Area */}
+                <Card className="flex-1 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-full">
+                      {/* Header */}
+                      <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+                        <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                          #
+                        </div>
+                        <div className="flex-1 min-w-[200px] flex items-center px-3 border-r h-10 font-medium text-sm">
+                          Item Name
+                        </div>
+                        <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                          Qty
+                        </div>
+                        {!isPOS && (
+                          <>
+                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                              Rate
+                            </div>
+                            <div className="w-28 flex items-center px-3 border-r h-10 font-medium text-sm bg-muted/30">
+                              Amount
+                            </div>
+                          </>
                         )}
-                      />
-                    </div>
+                        <div className="w-12 flex items-center justify-center h-10" />
+                      </div>
 
-                    {/* Spreadsheet table */}
-                    <div className="border rounded-md overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[30%]" : "w-[25%]")}>Source Location</th>
-                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[45%]" : "w-[30%]")}>Stock Item</th>
-                          <th className={cn("text-left p-3 font-medium", isPOS ? "w-[20%]" : "w-[12%]")}>Quantity</th>
-                          {!isPOS && <th className="text-left p-3 font-medium w-[12%]">Rate</th>}
-                          {!isPOS && <th className="text-left p-3 font-medium w-[16%]">Total</th>}
-                          <th className="w-[5%]"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                      {/* Rows */}
+                      <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                         {transferFields.map((field, index) => (
-                          <tr key={field.id} className="border-t">
-                            <td className="p-2">
-                              {isPOS ? (
-                                <div className="px-3 py-2 text-sm bg-muted/50 rounded-md" data-testid={`text-source-location-${index}`}>
-                                  {posLocationName || "Loading..."}
-                                </div>
-                              ) : (
-                                <FormField
-                                  control={stockTransferForm.control}
-                                  name={`entries.${index}.sourceLocationId`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormControl>
-                                        <LocationAutocomplete
-                                          value={field.value}
-                                          onChange={(locationId, locationName) => {
-                                            field.onChange(locationId);
-                                            stockTransferForm.setValue(`entries.${index}.sourceLocationName`, locationName);
-                                            setTransferInventorySource(locationId);
-                                            setActiveTransferRow(index);
-                                          }}
-                                          locations={locations}
-                                          onFocus={() => {
-                                            setActiveTransferRow(index);
-                                            if (transferEntries[index].sourceLocationId > 0) {
-                                              setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                            }
-                                          }}
-                                          onArrowUp={() => {
-                                            if (index > 0) {
-                                              setTimeout(() => {
-                                                const prevInput = document.querySelector(`[data-testid="input-source-location-${index - 1}"]`) as HTMLInputElement;
-                                                if (prevInput) {
-                                                  prevInput.focus();
-                                                  prevInput.select();
-                                                }
-                                              }, 50);
-                                            }
-                                          }}
-                                          onArrowDown={() => {
-                                            if (index < transferFields.length - 1) {
-                                              setTimeout(() => {
-                                                const nextInput = document.querySelector(`[data-testid="input-source-location-${index + 1}"]`) as HTMLInputElement;
-                                                if (nextInput) {
-                                                  nextInput.focus();
-                                                  nextInput.select();
-                                                }
-                                              }, 50);
-                                            }
-                                          }}
-                                          onArrowRight={() => {
-                                            setTimeout(() => {
-                                              const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
-                                              if (stockItemInput) stockItemInput.focus();
-                                            }, 50);
-                                          }}
-                                          onTab={() => {
-                                            setTimeout(() => {
-                                              const stockItemInput = document.querySelector(`[data-testid="input-stock-item-${index}"]`) as HTMLInputElement;
-                                              if (stockItemInput) stockItemInput.focus();
-                                            }, 50);
-                                          }}
-                                          placeholder="Type location..."
-                                          testId={`input-source-location-${index}`}
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              )}
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockTransferForm.control}
-                                name={`entries.${index}.stockItemId`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <StockItemAutocomplete
-                                        value={
-                                          transferEntries[index].stockItemId > 0
-                                            ? {
-                                                id: transferEntries[index].stockItemId,
-                                                name: transferEntries[index].stockItemName,
-                                              }
-                                            : null
+                          <div key={field.id} className="flex border-b hover-elevate">
+                            <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-[200px] border-r h-10">
+                              <input
+                                type="text"
+                                value={transferEntries[index]?.stockItemName || ""}
+                                onChange={(e) => {
+                                  setTransferSearchTerm(e.target.value);
+                                  setTransferHighlightedIndex(0);
+                                }}
+                                onFocus={() => {
+                                  setActiveTransferRow(index);
+                                  setTransferHighlightedIndex(0);
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => {
+                                    setActiveTransferRow(null);
+                                  }, 200);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "ArrowUp" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (index > 0) {
+                                      setTimeout(() => {
+                                        const prevInput = document.querySelector(`[data-testid="input-item-name-${index - 1}"]`) as HTMLInputElement;
+                                        if (prevInput) { prevInput.focus(); prevInput.select(); }
+                                      }, 50);
+                                    }
+                                  } else if (e.key === "ArrowDown" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (index < transferFields.length - 1) {
+                                      setTimeout(() => {
+                                        const nextInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                        if (nextInput) { nextInput.focus(); nextInput.select(); }
+                                      }, 50);
+                                    }
+                                  } else if (e.key === "ArrowRight") {
+                                    e.preventDefault();
+                                    setTimeout(() => {
+                                      const qtyInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                      if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                    }, 50);
+                                  } else if (e.key === "Tab" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    setTimeout(() => {
+                                      const qtyInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                      if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                    }, 50);
+                                  }
+                                }}
+                                placeholder="Type to search..."
+                                className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
+                                data-testid={`input-item-name-${index}`}
+                              />
+                            </div>
+                            <div className="w-24 border-r h-10">
+                              <input
+                                type="number"
+                                step="0.001"
+                                value={transferEntries[index]?.quantity || ""}
+                                onChange={(e) => {
+                                  stockTransferForm.setValue(`entries.${index}.quantity`, e.target.value);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "ArrowUp") {
+                                    e.preventDefault();
+                                    if (index > 0) {
+                                      setTimeout(() => {
+                                        const prevInput = document.querySelector(`[data-testid="input-transfer-quantity-${index - 1}"]`) as HTMLInputElement;
+                                        if (prevInput) { prevInput.focus(); prevInput.select(); }
+                                      }, 50);
+                                    }
+                                  } else if (e.key === "ArrowDown") {
+                                    e.preventDefault();
+                                    if (index < transferFields.length - 1) {
+                                      setTimeout(() => {
+                                        const nextInput = document.querySelector(`[data-testid="input-transfer-quantity-${index + 1}"]`) as HTMLInputElement;
+                                        if (nextInput) { nextInput.focus(); nextInput.select(); }
+                                      }, 50);
+                                    }
+                                  } else if (e.key === "ArrowLeft") {
+                                    e.preventDefault();
+                                    setTimeout(() => {
+                                      const nameInput = document.querySelector(`[data-testid="input-item-name-${index}"]`) as HTMLInputElement;
+                                      if (nameInput) { nameInput.focus(); nameInput.select(); }
+                                    }, 50);
+                                  } else if (e.key === "ArrowRight" && !isPOS) {
+                                    e.preventDefault();
+                                    setTimeout(() => {
+                                      const rateInput = document.querySelector(`[data-testid="input-transfer-rate-${index}"]`) as HTMLInputElement;
+                                      if (rateInput) { rateInput.focus(); rateInput.select(); }
+                                    }, 50);
+                                  } else if (e.key === "Tab" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (!isPOS) {
+                                      setTimeout(() => {
+                                        const rateInput = document.querySelector(`[data-testid="input-transfer-rate-${index}"]`) as HTMLInputElement;
+                                        if (rateInput) { rateInput.focus(); rateInput.select(); }
+                                      }, 50);
+                                    } else if (index < transferFields.length - 1) {
+                                      setTimeout(() => {
+                                        const nextNameInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                        if (nextNameInput) { nextNameInput.focus(); nextNameInput.select(); }
+                                      }, 50);
+                                    }
+                                  } else if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (index === transferFields.length - 1) {
+                                      appendTransfer({
+                                        sourceLocationId: transferInventorySource || 0,
+                                        sourceLocationName: locations.find(l => l.id === transferInventorySource)?.name || "",
+                                        stockItemId: 0,
+                                        stockItemName: "",
+                                        quantity: "",
+                                        rate: "",
+                                      });
+                                      setTimeout(() => {
+                                        const newInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                        if (newInput) newInput.focus();
+                                      }, 100);
+                                    }
+                                  }
+                                }}
+                                placeholder="0"
+                                className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
+                                data-testid={`input-transfer-quantity-${index}`}
+                              />
+                            </div>
+                            {!isPOS && (
+                              <>
+                                <div className="w-24 border-r h-10">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={transferEntries[index]?.rate || ""}
+                                    onChange={(e) => {
+                                      stockTransferForm.setValue(`entries.${index}.rate`, e.target.value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "ArrowUp") {
+                                        e.preventDefault();
+                                        if (index > 0) {
+                                          setTimeout(() => {
+                                            const prevInput = document.querySelector(`[data-testid="input-transfer-rate-${index - 1}"]`) as HTMLInputElement;
+                                            if (prevInput) { prevInput.focus(); prevInput.select(); }
+                                          }, 50);
                                         }
-                                        onChange={(id, name) => {
-                                          stockTransferForm.setValue(`entries.${index}.stockItemId`, id);
-                                          stockTransferForm.setValue(`entries.${index}.stockItemName`, name);
-                                          setTransferSearchTerm("");
-                                          
-                                          // Auto-fill rate from inventory if source location is selected
-                                          if (transferEntries[index].sourceLocationId > 0) {
-                                            fetch(`/api/locations/${transferEntries[index].sourceLocationId}/inventory`)
-                                              .then(res => res.json())
-                                              .then(inventory => {
-                                                const inventoryItem = inventory.find((inv: any) => inv.stockItemId === id);
-                                                if (inventoryItem && inventoryItem.averageRate) {
-                                                  stockTransferForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
-                                                }
-                                              })
-                                              .catch(err => console.error('Failed to fetch inventory:', err));
-                                          }
-                                        }}
-                                        stockItems={stockItems}
-                                        onFocus={() => {
-                                          setActiveTransferRow(index);
-                                          setTransferHighlightedIndex(0);
-                                          if (transferEntries[index].sourceLocationId > 0) {
-                                            setTransferInventorySource(transferEntries[index].sourceLocationId);
-                                          }
-                                        }}
-                                        onSearchChange={(term) => {
-                                          setTransferSearchTerm(term);
-                                          setTransferHighlightedIndex(0);
-                                        }}
-                                        hideDropdown={true}
-                                        onArrowUp={() => {
-                                          if (index > 0) {
-                                            setTimeout(() => {
-                                              const prevInput = document.querySelector(`[data-testid="input-stock-item-${index - 1}"]`) as HTMLInputElement;
-                                              if (prevInput) {
-                                                prevInput.focus();
-                                                prevInput.select();
-                                              }
-                                            }, 50);
-                                          }
-                                        }}
-                                        onArrowDown={() => {
-                                          if (index < transferFields.length - 1) {
-                                            setTimeout(() => {
-                                              const nextInput = document.querySelector(`[data-testid="input-stock-item-${index + 1}"]`) as HTMLInputElement;
-                                              if (nextInput) {
-                                                nextInput.focus();
-                                                nextInput.select();
-                                              }
-                                            }, 50);
-                                          }
-                                        }}
-                                        onArrowLeft={() => {
+                                      } else if (e.key === "ArrowDown") {
+                                        e.preventDefault();
+                                        if (index < transferFields.length - 1) {
                                           setTimeout(() => {
-                                            const sourceInput = document.querySelector(`[data-testid="input-source-location-${index}"]`) as HTMLInputElement;
-                                            if (sourceInput) {
-                                              sourceInput.focus();
-                                              sourceInput.select();
-                                            }
+                                            const nextInput = document.querySelector(`[data-testid="input-transfer-rate-${index + 1}"]`) as HTMLInputElement;
+                                            if (nextInput) { nextInput.focus(); nextInput.select(); }
                                           }, 50);
-                                        }}
-                                        onArrowRight={() => {
+                                        }
+                                      } else if (e.key === "ArrowLeft") {
+                                        e.preventDefault();
+                                        setTimeout(() => {
+                                          const qtyInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
+                                          if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                        }, 50);
+                                      } else if (e.key === "Tab" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        if (index < transferFields.length - 1) {
                                           setTimeout(() => {
-                                            const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
-                                            if (quantityInput) {
-                                              quantityInput.focus();
-                                              quantityInput.select();
-                                            }
+                                            const nextNameInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                            if (nextNameInput) { nextNameInput.focus(); nextNameInput.select(); }
                                           }, 50);
-                                        }}
-                                        onTab={() => {
+                                        }
+                                      } else if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        if (index === transferFields.length - 1) {
+                                          appendTransfer({
+                                            sourceLocationId: transferInventorySource || 0,
+                                            sourceLocationName: locations.find(l => l.id === transferInventorySource)?.name || "",
+                                            stockItemId: 0,
+                                            stockItemName: "",
+                                            quantity: "",
+                                            rate: "",
+                                          });
                                           setTimeout(() => {
-                                            const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${index}"]`) as HTMLInputElement;
-                                            if (quantityInput) {
-                                              quantityInput.focus();
-                                              quantityInput.select();
-                                            }
-                                          }, 50);
-                                        }}
-                                        placeholder="Type item name..."
-                                        testId={`input-stock-item-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockTransferForm.control}
-                                name={`entries.${index}.quantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.001"
-                                        placeholder="0.000"
-                                        className="font-mono"
-                                        data-testid={`input-transfer-quantity-${index}`}
-                                        onKeyDown={(e) => handleTransferKeyDown(e, index, "quantity")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            {!isPOS && (
-                              <td className="p-2">
-                                <FormField
-                                  control={stockTransferForm.control}
-                                  name={`entries.${index}.rate`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          type="number"
-                                          step="0.01"
-                                          placeholder="0.00"
-                                          className="font-mono"
-                                          data-testid={`input-transfer-rate-${index}`}
-                                          onKeyDown={(e) => handleTransferKeyDown(e, index, "rate")}
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </td>
-                            )}
-                            {!isPOS && (
-                              <td className="p-2">
-                                <div className="text-right font-mono">
-                                  ${(parseFloat(transferEntries[index].quantity || "0") * parseFloat(transferEntries[index].rate || "0")).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                            const newInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                                            if (newInput) newInput.focus();
+                                          }, 100);
+                                        }
+                                      }
+                                    }}
+                                    placeholder="0"
+                                    className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
+                                    data-testid={`input-transfer-rate-${index}`}
+                                  />
                                 </div>
-                              </td>
+                                <div className="w-28 border-r h-10 bg-muted/30 flex items-center justify-end px-3 font-mono">
+                                  {(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0")).toFixed(2)}
+                                </div>
+                              </>
                             )}
-                            <td className="p-2">
+                            <div className="w-12 flex items-center justify-center h-10">
                               {transferFields.length > 1 && (
                                 <Button
                                   type="button"
                                   variant="ghost"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => removeTransfer(index)}
+                                  className="h-8 w-8"
                                   data-testid={`button-remove-transfer-${index}`}
                                 >
-                                  ×
+                                  <X className="h-4 w-4 text-destructive" />
                                 </Button>
                               )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-muted/30 border-t-2">
-                        <tr>
-                          <td colSpan={isPOS ? 3 : 4} className="p-3">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                appendTransfer({
-                                  sourceLocationId: isPOS && posLocationId ? posLocationId : 0,
-                                  sourceLocationName: isPOS && posLocationName ? posLocationName : "",
-                                  stockItemId: 0,
-                                  stockItemName: "",
-                                  quantity: "",
-                                  rate: "",
-                                })
-                              }
-                              data-testid="button-add-transfer-row"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Row
-                            </Button>
-                          </td>
-                          {!isPOS && (
-                            <td className="p-3">
-                              <div className="text-right font-bold font-mono">
-                                ${transferTotal.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </div>
-                            </td>
-                          )}
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* Notes field */}
-                  <FormField
-                    control={stockTransferForm.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder="Additional notes..."
-                            rows={3}
-                            data-testid="input-transfer-notes"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Optional checkbox */}
-                  <FormField
-                    control={stockTransferForm.control}
-                    name="optional"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-transfer-optional"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>
-                            Mark as Optional
-                          </FormLabel>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Submit button */}
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={
-                        stockTransferMutation.isPending ||
-                        transferTotal === 0
-                      }
-                      data-testid="button-save-transfer-voucher"
-                    >
-                      {stockTransferMutation.isPending ? "Saving..." : "Save Stock Transfer"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-
-          {/* Right side panel - Stock Item Suggestions */}
-          {transferInventorySource && (
-            <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
-              <div className="p-4 border-b">
-                <h3 className="text-sm font-semibold mb-2">Search Items</h3>
-                <p className="text-xs text-muted-foreground mb-3">
-                  {locations.find(l => l.id === transferInventorySource)?.name}
-                </p>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name or code..."
-                    value={transferSearchTerm}
-                    onChange={(e) => {
-                      setTransferSearchTerm(e.target.value);
-                      setTransferHighlightedIndex(0);
-                    }}
-                    className="pl-9"
-                    data-testid="input-transfer-sidebar-search"
-                  />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2" ref={transferSidebarRef}>
-                <div className="space-y-1">
-                  {(() => {
-                    const filteredInventory = transferInventory
-                      .filter((item: any) => {
-                        if (!transferSearchTerm.trim()) return true;
-                        const term = transferSearchTerm.toLowerCase();
-                        return (
-                          item.stockItemName?.toLowerCase().includes(term) ||
-                          item.stockItemCode?.toLowerCase().includes(term)
-                        );
-                      })
-                      .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
-                    
-                    if (filteredInventory.length === 0) {
-                      return (
-                        <div className="text-center py-8 text-sm text-muted-foreground">
-                          No items found
-                        </div>
-                      );
-                    }
-                    
-                    return filteredInventory.map((item: any, idx: number) => {
-                      const stock = parseFloat(item.quantity || "0");
-                      const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
-                      
-                      return (
-                        <button
-                          key={item.stockItemId}
-                          type="button"
-                          className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
-                            stock === 0 ? "opacity-60" : ""
-                          } ${isHighlighted ? "bg-accent" : ""}`}
-                          data-testid={`button-suggest-item-${item.stockItemId}`}
-                          onClick={() => {
-                            if (activeTransferRow !== null) {
-                              const stockItem = stockItems.find(s => s.id === item.stockItemId);
-                              if (stockItem) {
-                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
-                                stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
-                                stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
-                                setTransferSearchTerm("");
-                                
-                                setTimeout(() => {
-                                  const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${activeTransferRow}"]`) as HTMLInputElement;
-                                  if (quantityInput) {
-                                    quantityInput.focus();
-                                    quantityInput.select();
-                                  }
-                                }, 50);
-                              }
-                            }
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium mb-1 truncate">{item.stockItemName}</div>
-                              <div className="text-xs text-muted-foreground font-mono">
-                                {item.stockItemCode}
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                              <div className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                stock === 0 
-                                  ? "bg-destructive/10 text-destructive" 
-                                  : stock < 10
-                                  ? "bg-chart-3/10 text-chart-3"
-                                  : "bg-chart-2/10 text-chart-2"
-                              }`}>
-                                {stock === 0 ? "Out" : `${stock.toFixed(0)}`}
-                              </div>
                             </div>
                           </div>
-                        </button>
-                      );
-                    });
-                  })()}
-                </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Section */}
+                  <div className="border-t bg-muted/20 p-4">
+                    <div className="flex justify-end items-center gap-8 max-w-lg ml-auto">
+                      <div className="text-sm text-muted-foreground">Total Items:</div>
+                      <div className="text-sm font-mono font-medium">
+                        {transferEntries.filter(e => e.stockItemId > 0).length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Total Qty:</div>
+                      <div className="text-sm font-mono font-medium">
+                        {transferEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0).toFixed(2)}
+                      </div>
+                      {!isPOS && (
+                        <>
+                          <div className="text-lg font-semibold">Grand Total:</div>
+                          <div className="text-2xl font-bold font-mono" data-testid="text-transfer-total">
+                            ${transferTotal.toFixed(2)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Right Panel - Item Search */}
+                <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                  <div className="p-4 border-b">
+                    <h3 className="text-sm font-semibold mb-2">Search Items</h3>
+                    {transferInventorySource && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        {locations.find(l => l.id === transferInventorySource)?.name}
+                      </p>
+                    )}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or code..."
+                        value={transferSearchTerm}
+                        onChange={(e) => {
+                          setTransferSearchTerm(e.target.value);
+                          setTransferHighlightedIndex(0);
+                        }}
+                        className="pl-9"
+                        data-testid="input-transfer-sidebar-search"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2" ref={transferSidebarRef}>
+                    <div className="space-y-1">
+                      {!transferInventorySource ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          Select a source location to see available items
+                        </div>
+                      ) : (() => {
+                        const filteredInventory = transferInventory
+                          .filter((item: any) => {
+                            if (!transferSearchTerm.trim()) return true;
+                            const term = transferSearchTerm.toLowerCase();
+                            return (
+                              item.stockItemName?.toLowerCase().includes(term) ||
+                              item.stockItemCode?.toLowerCase().includes(term)
+                            );
+                          })
+                          .sort((a: any, b: any) => a.stockItemName.localeCompare(b.stockItemName));
+                        
+                        if (filteredInventory.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-sm text-muted-foreground">
+                              No items found
+                            </div>
+                          );
+                        }
+                        
+                        return filteredInventory.map((item: any, idx: number) => {
+                          const stock = parseFloat(item.quantity || "0");
+                          const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
+                          
+                          return (
+                            <button
+                              key={item.stockItemId}
+                              type="button"
+                              className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
+                                stock === 0 ? "opacity-60" : ""
+                              } ${isHighlighted ? "bg-accent" : ""}`}
+                              data-testid={`button-suggest-item-${item.stockItemId}`}
+                              onClick={() => {
+                                if (activeTransferRow !== null) {
+                                  const stockItem = stockItems.find(s => s.id === item.stockItemId);
+                                  if (stockItem) {
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
+                                    setTransferSearchTerm("");
+                                    
+                                    setTimeout(() => {
+                                      const quantityInput = document.querySelector(`[data-testid="input-transfer-quantity-${activeTransferRow}"]`) as HTMLInputElement;
+                                      if (quantityInput) {
+                                        quantityInput.focus();
+                                        quantityInput.select();
+                                      }
+                                    }, 50);
+                                  }
+                                }
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium mb-1 truncate">{item.stockItemName}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {item.stockItemCode}
+                                  </div>
+                                </div>
+                                <div className="flex items-center">
+                                  <div className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                    stock === 0 
+                                      ? "bg-destructive/10 text-destructive" 
+                                      : stock < 10
+                                      ? "bg-chart-3/10 text-chart-3"
+                                      : "bg-chart-2/10 text-chart-2"
+                                  }`}>
+                                    {stock === 0 ? "Out" : `${stock.toFixed(0)}`}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                </Card>
               </div>
-            </Card>
-          )}
-        </div>
+
+              {/* Notes and Options */}
+              <div className="mt-4 flex items-start gap-4">
+                <FormField
+                  control={stockTransferForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Notes (optional)"
+                          className="resize-none h-9"
+                          data-testid="input-transfer-notes"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={stockTransferForm.control}
+                  name="optional"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-transfer-optional"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm">Optional</FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  disabled={stockTransferMutation.isPending || transferEntries.filter(e => e.stockItemId > 0).length === 0}
+                  data-testid="button-save-transfer-voucher"
+                >
+                  {stockTransferMutation.isPending ? "Saving..." : "Save Transfer"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </TabsContent>
 
         {!isPOS && (
