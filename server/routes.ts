@@ -4195,7 +4195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk update UOM from "bale" to "bl"
+  // Bulk update UOM from "bale" to "BL"
   app.post("/api/stock-items/bulk-update-uom", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
@@ -4218,14 +4218,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ message: "No items with UOM 'bale' found to update", updated: 0 });
       }
 
-      // Update all bale items to bl
+      // Update all bale items to BL
       let updated = 0;
       for (const item of baleItems) {
-        await storage.updateStockItem(item.id, { uom: "bl" });
+        await storage.updateStockItem(item.id, { uom: "BL" });
         updated++;
       }
 
-      res.json({ message: `Successfully updated ${updated} stock item(s) from 'bale' to 'bl'`, updated });
+      res.json({ message: `Successfully updated ${updated} stock item(s) from 'bale' to 'BL'`, updated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
