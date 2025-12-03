@@ -8028,36 +8028,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await tx.insert(poLineItems).values(newItems);
           }
           
-          // Update PO with new items total
+          // Update PO with new items total and charges
+          const freight = parseFloat(req.body.freight || existingPO.freight || "0");
+          const otherCharges = parseFloat(req.body.otherCharges || existingPO.otherCharges || "0");
+          
           await tx.update(purchaseOrders)
             .set({ 
               itemsTotal: itemsTotal.toFixed(2),
+              freight: freight.toFixed(2),
+              otherCharges: otherCharges.toFixed(2),
               poNumber: req.body.poNumber || existingPO.poNumber,
               currency: req.body.currency || existingPO.currency,
               status: req.body.status || existingPO.status,
             })
             .where(eq(purchaseOrders.id, id));
             
-          // Also update container's itemsTotal if applicable
+          // Also update container's totals if applicable
           const container = await storage.getContainerById(existingPO.containerId);
           if (container) {
-            // Get all POs for this container and recalculate total
+            // Get all POs for this container and recalculate totals
             const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
             const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
             let totalItemsCost = 0;
+            let totalFreight = 0;
+            let totalOtherCharges = 0;
+            
             for (const po of containerPOs) {
               if (po.id === id) {
+                // Use the new values for this PO
                 totalItemsCost += itemsTotal;
+                totalFreight += freight;
+                totalOtherCharges += otherCharges;
               } else {
                 totalItemsCost += parseFloat(po.itemsTotal || "0");
+                totalFreight += parseFloat(po.freight || "0");
+                totalOtherCharges += parseFloat(po.otherCharges || "0");
               }
             }
             
-            // Update container totals
-            const chargesTotal = parseFloat(container.chargesTotal || "0");
+            // Update container totals (chargesTotal = sum of PO freight + otherCharges)
+            const chargesTotal = totalFreight + totalOtherCharges;
             await tx.update(containers)
               .set({
                 itemsTotal: totalItemsCost.toFixed(2),
+                chargesTotal: chargesTotal.toFixed(2),
                 grandTotal: (totalItemsCost + chargesTotal).toFixed(2),
               })
               .where(eq(containers.id, existingPO.containerId));
@@ -8089,6 +8103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowedUpdates.currency = req.body.currency;
       if (req.body.status !== undefined)
         allowedUpdates.status = req.body.status;
+      if (req.body.freight !== undefined)
+        allowedUpdates.freight = req.body.freight;
+      if (req.body.otherCharges !== undefined)
+        allowedUpdates.otherCharges = req.body.otherCharges;
 
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
       res.json(updated);
