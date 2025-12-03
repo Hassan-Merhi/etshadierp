@@ -297,11 +297,11 @@ export default function LocationSummary() {
   }, [selectedRowKey]);
 
   return (
-    <div className="fixed inset-0 flex flex-col p-1 space-y-1 overflow-hidden" data-testid="location-summary-container">
-      <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
+    <div className="w-full h-screen flex flex-col overflow-hidden" data-testid="location-summary-container">
+      <div className="flex items-center justify-between gap-4 flex-wrap p-4 flex-shrink-0 border-b">
         <div>
-          <h1 className="text-lg font-bold" data-testid="text-page-title">Location Summary</h1>
-          <p className="text-xs text-muted-foreground">
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Summary</h1>
+          <p className="text-sm text-muted-foreground">
             Stock inventory across locations with expandable stock groups
           </p>
         </div>
@@ -393,9 +393,9 @@ export default function LocationSummary() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden flex flex-col flex-1 w-full" style={{ height: '100%' }}>
+        <Card className="overflow-hidden flex flex-col flex-1 w-full m-4 mt-0" style={{ minHeight: 0 }}>
           <div className="overflow-auto flex-1" ref={tableScrollContainer}>
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full border-collapse" style={{ fontSize: '12px' }}>
               <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="bg-muted">
                   <th 
