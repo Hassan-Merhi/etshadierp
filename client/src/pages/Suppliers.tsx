@@ -107,8 +107,6 @@ export default function Suppliers() {
       "Doc Number": txn.docNumber,
       Type: txn.voucherType,
       Description: txn.description,
-      Debit: txn.debit,
-      Credit: txn.credit,
       Balance: txn.balance,
     }));
 
@@ -344,65 +342,62 @@ export default function Suppliers() {
                       <TableHead>Doc #</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead className="max-w-xs">Description</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {unifiedLedger.map((txn: any, idx: number) => (
-                      <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                        <TableCell className="font-mono text-sm">
-                          {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <Badge variant="secondary">{txn.companyName}</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm font-medium">
-                          {txn.docNumber}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{txn.voucherType}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate text-sm">
-                          {txn.description || "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {txn.debit > 0 
-                            ? `$${txn.debit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {txn.credit > 0 
-                            ? `$${txn.credit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {[...unifiedLedger]
+                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((txn: any, idx: number) => {
+                        const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                        return (
+                          <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                            <TableCell className="font-mono text-sm">
+                              {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="secondary">{txn.companyName}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm font-medium">
+                              {txn.docNumber}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={isPayment ? "default" : "outline"}>
+                                {isPayment ? "Payment" : txn.voucherType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate text-sm">
+                              {txn.description || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
                 
                 {/* Summary */}
                 <div className="border-t pt-4 flex justify-end gap-8">
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Total Debit: </span>
+                    <span className="text-muted-foreground">Total Payments: </span>
                     <span className="font-mono font-semibold">
                       ${unifiedLedger.reduce((sum: number, t: any) => sum + t.debit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Total Credit: </span>
+                    <span className="text-muted-foreground">Total Purchases: </span>
                     <span className="font-mono font-semibold">
                       ${unifiedLedger.reduce((sum: number, t: any) => sum + t.credit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Final Balance: </span>
+                    <span className="text-muted-foreground">Current Balance: </span>
                     <span className="font-mono font-semibold">
-                      ${(unifiedLedger[unifiedLedger.length - 1]?.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${(unifiedLedger.length > 0 
+                        ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
+                        : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
