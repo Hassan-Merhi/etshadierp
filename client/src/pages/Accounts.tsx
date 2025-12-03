@@ -25,7 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2 } from "lucide-react";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2, ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -279,11 +279,17 @@ export default function Accounts() {
     setExpandedParents(newExpanded);
   };
 
+  const parseBalance = (value: any): number => {
+    if (value === null || value === undefined || value === "") return 0;
+    const parsed = typeof value === "string" ? parseFloat(value) : value;
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   const calculateRunningBalance = () => {
-    let runningBalance = selectedAccount?.balance || 0;
+    let runningBalance = parseBalance(selectedAccount?.balance);
     return transactions.map((transaction) => {
-      const debit = parseFloat(transaction.debitAmount || "0");
-      const credit = parseFloat(transaction.creditAmount || "0");
+      const debit = parseBalance(transaction.debitAmount);
+      const credit = parseBalance(transaction.creditAmount);
       runningBalance += debit - credit;
       return {
         ...transaction,
@@ -293,6 +299,22 @@ export default function Accounts() {
   };
 
   const transactionsWithBalance = calculateRunningBalance();
+
+  const transactionTotals = transactionsWithBalance.reduce(
+    (acc, txn) => ({
+      totalDebit: acc.totalDebit + parseBalance(txn.debitAmount),
+      totalCredit: acc.totalCredit + parseBalance(txn.creditAmount),
+    }),
+    { totalDebit: 0, totalCredit: 0 }
+  );
+
+  const closingBalance = transactionsWithBalance.length > 0
+    ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
+    : parseBalance(selectedAccount?.balance);
+
+  const handleTransactionClick = (transaction: Transaction & { runningBalance: number }) => {
+    navigate(`/vouchers/${transaction.voucherId}/edit`);
+  };
 
   const form = useForm<InsertLedgerAccount>({
     resolver: zodResolver(insertLedgerAccountSchema.omit({ companyId: true })),
@@ -783,111 +805,116 @@ export default function Accounts() {
         <TabsContent value="view" className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Select Account</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Select Account</CardTitle>
+            {selectedAccount && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedAccount(null)}
+                data-testid="button-change-account"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Change
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="account-search">Search & Select Account</Label>
+          {!selectedAccount ? (
             <div className="space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="account-search"
-                  placeholder="Search by name or type..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                  disabled={accountsLoading || !selectedCompany}
-                  data-testid="input-account-search"
-                />
-              </div>
-              
-              {accountsLoading || !selectedCompany ? (
-                <div className="p-4">
-                  <Skeleton className="h-8 w-full" />
+              <Label htmlFor="account-search">Search & Select Account</Label>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="account-search"
+                    placeholder="Search by name or type..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                    disabled={accountsLoading || !selectedCompany}
+                    data-testid="input-account-search"
+                  />
                 </div>
-              ) : (
-                <div className="max-h-64 overflow-y-auto border rounded-md">
-                  {filteredAccounts.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                      No accounts found
-                    </div>
-                  ) : (
-                    filteredAccounts.map((account) => (
-                      <div key={account.id}>
-                        <div className="flex items-center border-b last:border-b-0">
-                          {account.children.length > 0 && (
+                
+                {accountsLoading || !selectedCompany ? (
+                  <div className="p-4">
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                    {filteredAccounts.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No accounts found
+                      </div>
+                    ) : (
+                      filteredAccounts.map((account) => (
+                        <div key={account.id}>
+                          <div className="flex items-center border-b last:border-b-0">
+                            {account.children.length > 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleParent(account.id);
+                                }}
+                                className="p-2 hover-elevate"
+                                data-testid={`button-toggle-${account.id}`}
+                              >
+                                {expandedParents.has(account.id) ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleParent(account.id);
-                              }}
-                              className="p-2 hover-elevate"
-                              data-testid={`button-toggle-${account.id}`}
-                            >
-                              {expandedParents.has(account.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleAccountChange(account.id)}
-                            disabled={accountsLoading || !selectedCompany}
-                            className={`flex-1 p-3 text-left hover-elevate ${
-                              selectedAccount?.id === account.id
-                                ? "bg-accent"
-                                : ""
-                            } ${account.children.length === 0 ? 'ml-8' : ''}`}
-                            data-testid={`button-select-account-${account.id}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {account.type}
-                              </Badge>
-                              <span className="text-sm">{account.name}</span>
-                            </div>
-                          </button>
-                        </div>
-                        {expandedParents.has(account.id) && account.children.map((child) => (
-                          <div key={child.id} className="border-b last:border-b-0">
-                            <button
-                              onClick={() => handleAccountChange(child.id)}
+                              onClick={() => handleAccountChange(account.id)}
                               disabled={accountsLoading || !selectedCompany}
-                              className={`w-full p-3 pl-16 text-left hover-elevate ${
-                                selectedAccount?.id === child.id
-                                  ? "bg-accent"
-                                  : ""
-                              }`}
-                              data-testid={`button-select-account-${child.id}`}
+                              className={`flex-1 p-3 text-left hover-elevate ${account.children.length === 0 ? 'ml-8' : ''}`}
+                              data-testid={`button-select-account-${account.id}`}
                             >
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-xs">
-                                  {child.type}
+                                  {account.type}
                                 </Badge>
-                                <span className="text-sm">{child.name}</span>
+                                <span className="text-sm">{account.name}</span>
                               </div>
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+                          {expandedParents.has(account.id) && account.children.map((child) => (
+                            <div key={child.id} className="border-b last:border-b-0">
+                              <button
+                                onClick={() => handleAccountChange(child.id)}
+                                disabled={accountsLoading || !selectedCompany}
+                                className="w-full p-3 pl-16 text-left hover-elevate"
+                                data-testid={`button-select-account-${child.id}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {child.type}
+                                  </Badge>
+                                  <span className="text-sm">{child.name}</span>
+                                </div>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-
-          {selectedAccount && (
+          ) : (
             <Card className="bg-muted/50">
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Account Type</p>
-                    <Badge variant="outline" data-testid="badge-account-type">
-                      {selectedAccount.type}
-                    </Badge>
+                    <p className="text-xs text-muted-foreground mb-1">Account Name</p>
+                    <span className="font-medium" data-testid="text-account-name">
+                      {selectedAccount.name}
+                    </span>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Balance</p>
@@ -900,7 +927,7 @@ export default function Accounts() {
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
                       )}
                       <span className="font-mono font-semibold" data-testid="text-account-balance">
-                        ${Math.abs(selectedAccount.balance).toFixed(2)}{" "}
+                        ${Math.abs(parseBalance(selectedAccount.balance)).toFixed(2)}{" "}
                         {selectedAccount.balanceSide || ""}
                       </span>
                     </div>
@@ -1030,7 +1057,6 @@ export default function Accounts() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
-                        <TableHead>Voucher #</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Debit</TableHead>
@@ -1049,23 +1075,29 @@ export default function Accounts() {
                               ? formatDisplayDate(new Date(transaction.voucherDate))
                               : "-"}
                           </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {transaction.voucherNumber}
-                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{transaction.voucherType}</Badge>
                           </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {transaction.narration || transaction.voucherDescription || "-"}
+                          <TableCell>
+                            <button
+                              onClick={() => handleTransactionClick(transaction)}
+                              className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                              data-testid={`link-transaction-${transaction.entryId}`}
+                            >
+                              <span className="truncate max-w-xs">
+                                {transaction.narration || transaction.voucherDescription || "-"}
+                              </span>
+                              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            </button>
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(transaction.debitAmount || "0") > 0
-                              ? `$${parseFloat(transaction.debitAmount).toFixed(2)}`
+                            {parseBalance(transaction.debitAmount) > 0
+                              ? `$${parseBalance(transaction.debitAmount).toFixed(2)}`
                               : "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(transaction.creditAmount || "0") > 0
-                              ? `$${parseFloat(transaction.creditAmount).toFixed(2)}`
+                            {parseBalance(transaction.creditAmount) > 0
+                              ? `$${parseBalance(transaction.creditAmount).toFixed(2)}`
                               : "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
@@ -1073,6 +1105,19 @@ export default function Accounts() {
                           </TableCell>
                         </TableRow>
                       ))}
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell colSpan={2}></TableCell>
+                        <TableCell className="text-right">Totals</TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${transactionTotals.totalDebit.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${transactionTotals.totalCredit.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${Math.abs(closingBalance).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </div>
