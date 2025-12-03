@@ -87,6 +87,26 @@ export default function StockItems() {
     },
   });
 
+  const updateUOMMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/stock-items/bulk-update-uom", {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      toast({
+        title: "Success",
+        description: data.message || "UOM updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update UOM",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(filteredStockItems.map(item => item.id));
@@ -176,6 +196,15 @@ export default function StockItems() {
               Delete {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => updateUOMMutation.mutate()}
+            disabled={updateUOMMutation.isPending}
+            data-testid="button-update-uom"
+          >
+            Convert Bale to BL
+          </Button>
           <Button
             variant="outline"
             className="gap-2"

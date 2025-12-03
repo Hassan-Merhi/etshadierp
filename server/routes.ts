@@ -4195,6 +4195,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update UOM from "Bale" to "BL"
+  app.post("/api/stock-items/bulk-update-uom", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Find all stock items with UOM = "Bale" for current company
+      const baleItems = await db.query.stockItems.findMany({
+        where: and(
+          eq(stockItems.companyId, req.session.currentCompanyId),
+          eq(stockItems.uom, "Bale")
+        ),
+      });
+
+      if (baleItems.length === 0) {
+        return res.json({ message: "No items with UOM 'Bale' found to update", updated: 0 });
+      }
+
+      // Update all Bale items to BL
+      let updated = 0;
+      for (const item of baleItems) {
+        await storage.updateStockItem(item.id, { uom: "BL" });
+        updated++;
+      }
+
+      res.json({ message: `Successfully updated ${updated} stock item(s) from 'Bale' to 'BL'`, updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
