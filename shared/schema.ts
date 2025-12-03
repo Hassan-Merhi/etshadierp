@@ -430,6 +430,8 @@ export const purchaseOrders = pgTable("purchase_orders", {
   voucherId: integer("voucher_id"),
   currency: text("currency").notNull().default("USD"),
   itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
+  freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),
+  otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -442,6 +444,8 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   poNumber: z.string().min(1, "PO number is required"),
   containerId: z.number().min(1, "Container is required"),
   supplierId: z.number().min(1, "Supplier is required"),
+  freight: z.string().optional(),
+  otherCharges: z.string().optional(),
 });
 
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
