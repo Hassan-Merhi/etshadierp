@@ -205,7 +205,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Filter locations by search term
   const filteredLocations = sortedLocations.filter((location) =>
-    location.name.toLowerCase().includes(locationSearchTerm.toLowerCase())
+    (location.name ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase())
   );
 
   // Sort stock groups chronologically (by id, nulls last)
@@ -223,8 +223,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Filter stock items by search term
   const filteredStockItems = selectedGroup?.items.filter((item) =>
-    item.stockItemName.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-    item.stockItemCode.toLowerCase().includes(itemSearchTerm.toLowerCase())
+    (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+    (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
   ) || [];
 
   // Handle location selection
