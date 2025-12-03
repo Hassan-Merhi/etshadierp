@@ -46,6 +46,7 @@ interface StockGroup {
 
 export default function StockItems() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<number | null | "uncategorized">(null);
   const [selectedStockItemId, setSelectedStockItemId] = useState<number | null>(null);
   const [selectedStockItemName, setSelectedStockItemName] = useState<string>("");
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -144,11 +145,22 @@ export default function StockItems() {
     setEditDialogOpen(true);
   };
 
-  const filteredStockItems = stockItems.filter((item) =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredStockItems = stockItems
+    .filter((item) => {
+      // Filter by search term
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.barcode && item.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Filter by stock group
+      if (selectedGroupFilter === "uncategorized") {
+        return matchesSearch && !item.stockGroupId;
+      } else if (selectedGroupFilter !== null) {
+        return matchesSearch && item.stockGroupId === selectedGroupFilter;
+      }
+      return matchesSearch;
+    })
+    .sort((a, b) => a.id - b.id); // Sort chronologically by ID
 
   const getStockGroupName = (stockGroupId: number | null) => {
     if (!stockGroupId) return "Uncategorized";
@@ -235,15 +247,32 @@ export default function StockItems() {
       </div>
 
       <Card className="p-4">
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, code, or barcode..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="input-search"
-          />
+        <div className="flex gap-4 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, code, or barcode..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              data-testid="input-search"
+            />
+          </div>
+          <select
+            value={selectedGroupFilter === null ? "all" : selectedGroupFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedGroupFilter(val === "all" ? null : val === "uncategorized" ? "uncategorized" : parseInt(val));
+            }}
+            className="px-3 py-2 border rounded-md text-sm"
+            data-testid="select-stock-group"
+          >
+            <option value="all">All Groups</option>
+            <option value="uncategorized">Uncategorized</option>
+            {stockGroups.map(group => (
+              <option key={group.id} value={group.id}>{group.code} - {group.name}</option>
+            ))}
+          </select>
         </div>
 
         {isLoading ? (
@@ -265,6 +294,7 @@ export default function StockItems() {
                     />
                   </th>
                   <th className="text-left px-3 font-medium">Name</th>
+                  <th className="text-left px-3 font-medium">Stock Group</th>
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
                 </tr>
@@ -303,6 +333,13 @@ export default function StockItems() {
                             <Package className="h-4 w-4 text-muted-foreground" />
                             {item.name}
                           </div>
+                        </td>
+                        <td 
+                          className="px-3 text-sm cursor-pointer" 
+                          onClick={() => handleStockItemClick(item.id, item.name)}
+                          data-testid={`group-${item.id}`}
+                        >
+                          {getStockGroupName(item.stockGroupId)}
                         </td>
                         <td 
                           className="px-3 cursor-pointer" 
