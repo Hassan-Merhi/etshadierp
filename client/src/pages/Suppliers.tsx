@@ -71,25 +71,8 @@ export default function Suppliers() {
     // Close the dialog
     setSelectedSupplier(null);
 
-    // Navigate based on voucher type
-    const voucherType = txn.voucherType?.toLowerCase() || "";
-    
-    if (voucherType === "purchase" || voucherType.includes("po")) {
-      // For POs, extract container ID from description if available
-      const containerMatch = txn.description?.match(/Container\s+([A-Z0-9]+)/i);
-      if (containerMatch) {
-        navigate("/containers");
-      } else {
-        navigate(`/vouchers/${txn.voucherId}/edit`);
-      }
-    } else if (voucherType === "payment" || voucherType === "receipt") {
-      navigate(`/vouchers/${txn.voucherId}/edit`);
-    } else if (voucherType === "journal") {
-      navigate(`/vouchers/${txn.voucherId}/edit`);
-    } else {
-      // Default: navigate to voucher edit page
-      navigate(`/vouchers/${txn.voucherId}/edit`);
-    }
+    // Navigate to voucher edit page - it will load all data based on voucherId and voucherType
+    navigate(`/vouchers/${txn.voucherId}/edit`);
   };
   
   // Fetch global supplier statistics (no company filter)
