@@ -203,7 +203,7 @@ export default function StockItems() {
             disabled={updateUOMMutation.isPending}
             data-testid="button-update-uom"
           >
-            Convert Bale to BL
+            {updateUOMMutation.isPending ? "Converting..." : "Convert Bale to BL"}
           </Button>
           <Button
             variant="outline"
