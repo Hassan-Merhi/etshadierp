@@ -217,7 +217,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // Filter stock groups by search term
   const filteredStockGroups = sortedStockGroups.filter((group) =>
-    group.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
+    (group.groupName ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase()) ||
     (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
