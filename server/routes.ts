@@ -9184,6 +9184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             companyId: entry.companyId,
             companyName: company?.name || "Unknown",
             docNumber: entry.voucherNumber,
+            voucherId: entry.voucherId,
             description: entry.narration || entry.voucherDescription || "",
             voucherType: entry.voucherType,
             debit: parseFloat(entry.debitAmount || "0"),

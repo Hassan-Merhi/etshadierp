@@ -31,8 +31,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye } from "lucide-react";
+import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import * as XLSX from "xlsx";
 
@@ -54,8 +55,42 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, selectCompany } = useCompany();
   const [_location, navigate] = useLocation();
+
+  // Handle clicking on a transaction to navigate to it
+  const handleTransactionClick = async (txn: any) => {
+    // First switch to the correct company if different
+    const targetCompany = companies.find((c: any) => c.id === txn.companyId);
+    if (targetCompany && (!selectedCompany || selectedCompany.id !== txn.companyId)) {
+      // Switch company via API first
+      await apiRequest("POST", "/api/companies/switch", { companyId: txn.companyId });
+      selectCompany(targetCompany);
+    }
+
+    // Close the dialog
+    setSelectedSupplier(null);
+
+    // Navigate based on voucher type
+    const voucherType = txn.voucherType?.toLowerCase() || "";
+    
+    if (voucherType === "purchase" || voucherType.includes("po")) {
+      // For POs, extract container ID from description if available
+      const containerMatch = txn.description?.match(/Container\s+([A-Z0-9]+)/i);
+      if (containerMatch) {
+        navigate("/containers");
+      } else {
+        navigate(`/vouchers/${txn.voucherId}/edit`);
+      }
+    } else if (voucherType === "payment" || voucherType === "receipt") {
+      navigate(`/vouchers/${txn.voucherId}/edit`);
+    } else if (voucherType === "journal") {
+      navigate(`/vouchers/${txn.voucherId}/edit`);
+    } else {
+      // Default: navigate to voucher edit page
+      navigate(`/vouchers/${txn.voucherId}/edit`);
+    }
+  };
   
   // Fetch global supplier statistics (no company filter)
   const { data: suppliers = [], isLoading } = useQuery<SupplierWithStats[]>({
@@ -339,9 +374,8 @@ export default function Suppliers() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead>Doc #</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead className="max-w-xs">Description</TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -358,16 +392,20 @@ export default function Suppliers() {
                             <TableCell className="text-sm">
                               <Badge variant="secondary">{txn.companyName}</Badge>
                             </TableCell>
-                            <TableCell className="font-mono text-sm font-medium">
-                              {txn.docNumber}
-                            </TableCell>
                             <TableCell>
                               <Badge variant={isPayment ? "default" : "outline"}>
                                 {isPayment ? "Payment" : txn.voucherType}
                               </Badge>
                             </TableCell>
-                            <TableCell className="max-w-xs truncate text-sm">
-                              {txn.description || "-"}
+                            <TableCell>
+                              <button
+                                onClick={() => handleTransactionClick(txn)}
+                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                data-testid={`link-transaction-${idx}`}
+                              >
+                                <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
+                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                              </button>
                             </TableCell>
                             <TableCell className="text-right font-mono font-semibold">
                               ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -379,22 +417,10 @@ export default function Suppliers() {
                 </Table>
                 
                 {/* Summary */}
-                <div className="border-t pt-4 flex justify-end gap-8">
+                <div className="border-t pt-4 flex justify-end">
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Total Payments: </span>
-                    <span className="font-mono font-semibold">
-                      ${unifiedLedger.reduce((sum: number, t: any) => sum + t.debit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Purchases: </span>
-                    <span className="font-mono font-semibold">
-                      ${unifiedLedger.reduce((sum: number, t: any) => sum + t.credit, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Current Balance: </span>
-                    <span className="font-mono font-semibold">
+                    <span className="text-muted-foreground">Total Balance: </span>
+                    <span className="font-mono font-semibold text-lg">
                       ${(unifiedLedger.length > 0 
                         ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
                         : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
