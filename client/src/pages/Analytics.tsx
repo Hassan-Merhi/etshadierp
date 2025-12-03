@@ -429,7 +429,7 @@ export default function Analytics() {
 
   // Filter accounts
   const cashAccounts = accounts.filter(
-    (acc) => acc.type === "Bank" && (
+    (acc) => acc.type === "bank" && (
       acc.name.toLowerCase().includes("cash") || 
       acc.code.toLowerCase().includes("cash")
     )
@@ -437,9 +437,9 @@ export default function Analytics() {
 
   const assetAccounts = accounts.filter(
     (acc) =>
-      acc.type === "Fixed Asset" ||
-      (acc.type === "Ledger" && acc.accountType === "Asset") ||
-      acc.type === "Bank"
+      acc.type === "fixedAsset" ||
+      (acc.type === "ledger" && acc.accountType === "Asset") ||
+      acc.type === "bank"
   );
 
   // Exclude inventory-related accounts from expense display
@@ -458,7 +458,7 @@ export default function Analytics() {
     code.toUpperCase().replace(/[\s_-]/g, "");
   
   const expenseAccounts = accounts.filter((acc) => {
-    if (acc.type !== "Ledger") return false;
+    if (acc.type !== "ledger") return false;
     
     // Support both correct format (accountType="Expense") and legacy format
     // (accountType="Indirect Expense" or "Direct Expense")
@@ -485,7 +485,7 @@ export default function Analytics() {
 
   const liabilityAccounts = accounts.filter(
     (acc) => 
-      (acc.type === "Ledger" && (
+      (acc.type === "ledger" && (
         acc.accountType === "Liability" ||
         acc.accountType === "Accounts Payable" ||
         acc.accountType === "Loans" ||
@@ -496,14 +496,14 @@ export default function Analytics() {
 
   const directIncomeAccounts = accounts.filter(
     (acc) =>
-      acc.type === "Ledger" &&
+      acc.type === "ledger" &&
       acc.accountType === "Income" &&
       acc.subType === "Direct Income"
   );
 
   const indirectIncomeAccounts = accounts.filter(
     (acc) =>
-      acc.type === "Ledger" &&
+      acc.type === "ledger" &&
       acc.accountType === "Income" &&
       acc.subType === "Indirect Income"
   );
