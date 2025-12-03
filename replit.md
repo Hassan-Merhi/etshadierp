@@ -1,5 +1,15 @@
 # ERP POS System
 
+## Recent Changes (Dec 3, 2025)
+
+- **Purchase Order Freight & Charges**: POs now have editable freight and other charges fields
+  - Schema: Added `freight` and `otherCharges` decimal columns to `purchase_orders` table
+  - PurchaseOrderEdit UI: Fixed fields for freight and other charges (replaces dynamic charges array)
+  - Grand total displayed: Items + Freight + Other Charges
+  - Saving PO updates container totals (chargesTotal = sum of all PO freight + otherCharges)
+  - Saving PO updates associated voucher and voucher entries with new total
+  - Supplier account balance automatically reflects full PO amount including charges
+
 ## Recent Changes (Dec 2, 2025)
 
 - **Voucher Deletion Now Reverses Inventory**: Deleting vouchers now properly restores inventory movements
