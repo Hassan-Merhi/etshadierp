@@ -393,13 +393,13 @@ export default function LocationSummary() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+        <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 100px)' }}>
           <div className="overflow-auto flex-1" ref={tableScrollContainer}>
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="bg-muted">
                   <th 
-                    className="text-left py-1 px-2 font-semibold border-b border-r sticky left-0 bg-muted z-30 min-w-[180px]"
+                    className="text-left py-2 px-3 font-semibold border-b border-r sticky left-0 bg-muted z-30 min-w-[280px]"
                     rowSpan={2}
                   >
                     Particulars
@@ -408,7 +408,7 @@ export default function LocationSummary() {
                     <th 
                       key={location.id} 
                       colSpan={3} 
-                      className="text-center py-1 px-1 font-semibold border-b border-r bg-muted"
+                      className="text-center py-2 px-2 font-semibold border-b border-r bg-muted"
                     >
                       <span className="truncate block" title={location.name}>
                         {location.name}
@@ -419,9 +419,9 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-1 px-1 font-medium border-b w-56 bg-muted/80">Qty (BL)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b w-20 bg-muted/80">Rate ($)</th>
-                      <th className="text-right py-1 px-1 font-medium border-b border-r w-24 bg-muted/80">Value ($)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b w-32 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b w-24 bg-muted/80">Rate ($)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b border-r w-28 bg-muted/80">Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
@@ -460,7 +460,7 @@ export default function LocationSummary() {
                           data-row-key={buildRowKey(group.id)}
                         >
                           <td className={cn(
-                            "py-1 px-2 border-r sticky left-0 z-10 font-semibold",
+                            "py-2 px-3 border-r sticky left-0 z-10 font-semibold",
                             highlightedRows.has(buildRowKey(group.id)) ? "bg-blue-400 dark:bg-blue-800" : "bg-accent/30"
                           )}>
                             <div className="flex items-center gap-1">
@@ -478,19 +478,19 @@ export default function LocationSummary() {
                             return (
                               <Fragment key={`group-${group.id}-loc-${location.id}`}>
                                 <td className={cn(
-                                  "text-right py-1 px-1 tabular-nums font-medium",
+                                  "text-right py-2 px-3 tabular-nums font-medium",
                                   isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {formatNumber(data.quantity, 0, "BL")}
                                 </td>
                                 <td className={cn(
-                                  "text-right py-1 px-1 tabular-nums text-foreground",
+                                  "text-right py-2 px-3 tabular-nums text-foreground",
                                   isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                                 </td>
                                 <td className={cn(
-                                  "text-right py-1 px-1 border-r tabular-nums font-semibold",
+                                  "text-right py-2 px-3 border-r tabular-nums font-semibold",
                                   isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
                                   {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
@@ -516,7 +516,7 @@ export default function LocationSummary() {
                             data-row-key={buildRowKey(group.id, item.id)}
                           >
                             <td className={cn(
-                              "py-0.5 pl-6 pr-2 border-r sticky left-0 z-10 cursor-pointer hover:underline",
+                              "py-1 pl-8 pr-3 border-r sticky left-0 z-10 cursor-pointer hover:underline",
                               highlightedRows.has(buildRowKey(group.id, item.id)) 
                                 ? "bg-blue-300 dark:bg-blue-700" 
                                 : (itemIndex % 2 === 0 ? "bg-background" : "bg-muted/30")
@@ -540,7 +540,7 @@ export default function LocationSummary() {
                                 <Fragment key={`item-${item.id}-loc-${location.id}`}>
                                   <td 
                                     className={cn(
-                                      "text-right py-0.5 px-1 tabular-nums cursor-pointer hover:bg-accent/30",
+                                      "text-right py-1 px-3 tabular-nums cursor-pointer hover:bg-accent/30",
                                       isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
@@ -550,7 +550,7 @@ export default function LocationSummary() {
                                   </td>
                                   <td 
                                     className={cn(
-                                      "text-right py-0.5 px-1 tabular-nums text-foreground cursor-pointer hover:bg-accent/30",
+                                      "text-right py-1 px-3 tabular-nums text-foreground cursor-pointer hover:bg-accent/30",
                                       isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
@@ -560,7 +560,7 @@ export default function LocationSummary() {
                                   </td>
                                   <td 
                                     className={cn(
-                                      "text-right py-0.5 px-1 border-r tabular-nums cursor-pointer hover:bg-accent/30",
+                                      "text-right py-1 px-3 border-r tabular-nums cursor-pointer hover:bg-accent/30",
                                       isSelectedCell && !isHighlighted && "bg-blue-200 dark:bg-blue-800"
                                     )}
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
@@ -576,21 +576,50 @@ export default function LocationSummary() {
                       </Fragment>
                     ))}
                     <tr className="font-bold bg-primary/10 border-t-2 border-primary/30">
-                      <td className="py-1 px-2 border-r sticky left-0 bg-primary/10 text-primary z-10">
-                        Grand Total
+                      <td className="py-2 px-3 border-r sticky left-0 bg-primary/10 text-primary z-10">
+                        Grand Total (by Location)
                       </td>
                       {selectedLocations.map((location, locIndex) => {
                         const data = summaryData.grandTotals[location.id] || { quantity: 0, rate: 0, value: 0 };
                         return (
                           <Fragment key={`grand-${location.id}`}>
-                            <td className="text-right py-1 px-1 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
+                            <td className="text-right py-2 px-3 tabular-nums" data-testid={`text-grand-qty-${location.id}`}>
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
-                            <td className="text-right py-1 px-1 tabular-nums text-foreground">
+                            <td className="text-right py-2 px-3 tabular-nums text-foreground">
                               {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
                             </td>
-                            <td className="text-right py-1 px-1 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
+                            <td className="text-right py-2 px-3 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
                               {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
+                            </td>
+                          </Fragment>
+                        );
+                      })}
+                    </tr>
+                    <tr className="font-bold bg-green-100 dark:bg-green-900/40 border-t">
+                      <td className="py-2 px-3 border-r sticky left-0 bg-green-100 dark:bg-green-900/40 text-green-900 dark:text-green-100 z-10">
+                        Total (All Locations)
+                      </td>
+                      {selectedLocations.map((location) => {
+                        const totalQty = selectedLocations.reduce((sum, loc) => {
+                          const data = summaryData.grandTotals[loc.id] || { quantity: 0, rate: 0, value: 0 };
+                          return sum + data.quantity;
+                        }, 0);
+                        const totalValue = selectedLocations.reduce((sum, loc) => {
+                          const data = summaryData.grandTotals[loc.id] || { quantity: 0, rate: 0, value: 0 };
+                          return sum + data.value;
+                        }, 0);
+                        const avgRate = totalQty > 0 ? totalValue / totalQty : 0;
+                        return (
+                          <Fragment key={`total-all-${location.id}`}>
+                            <td className="text-right py-2 px-3 tabular-nums" data-testid="text-total-all-qty">
+                              {formatNumber(totalQty, 0, "BL")}
+                            </td>
+                            <td className="text-right py-2 px-3 tabular-nums text-foreground" data-testid="text-total-all-rate">
+                              {avgRate === 0 ? "" : "$" + formatNumber(avgRate, 2)}
+                            </td>
+                            <td className="text-right py-2 px-3 border-r tabular-nums" data-testid="text-total-all-value">
+                              {formatNumber(totalValue, 2, "")}
                             </td>
                           </Fragment>
                         );
