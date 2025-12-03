@@ -3,8 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Combobox } from "@/components/ui/combobox";
-import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
@@ -74,7 +76,7 @@ export default function Dashboard() {
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [selectedPayableAccountId, setSelectedPayableAccountId] = useState<number>(0);
-  const [payableSearchQuery, setPayableSearchQuery] = useState("");
+  const [payableComboboxOpen, setPayableComboboxOpen] = useState(false);
   
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
@@ -483,16 +485,50 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Supplier</label>
-                    <Combobox
-                      options={availablePayableAccounts.map((account) => ({
-                        value: account.id.toString(),
-                        label: account.name,
-                      }))}
-                      value={selectedPayableAccountId.toString()}
-                      onValueChange={(value) => setSelectedPayableAccountId(parseInt(value))}
-                      placeholder="Search suppliers..."
-                      data-testid="select-payable-account"
-                    />
+                    <Popover open={payableComboboxOpen} onOpenChange={setPayableComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={payableComboboxOpen}
+                          className="w-full justify-between"
+                          data-testid="select-payable-account"
+                        >
+                          {selectedPayableAccountId > 0
+                            ? availablePayableAccounts.find((acc) => acc.id === selectedPayableAccountId)?.name || "Select supplier..."
+                            : "Search suppliers..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search suppliers..." />
+                          <CommandList>
+                            <CommandEmpty>No supplier found.</CommandEmpty>
+                            <CommandGroup>
+                              {availablePayableAccounts.map((account) => (
+                                <CommandItem
+                                  key={account.id}
+                                  value={account.name}
+                                  onSelect={() => {
+                                    setSelectedPayableAccountId(account.id);
+                                    setPayableComboboxOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedPayableAccountId === account.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {account.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <Button
                     onClick={() => {
