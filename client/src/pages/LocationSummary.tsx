@@ -297,11 +297,11 @@ export default function LocationSummary() {
   }, [selectedRowKey]);
 
   return (
-    <div className="p-4 space-y-4" data-testid="location-summary-container">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="w-full h-screen flex flex-col p-2 space-y-2 overflow-hidden" data-testid="location-summary-container">
+      <div className="flex items-center justify-between gap-4 flex-wrap flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Location Summary</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold" data-testid="text-page-title">Location Summary</h1>
+          <p className="text-xs text-muted-foreground">
             Stock inventory across locations with expandable stock groups
           </p>
         </div>
@@ -393,13 +393,13 @@ export default function LocationSummary() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+        <Card className="overflow-hidden flex flex-col flex-1 w-full"style={{ maxHeight: 'calc(100vh - 150px)' }}>
           <div className="overflow-auto flex-1" ref={tableScrollContainer}>
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="bg-muted">
                   <th 
-                    className="text-left py-2 px-3 font-semibold border-b border-r sticky left-0 bg-muted z-30 min-w-[280px]"
+                    className="text-left py-2 px-3 font-semibold border-b border-r sticky left-0 bg-muted z-30 w-80 min-w-[320px]"
                     rowSpan={2}
                   >
                     Particulars
@@ -419,9 +419,9 @@ export default function LocationSummary() {
                 <tr className="bg-muted/80">
                   {selectedLocations.map((location, locIndex) => (
                     <Fragment key={`header-${location.id}`}>
-                      <th className="text-right py-2 px-3 font-medium border-b w-32 bg-muted/80">Qty (BL)</th>
-                      <th className="text-right py-2 px-3 font-medium border-b w-24 bg-muted/80">Rate ($)</th>
-                      <th className="text-right py-2 px-3 font-medium border-b border-r w-28 bg-muted/80">Value ($)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b w-40 bg-muted/80">Qty (BL)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b w-32 bg-muted/80">Rate ($)</th>
+                      <th className="text-right py-2 px-3 font-medium border-b border-r w-36 bg-muted/80">Value ($)</th>
                     </Fragment>
                   ))}
                 </tr>
