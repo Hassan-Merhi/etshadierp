@@ -337,7 +337,6 @@ export default function Accounts() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
-      setIsCreateDialogOpen(false);
       form.reset();
     },
     onError: (error: any) => {
@@ -431,7 +430,6 @@ export default function Accounts() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      setIsBankDialogOpen(false);
       bankForm.reset();
     },
     onError: (error: any) => {
@@ -756,7 +754,7 @@ export default function Accounts() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setIsBankDialogOpen(false)}
+                        onClick={() => setBankToEdit(null)}
                         data-testid="button-cancel-bank"
                       >
                         Cancel
@@ -775,8 +773,6 @@ export default function Accounts() {
             </Form>
           </DialogContent>
         </Dialog>
-        </div>
-      </div>
 
       <Tabs defaultValue="view" className="space-y-6">
         <TabsList>
