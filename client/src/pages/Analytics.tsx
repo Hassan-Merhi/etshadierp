@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -387,9 +387,16 @@ export default function Analytics() {
     return { parentAccounts, accountMap };
   };
 
+  const parseBalance = (balance: number | string): number => {
+    if (typeof balance === 'string') {
+      return parseFloat(balance) || 0;
+    }
+    return balance || 0;
+  };
+
   const calculateChildrenTotal = (parentAccountId: number, accountMap: Map<number, Account[]>) => {
     const children = accountMap.get(parentAccountId) || [];
-    return children.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    return children.reduce((sum, acc) => sum + parseBalance(acc.balance), 0);
   };
 
   const calculateTotal = (accountList: Account[]) => {
@@ -401,20 +408,33 @@ export default function Analytics() {
       accountList.filter(acc => acc.parentId).map(acc => acc.parentId!)
     );
     
-    // Only sum accounts that are:
-    // 1. NOT parents (leaf accounts)
-    // 2. Either have no parent OR their parent is in this list (not orphaned)
-    return accountList
-      .filter(acc => 
-        !parentAccountIds.has(acc.accountId) && 
-        (!acc.parentId || accountIds.has(acc.parentId))
-      )
-      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    // For parent accounts that have children in the list, sum their children only (not the parent)
+    // For accounts without children, include the account itself
+    // For child accounts whose parent is also in the list, skip them (they're counted via their parent's children total)
+    let total = 0;
+    
+    accountList.forEach(acc => {
+      const hasChildrenInList = parentAccountIds.has(acc.accountId);
+      const isChildOfParentInList = acc.parentId && accountIds.has(acc.parentId);
+      
+      if (hasChildrenInList) {
+        // This is a parent with children - count the children's total (not the parent's balance)
+        const children = accountList.filter(child => child.parentId === acc.accountId);
+        total += children.reduce((sum, child) => sum + parseBalance(child.balance), 0);
+      } else if (!isChildOfParentInList) {
+        // This is a standalone account (not a child of something in the list) - count its balance
+        total += parseBalance(acc.balance);
+      }
+      // If it's a child of a parent in the list, don't count it separately (already counted via parent)
+    });
+    
+    return total;
   };
 
   const calculatePLTotal = (accountList: Account[]) => {
     return accountList.reduce((sum, acc) => {
-      const amount = acc.balanceSide === "Cr" ? acc.balance : -acc.balance;
+      const balance = parseBalance(acc.balance);
+      const amount = acc.balanceSide === "Cr" ? balance : -balance;
       return sum + amount;
     }, 0);
   };
@@ -425,6 +445,15 @@ export default function Analytics() {
       currency: "USD",
       minimumFractionDigits: 2,
     }).format(Math.abs(value));
+  };
+
+  const formatSmartCurrency = (value: number): string => {
+    const absValue = Math.abs(value);
+    const isWholeNumber = absValue % 1 === 0;
+    if (isWholeNumber) {
+      return '$' + absValue.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+    return '$' + absValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   // Filter accounts
@@ -517,7 +546,7 @@ export default function Analytics() {
   const totalExpenses = totalDirectExpense + totalIndirectExpense;
   const netProfit = totalIncome - totalExpenses;
 
-  // Render hierarchical accounts
+  // Render hierarchical accounts (filters out zero-balance accounts)
   const renderHierarchicalAccounts = (accountList: Account[], showSide: boolean = false) => {
     const { parentAccounts, accountMap } = groupAccountsByParent(accountList);
 
@@ -528,11 +557,18 @@ export default function Analytics() {
           const hasChildren = children.length > 0;
           const isExpanded = expandedAccounts.has(parent.accountId);
           const childrenTotal = hasChildren ? calculateChildrenTotal(parent.accountId, accountMap) : 0;
+          const parentBalance = parseBalance(parent.balance);
+          const displayBalance = hasChildren ? childrenTotal : parentBalance;
+          
+          // Skip accounts with 0 balance (check children total for parent accounts)
+          if (displayBalance === 0) return null;
+          
+          // Filter out children with 0 balance
+          const nonZeroChildren = children.filter(child => parseBalance(child.balance) !== 0);
 
           return (
-            <>
+            <Fragment key={parent.id}>
               <TableRow 
-                key={parent.id} 
                 data-testid={`row-account-${parent.id}`}
                 className={hasChildren ? "hover-elevate cursor-pointer font-medium" : ""}
                 onClick={() => hasChildren && toggleAccount(parent.accountId)}
@@ -548,7 +584,7 @@ export default function Analytics() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono font-medium">
-                  ${(hasChildren ? childrenTotal : parent.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatSmartCurrency(displayBalance)}
                 </TableCell>
                 {showSide && (
                   <TableCell className="text-right text-sm text-muted-foreground">
@@ -556,13 +592,13 @@ export default function Analytics() {
                   </TableCell>
                 )}
               </TableRow>
-              {hasChildren && isExpanded && children.map((child) => (
+              {hasChildren && isExpanded && nonZeroChildren.map((child) => (
                 <TableRow key={child.id} data-testid={`row-account-${child.id}`}>
                   <TableCell className="pl-8 text-muted-foreground">
                     {child.name}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${child.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatSmartCurrency(parseBalance(child.balance))}
                   </TableCell>
                   {showSide && (
                     <TableCell className="text-right text-sm text-muted-foreground">
@@ -571,7 +607,7 @@ export default function Analytics() {
                   )}
                 </TableRow>
               ))}
-            </>
+            </Fragment>
           );
         })}
       </>
@@ -764,19 +800,19 @@ export default function Analytics() {
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Total Assets</span>
                     <span className="text-sm font-mono font-medium">
-                      ${calculateTotal(assetAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(assetAccounts))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Total Liabilities</span>
                     <span className="text-sm font-mono font-medium">
-                      ${calculateTotal(liabilityAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(liabilityAccounts))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Cash Balance</span>
                     <span className="text-sm font-mono font-medium">
-                      ${calculateTotal(cashAccounts).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(cashAccounts))}
                     </span>
                   </div>
                 </div>
@@ -886,7 +922,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(expenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(expenseAccounts))}
                     </p>
                   </div>
                 </div>
@@ -927,7 +963,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(assetAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(assetAccounts))}
                     </p>
                   </div>
                 </div>
@@ -968,7 +1004,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(liabilityAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(liabilityAccounts))}
                     </p>
                   </div>
                 </div>
@@ -1009,7 +1045,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(indirectExpenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
                     </p>
                   </div>
                 </div>
@@ -1050,7 +1086,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(directExpenseAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
                     </p>
                   </div>
                 </div>
@@ -1091,7 +1127,7 @@ export default function Analytics() {
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total Cash</p>
                     <p className="text-2xl font-bold font-mono">
-                      ${calculateTotal(cashAccounts).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatSmartCurrency(calculateTotal(cashAccounts))}
                     </p>
                   </div>
                 </div>
