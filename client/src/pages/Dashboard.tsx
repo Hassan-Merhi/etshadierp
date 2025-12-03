@@ -112,13 +112,17 @@ export default function Dashboard() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch all payable accounts (creditors)
+  // Fetch all payable accounts (ledger accounts with liability/payable type)
   const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
-    queryKey: ["/api/accounts/payables", selectedCompany?.id],
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/accounts/payables", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch payable accounts");
-      return await response.json();
+      const response = await fetch("/api/accounts/all", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch accounts");
+      const allAccounts = await response.json();
+      // Filter to show only payable/liability type accounts
+      return allAccounts.filter((acc: any) => 
+        acc.type && acc.type.toLowerCase() === "ledger"
+      );
     },
     enabled: !!selectedCompany,
   });
@@ -234,7 +238,7 @@ export default function Dashboard() {
 
   // Get available payable accounts (excluding ones already added)
   const availablePayableAccounts = allPayableAccounts.filter(acc => {
-    const alreadyAdded = dashboardPayableAccounts.some(dpa => dpa.id === acc.id);
+    const alreadyAdded = dashboardPayableAccounts.some(dpa => dpa.accountId === acc.accountId);
     return !alreadyAdded;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -495,30 +499,30 @@ export default function Dashboard() {
                           data-testid="select-payable-account"
                         >
                           {selectedPayableAccountId > 0
-                            ? availablePayableAccounts.find((acc) => acc.id === selectedPayableAccountId)?.name || "Select supplier..."
-                            : "Search suppliers..."}
+                            ? availablePayableAccounts.find((acc) => acc.accountId === selectedPayableAccountId)?.name || "Select account..."
+                            : "Search accounts..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Search suppliers..." />
+                          <CommandInput placeholder="Search accounts..." />
                           <CommandList>
-                            <CommandEmpty>No supplier found.</CommandEmpty>
+                            <CommandEmpty>No account found.</CommandEmpty>
                             <CommandGroup>
                               {availablePayableAccounts.map((account) => (
                                 <CommandItem
-                                  key={account.id}
+                                  key={account.accountId}
                                   value={account.name}
                                   onSelect={() => {
-                                    setSelectedPayableAccountId(account.id);
+                                    setSelectedPayableAccountId(account.accountId);
                                     setPayableComboboxOpen(false);
                                   }}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      selectedPayableAccountId === account.id ? "opacity-100" : "opacity-0"
+                                      selectedPayableAccountId === account.accountId ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   {account.name}
@@ -534,7 +538,7 @@ export default function Dashboard() {
                     onClick={() => {
                       if (selectedPayableAccountId > 0) {
                         addPayableAccountMutation.mutate({
-                          supplierId: selectedPayableAccountId,
+                          accountId: selectedPayableAccountId,
                         });
                       }
                     }}

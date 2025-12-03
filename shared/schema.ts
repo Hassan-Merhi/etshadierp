@@ -1090,7 +1090,7 @@ export type DashboardCashAccount = typeof dashboardCashAccounts.$inferSelect;
 export const dashboardPayableAccounts = pgTable("dashboard_payable_accounts", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
-  supplierId: integer("supplier_id").notNull(),
+  accountId: integer("account_id").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -1100,7 +1100,7 @@ export const insertDashboardPayableAccountSchema = createInsertSchema(dashboardP
   createdAt: true,
 }).extend({
   companyId: z.number().min(1, "Company is required"),
-  supplierId: z.number().min(1, "Supplier is required"),
+  accountId: z.number().min(1, "Account is required"),
   displayOrder: z.number().optional(),
 });
 

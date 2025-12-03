@@ -16115,7 +16115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { dashboardPayableAccounts, suppliers, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
+      const { dashboardPayableAccounts, ledgerAccounts, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
       
       const accounts = await db
         .select()
@@ -16124,24 +16124,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(dashboardPayableAccounts.displayOrder)
         .execute();
 
-      // Enrich with supplier details and calculate balance from voucher entries
+      // Enrich with ledger account details and calculate balance from voucher entries
       const enrichedAccounts = await Promise.all(
         accounts.map(async (account) => {
-          const [supplier] = await db
+          const [ledgerAccount] = await db
             .select()
-            .from(suppliers)
-            .where(eq(suppliers.id, account.supplierId))
+            .from(ledgerAccounts)
+            .where(eq(ledgerAccounts.id, account.accountId))
             .execute();
           
+          if (!ledgerAccount) {
+            return null;
+          }
+          
           // Calculate balance from voucher entries
-          let balance = parseFloat(supplier?.openingBalance || "0");
+          let balance = parseFloat(ledgerAccount?.openingBalance || "0");
           
           const entries = await db
             .select()
             .from(voucherEntries)
             .leftJoin(vouchersTable, eq(vouchersTable.id, voucherEntries.voucherId))
             .where(and(
-              eq(voucherEntries.supplierId, account.supplierId),
+              eq(voucherEntries.ledgerId, account.accountId),
               eq(vouchersTable.companyId, companyId)
             ))
             .execute();
@@ -16158,17 +16162,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           return {
-            id: account.supplierId,
-            accountId: account.supplierId,
-            code: supplier?.code || "",
-            name: supplier?.legalName || "",
+            id: account.accountId,
+            accountId: account.accountId,
+            code: ledgerAccount?.code || "",
+            name: ledgerAccount?.name || "",
             balance,
           };
         })
       );
 
-      // Filter out deleted suppliers
-      const validAccounts = enrichedAccounts.filter((a) => a.name !== "");
+      // Filter out deleted accounts
+      const validAccounts = enrichedAccounts.filter((a) => a !== null);
       res.json(validAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -16209,13 +16213,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { dashboardPayableAccounts } = await import("@shared/schema");
-      const supplierId = parseInt(req.params.id);
+      const accountId = parseInt(req.params.id);
 
       await db
         .delete(dashboardPayableAccounts)
         .where(
           and(
-            eq(dashboardPayableAccounts.supplierId, supplierId),
+            eq(dashboardPayableAccounts.accountId, accountId),
             eq(dashboardPayableAccounts.companyId, companyId)
           )
         )
