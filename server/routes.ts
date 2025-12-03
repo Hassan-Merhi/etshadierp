@@ -8076,6 +8076,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(containers.id, existingPO.containerId));
           }
+          
+          // Update the associated voucher with new total (items + freight + otherCharges)
+          if (existingPO.voucherId) {
+            const poGrandTotal = itemsTotal + freight + otherCharges;
+            
+            // Update voucher total amount
+            await tx.update(vouchers)
+              .set({ totalAmount: poGrandTotal.toFixed(2) })
+              .where(eq(vouchers.id, existingPO.voucherId));
+            
+            // Update voucher entries - both debit (purchases) and credit (supplier)
+            const existingEntries = await tx
+              .select()
+              .from(voucherEntries)
+              .where(eq(voucherEntries.voucherId, existingPO.voucherId));
+            
+            for (const entry of existingEntries) {
+              if (parseFloat(entry.debitAmount || "0") > 0) {
+                // Update debit entry (Purchases expense)
+                await tx.update(voucherEntries)
+                  .set({ debitAmount: poGrandTotal.toFixed(2) })
+                  .where(eq(voucherEntries.id, entry.id));
+              } else if (parseFloat(entry.creditAmount || "0") > 0) {
+                // Update credit entry (Supplier payable)
+                await tx.update(voucherEntries)
+                  .set({ creditAmount: poGrandTotal.toFixed(2) })
+                  .where(eq(voucherEntries.id, entry.id));
+              }
+            }
+          }
         });
         
         // Get updated PO with items
