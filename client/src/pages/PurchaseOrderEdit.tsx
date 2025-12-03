@@ -21,12 +21,6 @@ interface LineItem {
   lineTotal?: string;
 }
 
-interface Charge {
-  id?: number;
-  chargeType: string;
-  amount: string;
-}
-
 interface PurchaseOrder {
   id: number;
   poNumber: string;
@@ -37,9 +31,10 @@ interface PurchaseOrder {
   containerNumber: string;
   currency: string;
   itemsTotal: string;
+  freight: string;
+  otherCharges: string;
   status: string;
   items: LineItem[];
-  charges: Charge[];
 }
 
 export default function PurchaseOrderEdit() {
@@ -52,7 +47,8 @@ export default function PurchaseOrderEdit() {
   const [currency, setCurrency] = useState("USD");
   const [status, setStatus] = useState("Open");
   const [items, setItems] = useState<LineItem[]>([]);
-  const [charges, setCharges] = useState<Charge[]>([]);
+  const [freight, setFreight] = useState("0");
+  const [otherCharges, setOtherCharges] = useState("0");
 
   const { data: stockItems } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
@@ -76,12 +72,13 @@ export default function PurchaseOrderEdit() {
         rate: item.rate,
         lineTotal: item.lineTotal,
       })));
-      setCharges(po.charges || []);
+      setFreight(po.freight || "0");
+      setOtherCharges(po.otherCharges || "0");
     }
   }, [po]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { poNumber: string; currency: string; status: string; items: LineItem[]; charges: Charge[] }) => {
+    mutationFn: async (data: { poNumber: string; currency: string; status: string; items: LineItem[]; freight: string; otherCharges: string }) => {
       return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
     },
     onSuccess: () => {
@@ -116,20 +113,6 @@ export default function PurchaseOrderEdit() {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleAddCharge = () => {
-    setCharges([...charges, { chargeType: "", amount: "0" }]);
-  };
-
-  const handleRemoveCharge = (index: number) => {
-    setCharges(charges.filter((_, i) => i !== index));
-  };
-
-  const handleChargeChange = (index: number, field: keyof Charge, value: string) => {
-    const newCharges = [...charges];
-    (newCharges[index] as any)[field] = value;
-    setCharges(newCharges);
-  };
-
   const handleItemChange = (index: number, field: keyof LineItem, value: string | number | null) => {
     const newItems = [...items];
     if (field === "stockItemId" && value) {
@@ -153,10 +136,17 @@ export default function PurchaseOrderEdit() {
     return (qty * rate).toFixed(2);
   };
 
-  const calculateTotal = () => {
+  const calculateItemsTotal = () => {
     return items.reduce((sum, item) => {
       return sum + parseFloat(calculateLineTotal(item));
     }, 0).toFixed(2);
+  };
+
+  const calculateGrandTotal = () => {
+    const itemsTotal = parseFloat(calculateItemsTotal());
+    const freightAmount = parseFloat(freight) || 0;
+    const otherChargesAmount = parseFloat(otherCharges) || 0;
+    return (itemsTotal + freightAmount + otherChargesAmount).toFixed(2);
   };
 
   const handleSave = () => {
@@ -188,7 +178,8 @@ export default function PurchaseOrderEdit() {
         quantity: item.quantity,
         rate: item.rate,
       })),
-      charges: charges.filter(c => c.chargeType.trim()),
+      freight,
+      otherCharges,
     });
   };
 
@@ -365,10 +356,10 @@ export default function PurchaseOrderEdit() {
                   {items.length > 0 && (
                     <TableRow className="bg-muted/50">
                       <TableCell colSpan={3} className="text-right font-medium">
-                        Total:
+                        Items Total:
                       </TableCell>
                       <TableCell className="text-right font-mono font-bold">
-                        ${calculateTotal()}
+                        ${calculateItemsTotal()}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -378,67 +369,43 @@ export default function PurchaseOrderEdit() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Freight & Other Charges</Label>
-              <Button size="sm" variant="outline" onClick={handleAddCharge} data-testid="button-add-charge">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Charge
-              </Button>
+          <div className="space-y-4">
+            <Label>Freight & Other Charges</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="freight">Freight</Label>
+                <Input
+                  id="freight"
+                  type="number"
+                  step="0.01"
+                  value={freight}
+                  onChange={(e) => setFreight(e.target.value)}
+                  className="text-right"
+                  data-testid="input-freight"
+                />
+              </div>
+              <div>
+                <Label htmlFor="otherCharges">Other Charges</Label>
+                <Input
+                  id="otherCharges"
+                  type="number"
+                  step="0.01"
+                  value={otherCharges}
+                  onChange={(e) => setOtherCharges(e.target.value)}
+                  className="text-right"
+                  data-testid="input-other-charges"
+                />
+              </div>
             </div>
             
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50%]">Charge Type</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {charges.map((charge, index) => (
-                    <TableRow key={index} data-testid={`row-charge-${index}`}>
-                      <TableCell>
-                        <Input
-                          type="text"
-                          placeholder="e.g. Freight, Customs, Storage"
-                          value={charge.chargeType}
-                          onChange={(e) => handleChargeChange(index, "chargeType", e.target.value)}
-                          data-testid={`input-charge-type-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={charge.amount}
-                          onChange={(e) => handleChargeChange(index, "amount", e.target.value)}
-                          className="text-right"
-                          data-testid={`input-charge-amount-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleRemoveCharge(index)}
-                          data-testid={`button-remove-charge-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {charges.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                        No charges. Click "Add Charge" to add freight or other charges.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            <div className="bg-muted/50 rounded-md p-4">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Grand Total:</span>
+                <span className="text-xl font-bold font-mono">${calculateGrandTotal()}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Items (${calculateItemsTotal()}) + Freight (${parseFloat(freight) || 0}) + Other Charges (${parseFloat(otherCharges) || 0})
+              </p>
             </div>
           </div>
         </CardContent>
