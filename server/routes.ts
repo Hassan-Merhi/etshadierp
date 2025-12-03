@@ -16115,7 +16115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { dashboardPayableAccounts, suppliers } = await import("@shared/schema");
+      const { dashboardPayableAccounts, suppliers, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
       
       const accounts = await db
         .select()
@@ -16124,7 +16124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(dashboardPayableAccounts.displayOrder)
         .execute();
 
-      // Enrich with supplier details
+      // Enrich with supplier details and calculate balance from voucher entries
       const enrichedAccounts = await Promise.all(
         accounts.map(async (account) => {
           const [supplier] = await db
@@ -16133,12 +16133,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(suppliers.id, account.supplierId))
             .execute();
           
+          // Calculate balance from voucher entries
+          let balance = parseFloat(supplier?.openingBalance || "0");
+          
+          const entries = await db
+            .select()
+            .from(voucherEntries)
+            .leftJoin(vouchersTable, eq(vouchersTable.id, voucherEntries.voucherId))
+            .where(and(
+              eq(voucherEntries.supplierId, account.supplierId),
+              eq(vouchersTable.companyId, companyId)
+            ))
+            .execute();
+          
+          entries.forEach((entry: any) => {
+            const amount = parseFloat(String(entry.voucher_entries.amount || 0));
+            const side = entry.voucher_entries.side;
+            
+            if (side === "Dr") {
+              balance -= amount;
+            } else if (side === "Cr") {
+              balance += amount;
+            }
+          });
+          
           return {
             id: account.supplierId,
             accountId: account.supplierId,
             code: supplier?.code || "",
             name: supplier?.legalName || "",
-            balance: parseFloat(supplier?.openingBalance || "0"),
+            balance,
           };
         })
       );

@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [selectedPayableAccountId, setSelectedPayableAccountId] = useState<number>(0);
+  const [payableSearchQuery, setPayableSearchQuery] = useState("");
   
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
@@ -119,10 +121,11 @@ export default function Dashboard() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch dashboard payable accounts
+  // Fetch dashboard payable accounts (auto-refresh every 30 seconds)
   const { data: dashboardPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
     enabled: !!selectedCompany,
+    refetchInterval: 30000,
   });
 
   // Add dashboard cash account mutation
@@ -480,27 +483,16 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Supplier</label>
-                    <Select
+                    <Combobox
+                      options={availablePayableAccounts.map((account) => ({
+                        value: account.id.toString(),
+                        label: account.name,
+                      }))}
                       value={selectedPayableAccountId.toString()}
                       onValueChange={(value) => setSelectedPayableAccountId(parseInt(value))}
-                    >
-                      <SelectTrigger data-testid="select-payable-account">
-                        <SelectValue placeholder="Select a supplier..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePayableAccounts.length === 0 ? (
-                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                            No available suppliers
-                          </div>
-                        ) : (
-                          availablePayableAccounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Search suppliers..."
+                      data-testid="select-payable-account"
+                    />
                   </div>
                   <Button
                     onClick={() => {
