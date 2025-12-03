@@ -1006,11 +1006,10 @@ export default function Analytics() {
         {/* Accounts Tab */}
         <TabsContent value="accounts" className="space-y-4">
           <Tabs defaultValue="expenses">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
-              <TabsTrigger value="assets">Assets</TabsTrigger>
-              <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
-              <TabsTrigger value="cash">Cash</TabsTrigger>
+              <TabsTrigger value="direct-expenses">Direct Expenses</TabsTrigger>
+              <TabsTrigger value="indirect-expenses">Indirect Expenses</TabsTrigger>
             </TabsList>
 
             {/* Expenses */}
@@ -1054,18 +1053,18 @@ export default function Analytics() {
               </Card>
             </TabsContent>
 
-            {/* Assets */}
-            <TabsContent value="assets" className="space-y-4">
+            {/* Direct Expenses */}
+            <TabsContent value="direct-expenses" className="space-y-4">
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium flex items-center gap-2">
-                    <Package className="h-5 w-5 text-primary" />
-                    All Asset Accounts
+                    <DollarSign className="h-5 w-5 text-red-500" />
+                    Direct Expense Accounts
                   </h3>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(assetAccounts))}
+                      {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
                     </p>
                   </div>
                 </div>
@@ -1075,9 +1074,9 @@ export default function Analytics() {
                       <Skeleton key={i} className="h-14 w-full" />
                     ))}
                   </div>
-                ) : assetAccounts.length === 0 ? (
+                ) : directExpenseAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No asset accounts found
+                    No direct expense accounts found
                   </p>
                 ) : (
                   <Table>
@@ -1088,25 +1087,25 @@ export default function Analytics() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {renderHierarchicalAccounts(assetAccounts)}
+                      {renderHierarchicalAccounts(directExpenseAccounts)}
                     </TableBody>
                   </Table>
                 )}
               </Card>
             </TabsContent>
 
-            {/* Liabilities */}
-            <TabsContent value="liabilities" className="space-y-4">
+            {/* Indirect Expenses */}
+            <TabsContent value="indirect-expenses" className="space-y-4">
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-red-500" />
-                    All Liability Accounts
+                    <FileText className="h-5 w-5 text-orange-500" />
+                    Indirect Expense Accounts
                   </h3>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                      {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
                     </p>
                   </div>
                 </div>
@@ -1116,9 +1115,9 @@ export default function Analytics() {
                       <Skeleton key={i} className="h-14 w-full" />
                     ))}
                   </div>
-                ) : liabilityAccounts.length === 0 ? (
+                ) : indirectExpenseAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No liability accounts found
+                    No indirect expense accounts found
                   </p>
                 ) : (
                   <Table>
@@ -1129,49 +1128,7 @@ export default function Analytics() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {renderHierarchicalAccounts(liabilityAccounts)}
-                    </TableBody>
-                  </Table>
-                )}
-              </Card>
-            </TabsContent>
-
-            {/* Cash */}
-            <TabsContent value="cash" className="space-y-4">
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-green-500" />
-                    Cash Accounts
-                  </h3>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total Cash</p>
-                    <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(cashAccounts))}
-                    </p>
-                  </div>
-                </div>
-                {accountsLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-14 w-full" />
-                    ))}
-                  </div>
-                ) : cashAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No cash accounts found
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                        <TableHead className="text-right">Side</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(cashAccounts, true)}
+                      {renderHierarchicalAccounts(indirectExpenseAccounts)}
                     </TableBody>
                   </Table>
                 )}
