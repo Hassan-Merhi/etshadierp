@@ -1094,7 +1094,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
                       <th className="text-right px-3 font-medium">Items</th>
-                      <th className="text-right px-3 font-medium">Total Qty</th>
+                      <th className="text-right px-3 font-medium">Total Qty (BL)</th>
                       {!posUser && (
                         <>
                           <th className="text-right px-3 font-medium">Avg Rate</th>
@@ -1111,37 +1111,56 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         </td>
                       </tr>
                     ) : (
-                      filteredStockGroups.map((group) => (
-                        <tr
-                          key={group.groupId || 0}
-                          className="border-t hover-elevate cursor-pointer h-12"
-                          onClick={() => setSelectedGroup(group)}
-                          data-testid={`row-group-${group.groupId || 'uncategorized'}`}
-                        >
-                          <td className="px-3 font-medium" data-testid={`name-${group.groupId}`}>
-                            <div className="flex items-center gap-2">
-                              <Layers className="h-4 w-4 text-muted-foreground" />
-                              {group.groupName}
-                            </div>
-                          </td>
-                          <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
-                            {group.itemCount}
-                          </td>
-                          <td className="px-3 text-right font-mono" data-testid={`qty-${group.groupId}`}>
-                            {Math.floor(group.totalQuantity)}
-                          </td>
-                          {!posUser && (
-                            <>
-                              <td className="px-3 text-right font-mono" data-testid={`rate-${group.groupId}`}>
-                                ${group.averageRate.toFixed(2)}
-                              </td>
-                              <td className="px-3 text-right font-mono font-medium" data-testid={`value-${group.groupId}`}>
-                                ${group.totalValue.toFixed(2)}
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))
+                      <>
+                        {filteredStockGroups.map((group) => (
+                          <tr
+                            key={group.groupId || 0}
+                            className="border-t hover-elevate cursor-pointer h-12"
+                            onClick={() => setSelectedGroup(group)}
+                            data-testid={`row-group-${group.groupId || 'uncategorized'}`}
+                          >
+                            <td className="px-3 font-medium" data-testid={`name-${group.groupId}`}>
+                              <div className="flex items-center gap-2">
+                                <Layers className="h-4 w-4 text-muted-foreground" />
+                                {group.groupName}
+                              </div>
+                            </td>
+                            <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
+                              {group.itemCount.toLocaleString()}
+                            </td>
+                            <td className="px-3 text-right font-mono" data-testid={`qty-${group.groupId}`}>
+                              {Math.floor(group.totalQuantity).toLocaleString()} BL
+                            </td>
+                            {!posUser && (
+                              <>
+                                <td className="px-3 text-right font-mono" data-testid={`rate-${group.groupId}`}>
+                                  ${group.averageRate.toFixed(2)}
+                                </td>
+                                <td className="px-3 text-right font-mono font-medium" data-testid={`value-${group.groupId}`}>
+                                  ${group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                        {filteredStockGroups.length > 0 && !itemSearchTerm && (
+                          <tr className="border-t h-12 bg-muted/50 font-bold">
+                            <td className="px-3">Total</td>
+                            <td className="px-3 text-right">{filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()}</td>
+                            <td className="px-3 text-right font-mono">
+                              {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL
+                            </td>
+                            {!posUser && (
+                              <>
+                                <td className="px-3 text-right font-mono"></td>
+                                <td className="px-3 text-right font-mono">
+                                  ${filteredStockGroups.reduce((sum, g) => sum + g.totalValue, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        )}
+                      </>
                     )}
                   </tbody>
                 </table>
@@ -1220,9 +1239,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           </button>
                         </td>
                         <td className="px-3 text-right font-mono">
-                          {Math.floor(parseFloat(item.quantity))}
+                          {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
                         </td>
-                        <td className="px-3">{item.stockItemUom}</td>
+                        <td className="px-3"></td>
                         {!posUser && (
                           <>
                             <td className="px-3 text-right font-mono">
