@@ -1308,9 +1308,6 @@ export default function Accounts() {
                               <Badge variant="outline" className="text-xs">
                                 {account.type}
                               </Badge>
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {account.code}
-                              </span>
                               <span className="text-sm">{account.name}</span>
                               {!isEditable && (
                                 <span className="ml-auto text-xs text-muted-foreground italic">

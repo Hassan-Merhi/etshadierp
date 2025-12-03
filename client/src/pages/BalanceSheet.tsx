@@ -90,7 +90,6 @@ export default function BalanceSheet() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
               <TableHead>Account Name</TableHead>
               <TableHead className="text-right">Balance</TableHead>
             </TableRow>
@@ -98,7 +97,6 @@ export default function BalanceSheet() {
           <TableBody>
             {accountList.map((account) => (
               <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
-                <TableCell className="font-mono text-sm">{account.code}</TableCell>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
                   {formatCurrency(account.balance)} {account.balanceSide || ""}
@@ -107,7 +105,7 @@ export default function BalanceSheet() {
             ))}
             {showTotal && (
               <TableRow className="font-semibold bg-muted/50">
-                <TableCell colSpan={2}>Total</TableCell>
+                <TableCell>Total</TableCell>
                 <TableCell className="text-right font-mono" data-testid="text-total">
                   {formatCurrency(total)}
                 </TableCell>

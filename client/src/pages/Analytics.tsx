@@ -640,7 +640,6 @@ export default function Analytics() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
               <TableHead>Account Name</TableHead>
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
@@ -648,7 +647,6 @@ export default function Analytics() {
           <TableBody>
             {accountList.map((account) => (
               <TableRow key={account.id}>
-                <TableCell className="font-mono text-sm">{account.code}</TableCell>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
                   {formatCurrency(account.balance)}
@@ -657,7 +655,7 @@ export default function Analytics() {
             ))}
             {showTotal && (
               <TableRow className="font-semibold bg-muted/50">
-                <TableCell colSpan={2}>Total</TableCell>
+                <TableCell>Total</TableCell>
                 <TableCell className="text-right font-mono">
                   {formatCurrency(Math.abs(total))}
                 </TableCell>
@@ -868,11 +866,12 @@ export default function Analytics() {
           <Card>
             <CardContent className="p-6">
               <Tabs defaultValue="direct-income" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="direct-income">Direct Income</TabsTrigger>
                   <TabsTrigger value="indirect-income">Indirect Income</TabsTrigger>
-                  <TabsTrigger value="direct-expenses">Direct Expenses</TabsTrigger>
-                  <TabsTrigger value="indirect-expenses">Indirect Expenses</TabsTrigger>
+                  <TabsTrigger value="assets">Assets</TabsTrigger>
+                  <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
+                  <TabsTrigger value="cash">Cash</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="direct-income" className="mt-4">
@@ -885,14 +884,119 @@ export default function Analytics() {
                   {renderPLAccountTable(indirectIncomeAccounts)}
                 </TabsContent>
 
-                <TabsContent value="direct-expenses" className="mt-4">
-                  <h4 className="font-medium mb-4">Direct Expense Accounts</h4>
-                  {renderPLAccountTable(directExpenseAccounts)}
+                <TabsContent value="assets" className="mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      Asset Accounts
+                    </h4>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatSmartCurrency(calculateTotal(assetAccounts))}
+                      </p>
+                    </div>
+                  </div>
+                  {accountsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-14 w-full" />
+                      ))}
+                    </div>
+                  ) : assetAccounts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No asset accounts found
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(assetAccounts)}
+                      </TableBody>
+                    </Table>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="indirect-expenses" className="mt-4">
-                  <h4 className="font-medium mb-4">Indirect Expense Accounts</h4>
-                  {renderPLAccountTable(indirectExpenseAccounts)}
+                <TabsContent value="liabilities" className="mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-red-500" />
+                      Liability Accounts
+                    </h4>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                      </p>
+                    </div>
+                  </div>
+                  {accountsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-14 w-full" />
+                      ))}
+                    </div>
+                  ) : liabilityAccounts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No liability accounts found
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(liabilityAccounts)}
+                      </TableBody>
+                    </Table>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="cash" className="mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Wallet className="h-5 w-5 text-green-500" />
+                      Cash Accounts
+                    </h4>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total Cash</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatSmartCurrency(calculateTotal(cashAccounts))}
+                      </p>
+                    </div>
+                  </div>
+                  {accountsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-14 w-full" />
+                      ))}
+                    </div>
+                  ) : cashAccounts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No cash accounts found
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Account Name</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                          <TableHead className="text-right">Side</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renderHierarchicalAccounts(cashAccounts, true)}
+                      </TableBody>
+                    </Table>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>
@@ -902,12 +1006,10 @@ export default function Analytics() {
         {/* Accounts Tab */}
         <TabsContent value="accounts" className="space-y-4">
           <Tabs defaultValue="expenses">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
               <TabsTrigger value="assets">Assets</TabsTrigger>
               <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
-              <TabsTrigger value="indirect-expenses">Indirect Exp.</TabsTrigger>
-              <TabsTrigger value="direct-expenses">Direct Exp.</TabsTrigger>
               <TabsTrigger value="cash">Cash</TabsTrigger>
             </TabsList>
 
@@ -1028,88 +1130,6 @@ export default function Analytics() {
                     </TableHeader>
                     <TableBody>
                       {renderHierarchicalAccounts(liabilityAccounts)}
-                    </TableBody>
-                  </Table>
-                )}
-              </Card>
-            </TabsContent>
-
-            {/* Indirect Expenses */}
-            <TabsContent value="indirect-expenses" className="space-y-4">
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-orange-500" />
-                    Indirect Expense Accounts
-                  </h3>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
-                    </p>
-                  </div>
-                </div>
-                {accountsLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-14 w-full" />
-                    ))}
-                  </div>
-                ) : indirectExpenseAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No indirect expense accounts found
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(indirectExpenseAccounts)}
-                    </TableBody>
-                  </Table>
-                )}
-              </Card>
-            </TabsContent>
-
-            {/* Direct Expenses */}
-            <TabsContent value="direct-expenses" className="space-y-4">
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-red-500" />
-                    Direct Expense Accounts
-                  </h3>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold font-mono">
-                      {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
-                    </p>
-                  </div>
-                </div>
-                {accountsLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-14 w-full" />
-                    ))}
-                  </div>
-                ) : directExpenseAccounts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No direct expense accounts found
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Account Name</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {renderHierarchicalAccounts(directExpenseAccounts)}
                     </TableBody>
                   </Table>
                 )}
