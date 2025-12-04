@@ -14,6 +14,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -77,6 +87,7 @@ export default function Settings() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<any>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<any>(null);
@@ -210,6 +221,29 @@ export default function Settings() {
       toast({
         title: "Error",
         description: error.message || "Failed to save company",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: async (companyId: number) => {
+      const res = await apiRequest("DELETE", `/api/companies/${companyId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Company and all associated data deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/companies"] });
+      setCompanyToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete company",
         variant: "destructive",
       });
     },
@@ -599,14 +633,24 @@ export default function Settings() {
                       {company.active ? "Active" : "Inactive"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEditCompany(company)}
-                        data-testid={`button-edit-company-${company.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditCompany(company)}
+                          data-testid={`button-edit-company-${company.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCompanyToDelete(company)}
+                          data-testid={`button-delete-company-${company.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -614,6 +658,44 @@ export default function Settings() {
             </Table>
           )}
         </Card>
+
+        <AlertDialog open={!!companyToDelete} onOpenChange={(open) => !open && setCompanyToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Company</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Are you sure you want to delete <strong>{companyToDelete?.name}</strong>?
+                </p>
+                <p className="text-destructive font-medium">
+                  This will permanently delete ALL data associated with this company, including:
+                </p>
+                <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                  <li>All locations and inventory</li>
+                  <li>All ledger accounts and bank accounts</li>
+                  <li>All vouchers and transactions</li>
+                  <li>All purchase orders and containers</li>
+                  <li>All employees and customers</li>
+                  <li>All user role assignments for this company</li>
+                </ul>
+                <p className="font-bold text-destructive mt-2">
+                  This action cannot be undone!
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-company">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => companyToDelete && deleteCompanyMutation.mutate(companyToDelete.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deleteCompanyMutation.isPending}
+                data-testid="button-confirm-delete-company"
+              >
+                {deleteCompanyMutation.isPending ? "Deleting..." : "Delete Company"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
         </TabsContent>
 

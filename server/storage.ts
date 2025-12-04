@@ -60,6 +60,7 @@ export interface IStorage {
   getCompanyById(id: number): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: number, updates: Partial<InsertCompany>): Promise<Company>;
+  deleteCompany(id: number): Promise<void>;
 
   // User-Company Roles
   getUserCompaniesWithRoles(userId: string): Promise<UserCompanyRole[]>;
@@ -396,6 +397,146 @@ export class DbStorage implements IStorage {
       .where(eq(schema.companies.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteCompany(id: number): Promise<void> {
+    // Delete all company-related data in the correct order to avoid foreign key issues
+    // Use raw SQL with subqueries for tables that don't have direct companyId columns
+    
+    // Delete voucher entries first (references vouchers)
+    await db.delete(schema.voucherEntries).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    
+    // Delete stock transfer items (through vouchers -> stock_transfer_vouchers)
+    await db.delete(schema.stockTransferItems).where(sql`transfer_id IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${id})`);
+    
+    // Delete stock transfer vouchers (through vouchers)
+    await db.delete(schema.stockTransferVouchers).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    
+    // Delete stock adjustment items (through vouchers -> stock_adjustment_vouchers)
+    await db.delete(schema.stockAdjustmentItems).where(sql`adjustment_id IN (SELECT sav.id FROM stock_adjustment_vouchers sav JOIN vouchers v ON sav.voucher_id = v.id WHERE v.company_id = ${id})`);
+    
+    // Delete stock adjustment vouchers (through vouchers)
+    await db.delete(schema.stockAdjustmentVouchers).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    
+    // Delete vouchers
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, id));
+    
+    // Delete sales items
+    await db.delete(schema.salesItems).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    
+    // Delete draft POS sale items (through locations -> draft_pos_sales)
+    await db.delete(schema.draftPosSaleItems).where(sql`draft_id IN (SELECT dps.id FROM draft_pos_sales dps JOIN locations l ON dps.location_id = l.id WHERE l.company_id = ${id})`);
+    
+    // Delete draft POS sales (through locations)
+    await db.delete(schema.draftPosSales).where(sql`location_id IN (SELECT id FROM locations WHERE company_id = ${id})`);
+    
+    // Delete PO line items
+    await db.delete(schema.poLineItems).where(sql`po_id IN (SELECT id FROM purchase_orders WHERE company_id = ${id})`);
+    
+    // Delete purchase orders
+    await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, id));
+    
+    // Delete container charges
+    await db.delete(schema.containerCharges).where(sql`container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    
+    // Delete container offloads
+    await db.delete(schema.containerOffloads).where(sql`container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    
+    // Delete containers
+    await db.delete(schema.containers).where(eq(schema.containers.companyId, id));
+    
+    // Delete inventory
+    await db.delete(schema.inventory).where(eq(schema.inventory.companyId, id));
+    
+    // Delete stock item code aliases
+    await db.delete(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.companyId, id));
+    
+    // Delete stock item location prices
+    await db.delete(schema.stockItemLocationPrices).where(sql`stock_item_id IN (SELECT id FROM stock_items WHERE company_id = ${id})`);
+    
+    // Delete stock items
+    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, id));
+    
+    // Delete stock groups
+    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, id));
+    
+    // Delete mix batch sources
+    await db.delete(schema.mixBatchSources).where(sql`mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
+    
+    // Delete mix batches
+    await db.delete(schema.mixBatches).where(eq(schema.mixBatches.companyId, id));
+    
+    // Delete production bales
+    await db.delete(schema.productionBales).where(eq(schema.productionBales.companyId, id));
+    
+    // Delete bale transfer items
+    await db.delete(schema.baleTransferItems).where(sql`transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
+    
+    // Delete bale transfers
+    await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.companyId, id));
+    
+    // Delete bale products
+    await db.delete(schema.baleProducts).where(eq(schema.baleProducts.companyId, id));
+    
+    // Delete bale sequences
+    await db.delete(schema.baleSequences).where(eq(schema.baleSequences.companyId, id));
+    
+    // Delete bales
+    await db.delete(schema.bales).where(eq(schema.bales.companyId, id));
+    
+    // Delete salary advances
+    await db.delete(schema.salaryAdvances).where(eq(schema.salaryAdvances.companyId, id));
+    
+    // Delete employee group members
+    await db.delete(schema.employeeGroupMembers).where(sql`employee_group_id IN (SELECT id FROM employee_groups WHERE company_id = ${id})`);
+    
+    // Delete employee groups
+    await db.delete(schema.employeeGroups).where(eq(schema.employeeGroups.companyId, id));
+    
+    // Delete employees
+    await db.delete(schema.employees).where(eq(schema.employees.companyId, id));
+    
+    // Delete customer balances
+    await db.delete(schema.customerBalances).where(eq(schema.customerBalances.companyId, id));
+    
+    // Delete customers
+    await db.delete(schema.customers).where(eq(schema.customers.companyId, id));
+    
+    // Delete container sales
+    await db.delete(schema.containerSales).where(eq(schema.containerSales.companyId, id));
+    
+    // Delete inter-company transfers
+    await db.delete(schema.interCompanyTransfers).where(or(eq(schema.interCompanyTransfers.fromCompanyId, id), eq(schema.interCompanyTransfers.toCompanyId, id)));
+    
+    // Delete bank accounts
+    await db.delete(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, id));
+    
+    // Delete fixed assets
+    await db.delete(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, id));
+    
+    // Delete ledger accounts
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, id));
+    
+    // Delete locations
+    await db.delete(schema.locations).where(eq(schema.locations.companyId, id));
+    
+    // Delete fiscal period closures
+    await db.delete(schema.fiscalPeriodClosures).where(eq(schema.fiscalPeriodClosures.companyId, id));
+    
+    // Delete dashboard cash accounts
+    await db.delete(schema.dashboardCashAccounts).where(eq(schema.dashboardCashAccounts.companyId, id));
+    
+    // Delete dashboard payable accounts
+    await db.delete(schema.dashboardPayableAccounts).where(eq(schema.dashboardPayableAccounts.companyId, id));
+    
+    // Delete company settings
+    await db.delete(schema.companySettings).where(eq(schema.companySettings.companyId, id));
+    
+    // Delete user company roles
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, id));
+    
+    // Finally delete the company
+    await db.delete(schema.companies).where(eq(schema.companies.id, id));
   }
 
   // User-Company Roles
