@@ -77,6 +77,7 @@ export const locations = pgTable("locations", {
   state: text("state"),
   country: text("country"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -106,6 +107,7 @@ export const ledgerAccounts = pgTable("ledger_accounts", {
   openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
   openingBalanceSide: text("opening_balance_side"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("ledger_accounts_company_code_unique").on(t.companyId, t.code),
@@ -150,6 +152,7 @@ export const employees = pgTable("employees", {
   totalDeposits: decimal("total_deposits", { precision: 15, scale: 2 }).notNull().default("0"),
   totalWithdrawals: decimal("total_withdrawals", { precision: 15, scale: 2 }).notNull().default("0"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -232,6 +235,7 @@ export const suppliers = pgTable("suppliers", {
   paymentTerms: text("payment_terms"),
   openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -259,6 +263,7 @@ export const stockGroups = pgTable("stock_groups", {
   name: text("name").notNull(),
   parentId: integer("parent_id"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("stock_groups_company_code_unique").on(t.companyId, t.code),
@@ -289,6 +294,7 @@ export const stockItems = pgTable("stock_items", {
   reorderLevel: decimal("reorder_level", { precision: 15, scale: 3 }).default("0"),
   sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).default("0"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("stock_items_company_code_unique").on(t.companyId, t.code),
@@ -343,6 +349,7 @@ export const bankAccounts = pgTable("bank_accounts", {
   openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   openingBalanceSide: text("opening_balance_side"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -606,6 +613,7 @@ export const vouchers = pgTable("vouchers", {
   description: text("description"),
   totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull(),
   optional: boolean("optional").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -920,6 +928,7 @@ export const customers = pgTable("customers", {
   openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
   openingBalanceSide: varchar("opening_balance_side", { length: 2 }).default("Dr"),
   active: boolean("active").notNull().default(true),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   uniqueCompanyCode: uniqueIndex("customers_company_code_unique").on(t.companyId, t.code),

@@ -70,7 +70,7 @@ import {
   insertUserPreferencesSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne, desc, or } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne, desc, or, isNotNull } from "drizzle-orm";
 import { format } from "date-fns";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -20562,6 +20562,290 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Cleaned up ${deletedCount} orphaned charge vouchers`,
         deletedCount,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================
+  // DELETED ITEMS MANAGEMENT (Trash/Recycle Bin)
+  // ============================================================
+
+  // Get all deleted items (soft-deleted records)
+  app.get("/api/deleted-items", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get deleted locations
+      const deletedLocations = await db
+        .select()
+        .from(locations)
+        .where(and(
+          eq(locations.companyId, companyId),
+          isNotNull(locations.deletedAt)
+        ))
+        .orderBy(desc(locations.deletedAt));
+
+      // Get deleted stock items
+      const deletedStockItems = await db
+        .select()
+        .from(stockItems)
+        .where(and(
+          eq(stockItems.companyId, companyId),
+          isNotNull(stockItems.deletedAt)
+        ))
+        .orderBy(desc(stockItems.deletedAt));
+
+      // Get deleted stock groups
+      const deletedStockGroups = await db
+        .select()
+        .from(stockGroups)
+        .where(and(
+          eq(stockGroups.companyId, companyId),
+          isNotNull(stockGroups.deletedAt)
+        ))
+        .orderBy(desc(stockGroups.deletedAt));
+
+      // Get deleted ledger accounts
+      const deletedLedgerAccounts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(
+          eq(ledgerAccounts.companyId, companyId),
+          isNotNull(ledgerAccounts.deletedAt)
+        ))
+        .orderBy(desc(ledgerAccounts.deletedAt));
+
+      // Get deleted employees
+      const deletedEmployees = await db
+        .select()
+        .from(employees)
+        .where(and(
+          eq(employees.companyId, companyId),
+          isNotNull(employees.deletedAt)
+        ))
+        .orderBy(desc(employees.deletedAt));
+
+      // Get deleted customers
+      const deletedCustomers = await db
+        .select()
+        .from(customers)
+        .where(and(
+          eq(customers.companyId, companyId),
+          isNotNull(customers.deletedAt)
+        ))
+        .orderBy(desc(customers.deletedAt));
+
+      // Note: Vouchers are not included in deleted items because they are hard-deleted
+      // with inventory reversal due to complex business logic. They cannot be recovered.
+
+      // Get deleted suppliers (suppliers are global, not company-specific)
+      const deletedSuppliers = await db
+        .select()
+        .from(suppliers)
+        .where(isNotNull(suppliers.deletedAt))
+        .orderBy(desc(suppliers.deletedAt));
+
+      // Get deleted bank accounts
+      const deletedBankAccounts = await db
+        .select()
+        .from(bankAccounts)
+        .where(and(
+          eq(bankAccounts.companyId, companyId),
+          isNotNull(bankAccounts.deletedAt)
+        ))
+        .orderBy(desc(bankAccounts.deletedAt));
+
+      res.json({
+        locations: deletedLocations.map(l => ({
+          id: l.id,
+          type: "location",
+          name: l.name,
+          code: l.code,
+          deletedAt: l.deletedAt,
+        })),
+        stockItems: deletedStockItems.map(s => ({
+          id: s.id,
+          type: "stockItem",
+          name: s.name,
+          code: s.code,
+          deletedAt: s.deletedAt,
+        })),
+        stockGroups: deletedStockGroups.map(g => ({
+          id: g.id,
+          type: "stockGroup",
+          name: g.name,
+          code: g.code,
+          deletedAt: g.deletedAt,
+        })),
+        ledgerAccounts: deletedLedgerAccounts.map(a => ({
+          id: a.id,
+          type: "ledgerAccount",
+          name: a.name,
+          code: a.code,
+          accountType: a.accountType,
+          deletedAt: a.deletedAt,
+        })),
+        employees: deletedEmployees.map(e => ({
+          id: e.id,
+          type: "employee",
+          name: `${e.firstName} ${e.lastName}`,
+          code: e.code,
+          deletedAt: e.deletedAt,
+        })),
+        customers: deletedCustomers.map(c => ({
+          id: c.id,
+          type: "customer",
+          name: c.legalName,
+          code: c.code,
+          deletedAt: c.deletedAt,
+        })),
+        suppliers: deletedSuppliers.map(s => ({
+          id: s.id,
+          type: "supplier",
+          name: s.legalName,
+          code: s.code,
+          deletedAt: s.deletedAt,
+        })),
+        bankAccounts: deletedBankAccounts.map(b => ({
+          id: b.id,
+          type: "bankAccount",
+          name: b.name,
+          code: b.code,
+          deletedAt: b.deletedAt,
+        })),
+        totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length +
+          deletedLedgerAccounts.length + deletedEmployees.length + deletedCustomers.length +
+          deletedSuppliers.length + deletedBankAccounts.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Restore a deleted item
+  app.post("/api/deleted-items/:type/:id/restore", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const { type, id } = req.params;
+      const itemId = parseInt(id);
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: "Invalid item ID" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      switch (type) {
+        case "location":
+          await db.update(locations)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(locations.id, itemId), eq(locations.companyId, companyId)));
+          break;
+        case "stockItem":
+          await db.update(stockItems)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(stockItems.id, itemId), eq(stockItems.companyId, companyId)));
+          break;
+        case "stockGroup":
+          await db.update(stockGroups)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(stockGroups.id, itemId), eq(stockGroups.companyId, companyId)));
+          break;
+        case "ledgerAccount":
+          await db.update(ledgerAccounts)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(ledgerAccounts.id, itemId), eq(ledgerAccounts.companyId, companyId)));
+          break;
+        case "employee":
+          await db.update(employees)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(employees.id, itemId), eq(employees.companyId, companyId)));
+          break;
+        case "customer":
+          await db.update(customers)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(customers.id, itemId), eq(customers.companyId, companyId)));
+          break;
+        case "supplier":
+          await db.update(suppliers)
+            .set({ deletedAt: null, active: true })
+            .where(eq(suppliers.id, itemId));
+          break;
+        case "bankAccount":
+          await db.update(bankAccounts)
+            .set({ deletedAt: null, active: true })
+            .where(and(eq(bankAccounts.id, itemId), eq(bankAccounts.companyId, companyId)));
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid item type" });
+      }
+
+      res.json({ message: `${type} restored successfully` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Permanently delete an item
+  app.delete("/api/deleted-items/:type/:id/permanent", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const { type, id } = req.params;
+      const itemId = parseInt(id);
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: "Invalid item ID" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      switch (type) {
+        case "location":
+          await db.delete(locations)
+            .where(and(eq(locations.id, itemId), eq(locations.companyId, companyId)));
+          break;
+        case "stockItem":
+          // Also delete related aliases
+          await db.delete(stockItemCodeAliases)
+            .where(eq(stockItemCodeAliases.stockItemId, itemId));
+          await db.delete(stockItems)
+            .where(and(eq(stockItems.id, itemId), eq(stockItems.companyId, companyId)));
+          break;
+        case "stockGroup":
+          await db.delete(stockGroups)
+            .where(and(eq(stockGroups.id, itemId), eq(stockGroups.companyId, companyId)));
+          break;
+        case "ledgerAccount":
+          await db.delete(ledgerAccounts)
+            .where(and(eq(ledgerAccounts.id, itemId), eq(ledgerAccounts.companyId, companyId)));
+          break;
+        case "employee":
+          await db.delete(employees)
+            .where(and(eq(employees.id, itemId), eq(employees.companyId, companyId)));
+          break;
+        case "customer":
+          await db.delete(customers)
+            .where(and(eq(customers.id, itemId), eq(customers.companyId, companyId)));
+          break;
+        case "supplier":
+          await db.delete(suppliers)
+            .where(eq(suppliers.id, itemId));
+          break;
+        case "bankAccount":
+          await db.delete(bankAccounts)
+            .where(and(eq(bankAccounts.id, itemId), eq(bankAccounts.companyId, companyId)));
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid item type" });
+      }
+
+      res.json({ message: `${type} permanently deleted` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

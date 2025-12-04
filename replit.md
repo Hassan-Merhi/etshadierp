@@ -2,6 +2,21 @@
 
 ## Recent Changes (Dec 4, 2025)
 
+- **Soft Delete System & Deleted Items Management**: Comprehensive system-wide soft delete with recycle bin functionality
+  - **Schema Changes**: Added `deletedAt` timestamp column to 9 key tables (locations, ledgerAccounts, stockItems, stockGroups, suppliers, employees, customers, vouchers, bankAccounts)
+  - **Soft Delete Logic**: Delete operations for locations, stock items, ledger accounts, employees, and bank accounts now set `deletedAt` timestamp and `active=false` instead of hard delete
+  - **Note on Vouchers**: Voucher deletion still performs hard delete with inventory reversal due to complex inventory movement logic
+  - **API Endpoints**:
+    - `GET /api/deleted-items` - Lists all soft-deleted records grouped by type
+    - `POST /api/deleted-items/:type/:id/restore` - Restores a deleted item (clears deletedAt, sets active=true)
+    - `DELETE /api/deleted-items/:type/:id/permanent` - Permanently removes record from database
+  - **UI Page**: New `/deleted-items` page (Admin only) accessible from Settings → System tab
+    - Filter by item type (locations, stock items, accounts, vouchers, etc.)
+    - Shows deletion date/time for each item
+    - Restore button to bring items back
+    - Delete Forever button for permanent removal
+  - **Settings System Tab**: New System tab in Settings with links to Deleted Items and Orphaned Records pages
+
 - **Net Profit (P&L) Report**: New Tally Prime-style Profit & Loss statement in Analytics → Reports tab
   - Left pane shows: Opening Stock, Purchase Accounts, Direct Incomes, Direct Expenses, Gross Profit c/o, Indirect Expenses, Net Profit
   - Click any row (Purchase Accounts, Direct Incomes, Direct Expenses, Indirect Expenses) to expand and see individual accounts with debit/credit

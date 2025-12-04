@@ -53,7 +53,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2 } from "lucide-react";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2, Wrench, MapPin, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
@@ -501,6 +502,10 @@ export default function Settings() {
           <TabsTrigger value="preferences" data-testid="tab-preferences">
             <Settings2 className="h-4 w-4 mr-2" />
             Preferences
+          </TabsTrigger>
+          <TabsTrigger value="system" data-testid="tab-system">
+            <Wrench className="h-4 w-4 mr-2" />
+            System
           </TabsTrigger>
         </TabsList>
 
@@ -1097,6 +1102,56 @@ export default function Settings() {
                 </div>
               </div>
             </Card>
+          </div>
+        </TabsContent>
+
+        {/* System Tab */}
+        <TabsContent value="system" className="space-y-4">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              <h2 className="text-2xl font-semibold">System Tools</h2>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Link href="/deleted-items">
+                <Card className="p-6 hover-elevate cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-destructive/10 rounded-lg">
+                        <Trash2 className="h-6 w-6 text-destructive" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="link-deleted-items">Deleted Items</h3>
+                        <p className="text-sm text-muted-foreground">
+                          View and restore deleted records or permanently remove them
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+
+              <Link href="/orphaned-records">
+                <Card className="p-6 hover-elevate cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <MapPin className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="link-orphaned-records">Orphaned Records</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Find and reassign records that reference deleted locations
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

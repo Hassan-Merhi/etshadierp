@@ -1,4 +1,4 @@
-import { eq, and, or, sql, inArray, desc, ne } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc, ne, isNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -570,7 +570,12 @@ export class DbStorage implements IStorage {
   // Locations
   async getAllLocations(companyId: number): Promise<Location[]> {
     console.log('[storage.getAllLocations] Querying locations for companyId:', companyId);
-    const locations = await db.select().from(schema.locations).where(eq(schema.locations.companyId, companyId));
+    const locations = await db.select().from(schema.locations).where(
+      and(
+        eq(schema.locations.companyId, companyId),
+        isNull(schema.locations.deletedAt)
+      )
+    );
     console.log('[storage.getAllLocations] Query returned:', locations.length, 'locations');
     return locations;
   }
@@ -593,12 +598,20 @@ export class DbStorage implements IStorage {
   }
 
   async deleteLocation(id: number): Promise<void> {
-    await db.delete(schema.locations).where(eq(schema.locations.id, id));
+    // Soft delete - set deletedAt and active=false instead of hard delete
+    await db.update(schema.locations)
+      .set({ deletedAt: new Date(), active: false })
+      .where(eq(schema.locations.id, id));
   }
 
   // Ledger Accounts
   async getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]> {
-    return await db.select().from(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, companyId));
+    return await db.select().from(schema.ledgerAccounts).where(
+      and(
+        eq(schema.ledgerAccounts.companyId, companyId),
+        isNull(schema.ledgerAccounts.deletedAt)
+      )
+    );
   }
 
   async getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined> {
@@ -621,7 +634,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteLedgerAccount(id: number): Promise<void> {
-    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, id));
+    // Soft delete - set deletedAt and active=false instead of hard delete
+    await db.update(schema.ledgerAccounts)
+      .set({ deletedAt: new Date(), active: false })
+      .where(eq(schema.ledgerAccounts.id, id));
   }
 
   async getLedgerAccountById(id: number): Promise<LedgerAccount | undefined> {
@@ -641,7 +657,12 @@ export class DbStorage implements IStorage {
 
   // Employees
   async getAllEmployees(companyId: number): Promise<Employee[]> {
-    const employees = await db.select().from(schema.employees).where(eq(schema.employees.companyId, companyId));
+    const employees = await db.select().from(schema.employees).where(
+      and(
+        eq(schema.employees.companyId, companyId),
+        isNull(schema.employees.deletedAt)
+      )
+    );
     // Ensure camelCase mapping works correctly
     return employees.map(emp => ({
       ...emp,
@@ -757,22 +778,26 @@ export class DbStorage implements IStorage {
         };
       }
 
-      // Proceed with deletion
+      // Proceed with soft deletion
+      const now = new Date();
+      
       if (linkedAccount) {
-        // Delete linked ledger account
+        // Soft delete linked ledger account
         await tx
-          .delete(schema.ledgerAccounts)
+          .update(schema.ledgerAccounts)
+          .set({ deletedAt: now, active: false })
           .where(eq(schema.ledgerAccounts.id, linkedAccount.id));
       }
 
-      // Remove employee from any groups
+      // Remove employee from any groups (keep hard delete for association table)
       await tx
         .delete(schema.employeeGroupMembers)
         .where(eq(schema.employeeGroupMembers.employeeId, id));
 
-      // Delete the employee
+      // Soft delete the employee
       await tx
-        .delete(schema.employees)
+        .update(schema.employees)
+        .set({ deletedAt: now, active: false })
         .where(eq(schema.employees.id, id));
 
       return { success: true };
@@ -927,7 +952,12 @@ export class DbStorage implements IStorage {
 
   // Stock Items
   async getAllStockItems(companyId: number): Promise<StockItem[]> {
-    return await db.select().from(schema.stockItems).where(eq(schema.stockItems.companyId, companyId));
+    return await db.select().from(schema.stockItems).where(
+      and(
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
+      )
+    );
   }
 
   async getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined> {
@@ -960,8 +990,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteStockItem(id: number): Promise<void> {
+    // Soft delete - set deletedAt and active=false instead of hard delete
     await db
-      .delete(schema.stockItems)
+      .update(schema.stockItems)
+      .set({ deletedAt: new Date(), active: false })
       .where(eq(schema.stockItems.id, id));
   }
 
@@ -980,8 +1012,10 @@ export class DbStorage implements IStorage {
 
   async bulkDeleteStockItems(ids: number[]): Promise<void> {
     if (ids.length === 0) return;
+    // Soft delete - set deletedAt and active=false instead of hard delete
     await db
-      .delete(schema.stockItems)
+      .update(schema.stockItems)
+      .set({ deletedAt: new Date(), active: false })
       .where(inArray(schema.stockItems.id, ids));
   }
 
@@ -1064,7 +1098,12 @@ export class DbStorage implements IStorage {
 
   // Bank Accounts
   async getAllBankAccounts(companyId: number): Promise<BankAccount[]> {
-    return await db.select().from(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, companyId));
+    return await db.select().from(schema.bankAccounts).where(
+      and(
+        eq(schema.bankAccounts.companyId, companyId),
+        isNull(schema.bankAccounts.deletedAt)
+      )
+    );
   }
 
   async getBankAccountByCode(code: string): Promise<BankAccount | undefined> {
@@ -1148,8 +1187,9 @@ export class DbStorage implements IStorage {
       throw new Error(`Cannot delete bank account: ${entryCount} voucher entries exist`);
     }
 
-    // Safe to delete - scoped to both id AND companyId
-    await db.delete(schema.bankAccounts)
+    // Soft delete - scoped to both id AND companyId
+    await db.update(schema.bankAccounts)
+      .set({ deletedAt: new Date(), active: false })
       .where(
         and(
           eq(schema.bankAccounts.id, id),
