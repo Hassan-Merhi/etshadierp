@@ -1869,6 +1869,13 @@ export class DbStorage implements IStorage {
           openingBalanceSide: "Dr",
         }).returning();
         account = [newAccount];
+      } else if (account[0].parentId !== parentId) {
+        // Update existing account to have the parent if it doesn't already
+        await db
+          .update(schema.ledgerAccounts)
+          .set({ parentId })
+          .where(eq(schema.ledgerAccounts.id, account[0].id));
+        account[0].parentId = parentId;
       }
 
       return account[0].id;
