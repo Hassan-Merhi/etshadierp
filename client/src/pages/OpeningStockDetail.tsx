@@ -55,6 +55,8 @@ interface InventoryRecord {
   id: number;
   locationId: number;
   locationName: string | null;
+  locationDeleted: boolean;
+  locationStatus: string;
   quantity: number;
   averageRate: number;
   totalValue: number;
@@ -75,6 +77,9 @@ interface DebugData {
   totals: {
     recordCount: number;
     totalQuantity: number;
+    activeRecordCount: number;
+    activeQuantity: number;
+    activeValue: number;
     totalValue: number;
     calculatedRate: number;
   };
@@ -291,7 +296,7 @@ export default function OpeningStockDetail() {
               {/* Inventory Records */}
               <div>
                 <h3 className="font-semibold mb-2">
-                  Inventory Records ({debugData.totals.recordCount} records)
+                  Inventory Records ({debugData.totals.activeRecordCount} active / {debugData.totals.recordCount} total)
                 </h3>
                 {debugData.inventoryRecords.length > 0 ? (
                   <Table>
@@ -299,6 +304,7 @@ export default function OpeningStockDetail() {
                       <TableRow>
                         <TableHead>ID</TableHead>
                         <TableHead>Location</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead className="text-right">Avg Rate</TableHead>
                         <TableHead className="text-right">Total Value</TableHead>
@@ -307,9 +313,21 @@ export default function OpeningStockDetail() {
                     </TableHeader>
                     <TableBody>
                       {debugData.inventoryRecords.map((rec) => (
-                        <TableRow key={rec.id}>
+                        <TableRow 
+                          key={rec.id} 
+                          className={rec.locationDeleted ? "opacity-50 line-through" : ""}
+                        >
                           <TableCell className="font-mono">{rec.id}</TableCell>
-                          <TableCell>{rec.locationName || `Location ${rec.locationId}`}</TableCell>
+                          <TableCell>{rec.locationName}</TableCell>
+                          <TableCell>
+                            {rec.locationStatus === "Active" ? (
+                              <span className="text-green-600 dark:text-green-400">Active</span>
+                            ) : rec.locationStatus === "INACTIVE" ? (
+                              <span className="text-yellow-600 dark:text-yellow-400 font-semibold">INACTIVE</span>
+                            ) : (
+                              <span className="text-destructive font-semibold">DELETED</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-mono">
                             {formatNumber(rec.quantity)}
                           </TableCell>
@@ -333,35 +351,67 @@ export default function OpeningStockDetail() {
                 )}
               </div>
 
-              {/* Totals */}
-              <div className="bg-primary/10 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Calculated Totals (Closing Balance)</h3>
+              {/* Active Totals (what shows in closing balance) */}
+              <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/30">
+                <h3 className="font-semibold mb-2 text-green-600 dark:text-green-400">
+                  Active Locations Only (Closing Balance in Report)
+                </h3>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <div className="text-2xl font-bold font-mono">
-                      {formatNumber(debugData.totals.totalQuantity)}
+                    <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
+                      {formatNumber(debugData.totals.activeQuantity)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Total Quantity</div>
+                    <div className="text-sm text-muted-foreground">Quantity</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold font-mono">
-                      {formatNumber(debugData.totals.calculatedRate)}
+                    <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
+                      {debugData.totals.activeQuantity > 0 
+                        ? formatNumber(debugData.totals.activeValue / debugData.totals.activeQuantity)
+                        : "0.00"}
                     </div>
-                    <div className="text-sm text-muted-foreground">Weighted Avg Rate</div>
+                    <div className="text-sm text-muted-foreground">Avg Rate</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold font-mono">
-                      {formatNumber(debugData.totals.totalValue)}
+                    <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
+                      {formatNumber(debugData.totals.activeValue)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Total Value</div>
+                    <div className="text-sm text-muted-foreground">Value</div>
                   </div>
                 </div>
               </div>
 
+              {/* All Records Totals (for reference) */}
+              {debugData.totals.recordCount > debugData.totals.activeRecordCount && (
+                <div className="bg-muted/30 p-4 rounded-lg border border-muted">
+                  <h3 className="font-semibold mb-2 text-muted-foreground">
+                    All Records Including Deleted Locations (Old Incorrect Total)
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4 text-center text-muted-foreground">
+                    <div>
+                      <div className="text-xl font-mono">
+                        {formatNumber(debugData.totals.totalQuantity)}
+                      </div>
+                      <div className="text-sm">Quantity</div>
+                    </div>
+                    <div>
+                      <div className="text-xl font-mono">
+                        {formatNumber(debugData.totals.calculatedRate)}
+                      </div>
+                      <div className="text-sm">Avg Rate</div>
+                    </div>
+                    <div>
+                      <div className="text-xl font-mono">
+                        {formatNumber(debugData.totals.totalValue)}
+                      </div>
+                      <div className="text-sm">Value</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground">
-                The closing balance shown in the summary is calculated by adding up all inventory 
-                records above. If this doesn't match your expected inventory, check each location's 
-                quantity for discrepancies.
+                The closing balance now only counts inventory from active locations. 
+                Records from deleted locations are shown crossed out above for reference.
               </p>
             </div>
           ) : (

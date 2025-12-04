@@ -16179,6 +16179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allStockItems = await storage.getAllStockItems(companyId);
       
       // Get inventory data with optional location filter
+      // IMPORTANT: Use innerJoin + active=true to exclude inventory from deleted/inactive locations
       let inventoryData;
       if (locationId && locationId !== "all") {
         inventoryData = await db
@@ -16191,11 +16192,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             locationName: locations.name,
           })
           .from(inventory)
-          .leftJoin(locations, eq(inventory.locationId, locations.id))
+          .innerJoin(locations, eq(inventory.locationId, locations.id))
           .where(
             and(
               eq(inventory.companyId, companyId),
-              eq(inventory.locationId, parseInt(locationId as string))
+              eq(inventory.locationId, parseInt(locationId as string)),
+              eq(locations.active, true)
             )
           )
           .execute();
@@ -16210,8 +16212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             locationName: locations.name,
           })
           .from(inventory)
-          .leftJoin(locations, eq(inventory.locationId, locations.id))
-          .where(eq(inventory.companyId, companyId))
+          .innerJoin(locations, eq(inventory.locationId, locations.id))
+          .where(
+            and(
+              eq(inventory.companyId, companyId),
+              eq(locations.active, true)
+            )
+          )
           .execute();
       }
 
@@ -16334,6 +16341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .execute();
 
       // Get inventory data for these items
+      // IMPORTANT: Use innerJoin + active=true to exclude inventory from deleted/inactive locations
       const itemIds = groupItems.map((i) => i.id);
       
       let inventoryData: any[] = [];
@@ -16341,6 +16349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const conditions = [
           eq(inventory.companyId, companyId),
           inArray(inventory.stockItemId, itemIds),
+          eq(locations.active, true),
         ];
         if (locationId && locationId !== "all") {
           conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
@@ -16354,6 +16363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalValue: inventory.totalValue,
           })
           .from(inventory)
+          .innerJoin(locations, eq(inventory.locationId, locations.id))
           .where(and(...conditions))
           .execute();
       }
@@ -16461,12 +16471,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Stock item not found" });
       }
 
-      // Get all inventory records for this item
+      // Get all inventory records for this item (including deleted/inactive locations for debugging)
       const inventoryRecords = await db
         .select({
           id: inventory.id,
           locationId: inventory.locationId,
           locationName: locations.name,
+          locationExists: locations.id,
+          locationActive: locations.active,
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
           totalValue: inventory.totalValue,
@@ -16482,12 +16494,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .execute();
 
-      // Calculate totals
+      // Calculate totals - separately for all records and active-only records
       let totalQty = 0;
       let totalValue = 0;
+      let activeQty = 0;
+      let activeValue = 0;
       for (const rec of inventoryRecords) {
-        totalQty += parseFloat(rec.quantity);
-        totalValue += parseFloat(rec.totalValue);
+        const qty = parseFloat(rec.quantity);
+        const val = parseFloat(rec.totalValue);
+        totalQty += qty;
+        totalValue += val;
+        // Only count if location exists AND is active
+        if (rec.locationExists !== null && rec.locationActive === true) {
+          activeQty += qty;
+          activeValue += val;
+        }
       }
 
       res.json({
@@ -16500,18 +16521,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           openingRate: stockItem[0].openingRate,
           openingValue: stockItem[0].openingValue,
         },
-        inventoryRecords: inventoryRecords.map((r) => ({
-          id: r.id,
-          locationId: r.locationId,
-          locationName: r.locationName,
-          quantity: parseFloat(r.quantity),
-          averageRate: parseFloat(r.averageRate),
-          totalValue: parseFloat(r.totalValue),
-          lastUpdated: r.lastUpdated,
-        })),
+        inventoryRecords: inventoryRecords.map((r) => {
+          const isDeleted = r.locationExists === null;
+          const isInactive = r.locationActive === false;
+          let status = "Active";
+          let displayName = r.locationName || `Location ${r.locationId}`;
+          
+          if (isDeleted) {
+            status = "DELETED";
+            displayName = `[DELETED] Location ${r.locationId}`;
+          } else if (isInactive) {
+            status = "INACTIVE";
+            displayName = `[INACTIVE] ${r.locationName}`;
+          }
+          
+          return {
+            id: r.id,
+            locationId: r.locationId,
+            locationName: displayName,
+            locationDeleted: isDeleted || isInactive,
+            locationStatus: status,
+            quantity: parseFloat(r.quantity),
+            averageRate: parseFloat(r.averageRate),
+            totalValue: parseFloat(r.totalValue),
+            lastUpdated: r.lastUpdated,
+          };
+        }),
         totals: {
           recordCount: inventoryRecords.length,
           totalQuantity: totalQty,
+          activeRecordCount: inventoryRecords.filter(r => r.locationExists !== null && r.locationActive === true).length,
+          activeQuantity: activeQty,
+          activeValue: activeValue,
           totalValue: totalValue,
           calculatedRate: totalQty > 0 ? totalValue / totalQty : 0,
         },
