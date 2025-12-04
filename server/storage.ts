@@ -2685,6 +2685,17 @@ export class DbStorage implements IStorage {
             .limit(1);
 
           if (remainingPOs.length === 0) {
+            // Delete all charge vouchers associated with this container (Freight-CONT-xxx, Fumigation-CONT-xxx, etc.)
+            const chargeVouchers = await db
+              .select({ id: schema.vouchers.id })
+              .from(schema.vouchers)
+              .where(sql`${schema.vouchers.voucherNumber} LIKE ${'CHARGE-' + container.containerNumber + '-%'}`);
+            
+            for (const chargeVoucher of chargeVouchers) {
+              await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+              await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
+            }
+            
             await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
             await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
           } else {
