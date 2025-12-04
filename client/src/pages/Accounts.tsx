@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +77,11 @@ export default function Accounts() {
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  // Force refresh of account data when component mounts
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+  }, []);
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
