@@ -1,0 +1,163 @@
+import { useQuery } from "@tanstack/react-query";
+import { useLocation, useParams, useSearch } from "wouter";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, Package } from "lucide-react";
+import { useCompany } from "@/contexts/CompanyContext";
+
+interface StockItem {
+  id: number;
+  code: string;
+  name: string;
+  closing: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+}
+
+interface ClosingStockDetailData {
+  items: StockItem[];
+  totals: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+}
+
+function formatNumber(value: number, decimals: number = 2): string {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function formatQty(value: number): string {
+  if (value === 0) return "";
+  return `${formatNumber(value)} BL`;
+}
+
+function formatValue(value: number): string {
+  if (value === 0) return "";
+  return formatNumber(value);
+}
+
+export default function ClosingStockDetail() {
+  const [, navigate] = useLocation();
+  const params = useParams<{ stockGroupId: string }>();
+  const searchString = useSearch();
+  const { selectedCompany } = useCompany();
+
+  const groupName = new URLSearchParams(searchString).get("name") || "Stock Group";
+  const stockGroupId = params.stockGroupId;
+
+  const { data, isLoading } = useQuery<ClosingStockDetailData>({
+    queryKey: ["/api/reports/closing-stock-summary", stockGroupId, "items", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/reports/closing-stock-summary/${stockGroupId}/items`,
+        { credentials: "include" }
+      );
+      if (!response.ok) throw new Error("Failed to fetch closing stock items");
+      return response.json();
+    },
+    enabled: !!selectedCompany?.id && !!stockGroupId,
+  });
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/closing-stock-summary")}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Package className="h-6 w-6" />
+            {groupName}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Closing Stock Items - {selectedCompany?.name}
+          </p>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden">
+        <div className="bg-primary text-primary-foreground">
+          <div className="grid grid-cols-5 p-3 font-semibold text-sm">
+            <div className="col-span-2">Item Name</div>
+            <div className="col-span-3 text-center border-l border-primary-foreground/30">
+              Closing Balance
+            </div>
+          </div>
+          <div className="grid grid-cols-5 px-3 pb-2 text-xs">
+            <div className="col-span-2"></div>
+            <div className="text-right">Quantity</div>
+            <div className="text-right">Rate</div>
+            <div className="text-right">Value</div>
+          </div>
+        </div>
+
+        <div className="divide-y">
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : data?.items && data.items.length > 0 ? (
+            <>
+              {data.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="grid grid-cols-5 p-3"
+                  data-testid={`row-stock-item-${item.id}`}
+                >
+                  <div className="col-span-2 font-medium">
+                    <span className="text-muted-foreground text-sm mr-2">[{item.code}]</span>
+                    {item.name}
+                  </div>
+                  <div className="text-right font-mono text-sm">
+                    {formatQty(item.closing.quantity)}
+                  </div>
+                  <div className="text-right font-mono text-sm">
+                    {formatValue(item.closing.rate)}
+                  </div>
+                  <div className="text-right font-mono text-sm">
+                    {formatValue(item.closing.value)}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              No items found in this stock group.
+            </div>
+          )}
+        </div>
+
+        {data?.totals && (
+          <div className="bg-muted/50 border-t-2 border-primary">
+            <div className="grid grid-cols-5 p-3 font-bold">
+              <div className="col-span-2">Total</div>
+              <div className="text-right font-mono">
+                {formatNumber(data.totals.quantity)} BL
+              </div>
+              <div className="text-right font-mono">
+                {formatNumber(data.totals.rate)}
+              </div>
+              <div className="text-right font-mono">
+                {formatNumber(data.totals.value)}
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}

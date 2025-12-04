@@ -16702,6 +16702,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate totals for left pane
       const leftPaneTotal = openingStockValue + purchaseAccountsTotal + directIncomesTotal + directExpensesTotal;
 
+      // === RIGHT PANE DATA ===
+      
+      // 1. Sales Accounts - Sum of all sales from Receipt vouchers (POS sales)
+      // Calculate from salesItems table
+      const salesData = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false)
+          )
+        )
+        .execute();
+      const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
+
+      // 2. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
+      const activeLocationsData = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(
+          and(
+            eq(locations.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+      const activeLocationIds = activeLocationsData.map((l) => l.id);
+
+      let closingStockValue = 0;
+      if (activeLocationIds.length > 0) {
+        const inventoryData = await db
+          .select({
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+          })
+          .from(inventory)
+          .where(inArray(inventory.locationId, activeLocationIds))
+          .execute();
+
+        for (const inv of inventoryData) {
+          const qty = parseFloat(inv.quantity || "0");
+          const rate = parseFloat(inv.averageRate || "0");
+          closingStockValue += qty * rate;
+        }
+      }
+
+      // 3. Gross Profit b/f - Same as gross profit from left pane
+      const grossProfitBf = grossProfit;
+
+      // 4. Indirect Incomes - accounts with accountType="Income" AND subType="Indirect Income"
+      const indirectIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Indirect Income"
+      );
+      let indirectIncomesTotal = 0;
+      const indirectIncomesDetails = indirectIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.credit - balance.debit; // Income is credits
+        indirectIncomesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // Right pane total should equal left pane total for the P&L to balance
+      const rightPaneTotal = salesAccountsTotal + closingStockValue + grossProfitBf + indirectIncomesTotal;
+
       res.json({
         leftPane: {
           openingStock: {
@@ -16730,6 +16806,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
             count: indirectExpenseAccounts.length,
           },
           netProfit: netProfit,
+        },
+        rightPane: {
+          salesAccounts: {
+            total: salesAccountsTotal,
+          },
+          closingStock: {
+            value: closingStockValue,
+          },
+          grossProfitBf: grossProfitBf,
+          indirectIncomes: {
+            total: indirectIncomesTotal,
+            accounts: indirectIncomesDetails,
+            count: indirectIncomeAccounts.length,
+          },
+          total: rightPaneTotal,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Closing Stock Summary - Current inventory values by stock group
+  app.get("/api/reports/closing-stock-summary", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all stock groups for the company
+      const allStockGroups = await storage.getAllStockGroups(companyId);
+      
+      // Get all stock items for the company
+      const allStockItems = await storage.getAllStockItems(companyId);
+      
+      // Get inventory data from active locations only
+      const inventoryData = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+
+      // Aggregate inventory by stock item
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity);
+        const val = parseFloat(inv.totalValue);
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+
+      // Build stock groups summary
+      const stockGroupSummary = allStockGroups.map((group) => {
+        const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
+        
+        let closingQuantity = 0;
+        let closingValue = 0;
+        
+        for (const item of groupItems) {
+          const invData = inventoryByItem.get(item.id);
+          if (invData) {
+            closingQuantity += invData.quantity;
+            closingValue += invData.totalValue;
+          }
+        }
+        
+        const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
+        
+        return {
+          id: group.id,
+          code: group.code,
+          name: group.name,
+          closing: {
+            quantity: closingQuantity,
+            rate: closingRate,
+            value: closingValue,
+          },
+          itemCount: groupItems.length,
+        };
+      }).filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
+
+      // Calculate grand totals
+      const grandTotal = {
+        quantity: stockGroupSummary.reduce((sum, g) => sum + g.closing.quantity, 0),
+        value: stockGroupSummary.reduce((sum, g) => sum + g.closing.value, 0),
+      };
+      
+      const grandTotalRate = grandTotal.quantity > 0 ? grandTotal.value / grandTotal.quantity : 0;
+
+      res.json({
+        stockGroups: stockGroupSummary,
+        grandTotal: {
+          quantity: grandTotal.quantity,
+          rate: grandTotalRate,
+          value: grandTotal.value,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Closing Stock Detail - Items in a stock group
+  app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { stockGroupId } = req.params;
+
+      // Get stock items in this group
+      const groupItems = await db
+        .select()
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.stockGroupId, parseInt(stockGroupId)),
+            eq(stockItems.active, true)
+          )
+        )
+        .execute();
+
+      // Get inventory for these items from active locations
+      const itemIds = groupItems.map((i) => i.id);
+      
+      const inventoryData = itemIds.length > 0
+        ? await db
+            .select({
+              stockItemId: inventory.stockItemId,
+              quantity: inventory.quantity,
+              averageRate: inventory.averageRate,
+              totalValue: inventory.totalValue,
+            })
+            .from(inventory)
+            .innerJoin(locations, eq(inventory.locationId, locations.id))
+            .where(
+              and(
+                eq(inventory.companyId, companyId),
+                inArray(inventory.stockItemId, itemIds),
+                eq(locations.active, true),
+                isNull(locations.deletedAt)
+              )
+            )
+            .execute()
+        : [];
+
+      // Aggregate by stock item
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity);
+        const val = parseFloat(inv.totalValue);
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+
+      // Build items list
+      const items = groupItems.map((item) => {
+        const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
+        const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
+        
+        return {
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          closing: {
+            quantity: invData.quantity,
+            rate: rate,
+            value: invData.totalValue,
+          },
+        };
+      }).filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
+
+      // Calculate totals
+      const totals = {
+        quantity: items.reduce((sum, i) => sum + i.closing.quantity, 0),
+        value: items.reduce((sum, i) => sum + i.closing.value, 0),
+      };
+      const avgRate = totals.quantity > 0 ? totals.value / totals.quantity : 0;
+
+      res.json({
+        items,
+        totals: {
+          quantity: totals.quantity,
+          rate: avgRate,
+          value: totals.value,
         },
       });
     } catch (error: any) {

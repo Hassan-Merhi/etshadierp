@@ -264,6 +264,21 @@ interface NetProfitStatementData {
     };
     netProfit: number;
   };
+  rightPane?: {
+    salesAccounts: {
+      total: number;
+    };
+    closingStock: {
+      value: number;
+    };
+    grossProfitBf: number;
+    indirectIncomes: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
+    total: number;
+  };
 }
 
 function formatSmartNumber(num: number | string): string {
@@ -641,12 +656,14 @@ export default function Analytics() {
     return '$' + absValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Filter accounts
+  // Filter accounts - Cash accounts are ledger accounts with accountType="Cash"
   const cashAccounts = accounts.filter(
-    (acc) => acc.type === "bank" && (
-      acc.name.toLowerCase().includes("cash") || 
-      acc.code.toLowerCase().includes("cash")
-    )
+    (acc) => 
+      (acc.type === "ledger" && acc.accountType === "Cash") ||
+      (acc.type === "bank" && (
+        acc.name.toLowerCase().includes("cash") || 
+        acc.code.toLowerCase().includes("cash")
+      ))
   );
 
   const assetAccounts = accounts.filter(
@@ -656,21 +673,7 @@ export default function Analytics() {
       acc.type === "bank"
   );
 
-  // Exclude inventory-related accounts from expense display
-  // These are capitalized to inventory, not operating expenses
-  const excludedExpenseCodes = [
-    "PURCHASES",           // Direct inventory purchases
-    "IMPORTCHARGES",       // Old consolidated import charges
-    "DUTIES",              // Container import duties
-    "TRANSPORTCHARGES",    // Container transport costs
-    "TRANSPORT",           // Alternative transport account name
-    "CONTAINERLICENSES",   // Container license fees
-    "LICENSES",            // Alternative license account name
-  ];
-  
-  const normalizeCode = (code: string) => 
-    code.toUpperCase().replace(/[\s_-]/g, "");
-  
+  // Include all expense accounts in P&L calculations (no exclusions)
   const expenseAccounts = accounts.filter((acc) => {
     if (acc.type !== "ledger") return false;
     
@@ -681,12 +684,7 @@ export default function Analytics() {
       acc.accountType === "Indirect Expense" || 
       acc.accountType === "Direct Expense";
     
-    if (!isExpenseAccount) return false;
-    
-    const normalizedCode = normalizeCode(acc.code);
-    return !excludedExpenseCodes.some(excluded => 
-      normalizeCode(excluded) === normalizedCode
-    );
+    return isExpenseAccount;
   });
 
   const directExpenseAccounts = expenseAccounts.filter(
@@ -1940,15 +1938,112 @@ export default function Analytics() {
                   </div>
                 </div>
 
-                {/* Right Pane - Placeholder for future */}
+                {/* Right Pane */}
                 <div className="border rounded-lg overflow-hidden">
                   <div className="bg-muted/50 p-3 border-b">
                     <span className="font-semibold">Particulars</span>
                   </div>
-                  <div className="p-8 text-center text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Right pane coming soon</p>
-                    <p className="text-sm">Sales Accounts, Closing Stock, Gross Profit b/f, Indirect Incomes</p>
+                  <div className="divide-y">
+                    {/* Sales Accounts */}
+                    <div 
+                      className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                      onClick={() => navigate("/sales-report")}
+                      data-testid="row-sales-accounts"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ChevronRight className="h-4 w-4" />
+                        Sales Accounts
+                      </span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.salesAccounts?.total || 0)}</span>
+                    </div>
+
+                    {/* Closing Stock */}
+                    <div 
+                      className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                      onClick={() => navigate("/closing-stock-summary")}
+                      data-testid="row-closing-stock"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ChevronRight className="h-4 w-4" />
+                        Closing Stock
+                      </span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.closingStock?.value || 0)}</span>
+                    </div>
+
+                    {/* Empty spacer rows to match left pane */}
+                    <div className="h-10 bg-muted/10"></div>
+                    <div className="h-10 bg-muted/10"></div>
+
+                    {/* Gross Profit b/f */}
+                    <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
+                      <span>Gross Profit b/f</span>
+                      <span className={`font-mono ${(netProfitData.rightPane?.grossProfitBf || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${formatSmartNumber(Math.abs(netProfitData.rightPane?.grossProfitBf || 0))}
+                        {(netProfitData.rightPane?.grossProfitBf || 0) < 0 && ' (Loss)'}
+                      </span>
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex justify-between items-center p-3 bg-primary/10 font-semibold border-t-2">
+                      <span>Total</span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.total || 0)}</span>
+                    </div>
+
+                    {/* Separator */}
+                    <div className="h-4 bg-muted/30"></div>
+
+                    {/* Indirect Incomes */}
+                    <div>
+                      <div 
+                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                        onClick={() => toggleNetProfitSection("indirectIncomes")}
+                        data-testid="row-indirect-incomes"
+                      >
+                        <span className="flex items-center gap-2">
+                          {expandedNetProfitSections.has("indirectIncomes") ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          Indirect Incomes
+                          {(netProfitData.rightPane?.indirectIncomes?.count || 0) > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({netProfitData.rightPane?.indirectIncomes?.count})
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.indirectIncomes?.total || 0)}</span>
+                      </div>
+                      {expandedNetProfitSections.has("indirectIncomes") && (netProfitData.rightPane?.indirectIncomes?.accounts?.length || 0) > 0 && (
+                        <div className="bg-muted/30 divide-y">
+                          {netProfitData.rightPane?.indirectIncomes?.accounts?.map((acc: any) => (
+                            <div 
+                              key={acc.id} 
+                              className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
+                              onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
+                              data-testid={`row-indirect-income-${acc.id}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <ChevronRight className="h-3 w-3" />
+                                {acc.name}
+                              </span>
+                              <span className="font-mono">
+                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Net Profit (display only - matches left pane) */}
+                    <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
+                      <span>Net Profit</span>
+                      <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.netProfit))}
+                        {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -57,6 +57,8 @@ import LocationVouchers from "@/pages/LocationVouchers";
 import LocationSummary from "@/pages/LocationSummary";
 import OpeningStockSummary from "@/pages/OpeningStockSummary";
 import OpeningStockDetail from "@/pages/OpeningStockDetail";
+import ClosingStockSummary from "@/pages/ClosingStockSummary";
+import ClosingStockDetail from "@/pages/ClosingStockDetail";
 import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
 import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
@@ -124,6 +126,8 @@ function Router({ user }: { user: any }) {
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/opening-stock" component={OpeningStockSummary} />
       <Route path="/opening-stock/:groupId" component={OpeningStockDetail} />
+      <Route path="/closing-stock-summary" component={ClosingStockSummary} />
+      <Route path="/closing-stock/:groupId" component={ClosingStockDetail} />
       <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
       <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />

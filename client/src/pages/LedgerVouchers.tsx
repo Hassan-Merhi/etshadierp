@@ -165,7 +165,6 @@ export default function LedgerVouchers() {
                         <TableHead className="w-24">Date</TableHead>
                         <TableHead>Particulars</TableHead>
                         <TableHead className="w-32">Vch Type</TableHead>
-                        <TableHead className="w-24 text-center">Vch No.</TableHead>
                         <TableHead className="text-right w-32">Debit</TableHead>
                         <TableHead className="text-right w-32">Credit</TableHead>
                         <TableHead className="w-8"></TableHead>
@@ -174,7 +173,7 @@ export default function LedgerVouchers() {
                     <TableBody>
                       {data.vouchers.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
+                          <TableCell colSpan={6} className="text-center py-8">
                             <p className="text-muted-foreground">
                               No vouchers found for this period
                             </p>
@@ -205,9 +204,6 @@ export default function LedgerVouchers() {
                                   {voucher.voucherType}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-center font-mono">
-                                {voucher.voucherNumber}
-                              </TableCell>
                               <TableCell className="text-right font-mono">
                                 {voucher.debit > 0
                                   ? formatFullNumber(voucher.debit)
@@ -226,7 +222,7 @@ export default function LedgerVouchers() {
 
                           {/* Totals Row */}
                           <TableRow className="bg-primary/10 font-bold border-t-2">
-                            <TableCell colSpan={4}></TableCell>
+                            <TableCell colSpan={3}></TableCell>
                             <TableCell className="text-right font-mono">
                               {formatFullNumber(data.totals.debit)}
                             </TableCell>
