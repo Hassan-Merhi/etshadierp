@@ -401,46 +401,46 @@ export class DbStorage implements IStorage {
 
   async deleteCompany(id: number): Promise<void> {
     // Delete all company-related data in the correct order to avoid foreign key issues
-    // Use raw SQL with subqueries for tables that don't have direct companyId columns
+    // Use raw SQL execute for subqueries since Drizzle's where() doesn't work well with sql template subqueries
     
     // Delete voucher entries first (references vouchers)
-    await db.delete(schema.voucherEntries).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    
+    // Delete sales items (must be before vouchers)
+    await db.execute(sql`DELETE FROM sales_items WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
     
     // Delete stock transfer items (through vouchers -> stock_transfer_vouchers)
-    await db.delete(schema.stockTransferItems).where(sql`transfer_id IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${id})`);
+    await db.execute(sql`DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${id})`);
     
     // Delete stock transfer vouchers (through vouchers)
-    await db.delete(schema.stockTransferVouchers).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
     
     // Delete stock adjustment items (through vouchers -> stock_adjustment_vouchers)
-    await db.delete(schema.stockAdjustmentItems).where(sql`adjustment_id IN (SELECT sav.id FROM stock_adjustment_vouchers sav JOIN vouchers v ON sav.voucher_id = v.id WHERE v.company_id = ${id})`);
+    await db.execute(sql`DELETE FROM stock_adjustment_items WHERE adjustment_id IN (SELECT sav.id FROM stock_adjustment_vouchers sav JOIN vouchers v ON sav.voucher_id = v.id WHERE v.company_id = ${id})`);
     
     // Delete stock adjustment vouchers (through vouchers)
-    await db.delete(schema.stockAdjustmentVouchers).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
     
     // Delete vouchers
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, id));
     
-    // Delete sales items
-    await db.delete(schema.salesItems).where(sql`voucher_id IN (SELECT id FROM vouchers WHERE company_id = ${id})`);
-    
     // Delete draft POS sale items (through locations -> draft_pos_sales)
-    await db.delete(schema.draftPosSaleItems).where(sql`draft_id IN (SELECT dps.id FROM draft_pos_sales dps JOIN locations l ON dps.location_id = l.id WHERE l.company_id = ${id})`);
+    await db.execute(sql`DELETE FROM draft_pos_sale_items WHERE draft_id IN (SELECT dps.id FROM draft_pos_sales dps JOIN locations l ON dps.location_id = l.id WHERE l.company_id = ${id})`);
     
     // Delete draft POS sales (through locations)
-    await db.delete(schema.draftPosSales).where(sql`location_id IN (SELECT id FROM locations WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM draft_pos_sales WHERE location_id IN (SELECT id FROM locations WHERE company_id = ${id})`);
     
     // Delete PO line items
-    await db.delete(schema.poLineItems).where(sql`po_id IN (SELECT id FROM purchase_orders WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM po_line_items WHERE po_id IN (SELECT id FROM purchase_orders WHERE company_id = ${id})`);
     
     // Delete purchase orders
     await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, id));
     
     // Delete container charges
-    await db.delete(schema.containerCharges).where(sql`container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM container_charges WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
     
     // Delete container offloads
-    await db.delete(schema.containerOffloads).where(sql`container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM container_offloads WHERE container_id IN (SELECT id FROM containers WHERE company_id = ${id})`);
     
     // Delete containers
     await db.delete(schema.containers).where(eq(schema.containers.companyId, id));
@@ -452,7 +452,7 @@ export class DbStorage implements IStorage {
     await db.delete(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.companyId, id));
     
     // Delete stock item location prices
-    await db.delete(schema.stockItemLocationPrices).where(sql`stock_item_id IN (SELECT id FROM stock_items WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM stock_item_location_prices WHERE stock_item_id IN (SELECT id FROM stock_items WHERE company_id = ${id})`);
     
     // Delete stock items
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, id));
@@ -461,7 +461,7 @@ export class DbStorage implements IStorage {
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, id));
     
     // Delete mix batch sources
-    await db.delete(schema.mixBatchSources).where(sql`mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
     
     // Delete mix batches
     await db.delete(schema.mixBatches).where(eq(schema.mixBatches.companyId, id));
@@ -470,7 +470,7 @@ export class DbStorage implements IStorage {
     await db.delete(schema.productionBales).where(eq(schema.productionBales.companyId, id));
     
     // Delete bale transfer items
-    await db.delete(schema.baleTransferItems).where(sql`transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM bale_transfer_items WHERE transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
     
     // Delete bale transfers
     await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.companyId, id));
@@ -488,7 +488,7 @@ export class DbStorage implements IStorage {
     await db.delete(schema.salaryAdvances).where(eq(schema.salaryAdvances.companyId, id));
     
     // Delete employee group members
-    await db.delete(schema.employeeGroupMembers).where(sql`employee_group_id IN (SELECT id FROM employee_groups WHERE company_id = ${id})`);
+    await db.execute(sql`DELETE FROM employee_group_members WHERE employee_group_id IN (SELECT id FROM employee_groups WHERE company_id = ${id})`);
     
     // Delete employee groups
     await db.delete(schema.employeeGroups).where(eq(schema.employeeGroups.companyId, id));
