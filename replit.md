@@ -2,11 +2,12 @@
 
 ## Recent Changes (Dec 4, 2025)
 
-- **Opening Stock Summary Report**: New report in Analytics → Reports tab showing stock groups with opening and closing balances
-  - Groups stock items by stock group with aggregated opening quantities, rates, and values
-  - Shows closing quantities, rates, and values from current inventory
-  - Expandable rows to drill down into individual items within each stock group
-  - Location filter to view inventory for specific locations
+- **Opening Stock Summary Report**: New auto-loading report in Analytics → Reports tab showing stock groups with opening and closing balances
+  - Lists all stock groups with aggregated opening and closing balances
+  - Click any stock group row to expand and drill down into individual items
+  - Expandable hierarchy: stock groups → items with opening/closing qty, rate, and value
+  - Location filter to view closing inventory for specific locations (opening balances are not location-specific)
+  - Shows grand totals for all stock groups combined
   - API endpoints: `GET /api/reports/opening-stock-summary`, `GET /api/reports/opening-stock-summary/:stockGroupId/items`
 
 - **Container Offload Now Includes PO Freight in Inventory Cost**: Fixed bug where PO freight/charges were not being added to inventory item costs
