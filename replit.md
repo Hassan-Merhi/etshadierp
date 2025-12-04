@@ -2,13 +2,20 @@
 
 ## Recent Changes (Dec 4, 2025)
 
-- **Opening Stock Summary Report**: New auto-loading report in Analytics → Reports tab showing stock groups with opening and closing balances
-  - Lists all stock groups with aggregated opening and closing balances
-  - Click any stock group row to expand and drill down into individual items
-  - Expandable hierarchy: stock groups → items with opening/closing qty, rate, and value
-  - Location filter to view closing inventory for specific locations (opening balances are not location-specific)
-  - Shows grand totals for all stock groups combined
-  - API endpoints: `GET /api/reports/opening-stock-summary`, `GET /api/reports/opening-stock-summary/:stockGroupId/items`
+- **Net Profit (P&L) Report**: New Tally Prime-style Profit & Loss statement in Analytics → Reports tab
+  - Left pane shows: Opening Stock, Purchase Accounts, Direct Incomes, Direct Expenses, Gross Profit c/o, Indirect Expenses, Net Profit
+  - Click any row (Purchase Accounts, Direct Incomes, Direct Expenses, Indirect Expenses) to expand and see individual accounts with debit/credit
+  - Opening Stock calculated from stock items' opening values or current inventory if none set
+  - Purchase Accounts identified by code "PURCHASES" or "PURCHASES-*"
+  - Direct Incomes: accounts with accountType="Income" AND subType="Direct Income"
+  - Indirect Expenses: accounts with accountType="Indirect Expense"
+  - Gross Profit = Direct Incomes - Purchases - Direct Expenses
+  - Net Profit = Gross Profit - Indirect Expenses
+  - API endpoint: `GET /api/reports/net-profit-statement`
+  - Drill-down endpoints: purchase-accounts, direct-incomes, direct-expenses, indirect-expenses
+  - Right pane placeholder for future: Sales Accounts, Closing Stock, Gross Profit b/f, Indirect Incomes
+
+- **Opening Stock Summary Report** (Hidden - code kept for future use)
 
 - **Container Offload Now Includes PO Freight in Inventory Cost**: Fixed bug where PO freight/charges were not being added to inventory item costs
   - The `offloadContainer` function now includes `container.chargesTotal` (sum of all PO freight + otherCharges) in the additionalCostPerBale calculation

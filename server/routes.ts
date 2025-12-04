@@ -16349,6 +16349,462 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Net Profit (P&L) Report - Tally Prime style
+  app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all ledger accounts for this company
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+
+      // Get all non-optional vouchers for this company
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+
+      // Get all voucher entries
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Calculate balances for each account (credit - debit for normal P&L view)
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of companyEntries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      // 1. Opening Stock - from stock items' opening values (earliest inventory)
+      const allStockItems = await storage.getAllStockItems(companyId);
+      let openingStockValue = 0;
+      for (const item of allStockItems) {
+        openingStockValue += parseFloat(item.openingValue || "0");
+      }
+
+      // If no opening values set in stock items, use current inventory as opening stock
+      if (openingStockValue === 0) {
+        const inventoryData = await db
+          .select({ totalValue: inventory.totalValue })
+          .from(inventory)
+          .where(eq(inventory.companyId, companyId))
+          .execute();
+        openingStockValue = inventoryData.reduce((sum, inv) => sum + parseFloat(inv.totalValue), 0);
+      }
+
+      // 2. Purchase Accounts - accounts with code starting with PURCHASES or related expense accounts
+      const purchaseAccounts = companyAccounts.filter(
+        (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+      );
+      let purchaseAccountsTotal = 0;
+      const purchaseAccountsDetails = purchaseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Purchases are debits
+        purchaseAccountsTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
+      const directIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+      );
+      let directIncomesTotal = 0;
+      const directIncomesDetails = directIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.credit - balance.debit; // Income is credits
+        directIncomesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 4. Direct Expenses - accounts with accountType="Direct Expense"
+      const directExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Direct Expense"
+      );
+      let directExpensesTotal = 0;
+      const directExpensesDetails = directExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Expenses are debits
+        directExpensesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 5. Gross Profit Calculation
+      // Gross Profit = Direct Incomes - (Opening Stock + Purchases + Direct Expenses)
+      // Note: In traditional P&L, Gross Profit = Sales - COGS, where COGS = Opening Stock + Purchases - Closing Stock
+      // For now using simplified: Gross Profit = Direct Incomes - Purchases - Direct Expenses
+      const grossProfit = directIncomesTotal - purchaseAccountsTotal - directExpensesTotal;
+
+      // 6. Indirect Expenses - accounts with accountType="Indirect Expense"
+      const indirectExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Indirect Expense"
+      );
+      let indirectExpensesTotal = 0;
+      const indirectExpensesDetails = indirectExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.debit - balance.credit; // Expenses are debits
+        indirectExpensesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 7. Net Profit = Gross Profit - Indirect Expenses
+      const netProfit = grossProfit - indirectExpensesTotal;
+
+      // Calculate totals for left pane
+      const leftPaneTotal = openingStockValue + purchaseAccountsTotal + directIncomesTotal + directExpensesTotal;
+
+      res.json({
+        leftPane: {
+          openingStock: {
+            value: openingStockValue,
+          },
+          purchaseAccounts: {
+            total: purchaseAccountsTotal,
+            accounts: purchaseAccountsDetails,
+            count: purchaseAccounts.length,
+          },
+          directIncomes: {
+            total: directIncomesTotal,
+            accounts: directIncomesDetails,
+            count: directIncomeAccounts.length,
+          },
+          directExpenses: {
+            total: directExpensesTotal,
+            accounts: directExpensesDetails,
+            count: directExpenseAccounts.length,
+          },
+          grossProfit: grossProfit,
+          subtotal: leftPaneTotal + grossProfit,
+          indirectExpenses: {
+            total: indirectExpensesTotal,
+            accounts: indirectExpensesDetails,
+            count: indirectExpenseAccounts.length,
+          },
+          netProfit: netProfit,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Purchase Accounts
+  app.get("/api/reports/net-profit-statement/purchase-accounts", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const purchaseAccounts = companyAccounts.filter(
+        (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+      );
+
+      // Get voucher entries for these accounts
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = purchaseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = purchaseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit,
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Direct Incomes
+  app.get("/api/reports/net-profit-statement/direct-incomes", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const directIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = directIncomeAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = directIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.credit - balance.debit, // Income is credit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Direct Expenses
+  app.get("/api/reports/net-profit-statement/direct-expenses", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const directExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Direct Expense"
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = directExpenseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = directExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit, // Expense is debit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Net Profit Drill-down: Indirect Expenses
+  app.get("/api/reports/net-profit-statement/indirect-expenses", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const indirectExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Indirect Expense"
+      );
+
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      
+      const companyVoucherIds = companyVouchers.map((v) => v.id);
+      const accountIds = indirectExpenseAccounts.map((a) => a.id);
+
+      const entries = companyVoucherIds.length > 0 && accountIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(
+              and(
+                inArray(voucherEntries.voucherId, companyVoucherIds),
+                inArray(voucherEntries.ledgerAccountId, accountIds)
+              )
+            )
+            .execute()
+        : [];
+
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
+      for (const entry of entries) {
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
+        }
+      }
+
+      const accounts = indirectExpenseAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: balance.debit - balance.credit, // Expense is debit
+        };
+      }).filter((a) => a.debit > 0 || a.credit > 0);
+
+      const total = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+      res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Dashboard Cash Accounts - user-selected accounts for dashboard display
   app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
     try {

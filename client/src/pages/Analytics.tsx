@@ -225,6 +225,46 @@ interface OpeningStockItemsData {
   };
 }
 
+interface NetProfitAccount {
+  id: number;
+  code: string;
+  name: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+interface NetProfitStatementData {
+  leftPane: {
+    openingStock: {
+      value: number;
+    };
+    purchaseAccounts: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
+    directIncomes: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
+    directExpenses: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
+    grossProfit: number;
+    subtotal: number;
+    indirectExpenses: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
+    netProfit: number;
+  };
+}
+
 function formatSmartNumber(num: number | string): string {
   const value = typeof num === 'string' ? parseFloat(num) : num;
   const isWholeNumber = value % 1 === 0;
@@ -256,6 +296,9 @@ export default function Analytics() {
   const [openingStockLocationId, setOpeningStockLocationId] = useState("all");
   const [expandedStockGroups, setExpandedStockGroups] = useState<Set<number>>(new Set());
   const [stockGroupItems, setStockGroupItems] = useState<Map<number, OpeningStockItemsData>>(new Map());
+  
+  // Net Profit Report state
+  const [expandedNetProfitSections, setExpandedNetProfitSections] = useState<Set<string>>(new Set());
   
   // Clear cached items when location filter changes
   const handleOpeningStockLocationChange = (newLocationId: string) => {
@@ -447,6 +490,28 @@ export default function Analytics() {
     },
     enabled: !!selectedCompany,
   });
+
+  // Fetch Net Profit Statement
+  const { data: netProfitData, isLoading: loadingNetProfit } = useQuery<NetProfitStatementData>({
+    queryKey: ["/api/reports/net-profit-statement", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/reports/net-profit-statement", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch net profit statement");
+      return response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Toggle Net Profit section expansion
+  const toggleNetProfitSection = (section: string) => {
+    const newExpanded = new Set(expandedNetProfitSections);
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section);
+    } else {
+      newExpanded.add(section);
+    }
+    setExpandedNetProfitSections(newExpanded);
+  };
 
   // Toggle stock group expansion and fetch items
   const toggleStockGroup = async (groupId: number) => {
@@ -1656,171 +1721,223 @@ export default function Analytics() {
 
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
-          {/* Opening Stock Summary Report */}
+          {/* Net Profit Report - Tally Prime style */}
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Opening Stock Summary
+                <DollarSign className="h-5 w-5" />
+                Net Profit (P&L Statement)
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <Label htmlFor="opening-stock-location">Location Filter</Label>
-                <Select 
-                  value={openingStockLocationId} 
-                  onValueChange={handleOpeningStockLocationChange}
-                >
-                  <SelectTrigger id="opening-stock-location" data-testid="select-opening-stock-location">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Locations</SelectItem>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {openingStockLocationId !== "all" && (
-              <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted/50 rounded-md">
-                <strong>Note:</strong> Opening balances are from stock item master data (not location-specific). 
-                Closing balances are filtered by the selected location.
-              </div>
-            )}
-
-            {loadingOpeningStock ? (
+            {loadingNetProfit ? (
               <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
-            ) : openingStockData ? (
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-10"></TableHead>
-                        <TableHead>Stock Group</TableHead>
-                        <TableHead className="text-right">Opening Qty</TableHead>
-                        <TableHead className="text-right">Opening Rate</TableHead>
-                        <TableHead className="text-right">Opening Value</TableHead>
-                        <TableHead className="text-right">Closing Qty</TableHead>
-                        <TableHead className="text-right">Closing Rate</TableHead>
-                        <TableHead className="text-right">Closing Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {openingStockData.stockGroups.map((group) => (
-                        <>
-                          <TableRow 
-                            key={group.id} 
-                            className="cursor-pointer hover-elevate"
-                            onClick={() => toggleStockGroup(group.id)}
-                            data-testid={`row-stock-group-${group.id}`}
-                          >
-                            <TableCell>
-                              {expandedStockGroups.has(group.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {group.name}
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                ({group.itemCount} items)
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatSmartNumber(group.opening.quantity)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${formatSmartNumber(group.opening.rate)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${formatSmartNumber(group.opening.value)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatSmartNumber(group.closing.quantity)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${formatSmartNumber(group.closing.rate)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              ${formatSmartNumber(group.closing.value)}
-                            </TableCell>
-                          </TableRow>
-                          {expandedStockGroups.has(group.id) && stockGroupItems.has(group.id) && (
-                            <>
-                              {stockGroupItems.get(group.id)!.items.map((item) => (
-                                <TableRow 
-                                  key={`item-${item.id}`} 
-                                  className="bg-muted/30"
-                                  data-testid={`row-stock-item-${item.id}`}
-                                >
-                                  <TableCell></TableCell>
-                                  <TableCell className="pl-8 text-muted-foreground">
-                                    {item.code} - {item.name}
-                                    <span className="ml-2 text-xs">({item.uom})</span>
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    {formatSmartNumber(item.opening.quantity)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    ${formatSmartNumber(item.opening.rate)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    ${formatSmartNumber(item.opening.value)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    {formatSmartNumber(item.closing.quantity)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    ${formatSmartNumber(item.closing.rate)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    ${formatSmartNumber(item.closing.value)}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </>
+            ) : netProfitData ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Pane */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 p-3 border-b">
+                    <span className="font-semibold">Particulars</span>
+                  </div>
+                  <div className="divide-y">
+                    {/* Opening Stock */}
+                    <div className="flex justify-between items-center p-3">
+                      <span>Opening Stock</span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.openingStock.value)}</span>
+                    </div>
+
+                    {/* Purchase Accounts */}
+                    <div>
+                      <div 
+                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                        onClick={() => toggleNetProfitSection("purchaseAccounts")}
+                        data-testid="row-purchase-accounts"
+                      >
+                        <span className="flex items-center gap-2">
+                          {expandedNetProfitSections.has("purchaseAccounts") ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
                           )}
-                        </>
-                      ))}
-                    </TableBody>
-                    <TableBody className="font-semibold border-t-2">
-                      <TableRow>
-                        <TableCell></TableCell>
-                        <TableCell>GRAND TOTAL</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatSmartNumber(openingStockData.grandTotal.opening.quantity)}
-                        </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${formatSmartNumber(openingStockData.grandTotal.opening.value)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatSmartNumber(openingStockData.grandTotal.closing.quantity)}
-                        </TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${formatSmartNumber(openingStockData.grandTotal.closing.value)}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                          Purchase Accounts
+                          {netProfitData.leftPane.purchaseAccounts.count > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({netProfitData.leftPane.purchaseAccounts.count})
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.purchaseAccounts.total)}</span>
+                      </div>
+                      {expandedNetProfitSections.has("purchaseAccounts") && netProfitData.leftPane.purchaseAccounts.accounts.length > 0 && (
+                        <div className="bg-muted/30 divide-y">
+                          {netProfitData.leftPane.purchaseAccounts.accounts.map((acc) => (
+                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                              <span>{acc.name}</span>
+                              <span className="font-mono">
+                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Direct Incomes */}
+                    <div>
+                      <div 
+                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                        onClick={() => toggleNetProfitSection("directIncomes")}
+                        data-testid="row-direct-incomes"
+                      >
+                        <span className="flex items-center gap-2">
+                          {expandedNetProfitSections.has("directIncomes") ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          Direct Incomes
+                          {netProfitData.leftPane.directIncomes.count > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({netProfitData.leftPane.directIncomes.count})
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.directIncomes.total)}</span>
+                      </div>
+                      {expandedNetProfitSections.has("directIncomes") && netProfitData.leftPane.directIncomes.accounts.length > 0 && (
+                        <div className="bg-muted/30 divide-y">
+                          {netProfitData.leftPane.directIncomes.accounts.map((acc) => (
+                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                              <span>{acc.name}</span>
+                              <span className="font-mono">
+                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Direct Expenses */}
+                    {netProfitData.leftPane.directExpenses.count > 0 && (
+                      <div>
+                        <div 
+                          className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                          onClick={() => toggleNetProfitSection("directExpenses")}
+                          data-testid="row-direct-expenses"
+                        >
+                          <span className="flex items-center gap-2">
+                            {expandedNetProfitSections.has("directExpenses") ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            Direct Expenses
+                            <span className="text-xs text-muted-foreground">
+                              ({netProfitData.leftPane.directExpenses.count})
+                            </span>
+                          </span>
+                          <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.directExpenses.total)}</span>
+                        </div>
+                        {expandedNetProfitSections.has("directExpenses") && netProfitData.leftPane.directExpenses.accounts.length > 0 && (
+                          <div className="bg-muted/30 divide-y">
+                            {netProfitData.leftPane.directExpenses.accounts.map((acc) => (
+                              <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                                <span>{acc.name}</span>
+                                <span className="font-mono">
+                                  Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Gross Profit c/o */}
+                    <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
+                      <span>Gross Profit c/o</span>
+                      <span className={`font-mono ${netProfitData.leftPane.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.grossProfit))}
+                        {netProfitData.leftPane.grossProfit < 0 && ' (Loss)'}
+                      </span>
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex justify-between items-center p-3 bg-primary/10 font-semibold border-t-2">
+                      <span>Total</span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.subtotal)}</span>
+                    </div>
+
+                    {/* Separator */}
+                    <div className="h-4 bg-muted/30"></div>
+
+                    {/* Indirect Expenses */}
+                    <div>
+                      <div 
+                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                        onClick={() => toggleNetProfitSection("indirectExpenses")}
+                        data-testid="row-indirect-expenses"
+                      >
+                        <span className="flex items-center gap-2">
+                          {expandedNetProfitSections.has("indirectExpenses") ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          Indirect Expenses
+                          {netProfitData.leftPane.indirectExpenses.count > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({netProfitData.leftPane.indirectExpenses.count})
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.indirectExpenses.total)}</span>
+                      </div>
+                      {expandedNetProfitSections.has("indirectExpenses") && netProfitData.leftPane.indirectExpenses.accounts.length > 0 && (
+                        <div className="bg-muted/30 divide-y">
+                          {netProfitData.leftPane.indirectExpenses.accounts.map((acc) => (
+                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                              <span>{acc.name}</span>
+                              <span className="font-mono">
+                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Net Profit */}
+                    <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
+                      <span>Net Profit</span>
+                      <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.netProfit))}
+                        {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Pane - Placeholder for future */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-muted/50 p-3 border-b">
+                    <span className="font-semibold">Particulars</span>
+                  </div>
+                  <div className="p-8 text-center text-muted-foreground">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Right pane coming soon</p>
+                    <p className="text-sm">Sales Accounts, Closing Stock, Gross Profit b/f, Indirect Incomes</p>
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                No data available. Click Generate to load report.
+                No data available.
               </div>
             )}
           </Card>
