@@ -127,6 +127,7 @@ export interface IStorage {
   
   // Stock Item Code Aliases
   getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]>;
+  getAllCompanyCodeAliases(companyId: number): Promise<schema.StockItemCodeAlias[]>;
   getStockItemCodeAliasById(id: number): Promise<schema.StockItemCodeAlias | undefined>;
   createStockItemCodeAlias(alias: schema.InsertStockItemCodeAlias): Promise<schema.StockItemCodeAlias>;
   deleteStockItemCodeAlias(id: number): Promise<void>;
@@ -1018,6 +1019,13 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.stockItemCodeAliases)
       .where(eq(schema.stockItemCodeAliases.stockItemId, stockItemId));
+  }
+
+  async getAllCompanyCodeAliases(companyId: number): Promise<schema.StockItemCodeAlias[]> {
+    return await db
+      .select()
+      .from(schema.stockItemCodeAliases)
+      .where(eq(schema.stockItemCodeAliases.companyId, companyId));
   }
 
   async getStockItemCodeAliasById(id: number): Promise<schema.StockItemCodeAlias | undefined> {

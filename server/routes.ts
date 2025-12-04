@@ -4244,15 +4244,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Pre-fetch all stock items once for efficient lookup
       const allItems = await storage.getAllStockItems(req.session.currentCompanyId);
-      // Map by code field (code is used as barcode in this system)
-      const itemsByCode = new Map(allItems.map(i => [i.code, i]));
+      // Map by primary code field (skip empty/null codes)
+      const itemsByCode = new Map<string, typeof allItems[0]>();
+      const itemsById = new Map(allItems.map(i => [i.id, i]));
+      for (const item of allItems) {
+        if (item.code && typeof item.code === 'string') {
+          itemsByCode.set(item.code.toLowerCase(), item);
+        }
+      }
+      
+      // Pre-fetch all code aliases and build alias lookup map (skip empty/null aliases)
+      const allAliases = await storage.getAllCompanyCodeAliases(req.session.currentCompanyId);
+      const itemsByAlias = new Map<string, typeof allItems[0]>();
+      for (const alias of allAliases) {
+        if (alias.aliasCode && typeof alias.aliasCode === 'string') {
+          const item = itemsById.get(alias.stockItemId);
+          if (item) {
+            itemsByAlias.set(alias.aliasCode.toLowerCase(), item);
+          }
+        }
+      }
 
       for (const entry of openingBalances) {
         const { barcode, openingQty, openingRate, openingValue } = entry;
-        if (!barcode) continue;
+        if (!barcode || typeof barcode !== 'string') continue;
 
-        // Find item by code (code is used as barcode in this system)
-        const item = itemsByCode.get(barcode);
+        // Find item by primary code first, then by alias (case-insensitive)
+        const barcodeLC = barcode.toLowerCase();
+        const item = itemsByCode.get(barcodeLC) || itemsByAlias.get(barcodeLC);
 
         if (item) {
           // Calculate total value if not provided: qty * rate
