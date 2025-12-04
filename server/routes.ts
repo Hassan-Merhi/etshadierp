@@ -16392,21 +16392,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // 1. Opening Stock - from stock items' opening values (earliest inventory)
+      // 1. Opening Stock - FROZEN value from stock items' opening values only
+      // This value does not change with POS sales - it represents the initial inventory setup
       const allStockItems = await storage.getAllStockItems(companyId);
       let openingStockValue = 0;
       for (const item of allStockItems) {
         openingStockValue += parseFloat(item.openingValue || "0");
-      }
-
-      // If no opening values set in stock items, use current inventory as opening stock
-      if (openingStockValue === 0) {
-        const inventoryData = await db
-          .select({ totalValue: inventory.totalValue })
-          .from(inventory)
-          .where(eq(inventory.companyId, companyId))
-          .execute();
-        openingStockValue = inventoryData.reduce((sum, inv) => sum + parseFloat(inv.totalValue), 0);
       }
 
       // 2. Purchase Accounts - accounts with code starting with PURCHASES or related expense accounts
