@@ -1784,8 +1784,16 @@ export default function Analytics() {
                       {expandedNetProfitSections.has("purchaseAccounts") && netProfitData.leftPane.purchaseAccounts.accounts.length > 0 && (
                         <div className="bg-muted/30 divide-y">
                           {netProfitData.leftPane.purchaseAccounts.accounts.map((acc) => (
-                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
-                              <span>{acc.name}</span>
+                            <div 
+                              key={acc.id} 
+                              className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground cursor-pointer hover-elevate"
+                              onClick={() => navigate(`/ledger-monthly/${acc.id}`)}
+                              data-testid={`row-purchase-account-${acc.id}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <ChevronRight className="h-3 w-3" />
+                                {acc.name}
+                              </span>
                               <span className="font-mono">
                                 Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
                               </span>

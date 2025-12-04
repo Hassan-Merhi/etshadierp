@@ -68,9 +68,10 @@ import {
   stockItemLocationPrices,
   userPreferences,
   insertUserPreferencesSchema,
+  stockItemCodeAliases,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne, desc, or, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
 import { format } from "date-fns";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17004,6 +17005,482 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
 
       res.json({ accounts, total });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Ledger Monthly Summary - monthly breakdown for a ledger account
+  app.get("/api/reports/ledger-monthly-summary/:accountId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.accountId);
+      const { startDate, endDate } = req.query;
+
+      // Get the ledger account
+      const account = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Parse date range
+      const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
+      const end = endDate ? new Date(endDate as string) : new Date(new Date().getFullYear(), 11, 31);
+
+      // Get opening balance (entries before start date)
+      const openingEntries = await db
+        .select({
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            lt(vouchers.voucherDate, start.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      let openingBalance = parseFloat(account.openingBalance || "0");
+      for (const entry of openingEntries) {
+        openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
+      }
+
+      // Get all voucher entries in date range grouped by month
+      const entries = await db
+        .select({
+          voucherId: vouchers.id,
+          date: vouchers.voucherDate,
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            gte(vouchers.voucherDate, start.toISOString().split("T")[0]),
+            lte(vouchers.voucherDate, end.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      // Group by month
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      const monthlyData: { month: number; monthName: string; debit: number; credit: number; closingBalance: number }[] = [];
+      let runningBalance = openingBalance;
+
+      for (let month = 0; month < 12; month++) {
+        const monthEntries = entries.filter((e) => {
+          const d = new Date(e.date);
+          return d.getMonth() === month && d.getFullYear() === start.getFullYear();
+        });
+
+        let debit = 0;
+        let credit = 0;
+        for (const entry of monthEntries) {
+          debit += parseFloat(entry.debit || "0");
+          credit += parseFloat(entry.credit || "0");
+        }
+
+        runningBalance += debit - credit;
+
+        monthlyData.push({
+          month: month + 1,
+          monthName: monthNames[month],
+          debit,
+          credit,
+          closingBalance: runningBalance,
+        });
+      }
+
+      // Calculate grand totals
+      const grandTotal = {
+        debit: monthlyData.reduce((sum, m) => sum + m.debit, 0),
+        credit: monthlyData.reduce((sum, m) => sum + m.credit, 0),
+        closingBalance: runningBalance,
+      };
+
+      res.json({
+        account: {
+          id: account.id,
+          code: account.code,
+          name: account.name,
+        },
+        openingBalance,
+        months: monthlyData,
+        grandTotal,
+        dateRange: {
+          startDate: start.toISOString().split("T")[0],
+          endDate: end.toISOString().split("T")[0],
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Ledger Vouchers - vouchers for a specific month
+  app.get("/api/reports/ledger-vouchers/:accountId/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const accountId = parseInt(req.params.accountId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      // Get the ledger account
+      const account = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const monthNames = [
+        "", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      // Calculate date range for the month
+      const startOfMonth = new Date(year, month - 1, 1);
+      const endOfMonth = new Date(year, month, 0);
+
+      // Get opening balance (entries before this month)
+      const openingEntries = await db
+        .select({
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            lt(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0])
+          )
+        )
+        .execute();
+
+      let openingBalance = parseFloat(account.openingBalance || "0");
+      for (const entry of openingEntries) {
+        openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
+      }
+
+      // Get vouchers for the month
+      const voucherEntriesData = await db
+        .select({
+          entryId: voucherEntries.id,
+          voucherId: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          date: vouchers.voucherDate,
+          debit: voucherEntries.debitAmount,
+          credit: voucherEntries.creditAmount,
+          supplierId: voucherEntries.supplierId,
+          locationId: vouchers.locationId,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, accountId),
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            gte(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0]),
+            lte(vouchers.voucherDate, endOfMonth.toISOString().split("T")[0])
+          )
+        )
+        .orderBy(vouchers.voucherDate, vouchers.voucherNumber)
+        .execute();
+
+      // Enrich with party names
+      const vouchersWithDetails = await Promise.all(
+        voucherEntriesData.map(async (entry) => {
+          let particulars = "";
+          
+          if (entry.supplierId) {
+            const supplierData = await db
+              .select({ legalName: suppliers.legalName })
+              .from(suppliers)
+              .where(eq(suppliers.id, entry.supplierId))
+              .execute()
+              .then((rows) => rows[0]);
+            particulars = supplierData?.legalName || "Unknown Supplier";
+          } else if (entry.locationId) {
+            const location = await db
+              .select({ name: locations.name })
+              .from(locations)
+              .where(eq(locations.id, entry.locationId))
+              .execute()
+              .then((rows) => rows[0]);
+            particulars = location?.name || "Unknown Location";
+          } else if (entry.narration) {
+            particulars = entry.narration.substring(0, 50);
+          } else {
+            // Get contra account
+            const contraEntries = await db
+              .select({ accountName: ledgerAccounts.name })
+              .from(voucherEntries)
+              .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+              .where(
+                and(
+                  eq(voucherEntries.voucherId, entry.voucherId),
+                  ne(voucherEntries.ledgerAccountId, accountId)
+                )
+              )
+              .execute();
+            particulars = contraEntries[0]?.accountName || "Multiple Accounts";
+          }
+
+          return {
+            id: entry.entryId,
+            voucherId: entry.voucherId,
+            date: entry.date,
+            particulars,
+            voucherType: entry.voucherType,
+            voucherNumber: entry.voucherNumber,
+            debit: parseFloat(entry.debit || "0"),
+            credit: parseFloat(entry.credit || "0"),
+          };
+        })
+      );
+
+      const totals = {
+        debit: vouchersWithDetails.reduce((sum, v) => sum + v.debit, 0),
+        credit: vouchersWithDetails.reduce((sum, v) => sum + v.credit, 0),
+      };
+
+      const closingBalance = openingBalance + totals.debit - totals.credit;
+
+      res.json({
+        account: {
+          id: account.id,
+          code: account.code,
+          name: account.name,
+        },
+        month,
+        monthName: monthNames[month],
+        year,
+        openingBalance,
+        vouchers: vouchersWithDetails,
+        totals,
+        closingBalance,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Voucher Detail - full voucher with items/entries
+  app.get("/api/voucher-detail/:voucherId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const voucherId = parseInt(req.params.voucherId);
+
+      // Get the voucher
+      const voucher = await db
+        .select()
+        .from(vouchers)
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)))
+        .execute()
+        .then((rows) => rows[0]);
+
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Get party name from voucher entries (supplier)
+      let partyName: string | null = null;
+      const supplierEntry = await db
+        .select({ supplierId: voucherEntries.supplierId })
+        .from(voucherEntries)
+        .where(and(eq(voucherEntries.voucherId, voucherId), isNotNull(voucherEntries.supplierId)))
+        .execute()
+        .then((rows) => rows[0]);
+      
+      if (supplierEntry?.supplierId) {
+        const supplier = await db
+          .select({ legalName: suppliers.legalName })
+          .from(suppliers)
+          .where(eq(suppliers.id, supplierEntry.supplierId))
+          .execute()
+          .then((rows) => rows[0]);
+        partyName = supplier?.legalName || null;
+      }
+
+      // Get location name
+      const locationName = voucher.locationName || null;
+
+      // Get purchase ledger
+      let purchaseLedger: string | null = null;
+      const purchaseEntry = await db
+        .select({ name: ledgerAccounts.name })
+        .from(voucherEntries)
+        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+        .where(
+          and(
+            eq(voucherEntries.voucherId, voucherId),
+            or(
+              eq(ledgerAccounts.code, "PURCHASES"),
+              sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`
+            )
+          )
+        )
+        .execute()
+        .then((rows) => rows[0]);
+      purchaseLedger = purchaseEntry?.name || null;
+
+      // Get sales items (from sales_items table for Receipt vouchers)
+      const salesItemsData = await db
+        .select({
+          id: salesItems.id,
+          stockItemId: salesItems.stockItemId,
+          quantity: salesItems.quantity,
+          rate: salesItems.sellingPrice,
+          total: salesItems.totalSales,
+        })
+        .from(salesItems)
+        .where(eq(salesItems.voucherId, voucherId))
+        .execute();
+
+      // Get purchase order line items if this is a PO-linked voucher
+      const poItemsData = await db
+        .select({
+          id: poLineItems.id,
+          stockItemId: poLineItems.stockItemId,
+          quantity: poLineItems.quantity,
+          rate: poLineItems.rate,
+          total: poLineItems.lineTotal,
+        })
+        .from(poLineItems)
+        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .where(eq(purchaseOrders.voucherId, voucherId))
+        .execute();
+
+      // Combine and enrich items
+      const allItems = [...salesItemsData, ...poItemsData];
+      const items = await Promise.all(
+        allItems.map(async (item) => {
+          let stockItem = null;
+          if (item.stockItemId) {
+            stockItem = await db
+              .select({ name: stockItems.name, code: stockItems.code, uom: stockItems.uom })
+              .from(stockItems)
+              .where(eq(stockItems.id, item.stockItemId))
+              .execute()
+              .then((rows) => rows[0]);
+          }
+
+          return {
+            id: item.id,
+            stockItemId: item.stockItemId,
+            stockItemName: stockItem?.name || "Unknown Item",
+            stockItemCode: stockItem?.code || "",
+            quantity: parseFloat(item.quantity || "0"),
+            unit: stockItem?.uom || "BL",
+            rate: parseFloat(item.rate || "0"),
+            amount: parseFloat(item.total || "0"),
+          };
+        })
+      );
+
+      // Get ledger entries
+      const entriesData = await db
+        .select({
+          id: voucherEntries.id,
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .where(eq(voucherEntries.voucherId, voucherId))
+        .execute();
+
+      const entries = await Promise.all(
+        entriesData.map(async (entry) => {
+          let ledgerName = "Unknown Account";
+          if (entry.ledgerAccountId) {
+            const ledger = await db
+              .select({ name: ledgerAccounts.name })
+              .from(ledgerAccounts)
+              .where(eq(ledgerAccounts.id, entry.ledgerAccountId))
+              .execute()
+              .then((rows) => rows[0]);
+            ledgerName = ledger?.name || "Unknown Account";
+          }
+
+          return {
+            id: entry.id,
+            ledgerAccountId: entry.ledgerAccountId || 0,
+            ledgerAccountName: ledgerName,
+            debitAmount: parseFloat(entry.debitAmount || "0"),
+            creditAmount: parseFloat(entry.creditAmount || "0"),
+            narration: entry.narration,
+          };
+        })
+      );
+
+      // Calculate totals
+      const itemsTotalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
+      const itemsTotalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+      const entriesDebit = entries.reduce((sum, e) => sum + e.debitAmount, 0);
+      const entriesCredit = entries.reduce((sum, e) => sum + e.creditAmount, 0);
+
+      res.json({
+        id: voucher.id,
+        voucherNumber: voucher.voucherNumber,
+        voucherType: voucher.voucherType,
+        date: voucher.voucherDate,
+        partyName,
+        purchaseLedger,
+        locationName,
+        narration: voucher.description,
+        supplierInvoiceNo: null,
+        items,
+        entries,
+        totals: {
+          quantity: itemsTotalQuantity,
+          amount: itemsTotalAmount,
+          debit: entriesDebit,
+          credit: entriesCredit,
+        },
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

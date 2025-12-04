@@ -57,6 +57,9 @@ import LocationVouchers from "@/pages/LocationVouchers";
 import LocationSummary from "@/pages/LocationSummary";
 import OpeningStockSummary from "@/pages/OpeningStockSummary";
 import OpeningStockDetail from "@/pages/OpeningStockDetail";
+import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
+import LedgerVouchers from "@/pages/LedgerVouchers";
+import VoucherDetail from "@/pages/VoucherDetail";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -121,6 +124,9 @@ function Router({ user }: { user: any }) {
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
       <Route path="/opening-stock" component={OpeningStockSummary} />
       <Route path="/opening-stock/:groupId" component={OpeningStockDetail} />
+      <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
+      <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+      <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
       <Route path="/bales" component={Bales} />
       <Route path="/mix-batches" component={MixBatches} />
       <Route path="/production-bales" component={ProductionBales} />
