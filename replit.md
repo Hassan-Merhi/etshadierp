@@ -1,5 +1,13 @@
 # ERP POS System
 
+## Recent Changes (Dec 4, 2025)
+
+- **Container Offload Now Includes PO Freight in Inventory Cost**: Fixed bug where PO freight/charges were not being added to inventory item costs
+  - The `offloadContainer` function now includes `container.chargesTotal` (sum of all PO freight + otherCharges) in the additionalCostPerBale calculation
+  - Inventory values now correctly reflect: base item cost + (all charges / total bales)
+  - Example: 646 bales with $3,667 freight → adds ~$5.68 per bale to cost
+  - **Note**: Existing offloaded containers need to be re-offloaded to apply this fix
+
 ## Recent Changes (Dec 3, 2025)
 
 - **Purchase Order Freight & Charges**: POs now have editable freight and other charges fields
