@@ -19594,6 +19594,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cleanup endpoint to remove orphaned charge vouchers (no auth required for cleanup operations)
+  app.post("/api/cleanup/orphaned-charges", async (req, res) => {
+    try {
+      // Find all CHARGE vouchers
+      const chargeVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(sql`${vouchers.voucherNumber} LIKE 'CHARGE-%'`);
+
+      let deletedCount = 0;
+
+      for (const chargeVoucher of chargeVouchers) {
+        // Extract container number from voucher number (format: CHARGE-CONT-XXXX-YYYY-...)
+        const containerNumber = chargeVoucher.voucherNumber.split('-')[1] + '-' + chargeVoucher.voucherNumber.split('-')[2];
+        
+        // Check if any POs exist for this container
+        const remainingPOs = await db
+          .select()
+          .from(purchaseOrders)
+          .leftJoin(containers, eq(purchaseOrders.containerId, containers.id))
+          .where(eq(containers.containerNumber, containerNumber))
+          .limit(1);
+
+        // If no POs for this container, delete the charge voucher
+        if (remainingPOs.length === 0) {
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, chargeVoucher.id));
+          await db.delete(vouchers).where(eq(vouchers.id, chargeVoucher.id));
+          deletedCount++;
+        }
+      }
+
+      res.json({
+        message: `Cleaned up ${deletedCount} orphaned charge vouchers`,
+        deletedCount,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
