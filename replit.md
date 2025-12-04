@@ -2,6 +2,13 @@
 
 ## Recent Changes (Dec 4, 2025)
 
+- **Opening Stock Summary Report**: New report in Analytics → Reports tab showing stock groups with opening and closing balances
+  - Groups stock items by stock group with aggregated opening quantities, rates, and values
+  - Shows closing quantities, rates, and values from current inventory
+  - Expandable rows to drill down into individual items within each stock group
+  - Location filter to view inventory for specific locations
+  - API endpoints: `GET /api/reports/opening-stock-summary`, `GET /api/reports/opening-stock-summary/:stockGroupId/items`
+
 - **Container Offload Now Includes PO Freight in Inventory Cost**: Fixed bug where PO freight/charges were not being added to inventory item costs
   - The `offloadContainer` function now includes `container.chargesTotal` (sum of all PO freight + otherCharges) in the additionalCostPerBale calculation
   - Inventory values now correctly reflect: base item cost + (all charges / total bales)

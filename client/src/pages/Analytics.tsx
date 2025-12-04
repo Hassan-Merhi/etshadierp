@@ -168,6 +168,63 @@ interface Supplier {
   name: string;
 }
 
+interface OpeningStockGroup {
+  id: number;
+  code: string;
+  name: string;
+  opening: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+  closing: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+  itemCount: number;
+}
+
+interface OpeningStockItem {
+  id: number;
+  code: string;
+  name: string;
+  uom: string;
+  opening: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+  closing: {
+    quantity: number;
+    rate: number;
+    value: number;
+  };
+}
+
+interface OpeningStockSummaryData {
+  stockGroups: OpeningStockGroup[];
+  grandTotal: {
+    opening: { quantity: number; value: number };
+    closing: { quantity: number; value: number };
+  };
+  filters: {
+    locationId: string | null;
+  };
+  notes?: {
+    opening: string;
+    closing: string;
+  };
+}
+
+interface OpeningStockItemsData {
+  items: OpeningStockItem[];
+  totals: {
+    opening: { quantity: number; value: number };
+    closing: { quantity: number; value: number };
+  };
+}
+
 function formatSmartNumber(num: number | string): string {
   const value = typeof num === 'string' ? parseFloat(num) : num;
   const isWholeNumber = value % 1 === 0;
@@ -194,6 +251,18 @@ export default function Analytics() {
   const [reportStockGroupId, setReportStockGroupId] = useState("all");
   const [reportSupplierId, setReportSupplierId] = useState("all");
   const [reportContainerStatus, setReportContainerStatus] = useState("all");
+  
+  // Opening Stock Summary state
+  const [openingStockLocationId, setOpeningStockLocationId] = useState("all");
+  const [expandedStockGroups, setExpandedStockGroups] = useState<Set<number>>(new Set());
+  const [stockGroupItems, setStockGroupItems] = useState<Map<number, OpeningStockItemsData>>(new Map());
+  
+  // Clear cached items when location filter changes
+  const handleOpeningStockLocationChange = (newLocationId: string) => {
+    setOpeningStockLocationId(newLocationId);
+    setExpandedStockGroups(new Set());
+    setStockGroupItems(new Map());
+  };
 
   // Fetch reference data
   const { data: locations = [] } = useQuery<Location[]>({ 
@@ -359,6 +428,55 @@ export default function Analytics() {
     },
     enabled: false, // Manual trigger via Generate button
   });
+
+  // Fetch Opening Stock Summary
+  const buildOpeningStockUrl = () => {
+    const params = new URLSearchParams();
+    if (openingStockLocationId && openingStockLocationId !== "all") {
+      params.append("locationId", openingStockLocationId);
+    }
+    return `/api/reports/opening-stock-summary?${params}`;
+  };
+
+  const { data: openingStockData, refetch: refetchOpeningStock, isLoading: loadingOpeningStock } = useQuery<OpeningStockSummaryData>({
+    queryKey: [buildOpeningStockUrl(), selectedCompany?.id],
+    queryFn: async ({ queryKey }) => {
+      const response = await fetch(queryKey[0] as string, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch opening stock summary");
+      return response.json();
+    },
+    enabled: false, // Manual trigger via Generate button
+  });
+
+  // Toggle stock group expansion and fetch items
+  const toggleStockGroup = async (groupId: number) => {
+    const newExpanded = new Set(expandedStockGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+      // Fetch items if not already loaded
+      if (!stockGroupItems.has(groupId)) {
+        try {
+          const params = new URLSearchParams();
+          if (openingStockLocationId && openingStockLocationId !== "all") {
+            params.append("locationId", openingStockLocationId);
+          }
+          const response = await fetch(
+            `/api/reports/opening-stock-summary/${groupId}/items?${params}`,
+            { credentials: "include" }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setStockGroupItems(new Map(stockGroupItems).set(groupId, data));
+          }
+        } catch (error) {
+          console.error("Failed to fetch stock group items:", error);
+        }
+      }
+    }
+    setExpandedStockGroups(newExpanded);
+  };
 
   // Helper functions
   const toggleAccount = (accountId: number) => {
@@ -1665,6 +1783,187 @@ export default function Analytics() {
                 </div>
               </div>
             ) : null}
+          </Card>
+
+          {/* Opening Stock Summary Report */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Opening Stock Summary
+              </h3>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setExpandedStockGroups(new Set());
+                  setStockGroupItems(new Map());
+                  refetchOpeningStock();
+                }}
+                disabled={loadingOpeningStock}
+                data-testid="button-generate-opening-stock"
+              >
+                {loadingOpeningStock ? "Loading..." : "Generate"}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <Label htmlFor="opening-stock-location">Location Filter</Label>
+                <Select 
+                  value={openingStockLocationId} 
+                  onValueChange={handleOpeningStockLocationChange}
+                >
+                  <SelectTrigger id="opening-stock-location" data-testid="select-opening-stock-location">
+                    <SelectValue placeholder="All Locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Locations</SelectItem>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id.toString()}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {openingStockLocationId !== "all" && (
+              <div className="text-sm text-muted-foreground mb-4 p-3 bg-muted/50 rounded-md">
+                <strong>Note:</strong> Opening balances are from stock item master data (not location-specific). 
+                Closing balances are filtered by the selected location.
+              </div>
+            )}
+
+            {loadingOpeningStock ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : openingStockData ? (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10"></TableHead>
+                        <TableHead>Stock Group</TableHead>
+                        <TableHead className="text-right">Opening Qty</TableHead>
+                        <TableHead className="text-right">Opening Rate</TableHead>
+                        <TableHead className="text-right">Opening Value</TableHead>
+                        <TableHead className="text-right">Closing Qty</TableHead>
+                        <TableHead className="text-right">Closing Rate</TableHead>
+                        <TableHead className="text-right">Closing Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {openingStockData.stockGroups.map((group) => (
+                        <>
+                          <TableRow 
+                            key={group.id} 
+                            className="cursor-pointer hover-elevate"
+                            onClick={() => toggleStockGroup(group.id)}
+                            data-testid={`row-stock-group-${group.id}`}
+                          >
+                            <TableCell>
+                              {expandedStockGroups.has(group.id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {group.name}
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                ({group.itemCount} items)
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatSmartNumber(group.opening.quantity)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${formatSmartNumber(group.opening.rate)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${formatSmartNumber(group.opening.value)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatSmartNumber(group.closing.quantity)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${formatSmartNumber(group.closing.rate)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              ${formatSmartNumber(group.closing.value)}
+                            </TableCell>
+                          </TableRow>
+                          {expandedStockGroups.has(group.id) && stockGroupItems.has(group.id) && (
+                            <>
+                              {stockGroupItems.get(group.id)!.items.map((item) => (
+                                <TableRow 
+                                  key={`item-${item.id}`} 
+                                  className="bg-muted/30"
+                                  data-testid={`row-stock-item-${item.id}`}
+                                >
+                                  <TableCell></TableCell>
+                                  <TableCell className="pl-8 text-muted-foreground">
+                                    {item.code} - {item.name}
+                                    <span className="ml-2 text-xs">({item.uom})</span>
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    {formatSmartNumber(item.opening.quantity)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    ${formatSmartNumber(item.opening.rate)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    ${formatSmartNumber(item.opening.value)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    {formatSmartNumber(item.closing.quantity)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    ${formatSmartNumber(item.closing.rate)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    ${formatSmartNumber(item.closing.value)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </>
+                          )}
+                        </>
+                      ))}
+                    </TableBody>
+                    <TableBody className="font-semibold border-t-2">
+                      <TableRow>
+                        <TableCell></TableCell>
+                        <TableCell>GRAND TOTAL</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatSmartNumber(openingStockData.grandTotal.opening.quantity)}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${formatSmartNumber(openingStockData.grandTotal.opening.value)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatSmartNumber(openingStockData.grandTotal.closing.quantity)}
+                        </TableCell>
+                        <TableCell></TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${formatSmartNumber(openingStockData.grandTotal.closing.value)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No data available. Click Generate to load report.
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

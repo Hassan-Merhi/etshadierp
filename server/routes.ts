@@ -16084,6 +16084,271 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Opening Stock Summary Report - shows stock groups with opening/closing balances
+  app.get("/api/reports/opening-stock-summary", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { locationId, stockGroupId } = req.query;
+
+      // Get all stock groups for the company
+      const allStockGroups = await storage.getAllStockGroups(companyId);
+      
+      // Get all stock items for the company
+      const allStockItems = await storage.getAllStockItems(companyId);
+      
+      // Get inventory data with optional location filter
+      let inventoryData;
+      if (locationId && locationId !== "all") {
+        inventoryData = await db
+          .select({
+            stockItemId: inventory.stockItemId,
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+            totalValue: inventory.totalValue,
+            locationId: inventory.locationId,
+            locationName: locations.name,
+          })
+          .from(inventory)
+          .leftJoin(locations, eq(inventory.locationId, locations.id))
+          .where(
+            and(
+              eq(inventory.companyId, companyId),
+              eq(inventory.locationId, parseInt(locationId as string))
+            )
+          )
+          .execute();
+      } else {
+        inventoryData = await db
+          .select({
+            stockItemId: inventory.stockItemId,
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+            totalValue: inventory.totalValue,
+            locationId: inventory.locationId,
+            locationName: locations.name,
+          })
+          .from(inventory)
+          .leftJoin(locations, eq(inventory.locationId, locations.id))
+          .where(eq(inventory.companyId, companyId))
+          .execute();
+      }
+
+      // Create a map of stock item ID to inventory aggregated across locations
+      // For weighted average rate: use totalValue/quantity (since totalValue = qty * averageRate)
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity);
+        const val = parseFloat(inv.totalValue);
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+
+      // Build stock groups summary
+      const stockGroupSummary = allStockGroups.map((group) => {
+        // Get items in this group
+        const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
+        
+        // Calculate opening balance from stock items
+        let openingQty = 0;
+        let openingValue = 0;
+        
+        // Calculate closing balance from inventory
+        let closingQty = 0;
+        let closingValue = 0;
+
+        for (const item of groupItems) {
+          // Opening balance from stock item master data
+          const itemOpeningQty = parseFloat(item.openingQty || "0");
+          const itemOpeningValue = parseFloat(item.openingValue || "0");
+          openingQty += itemOpeningQty;
+          openingValue += itemOpeningValue;
+
+          // Closing balance from current inventory
+          const inv = inventoryByItem.get(item.id);
+          if (inv) {
+            closingQty += inv.quantity;
+            closingValue += inv.totalValue;
+          }
+        }
+
+        return {
+          id: group.id,
+          code: group.code,
+          name: group.name,
+          opening: {
+            quantity: openingQty,
+            rate: openingQty > 0 ? openingValue / openingQty : 0,
+            value: openingValue,
+          },
+          closing: {
+            quantity: closingQty,
+            rate: closingQty > 0 ? closingValue / closingQty : 0,
+            value: closingValue,
+          },
+          itemCount: groupItems.length,
+        };
+      }).filter((g) => g.opening.quantity > 0 || g.closing.quantity > 0);
+
+      // Calculate grand totals
+      const grandTotal = {
+        opening: {
+          quantity: stockGroupSummary.reduce((sum, g) => sum + g.opening.quantity, 0),
+          value: stockGroupSummary.reduce((sum, g) => sum + g.opening.value, 0),
+        },
+        closing: {
+          quantity: stockGroupSummary.reduce((sum, g) => sum + g.closing.quantity, 0),
+          value: stockGroupSummary.reduce((sum, g) => sum + g.closing.value, 0),
+        },
+      };
+
+      res.json({
+        stockGroups: stockGroupSummary,
+        grandTotal,
+        filters: {
+          locationId: locationId || null,
+        },
+        notes: {
+          opening: "Opening balances are from stock item master data (not location-specific)",
+          closing: locationId && locationId !== "all" 
+            ? "Closing balances are filtered by the selected location" 
+            : "Closing balances are aggregated across all locations",
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get stock items for a specific stock group (drill-down)
+  app.get("/api/reports/opening-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { stockGroupId } = req.params;
+      const { locationId } = req.query;
+
+      // Get stock items in this group
+      const groupItems = await db
+        .select()
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.stockGroupId, parseInt(stockGroupId))
+          )
+        )
+        .execute();
+
+      // Get inventory data for these items
+      const itemIds = groupItems.map((i) => i.id);
+      
+      let inventoryData: any[] = [];
+      if (itemIds.length > 0) {
+        const conditions = [
+          eq(inventory.companyId, companyId),
+          inArray(inventory.stockItemId, itemIds),
+        ];
+        if (locationId && locationId !== "all") {
+          conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
+        }
+        
+        inventoryData = await db
+          .select({
+            stockItemId: inventory.stockItemId,
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+            totalValue: inventory.totalValue,
+          })
+          .from(inventory)
+          .where(and(...conditions))
+          .execute();
+      }
+
+      // Create inventory map aggregated by item
+      // For weighted average rate: use totalValue/quantity
+      const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of inventoryData) {
+        const qty = parseFloat(inv.quantity);
+        const val = parseFloat(inv.totalValue);
+        
+        if (inventoryByItem.has(inv.stockItemId)) {
+          const existing = inventoryByItem.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          inventoryByItem.set(inv.stockItemId, {
+            quantity: qty,
+            totalValue: val,
+          });
+        }
+      }
+
+      // Build items with opening and closing balances
+      const items = groupItems.map((item) => {
+        const openingQty = parseFloat(item.openingQty || "0");
+        const openingRate = parseFloat(item.openingRate || "0");
+        const openingValue = parseFloat(item.openingValue || "0");
+
+        const inv = inventoryByItem.get(item.id);
+        const closingQty = inv?.quantity || 0;
+        const closingValue = inv?.totalValue || 0;
+        const closingRate = closingQty > 0 ? closingValue / closingQty : 0;
+
+        return {
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          uom: item.uom,
+          opening: {
+            quantity: openingQty,
+            rate: openingRate,
+            value: openingValue,
+          },
+          closing: {
+            quantity: closingQty,
+            rate: closingRate,
+            value: closingValue,
+          },
+        };
+      }).filter((i) => i.opening.quantity > 0 || i.closing.quantity > 0);
+
+      // Calculate totals
+      const totals = {
+        opening: {
+          quantity: items.reduce((sum, i) => sum + i.opening.quantity, 0),
+          value: items.reduce((sum, i) => sum + i.opening.value, 0),
+        },
+        closing: {
+          quantity: items.reduce((sum, i) => sum + i.closing.quantity, 0),
+          value: items.reduce((sum, i) => sum + i.closing.value, 0),
+        },
+      };
+
+      res.json({
+        items,
+        totals,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Dashboard Cash Accounts - user-selected accounts for dashboard display
   app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
     try {
