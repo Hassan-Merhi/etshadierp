@@ -1816,8 +1816,36 @@ export class DbStorage implements IStorage {
     // Create voucher entries for charges with associated supplier accounts
     const voucherDate = offloadDate || new Date().toISOString().split('T')[0];
     
+    // Helper function to find or create parent EXPENSES account
+    const findOrCreateExpensesParent = async () => {
+      let [parentAccount] = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, location.companyId),
+            eq(schema.ledgerAccounts.code, "EXPENSES")
+          )
+        )
+        .limit(1);
+
+      if (!parentAccount) {
+        [parentAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: location.companyId,
+          code: "EXPENSES",
+          name: "Expenses",
+          accountType: "Expense",
+          subType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+        }).returning();
+      }
+
+      return parentAccount.id;
+    };
+    
     // Helper function to find or create expense accounts
-    const findOrCreateExpenseAccount = async (code: string, name: string) => {
+    const findOrCreateExpenseAccount = async (code: string, name: string, parentId: number) => {
       let account = await db
         .select()
         .from(schema.ledgerAccounts)
@@ -1836,6 +1864,7 @@ export class DbStorage implements IStorage {
           name,
           accountType: "Expense",
           subType: "Direct Expense",
+          parentId,
           openingBalance: "0",
           openingBalanceSide: "Dr",
         }).returning();
@@ -1845,9 +1874,12 @@ export class DbStorage implements IStorage {
       return account[0].id;
     };
     
+    // Get or create parent EXPENSES account
+    const expensesParentId = await findOrCreateExpensesParent();
+    
     // Duties voucher entry
     if (dutiesAccountId && parseFloat(duties) > 0) {
-      const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties");
+      const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", expensesParentId);
       const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1879,7 +1911,7 @@ export class DbStorage implements IStorage {
 
     // Office charges voucher entry
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
-      const officeExpenseAccountId = await findOrCreateExpenseAccount("OFFICE_CHARGES", "Office Charges");
+      const officeExpenseAccountId = await findOrCreateExpenseAccount("OFFICE_CHARGES", "Office Charges", expensesParentId);
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1911,7 +1943,7 @@ export class DbStorage implements IStorage {
 
     // Transport fees voucher entry
     if (transportAccountId && parseFloat(transportFees) > 0) {
-      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges");
+      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges", expensesParentId);
       const voucherNumber = `TRANS-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -1943,7 +1975,7 @@ export class DbStorage implements IStorage {
 
     // Transfer charges (if any)
     if (parseFloat(transferCharges) > 0) {
-      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges");
+      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", expensesParentId);
       // Note: Transfer charges don't have a supplier account, so we'll need to specify one in the UI
       // For now, we'll skip creating a voucher entry if no supplier is specified
     }
@@ -1964,7 +1996,8 @@ export class DbStorage implements IStorage {
         // Debit: Additional Charge Expense (Expense increases)
         const additionalExpenseAccountId = await findOrCreateExpenseAccount(
           "ADDITIONAL_CHARGES", 
-          "Additional Container Charges"
+          "Additional Container Charges",
+          expensesParentId
         );
         await db.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
