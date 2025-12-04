@@ -59,6 +59,7 @@ export interface IStorage {
   getAllCompanies(): Promise<Company[]>;
   getCompanyById(id: number): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: number, updates: Partial<InsertCompany>): Promise<Company>;
 
   // User-Company Roles
   getUserCompaniesWithRoles(userId: string): Promise<UserCompanyRole[]>;
@@ -386,6 +387,15 @@ export class DbStorage implements IStorage {
   async createCompany(company: InsertCompany): Promise<Company> {
     const [created] = await db.insert(schema.companies).values(company).returning();
     return created;
+  }
+
+  async updateCompany(id: number, updates: Partial<InsertCompany>): Promise<Company> {
+    const [updated] = await db
+      .update(schema.companies)
+      .set(updates)
+      .where(eq(schema.companies.id, id))
+      .returning();
+    return updated;
   }
 
   // User-Company Roles

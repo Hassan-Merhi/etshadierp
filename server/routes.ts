@@ -520,6 +520,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  app.patch(
+    "/api/companies/:id",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const company = await storage.updateCompany(parseInt(id), req.body);
+        res.json(company);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
   // Set current company in session
   app.post("/api/auth/set-company", requireAuth, async (req, res) => {
     try {

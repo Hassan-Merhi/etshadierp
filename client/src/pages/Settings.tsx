@@ -585,7 +585,6 @@ export default function Settings() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Company Name</TableHead>
-                  <TableHead>Code</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -596,7 +595,6 @@ export default function Settings() {
                     <TableCell className="font-medium" data-testid={`text-company-name-${company.id}`}>
                       {company.name}
                     </TableCell>
-                    <TableCell data-testid={`text-company-code-${company.id}`}>{company.code}</TableCell>
                     <TableCell data-testid={`text-company-status-${company.id}`}>
                       {company.active ? "Active" : "Inactive"}
                     </TableCell>
