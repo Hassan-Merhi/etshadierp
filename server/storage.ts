@@ -2652,13 +2652,16 @@ export class DbStorage implements IStorage {
       .where(eq(schema.purchaseOrders.voucherId, id));
 
     if (linkedPOs.length > 0) {
-      const containerUpdates = new Map<number, { itemsTotal: number }>();
+      const containerUpdates = new Map<number, { itemsTotal: number; containerNumber: string }>();
       
       for (const po of linkedPOs) {
         const itemsTotal = parseFloat(po.itemsTotal || "0");
-        const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0 };
+        const container = await db.select().from(schema.containers).where(eq(schema.containers.id, po.containerId)).limit(1);
+        const containerNumber = container.length > 0 ? container[0].containerNumber : "";
+        const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0, containerNumber };
         containerUpdates.set(po.containerId, {
           itemsTotal: existing.itemsTotal + itemsTotal,
+          containerNumber,
         });
 
         await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
@@ -2674,8 +2677,19 @@ export class DbStorage implements IStorage {
           .limit(1);
 
         if (container) {
+          // Delete all charge vouchers associated with this container whenever ANY PO is deleted
+          const chargeVouchers = await db
+            .select({ id: schema.vouchers.id })
+            .from(schema.vouchers)
+            .where(sql`${schema.vouchers.voucherNumber} LIKE ${'CHARGE-' + container.containerNumber + '-%'}`);
+          
+          for (const chargeVoucher of chargeVouchers) {
+            await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+            await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
+          }
+
           const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - totals.itemsTotal);
-          const newChargesTotal = parseFloat(container.chargesTotal || "0");
+          const newChargesTotal = 0; // Reset to 0 since we deleted charge vouchers
           const newGrandTotal = newItemsTotal + newChargesTotal;
 
           const remainingPOs = await db
@@ -2685,17 +2699,6 @@ export class DbStorage implements IStorage {
             .limit(1);
 
           if (remainingPOs.length === 0) {
-            // Delete all charge vouchers associated with this container (Freight-CONT-xxx, Fumigation-CONT-xxx, etc.)
-            const chargeVouchers = await db
-              .select({ id: schema.vouchers.id })
-              .from(schema.vouchers)
-              .where(sql`${schema.vouchers.voucherNumber} LIKE ${'CHARGE-' + container.containerNumber + '-%'}`);
-            
-            for (const chargeVoucher of chargeVouchers) {
-              await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
-              await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
-            }
-            
             await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
             await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
           } else {
@@ -2703,6 +2706,7 @@ export class DbStorage implements IStorage {
               .update(schema.containers)
               .set({
                 itemsTotal: newItemsTotal.toString(),
+                chargesTotal: newChargesTotal.toString(),
                 grandTotal: newGrandTotal.toString(),
               })
               .where(eq(schema.containers.id, containerId));
