@@ -579,7 +579,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.canSellNegativeStock = userRole.canSellNegativeStock;
       req.session.canEditDaybook = userRole.canEditDaybook;
 
-      res.json({ message: "Company set successfully", companyId });
+      // Explicitly save session to ensure it's persisted before responding
+      req.session.save((err) => {
+        if (err) {
+          console.error("Error saving session:", err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        res.json({ message: "Company set successfully", companyId });
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -16571,14 +16578,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      // Get date range filters (optional)
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
+
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
 
-      // Get all non-optional vouchers for this company
+      // Build voucher filter conditions
+      const voucherConditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false)
+      ];
+      
+      // Add date filters if provided
+      if (startDate) {
+        voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+      }
+      if (endDate) {
+        voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+
+      // Get all non-optional vouchers for this company within date range
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(...voucherConditions))
         .execute();
       
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -16705,19 +16730,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // === RIGHT PANE DATA ===
       
       // 1. Sales Accounts - Sum of all sales from Receipt vouchers (POS sales)
-      // Calculate from salesItems table
+      // Calculate from salesItems table with date filtering
+      const salesConditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false)
+      ];
+      if (startDate) {
+        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+      }
+      if (endDate) {
+        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+      
       const salesData = await db
         .select({
           total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.optional, false)
-          )
-        )
+        .where(and(...salesConditions))
         .execute();
       const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
 
@@ -16779,6 +16810,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rightPaneTotal = salesAccountsTotal + closingStockValue + grossProfitBf + indirectIncomesTotal;
 
       res.json({
+        dateRange: {
+          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
+          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
+        },
         leftPane: {
           openingStock: {
             value: openingStockValue,

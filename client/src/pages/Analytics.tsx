@@ -316,6 +316,8 @@ export default function Analytics() {
   
   // Net Profit Report state
   const [expandedNetProfitSections, setExpandedNetProfitSections] = useState<Set<string>>(new Set());
+  const [plStartDate, setPlStartDate] = useState("");
+  const [plEndDate, setPlEndDate] = useState("");
   
   // Tab state for controlled navigation
   const [activeTab, setActiveTab] = useState("overview");
@@ -511,11 +513,23 @@ export default function Analytics() {
     enabled: !!selectedCompany,
   });
 
+  // Build Net Profit URL with date filters
+  const buildNetProfitUrl = () => {
+    const params = new URLSearchParams();
+    if (plStartDate) {
+      params.append("startDate", plStartDate);
+    }
+    if (plEndDate) {
+      params.append("endDate", plEndDate);
+    }
+    return `/api/reports/net-profit-statement?${params}`;
+  };
+
   // Fetch Net Profit Statement
   const { data: netProfitData, isLoading: loadingNetProfit } = useQuery<NetProfitStatementData>({
-    queryKey: ["/api/reports/net-profit-statement", selectedCompany?.id],
+    queryKey: ["/api/reports/net-profit-statement", selectedCompany?.id, plStartDate, plEndDate],
     queryFn: async () => {
-      const response = await fetch("/api/reports/net-profit-statement", { credentials: "include" });
+      const response = await fetch(buildNetProfitUrl(), { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch net profit statement");
       return response.json();
     },
@@ -1726,12 +1740,54 @@ export default function Analytics() {
         <TabsContent value="reports" className="space-y-4">
           {/* Net Profit Report - Tally Prime style */}
           <Card className="p-6">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
                 Net Profit (P&L Statement)
               </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="pl-start-date" className="text-sm whitespace-nowrap">From:</Label>
+                  <Input
+                    id="pl-start-date"
+                    type="date"
+                    value={plStartDate}
+                    onChange={(e) => setPlStartDate(e.target.value)}
+                    className="w-36"
+                    data-testid="input-pl-start-date"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="pl-end-date" className="text-sm whitespace-nowrap">To:</Label>
+                  <Input
+                    id="pl-end-date"
+                    type="date"
+                    value={plEndDate}
+                    onChange={(e) => setPlEndDate(e.target.value)}
+                    className="w-36"
+                    data-testid="input-pl-end-date"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPlStartDate("");
+                    setPlEndDate("");
+                  }}
+                  data-testid="button-pl-clear-dates"
+                >
+                  Clear
+                </Button>
+              </div>
             </div>
+            
+            {/* Show date range info */}
+            {(plStartDate || plEndDate) && (
+              <div className="text-sm text-muted-foreground mb-4">
+                Showing data for: {plStartDate || "Beginning"} to {plEndDate || "Present"}
+              </div>
+            )}
 
             {loadingNetProfit ? (
               <div className="space-y-3">
