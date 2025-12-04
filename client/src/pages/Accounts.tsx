@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2, ExternalLink } from "lucide-react";
+import { Search, Calendar, DollarSign, TrendingUp, TrendingDown, X, Plus, Edit, ChevronRight, ChevronDown, Trash2, ExternalLink, Printer } from "lucide-react";
+import { useReactToPrint } from "react-to-print";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -85,6 +86,13 @@ export default function Accounts() {
   const [editSearchTerm, setEditSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
+  
+  // Print functionality
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: selectedAccount ? `Statement - ${selectedAccount.name}` : "Account Statement",
+  });
 
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all"],
@@ -917,20 +925,36 @@ export default function Accounts() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Balance</p>
+                    <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
                     <div className="flex items-center gap-2">
-                      {selectedAccount.balanceSide === "Dr" ? (
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                      ) : selectedAccount.balanceSide === "Cr" ? (
-                        <TrendingDown className="w-4 h-4 text-red-600" />
+                      {transactionsLoading ? (
+                        <Skeleton className="h-5 w-32" />
                       ) : (
-                        <DollarSign className="w-4 h-4 text-muted-foreground" />
+                        <>
+                          {closingBalance >= 0 ? (
+                            <TrendingUp className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <TrendingDown className="w-4 h-4 text-red-600" />
+                          )}
+                          <span className="font-mono font-semibold" data-testid="text-account-balance">
+                            ${Math.abs(closingBalance).toFixed(2)}{" "}
+                            {closingBalance >= 0 ? "Dr" : "Cr"}
+                          </span>
+                        </>
                       )}
-                      <span className="font-mono font-semibold" data-testid="text-account-balance">
-                        ${Math.abs(parseBalance(selectedAccount.balance)).toFixed(2)}{" "}
-                        {selectedAccount.balanceSide || ""}
-                      </span>
                     </div>
+                  </div>
+                  <div className="md:col-span-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePrint()}
+                      disabled={transactionsLoading || transactionsWithBalance.length === 0}
+                      data-testid="button-print-statement"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Statement
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -1052,7 +1076,21 @@ export default function Accounts() {
                   )}
                 </div>
               ) : (
-                <div className="rounded-md border overflow-x-auto">
+                <div ref={printRef} className="print-container">
+                  {/* Print header - only visible when printing */}
+                  <div className="hidden print:block mb-6 pb-4 border-b">
+                    <h1 className="text-2xl font-bold mb-2">{selectedCompany?.name}</h1>
+                    <h2 className="text-xl font-semibold mb-1">Account Statement: {selectedAccount?.name}</h2>
+                    {(startDate || endDate) && (
+                      <p className="text-sm text-muted-foreground">
+                        Period: {startDate ? formatDisplayDate(new Date(startDate)) : "Beginning"} to {endDate ? formatDisplayDate(new Date(endDate)) : "Present"}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Printed on: {formatDisplayDate(new Date())}
+                    </p>
+                  </div>
+                  <div className="rounded-md border overflow-x-auto print:border-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1120,6 +1158,7 @@ export default function Accounts() {
                       </TableRow>
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </CardContent>

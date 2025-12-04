@@ -308,3 +308,48 @@
     inset: -1px;
   }
 }
+
+/* Print styles for account statements */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-container {
+    background: white !important;
+    padding: 20px;
+  }
+
+  .print-container table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .print-container th,
+  .print-container td {
+    border: 1px solid #ddd !important;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .print-container th {
+    background-color: #f5f5f5 !important;
+    font-weight: bold;
+  }
+
+  .print-container tr:nth-child(even) {
+    background-color: #fafafa !important;
+  }
+
+  .print-container .text-right {
+    text-align: right;
+  }
+
+  .print-container .font-mono {
+    font-family: monospace;
+  }
+}
