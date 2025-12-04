@@ -4225,6 +4225,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Opening Balances from Excel (columns: Barcode, Qty, Rate, Total Value)
+  // This only updates stockItems opening fields, does NOT affect location inventory
+  app.post("/api/stock-items/import-opening-balances", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { openingBalances } = req.body;
+      if (!Array.isArray(openingBalances) || openingBalances.length === 0) {
+        return res.status(400).json({ message: "Invalid or empty opening balances array" });
+      }
+
+      let updated = 0;
+      let notFound = 0;
+      const notFoundBarcodes: string[] = [];
+
+      // Pre-fetch all stock items once for efficient lookup
+      const allItems = await storage.getAllStockItems(req.session.currentCompanyId);
+      // Map by code field (code is used as barcode in this system)
+      const itemsByCode = new Map(allItems.map(i => [i.code, i]));
+
+      for (const entry of openingBalances) {
+        const { barcode, openingQty, openingRate, openingValue } = entry;
+        if (!barcode) continue;
+
+        // Find item by code (code is used as barcode in this system)
+        const item = itemsByCode.get(barcode);
+
+        if (item) {
+          // Calculate total value if not provided: qty * rate
+          const qty = parseFloat(openingQty) || 0;
+          const rate = parseFloat(openingRate) || 0;
+          let totalValue = parseFloat(openingValue) || 0;
+          
+          // If total value not provided, calculate from qty * rate
+          if (totalValue === 0 && qty > 0 && rate > 0) {
+            totalValue = qty * rate;
+          }
+
+          await storage.updateStockItem(item.id, {
+            openingQty: String(qty),
+            openingRate: String(rate),
+            openingValue: String(totalValue),
+          });
+          updated++;
+        } else {
+          notFound++;
+          notFoundBarcodes.push(barcode);
+        }
+      }
+
+      const message = `Updated opening balances for ${updated} item(s)${notFound > 0 ? `. ${notFound} barcode(s) not found: ${notFoundBarcodes.slice(0, 5).join(", ")}${notFoundBarcodes.length > 5 ? "..." : ""}` : "."}`;
+      res.json({ message, updated, notFound, notFoundBarcodes });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bulk update UOM from "bale" to "BL"
   app.post("/api/stock-items/bulk-update-uom", requireAuth, requireNonPOS, async (req, res) => {
     try {

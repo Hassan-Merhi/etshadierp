@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
-import { Download } from "lucide-react";
+import { Download, Package } from "lucide-react";
 import type { Location } from "@shared/schema";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CombinedImportDialogProps {
   open: boolean;
@@ -18,8 +19,10 @@ interface CombinedImportDialogProps {
 
 export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialogProps) {
   const [pricesFile, setPricesFile] = useState<File | null>(null);
+  const [openingFile, setOpeningFile] = useState<File | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessingOpening, setIsProcessingOpening] = useState(false);
   const { toast } = useToast();
 
   const { data: locations = [] } = useQuery<Location[]>({
@@ -46,6 +49,31 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         variant: "destructive",
       });
       setIsProcessing(false);
+    },
+  });
+
+  const openingBalanceMutation = useMutation({
+    mutationFn: async (data: Array<{ barcode: string; openingQty: string; openingRate: string; openingValue: string }>) => {
+      return await apiRequest("POST", "/api/stock-items/import-opening-balances", { openingBalances: data });
+    },
+    onSuccess: (result: any) => {
+      toast({
+        title: "Success",
+        description: result.message || "Opening balances imported successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/net-profit-statement"] });
+      setOpeningFile(null);
+      setIsProcessingOpening(false);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import opening balances",
+        variant: "destructive",
+      });
+      setIsProcessingOpening(false);
     },
   });
 
@@ -137,6 +165,91 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
     }
   };
 
+  const downloadOpeningTemplate = () => {
+    const template = [
+      { Barcode: "BAR001", Qty: 100, Rate: 10.50, "Total Value": 1050.00 },
+      { Barcode: "BAR002", Qty: 50, Rate: 25.00, "Total Value": 1250.00 },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Opening Balances");
+    XLSX.writeFile(wb, "opening_balances_template.xlsx");
+
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to prepare your opening stock data",
+    });
+  };
+
+  const handleOpeningFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      setOpeningFile(e.target.files[0]);
+    }
+  };
+
+  const handleImportOpening = async () => {
+    if (!openingFile) {
+      toast({
+        title: "Error",
+        description: "Please select a file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessingOpening(true);
+    try {
+      const arrayBuffer = await openingFile.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet) as Array<{ 
+        Barcode?: string; 
+        Qty?: string | number; 
+        Rate?: string | number; 
+        "Total Value"?: string | number 
+      }>;
+
+      if (data.length === 0) {
+        toast({
+          title: "Error",
+          description: "No data found in file",
+          variant: "destructive",
+        });
+        setIsProcessingOpening(false);
+        return;
+      }
+
+      const openingBalances = data
+        .map((row) => ({
+          barcode: String(row.Barcode || "").trim(),
+          openingQty: String(row.Qty || "0").trim(),
+          openingRate: String(row.Rate || "0").trim(),
+          openingValue: String(row["Total Value"] || "0").trim(),
+        }))
+        .filter((item) => item.barcode);
+
+      if (openingBalances.length === 0) {
+        toast({
+          title: "Error",
+          description: "No valid barcode entries found",
+          variant: "destructive",
+        });
+        setIsProcessingOpening(false);
+        return;
+      }
+
+      openingBalanceMutation.mutate(openingBalances);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to read file",
+        variant: "destructive",
+      });
+      setIsProcessingOpening(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl" data-testid="dialog-combined-import">
@@ -147,11 +260,63 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="prices" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="prices">Import Prices</TabsTrigger>
-            <TabsTrigger value="items">Import Items</TabsTrigger>
+        <Tabs defaultValue="opening" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="opening">Opening Stock</TabsTrigger>
+            <TabsTrigger value="prices">Prices</TabsTrigger>
+            <TabsTrigger value="items">Items</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="opening" className="space-y-4">
+            <div className="space-y-4 mt-4">
+              <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <Package className="h-4 w-4" />
+                <AlertDescription>
+                  Import opening stock balances for P&L reports. This updates the frozen opening values in stock items - it does NOT affect current inventory.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">File</label>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleOpeningFileChange}
+                  data-testid="input-import-opening-file"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Excel columns: "Barcode", "Qty", "Rate", "Total Value"
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={downloadOpeningTemplate}
+                data-testid="button-download-opening-template"
+              >
+                <Download className="h-4 w-4" />
+                Download Template
+              </Button>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  data-testid="button-cancel-opening-import"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleImportOpening}
+                  disabled={!openingFile || isProcessingOpening}
+                  data-testid="button-confirm-opening-import"
+                >
+                  {isProcessingOpening ? "Importing..." : "Import Opening Balances"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="prices" className="space-y-4">
             <div className="space-y-4 mt-4">
