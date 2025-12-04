@@ -1639,6 +1639,12 @@ export class DbStorage implements IStorage {
     additionalCharges: Array<{ description: string; amount: number; ledgerAccountId: number }> = [],
     offloadDate?: string
   ): Promise<ContainerOffload> {
+    // Get container to access PO charges (freight + otherCharges from purchase orders)
+    const container = await this.getContainerById(containerId);
+    if (!container) {
+      throw new Error(`Container ${containerId} not found`);
+    }
+    
     // Get all POs for this container
     const pos = await this.getPurchaseOrdersByContainer(containerId);
     
@@ -1658,14 +1664,16 @@ export class DbStorage implements IStorage {
       return sum + parseFloat(item.quantity);
     }, 0);
 
-    // Calculate total charges including additional charges
+    // Calculate total charges including additional charges AND PO charges (freight + otherCharges)
     const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
+    const poCharges = parseFloat(container.chargesTotal || "0"); // Freight + otherCharges from POs
     const totalCharges = 
       parseFloat(duties) + 
       parseFloat(officeCharges) + 
       parseFloat(transferCharges) + 
       parseFloat(transportFees) +
-      additionalChargesTotal;
+      additionalChargesTotal +
+      poCharges; // Include PO freight/charges in inventory cost
 
     // Calculate additional cost per bale
     const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
@@ -1798,12 +1806,11 @@ export class DbStorage implements IStorage {
     // Update container status to OFFLOADED
     await this.updateContainer(containerId, { status: "OFFLOADED" });
 
-    // Get container and location details for voucher entries
-    const container = await this.getContainerById(containerId);
+    // Get location details for voucher entries (container already fetched at top)
     const location = await this.getLocationById(locationId);
     
-    if (!container || !location) {
-      throw new Error("Container or location not found");
+    if (!location) {
+      throw new Error("Location not found");
     }
 
     // Create voucher entries for charges with associated supplier accounts
