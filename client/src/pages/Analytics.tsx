@@ -438,14 +438,14 @@ export default function Analytics() {
     return `/api/reports/opening-stock-summary?${params}`;
   };
 
-  const { data: openingStockData, refetch: refetchOpeningStock, isLoading: loadingOpeningStock } = useQuery<OpeningStockSummaryData>({
+  const { data: openingStockData, isLoading: loadingOpeningStock } = useQuery<OpeningStockSummaryData>({
     queryKey: [buildOpeningStockUrl(), selectedCompany?.id],
     queryFn: async ({ queryKey }) => {
       const response = await fetch(queryKey[0] as string, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch opening stock summary");
       return response.json();
     },
-    enabled: false, // Manual trigger via Generate button
+    enabled: !!selectedCompany,
   });
 
   // Toggle stock group expansion and fetch items
@@ -1656,154 +1656,13 @@ export default function Analytics() {
 
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">Financial Ratios</h3>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setRatiosStartDate("");
-                    setRatiosEndDate("");
-                  }}
-                >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Reset
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={exportRatiosToExcel}
-                  disabled={!ratiosData}
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Export
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <Label htmlFor="start-date">Start Date</Label>
-                <DatePickerInput
-                  value={ratiosStartDate}
-                  onChange={setRatiosStartDate}
-                  placeholder="Start date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="end-date">End Date</Label>
-                <DatePickerInput
-                  value={ratiosEndDate}
-                  onChange={setRatiosEndDate}
-                  placeholder="End date"
-                />
-              </div>
-            </div>
-
-            {ratiosLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : ratiosData ? (
-              <div className="space-y-6">
-                <div>
-                  <h4 className="font-medium mb-3">Financial Ratios</h4>
-                  <div className="rounded-md border p-4 space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Gross Profit Margin</span>
-                      <span className="font-mono font-medium">
-                        {ratiosData.ratios.grossProfitMargin.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Net Profit Margin</span>
-                      <span className="font-mono font-medium">
-                        {ratiosData.ratios.netProfitMargin.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Current Ratio</span>
-                      <span className="font-mono font-medium">
-                        {ratiosData.ratios.currentRatio.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Debt to Equity</span>
-                      <span className="font-mono font-medium">
-                        {ratiosData.ratios.debtToEquity.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium mb-3">Underlying Data</h4>
-                  <div className="rounded-md border p-4 space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Total Income</span>
-                      <span className="font-mono">
-                        ${ratiosData.underlying.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Total Expenses</span>
-                      <span className="font-mono">
-                        ${ratiosData.underlying.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Net Profit</span>
-                      <span className="font-mono font-medium">
-                        ${ratiosData.underlying.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Total Assets</span>
-                      <span className="font-mono">
-                        ${ratiosData.underlying.totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Total Liabilities</span>
-                      <span className="font-mono">
-                        ${ratiosData.underlying.totalLiabilities.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Total Equity</span>
-                      <span className="font-mono">
-                        ${ratiosData.underlying.totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </Card>
-
           {/* Opening Stock Summary Report */}
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Opening Stock Summary
               </h3>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setExpandedStockGroups(new Set());
-                  setStockGroupItems(new Map());
-                  refetchOpeningStock();
-                }}
-                disabled={loadingOpeningStock}
-                data-testid="button-generate-opening-stock"
-              >
-                {loadingOpeningStock ? "Loading..." : "Generate"}
-              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
