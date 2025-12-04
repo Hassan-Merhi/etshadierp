@@ -54,6 +54,8 @@ import StockItemVouchers from "@/pages/StockItemVouchers";
 import LocationMonthlySummary from "@/pages/LocationMonthlySummary";
 import LocationVouchers from "@/pages/LocationVouchers";
 import LocationSummary from "@/pages/LocationSummary";
+import OpeningStockSummary from "@/pages/OpeningStockSummary";
+import OpeningStockDetail from "@/pages/OpeningStockDetail";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -116,6 +118,8 @@ function Router({ user }: { user: any }) {
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />
+      <Route path="/opening-stock" component={OpeningStockSummary} />
+      <Route path="/opening-stock/:groupId" component={OpeningStockDetail} />
       <Route path="/bales" component={Bales} />
       <Route path="/mix-batches" component={MixBatches} />
       <Route path="/production-bales" component={ProductionBales} />

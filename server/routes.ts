@@ -16407,7 +16407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).filter((i) => i.opening.quantity > 0 || i.closing.quantity > 0);
 
       // Calculate totals
-      const totals = {
+      const grandTotal = {
         opening: {
           quantity: items.reduce((sum, i) => sum + i.opening.quantity, 0),
           value: items.reduce((sum, i) => sum + i.opening.value, 0),
@@ -16418,9 +16418,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
 
+      // Get stock group info
+      const stockGroup = await storage.getStockGroupById(parseInt(stockGroupId), companyId);
+
       res.json({
         items,
-        totals,
+        grandTotal,
+        stockGroup: stockGroup ? {
+          id: stockGroup.id,
+          code: stockGroup.code,
+          name: stockGroup.name,
+        } : null,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -112,6 +112,7 @@ export interface IStorage {
   // Stock Groups
   getAllStockGroups(companyId: number): Promise<StockGroup[]>;
   getStockGroupByCode(code: string, companyId: number): Promise<StockGroup | undefined>;
+  getStockGroupById(id: number, companyId: number): Promise<StockGroup | undefined>;
   createStockGroup(group: InsertStockGroup): Promise<StockGroup>;
 
   // Stock Items
@@ -903,6 +904,16 @@ export class DbStorage implements IStorage {
     const [group] = await db.select().from(schema.stockGroups).where(
       and(
         eq(schema.stockGroups.code, code),
+        eq(schema.stockGroups.companyId, companyId)
+      )
+    );
+    return group;
+  }
+
+  async getStockGroupById(id: number, companyId: number): Promise<StockGroup | undefined> {
+    const [group] = await db.select().from(schema.stockGroups).where(
+      and(
+        eq(schema.stockGroups.id, id),
         eq(schema.stockGroups.companyId, companyId)
       )
     );

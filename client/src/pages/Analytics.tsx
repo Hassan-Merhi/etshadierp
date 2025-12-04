@@ -1,5 +1,6 @@
 import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -277,6 +278,7 @@ function formatSmartNumber(num: number | string): string {
 export default function Analytics() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
@@ -1745,8 +1747,15 @@ export default function Analytics() {
                   </div>
                   <div className="divide-y">
                     {/* Opening Stock */}
-                    <div className="flex justify-between items-center p-3">
-                      <span>Opening Stock</span>
+                    <div 
+                      className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                      onClick={() => navigate("/opening-stock")}
+                      data-testid="row-opening-stock"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ChevronRight className="h-4 w-4" />
+                        Opening Stock
+                      </span>
                       <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.openingStock.value)}</span>
                     </div>
 
