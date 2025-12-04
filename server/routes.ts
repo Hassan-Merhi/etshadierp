@@ -16435,6 +16435,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint: Check raw inventory records for a specific stock item
+  app.get("/api/debug/inventory/:stockItemId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { stockItemId } = req.params;
+
+      // Get the stock item
+      const stockItem = await db
+        .select()
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.id, parseInt(stockItemId)),
+            eq(stockItems.companyId, companyId)
+          )
+        )
+        .execute();
+
+      if (stockItem.length === 0) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+
+      // Get all inventory records for this item
+      const inventoryRecords = await db
+        .select({
+          id: inventory.id,
+          locationId: inventory.locationId,
+          locationName: locations.name,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+          lastUpdated: inventory.lastUpdated,
+        })
+        .from(inventory)
+        .leftJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.stockItemId, parseInt(stockItemId)),
+            eq(inventory.companyId, companyId)
+          )
+        )
+        .execute();
+
+      // Calculate totals
+      let totalQty = 0;
+      let totalValue = 0;
+      for (const rec of inventoryRecords) {
+        totalQty += parseFloat(rec.quantity);
+        totalValue += parseFloat(rec.totalValue);
+      }
+
+      res.json({
+        stockItem: {
+          id: stockItem[0].id,
+          code: stockItem[0].code,
+          name: stockItem[0].name,
+          stockGroupId: stockItem[0].stockGroupId,
+          openingQty: stockItem[0].openingQty,
+          openingRate: stockItem[0].openingRate,
+          openingValue: stockItem[0].openingValue,
+        },
+        inventoryRecords: inventoryRecords.map((r) => ({
+          id: r.id,
+          locationId: r.locationId,
+          locationName: r.locationName,
+          quantity: parseFloat(r.quantity),
+          averageRate: parseFloat(r.averageRate),
+          totalValue: parseFloat(r.totalValue),
+          lastUpdated: r.lastUpdated,
+        })),
+        totals: {
+          recordCount: inventoryRecords.length,
+          totalQuantity: totalQty,
+          totalValue: totalValue,
+          calculatedRate: totalQty > 0 ? totalValue / totalQty : 0,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Net Profit (P&L) Report - Tally Prime style
   app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
     try {
