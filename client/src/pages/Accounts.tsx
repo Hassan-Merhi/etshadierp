@@ -56,6 +56,7 @@ interface Account {
   name: string;
   balance: number;
   balanceSide: string | null;
+  openingBalance?: number;
   active: boolean;
 }
 
@@ -299,7 +300,8 @@ export default function Accounts() {
   };
 
   const calculateRunningBalance = () => {
-    let runningBalance = parseBalance(selectedAccount?.balance);
+    // Start from OPENING balance, not current balance (which already includes all transactions)
+    let runningBalance = parseBalance(selectedAccount?.openingBalance ?? 0);
     return transactions.map((transaction) => {
       const debit = parseBalance(transaction.debitAmount);
       const credit = parseBalance(transaction.creditAmount);
@@ -942,14 +944,28 @@ export default function Accounts() {
                         <Skeleton className="h-5 w-32" />
                       ) : (
                         <>
-                          {closingBalance >= 0 ? (
-                            <TrendingUp className="w-4 h-4 text-green-600" />
+                          {/* For suppliers, positive balance = we owe them (Cr/red) 
+                              For other accounts, positive balance = they owe us (Dr/green) */}
+                          {selectedAccount?.type === "supplier" ? (
+                            // Supplier: positive = Cr (payable, red), negative = Dr (prepaid, green)
+                            closingBalance > 0 ? (
+                              <TrendingDown className="w-4 h-4 text-red-600" />
+                            ) : (
+                              <TrendingUp className="w-4 h-4 text-green-600" />
+                            )
                           ) : (
-                            <TrendingDown className="w-4 h-4 text-red-600" />
+                            // Other accounts: positive = Dr (green), negative = Cr (red)
+                            closingBalance >= 0 ? (
+                              <TrendingUp className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4 text-red-600" />
+                            )
                           )}
                           <span className="font-mono font-semibold" data-testid="text-account-balance">
                             ${Math.abs(closingBalance).toFixed(2)}{" "}
-                            {closingBalance >= 0 ? "Dr" : "Cr"}
+                            {selectedAccount?.type === "supplier"
+                              ? (closingBalance > 0 ? "Cr" : "Dr")
+                              : (closingBalance >= 0 ? "Dr" : "Cr")}
                           </span>
                         </>
                       )}

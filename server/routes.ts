@@ -8696,6 +8696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             subType: account.subType,
             balance: balance.toFixed(2),
             balanceSide,
+            openingBalance: parseFloat(account.openingBalance || "0"),
             active: account.active,
             parentId: account.parentId,
           };
@@ -8720,6 +8721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: `${account.name} (${account.bankName})`,
             balance: balance.toFixed(2),
             balanceSide,
+            openingBalance: parseFloat(account.openingBalance || "0"),
             active: account.active,
             parentId: null,
           };
@@ -8744,6 +8746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: asset.name,
             balance: balance.toFixed(2),
             balanceSide,
+            openingBalance: parseFloat(asset.openingBalance || "0"),
             active: asset.active,
             parentId: null,
           };
@@ -8773,6 +8776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: supplier.legalName,
             balance: absoluteBalance.toFixed(2),
             balanceSide,
+            openingBalance: openingBalance,
             active: supplier.active,
             parentId: null,
           };
