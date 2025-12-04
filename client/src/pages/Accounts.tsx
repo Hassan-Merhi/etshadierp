@@ -298,7 +298,13 @@ export default function Accounts() {
     return transactions.map((transaction) => {
       const debit = parseBalance(transaction.debitAmount);
       const credit = parseBalance(transaction.creditAmount);
-      runningBalance += debit - credit;
+      // For suppliers, credits increase balance (we owe more), debits decrease it (we pay)
+      // For other accounts, debits increase and credits decrease
+      if (selectedAccount?.type === "supplier") {
+        runningBalance += credit - debit;
+      } else {
+        runningBalance += debit - credit;
+      }
       return {
         ...transaction,
         runningBalance,
