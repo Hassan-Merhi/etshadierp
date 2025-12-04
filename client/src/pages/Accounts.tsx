@@ -57,6 +57,7 @@ interface Account {
   balance: number;
   balanceSide: string | null;
   openingBalance?: number;
+  openingBalanceSide?: string | null;
   active: boolean;
 }
 
@@ -301,7 +302,21 @@ export default function Accounts() {
 
   const calculateRunningBalance = () => {
     // Start from OPENING balance, not current balance (which already includes all transactions)
-    let runningBalance = parseBalance(selectedAccount?.openingBalance ?? 0);
+    // For non-suppliers: sign the opening balance based on openingBalanceSide (Cr = negative, Dr = positive)
+    // For suppliers: opening balance is already in the correct form (positive = we owe them)
+    let rawOpeningBalance = parseBalance(selectedAccount?.openingBalance ?? 0);
+    let runningBalance: number;
+    
+    if (selectedAccount?.type === "supplier") {
+      // Supplier opening balance is already positive (what we owe them)
+      runningBalance = rawOpeningBalance;
+    } else {
+      // For non-suppliers: Cr opening balance should be negative, Dr should be positive
+      runningBalance = selectedAccount?.openingBalanceSide === "Cr" 
+        ? -rawOpeningBalance 
+        : rawOpeningBalance;
+    }
+    
     return transactions.map((transaction) => {
       const debit = parseBalance(transaction.debitAmount);
       const credit = parseBalance(transaction.creditAmount);

@@ -8697,6 +8697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance: balance.toFixed(2),
             balanceSide,
             openingBalance: parseFloat(account.openingBalance || "0"),
+            openingBalanceSide: account.openingBalanceSide || "Dr",
             active: account.active,
             parentId: account.parentId,
           };
@@ -8722,6 +8723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance: balance.toFixed(2),
             balanceSide,
             openingBalance: parseFloat(account.openingBalance || "0"),
+            openingBalanceSide: account.openingBalanceSide || "Dr",
             active: account.active,
             parentId: null,
           };
@@ -8747,6 +8749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance: balance.toFixed(2),
             balanceSide,
             openingBalance: parseFloat(asset.openingBalance || "0"),
+            openingBalanceSide: "Dr", // Fixed assets are always debit balance
             active: asset.active,
             parentId: null,
           };
@@ -8777,6 +8780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance: absoluteBalance.toFixed(2),
             balanceSide,
             openingBalance: openingBalance,
+            openingBalanceSide: "Cr", // Suppliers are always credit balance (payable)
             active: supplier.active,
             parentId: null,
           };
@@ -16227,7 +16231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(voucherEntries)
             .leftJoin(vouchersTable, eq(vouchersTable.id, voucherEntries.voucherId))
             .where(and(
-              eq(voucherEntries.ledgerId, account.accountId),
+              eq(voucherEntries.ledgerAccountId, account.accountId),
               eq(vouchersTable.companyId, companyId)
             ))
             .execute();
