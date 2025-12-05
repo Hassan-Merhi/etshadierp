@@ -1,0 +1,28 @@
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Build failed 😞
+    at file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:20025:26
+    at ModuleLoader.handleInvalidResolvedId (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:20067:26)
+    at Object.logger [as onLog] (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:21178:9)
+    at file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:19452:13
+    at onwarn (file:///opt/render/project/src/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65549:7)
+    at onRollupWarning (file:///opt/render/project/src/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65884:5)
+    at onwarn (file:///opt/render/project/src/node_modules/@vitejs/plugin-react/dist/index.js:90:7)
+    at viteWarn (file:///opt/render/project/src/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:65854:17)
+`build.rollupOptions.external`
+If you do want to externalize this module explicitly add it to
+This is most likely unintended because it can break your application at runtime.
+[vite]: Rollup failed to resolve import "react-markdown" from "/opt/render/project/src/client/src/components/ChatWidget.tsx".
+error during build:
+x Build failed in 1.79s
+✓ 24 modules transformed.
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+  npx update-browserslist-db@latest
+Browserslist: browsers data (caniuse-lite) is 14 months old. Please run:
+transforming...
+vite v5.4.20 building for production...
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+> rest-express@1.0.0 build
+Run `npm audit` for details.
+a different dependency.
+Some issues need review, and may require choosing
