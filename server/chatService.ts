@@ -6,6 +6,7 @@ import { eq, and, desc, sql, lt, gt, isNull, asc } from "drizzle-orm";
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 interface ERPContext {
+  dataFetchedAt: string; // ISO timestamp when data was fetched
   inventory: any[];
   stockItems: any[];
   stockGroups: any[];
@@ -35,6 +36,9 @@ interface UserPreferences {
 }
 
 export async function getERPContext(companyId: number): Promise<ERPContext> {
+  // Capture exact timestamp when data fetch begins - this is REAL-TIME data
+  const dataFetchedAt = new Date().toISOString();
+  
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -347,6 +351,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   }));
 
   return {
+    dataFetchedAt, // Real-time timestamp
     inventory,
     stockItems,
     stockGroups,
@@ -375,7 +380,19 @@ function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreference
     ? ((parseFloat(context.profitAnalysis.totalProfit) / parseFloat(context.profitAnalysis.totalSales)) * 100).toFixed(1)
     : '0';
 
+  // Format the timestamp for display
+  const fetchTime = new Date(context.dataFetchedAt);
+  const formattedTime = fetchTime.toLocaleString('en-US', { 
+    dateStyle: 'medium', 
+    timeStyle: 'medium' 
+  });
+
   return `You are an intelligent AI assistant for an ERP/POS system called "ERP Assistant". You help business owners and managers understand their data, make decisions, and get insights.
+
+## CRITICAL: REAL-TIME DATA
+**⚡ DATA FRESHNESS: This data was fetched from the database at ${formattedTime} (${context.dataFetchedAt})**
+**This is LIVE, REAL-TIME data - not cached. All numbers reflect the current state of the database at this exact moment.**
+**If the user asks about "current" or "now" data - you have the most up-to-date information available.**
 
 ## YOUR CAPABILITIES:
 1. **Data Analysis**: Answer questions about inventory, sales, finances, suppliers, and customers
@@ -384,7 +401,7 @@ function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreference
 4. **Alerts & Monitoring**: Highlight critical issues that need attention
 5. **Multi-language**: Respond in the same language as the user's question
 
-## CURRENT COMPANY DATA:
+## CURRENT COMPANY DATA (REAL-TIME as of ${formattedTime}):
 
 ### 📊 EXECUTIVE SUMMARY:
 - Total Inventory Items: ${context.inventory.length} items across ${context.locations.length} locations
