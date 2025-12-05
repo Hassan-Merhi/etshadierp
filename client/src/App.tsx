@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ChatWidget } from "@/components/ChatWidget";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -298,6 +299,7 @@ export default function App() {
                   </Route>
                 </Switch>
                 <Toaster />
+                <ChatWidget />
               </DateFormatProvider>
             </LocationProvider>
           </CompanyProvider>

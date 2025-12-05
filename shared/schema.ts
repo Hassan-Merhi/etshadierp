@@ -54,6 +54,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   active: boolean("active").notNull().default(true),
+  chatbotEnabled: boolean("chatbot_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1485,3 +1486,32 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
 
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Chat Messages - stores AI chatbot conversation history
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  sessionId: varchar("session_id").notNull(), // Groups messages in a conversation
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  sessionIdx: index("chat_messages_session_idx").on(t.sessionId),
+  userIdx: index("chat_messages_user_idx").on(t.userId),
+  companyIdx: index("chat_messages_company_idx").on(t.companyId),
+}));
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  userId: z.string().min(1, "User ID is required"),
+  role: z.enum(["user", "assistant"]),
+  content: z.string().min(1, "Content is required"),
+  sessionId: z.string().min(1, "Session ID is required"),
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

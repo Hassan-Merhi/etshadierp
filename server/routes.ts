@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
+import { chat, saveMessage, getConversationHistory, getAllChatHistory } from "./chatService";
 import {
   requireAuth,
   requireRole,
@@ -69,6 +70,8 @@ import {
   userPreferences,
   insertUserPreferencesSchema,
   stockItemCodeAliases,
+  users,
+  chatMessages,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
@@ -21677,6 +21680,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: `${type} permanently deleted` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ AI Chatbot API Endpoints ============
+
+  // Check if chatbot is enabled for current user
+  app.get("/api/chatbot/status", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const companyId = req.session.currentCompanyId;
+      const userRole = req.session.currentRole;
+      
+      if (!userId || !companyId) {
+        return res.json({ enabled: false });
+      }
+
+      // Get user chatbot status
+      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      // Check if API key is configured
+      const hasApiKey = !!process.env.GEMINI_API_KEY;
+
+      res.json({
+        enabled: user?.chatbotEnabled || false,
+        hasApiKey,
+        isAdminOrOwner: userRole === "Admin" || userRole === "Owner",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send a chat message
+  app.post("/api/chatbot/message", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      const companyId = req.session.currentCompanyId;
+      
+      if (!userId || !companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Check if user has chatbot enabled
+      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user?.chatbotEnabled) {
+        return res.status(403).json({ message: "Chatbot is not enabled for your account" });
+      }
+
+      const { message, sessionId } = req.body;
+      if (!message || !sessionId) {
+        return res.status(400).json({ message: "Message and sessionId are required" });
+      }
+
+      // Save user message
+      await saveMessage(companyId, userId, "user", message, sessionId);
+
+      // Get conversation history
+      const history = await getConversationHistory(sessionId, 10);
+
+      // Get AI response
+      const response = await chat(message, companyId, history.slice(0, -1)); // Exclude the current message from history
+
+      // Save assistant response
+      await saveMessage(companyId, userId, "assistant", response, sessionId);
+
+      res.json({ response });
+    } catch (error: any) {
+      console.error("Chat error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get chat history for current session
+  app.get("/api/chatbot/history/:sessionId", requireAuth, async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const history = await getConversationHistory(sessionId, 50);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all chat history (Admin/Owner only)
+  app.get("/api/chatbot/all-history", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userRole = req.session.currentRole;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Only Admin/Owner can view all chat history
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const history = await getAllChatHistory(companyId, 200);
+      
+      // Enrich with username
+      const userIds = [...new Set(history.map(h => h.userId))];
+      const usersList = userIds.length > 0 
+        ? await db.select({ id: users.id, username: users.username })
+            .from(users)
+            .where(inArray(users.id, userIds))
+        : [];
+      
+      const userMap = new Map(usersList.map(u => [u.id, u.username]));
+      
+      const enrichedHistory = history.map(h => ({
+        ...h,
+        username: userMap.get(h.userId) || "Unknown",
+      }));
+
+      res.json(enrichedHistory);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle chatbot for a user (Admin/Owner only)
+  app.patch("/api/users/:userId/chatbot", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      
+      // Only Admin/Owner can toggle chatbot
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { userId } = req.params;
+      const { enabled } = req.body;
+
+      await db.update(users)
+        .set({ chatbotEnabled: enabled })
+        .where(eq(users.id, userId));
+
+      res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get users with their chatbot status (Admin/Owner only)
+  app.get("/api/users/chatbot-status", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const allUsers = await db.select({
+        id: users.id,
+        username: users.username,
+        chatbotEnabled: users.chatbotEnabled,
+        active: users.active,
+      })
+        .from(users)
+        .where(eq(users.active, true));
+
+      res.json(allUsers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
