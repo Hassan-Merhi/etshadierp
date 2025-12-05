@@ -21,7 +21,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 
 interface UserChatbotStatus {
-  id: number;
+  id: string;
   username: string;
   chatbotEnabled: boolean;
   active: boolean;
@@ -54,8 +54,8 @@ export default function ChatbotSettings() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ userId, enabled }: { userId: number; enabled: boolean }) => {
-      const response = await apiRequest(`/api/users/${userId}/chatbot`, "PATCH", { enabled });
+    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
+      const response = await apiRequest("PATCH", `/api/users/${userId}/chatbot`, { enabled });
       return response.json();
     },
     onSuccess: (_, variables) => {
