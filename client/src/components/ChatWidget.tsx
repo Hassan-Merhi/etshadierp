@@ -35,7 +35,7 @@ export function ChatWidget() {
   });
 
   const { data: history = [], refetch: refetchHistory } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/chatbot/history", sessionId],
+    queryKey: [`/api/chatbot/history/${sessionId}`],
     enabled: isOpen && status?.enabled && status?.hasApiKey,
   });
 

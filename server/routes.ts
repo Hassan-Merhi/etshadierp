@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import crypto from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
-import { chat, saveMessage, getConversationHistory, getAllChatHistory } from "./chatService";
+import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
 import {
   requireAuth,
   requireRole,
@@ -21743,11 +21743,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save user message
       await saveMessage(companyId, userId, "user", message, sessionId);
 
-      // Get conversation history
-      const history = await getConversationHistory(sessionId, 10);
+      // Get conversation history for AI context (excluding current message)
+      const history = await getConversationHistoryForAI(sessionId, 10);
 
-      // Get AI response
-      const response = await chat(message, companyId, history.slice(0, -1)); // Exclude the current message from history
+      // Get AI response (excluding current message from history context)
+      const response = await chat(message, companyId, history.slice(0, -1));
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", response, sessionId);

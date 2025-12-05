@@ -248,6 +248,25 @@ export async function saveMessage(
 export async function getConversationHistory(
   sessionId: string,
   limit: number = 10
+): Promise<{ id: number; role: string; message: string; createdAt: Date }[]> {
+  const messages = await db
+    .select({
+      id: schema.chatMessages.id,
+      role: schema.chatMessages.role,
+      message: schema.chatMessages.content,
+      createdAt: schema.chatMessages.createdAt,
+    })
+    .from(schema.chatMessages)
+    .where(eq(schema.chatMessages.sessionId, sessionId))
+    .orderBy(desc(schema.chatMessages.createdAt))
+    .limit(limit);
+
+  return messages.reverse();
+}
+
+export async function getConversationHistoryForAI(
+  sessionId: string,
+  limit: number = 10
 ): Promise<{ role: string; content: string }[]> {
   const messages = await db
     .select({
