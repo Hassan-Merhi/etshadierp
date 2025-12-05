@@ -7667,7 +7667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            // Delete old vouchers
+            // Delete old OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG- prefixes)
+            // DO NOT delete PO vouchers that track supplier balances
             const oldVouchers = await db
               .select()
               .from(vouchers)
@@ -7675,6 +7676,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 and(
                   eq(vouchers.companyId, container.companyId),
                   sql`LOWER(${vouchers.description}) LIKE LOWER('%container ${container.containerNumber}%')`,
+                  sql`(
+                    ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
+                    ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
+                    ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
+                    ${vouchers.voucherNumber} LIKE 'CHG-%'
+                  )`,
                 ),
               );
 
@@ -7803,7 +7810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Delete vouchers created for this container offload
+          // Delete OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG- prefixes)
+          // DO NOT delete PO vouchers that track supplier balances
           const containerVouchers = await tx
             .select()
             .from(vouchers)
@@ -7811,6 +7819,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
                 like(sql`LOWER(${vouchers.description})`, `%container ${container.containerNumber.toLowerCase()}%`),
+                sql`(
+                  ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
+                  ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
+                  ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
+                  ${vouchers.voucherNumber} LIKE 'CHG-%'
+                )`,
               ),
             );
 
