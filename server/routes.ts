@@ -8689,10 +8689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         number,
         { debits: number; credits: number }
       >();
-      const supplierBalances = new Map<
-        number,
-        { debits: number; credits: number }
-      >();
+      // Note: Supplier balances are calculated separately below using global entries
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -8730,26 +8727,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             credits: existing.credits + credit,
           });
         }
-
-        if (entry.supplierId) {
-          const existing = supplierBalances.get(entry.supplierId) || {
-            debits: 0,
-            credits: 0,
-          };
-          // Only count pure credit or pure debit entries to prevent double-counting
-          // This matches the logic in /api/suppliers/stats
-          if (credit > 0 && debit === 0) {
-            supplierBalances.set(entry.supplierId, {
-              debits: existing.debits,
-              credits: existing.credits + credit,
-            });
-          } else if (debit > 0 && credit === 0) {
-            supplierBalances.set(entry.supplierId, {
-              debits: existing.debits + debit,
-              credits: existing.credits,
-            });
-          }
-        }
+        // Note: Supplier balances are calculated separately below using global entries
+        // (not company-filtered) to match the supplier stats endpoint
       }
 
       // Helper function to calculate actual balance
@@ -8857,18 +8836,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parentId: null,
           };
         }),
-        ...suppliers.map((supplier) => {
-          const movements = supplierBalances.get(supplier.id) || {
-            debits: 0,
-            credits: 0,
-          };
+      ];
 
-          // Calculate balance using signed opening balance (same logic as /api/suppliers/stats)
-          // Positive opening balance = we owe them, Negative = they owe us/prepaid
-          // Credits increase payable, Debits decrease payable
+      // Calculate supplier balances separately using global entries (matching /api/suppliers/stats)
+      // Suppliers are global entities, so their balances should include entries from ALL companies
+      const supplierAccountsList = await Promise.all(
+        suppliers.map(async (supplier) => {
+          // Get entries across ALL companies (same as supplier stats endpoint)
+          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
           const openingBalance = parseFloat(supplier.openingBalance || "0");
-          const calculatedBalance =
-            openingBalance + movements.credits - movements.debits;
+
+          // Calculate balance: Opening Balance + Credits - Debits
+          const calculatedBalance = entries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            // Only count pure credit or pure debit entries
+            if (credit > 0 && debit === 0) {
+              return sum + credit;
+            } else if (debit > 0 && credit === 0) {
+              return sum - debit;
+            }
+            return sum;
+          }, openingBalance);
 
           // Determine side based on final balance
           const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
@@ -8887,10 +8876,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             active: supplier.active,
             parentId: null,
           };
-        }),
-      ];
+        })
+      );
 
-      res.json(accounts);
+      // Combine all accounts
+      const allAccounts = [...accounts, ...supplierAccountsList];
+
+      res.json(allAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
