@@ -8847,6 +8847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
           // Calculate balance: Opening Balance + Credits - Debits
+          // This gives a signed value where positive = we owe them, negative = they owe us/prepaid
           const calculatedBalance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -8859,9 +8860,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return sum;
           }, openingBalance);
 
-          // Determine side based on final balance
+          // For suppliers, return the signed balance (same format as /api/suppliers/stats)
+          // Positive = we owe them (Cr), Negative = they owe us/prepaid (Dr)
           const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
-          const absoluteBalance = Math.abs(calculatedBalance);
 
           return {
             id: `supplier-${supplier.id}`,
@@ -8869,7 +8870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: "supplier",
             code: supplier.code,
             name: supplier.legalName,
-            balance: absoluteBalance.toFixed(2),
+            balance: calculatedBalance.toFixed(2), // Signed value, not absolute
             balanceSide,
             openingBalance: openingBalance,
             openingBalanceSide: "Cr", // Suppliers are always credit balance (payable)
