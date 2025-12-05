@@ -53,7 +53,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2, Wrench, MapPin, ChevronRight } from "lucide-react";
+import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
@@ -1144,6 +1144,25 @@ export default function Settings() {
                         <h3 className="font-semibold" data-testid="link-orphaned-records">Orphaned Records</h3>
                         <p className="text-sm text-muted-foreground">
                           Find and reassign records that reference deleted locations
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </Card>
+              </Link>
+
+              <Link href="/chatbot-settings">
+                <Card className="p-6 hover-elevate cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <Bot className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Manage AI assistant access and view conversation history
                         </p>
                       </div>
                     </div>

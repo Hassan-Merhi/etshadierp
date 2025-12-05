@@ -21762,6 +21762,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get chat history for current session
   app.get("/api/chatbot/history/:sessionId", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Check if user has chatbot enabled
+      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user?.chatbotEnabled) {
+        return res.status(403).json({ message: "Chatbot is not enabled for your account" });
+      }
+
       const { sessionId } = req.params;
       const history = await getConversationHistory(sessionId, 50);
       res.json(history);
@@ -21788,7 +21802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const history = await getAllChatHistory(companyId, 200);
       
       // Enrich with username
-      const userIds = [...new Set(history.map(h => h.userId))];
+      const userIds = Array.from(new Set(history.map(h => h.userId)));
       const usersList = userIds.length > 0 
         ? await db.select({ id: users.id, username: users.username })
             .from(users)

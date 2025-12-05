@@ -1,104 +1,8 @@
 # ERP POS System
 
-## Recent Changes (Dec 4, 2025)
-
-- **Soft Delete System & Deleted Items Management**: Comprehensive system-wide soft delete with recycle bin functionality
-  - **Schema Changes**: Added `deletedAt` timestamp column to 9 key tables (locations, ledgerAccounts, stockItems, stockGroups, suppliers, employees, customers, vouchers, bankAccounts)
-  - **Soft Delete Logic**: Delete operations for locations, stock items, ledger accounts, employees, and bank accounts now set `deletedAt` timestamp and `active=false` instead of hard delete
-  - **Note on Vouchers**: Voucher deletion still performs hard delete with inventory reversal due to complex inventory movement logic
-  - **API Endpoints**:
-    - `GET /api/deleted-items` - Lists all soft-deleted records grouped by type
-    - `POST /api/deleted-items/:type/:id/restore` - Restores a deleted item (clears deletedAt, sets active=true)
-    - `DELETE /api/deleted-items/:type/:id/permanent` - Permanently removes record from database
-  - **UI Page**: New `/deleted-items` page (Admin only) accessible from Settings → System tab
-    - Filter by item type (locations, stock items, accounts, vouchers, etc.)
-    - Shows deletion date/time for each item
-    - Restore button to bring items back
-    - Delete Forever button for permanent removal
-  - **Settings System Tab**: New System tab in Settings with links to Deleted Items and Orphaned Records pages
-
-- **Net Profit (P&L) Report**: New Tally Prime-style Profit & Loss statement in Analytics → Reports tab
-  - Left pane shows: Opening Stock, Purchase Accounts, Direct Incomes, Direct Expenses, Gross Profit c/o, Indirect Expenses, Net Profit
-  - Click any row (Purchase Accounts, Direct Incomes, Direct Expenses, Indirect Expenses) to expand and see individual accounts with debit/credit
-  - Opening Stock calculated from stock items' opening values or current inventory if none set
-  - Purchase Accounts identified by code "PURCHASES" or "PURCHASES-*"
-  - Direct Incomes: accounts with accountType="Income" AND subType="Direct Income"
-  - Indirect Expenses: accounts with accountType="Indirect Expense"
-  - Gross Profit = Direct Incomes - Purchases - Direct Expenses
-  - Net Profit = Gross Profit - Indirect Expenses
-  - API endpoint: `GET /api/reports/net-profit-statement`
-  - Drill-down endpoints: purchase-accounts, direct-incomes, direct-expenses, indirect-expenses
-  - Right pane placeholder for future: Sales Accounts, Closing Stock, Gross Profit b/f, Indirect Incomes
-
-- **Opening Stock Summary Report** (Hidden - code kept for future use)
-
-- **Container Offload Now Includes PO Freight in Inventory Cost**: Fixed bug where PO freight/charges were not being added to inventory item costs
-  - The `offloadContainer` function now includes `container.chargesTotal` (sum of all PO freight + otherCharges) in the additionalCostPerBale calculation
-  - Inventory values now correctly reflect: base item cost + (all charges / total bales)
-  - Example: 646 bales with $3,667 freight → adds ~$5.68 per bale to cost
-  - **Note**: Existing offloaded containers need to be re-offloaded to apply this fix
-
-## Recent Changes (Dec 3, 2025)
-
-- **Purchase Order Freight & Charges**: POs now have editable freight and other charges fields
-  - Schema: Added `freight` and `otherCharges` decimal columns to `purchase_orders` table
-  - PurchaseOrderEdit UI: Fixed fields for freight and other charges (replaces dynamic charges array)
-  - Grand total displayed: Items + Freight + Other Charges
-  - Saving PO updates container totals (chargesTotal = sum of all PO freight + otherCharges)
-  - Saving PO updates associated voucher and voucher entries with new total
-  - Supplier account balance automatically reflects full PO amount including charges
-
-## Recent Changes (Dec 2, 2025)
-
-- **Voucher Deletion Now Reverses Inventory**: Deleting vouchers now properly restores inventory movements
-  - **Stock Transfer**: Deleting a stock transfer voucher adds quantity back to source location and removes from destination
-  - **Production**: Deleting a production voucher subtracts the produced quantity from inventory
-  - **Consumption**: Deleting a consumption voucher adds the consumed quantity back to inventory
-  - **POS Sales (Receipt)**: Deleting a POS sale voucher adds sold items back to inventory
-  - All reversals maintain proper weighted average cost calculations
-  - Cleanup also removes related records (stockTransferItems, stockAdjustmentItems, salesItems)
-- **Fixed Quantity Input Crash**: Fixed parseFloat crash when quantity field is empty in stock transfer view dialog
-
-## Recent Changes (Nov 26, 2025)
-
-- **Stock Transfer Consolidated to Vouchers Page**: POS users now access stock transfer through the Vouchers page
-  - Removed standalone `/stock-transfer` page and routes
-  - POS users see only the Stock Transfer tab (other voucher tabs hidden)
-  - Source location auto-populated with POS user's assigned location (read-only)
-  - Rate and Total columns hidden for POS users (cost prices protected)
-  - Import button hidden for POS users (admin-only feature)
-  - Page title changes to "Stock Transfer" for POS users
-- **POS Stock Transfer Redesigned**: Completely rewritten with table-based, typable item entry
-  - Uses StockItemAutocomplete component for searchable item selection
-  - Shows available quantity for each item (no cost prices for POS users)
-  - Supports unlimited item additions with "Add Item" button
-  - Validates quantities against available stock before submission
-  - POS users' source location is automatically set to their assigned location
-  - Destination dropdown automatically excludes the source location
-- **Location Name Preservation**: Vouchers now save the location name as text when created/updated
-  - Sales reports display saved location name even after the original location is deleted (instead of "-")
-  - Uses COALESCE in queries to fallback to saved locationName when location record is missing
-  - All voucher creation and edit paths now persist locationName alongside locationId
-- **Orphaned Records Management**: Admin-only page to find and reassign records with deleted locations
-  - API: GET `/api/orphaned-records` - Lists vouchers with deleted locations
-  - API: POST `/api/orphaned-records/reassign` - Bulk reassign vouchers to new location
-  - UI: `/orphaned-records` page (Admin only) with selection and reassignment interface
-
-## Recent Changes (Nov 24, 2025)
-
-- **Added Stock Transfer for POS**: POS users can now transfer stock between locations via `/stock-transfer` page
-  - Shows only item names and quantities (cost prices hidden)
-  - Automatically updates inventory at source and destination
-  - Creates vouchers for accounting records
-  - API endpoints: GET/POST `/api/stock-transfers`, GET `/api/inventory-by-location/:id`
-- **Fixed Configured Selling Price**: Sales reports now use the configured selling price from stock items when available. If a stock item has a configured price, sales will use that price instead of the manually entered rate.
-- **Fixed Error Handler**: Removed `throw err` from Express error handler to prevent process crashes
-- **Fixed Barcode Generation**: Moved barcode generation from frontend (bwip-js) to backend API endpoint (`/api/generate-barcode`) to fix production builds
-- **Added Barcode API**: New `/api/generate-barcode` POST endpoint generates PNG barcodes server-side for printing
-
 ## Overview
 
-This project is a comprehensive ERP and POS system designed for multi-company warehouse management. It provides robust inventory tracking across multiple locations, streamlines purchase order management, enables container tracking, and offers full financial accounting and reporting capabilities. Built as a full-stack TypeScript application, its primary purpose is to optimize operations and provide strong financial oversight for businesses managing bulk inventory with complex supply chains, including international container shipments. The system is designed to support multi-entity businesses by ensuring isolated data for each company while providing a unified platform.
+This project is a comprehensive ERP and POS system designed for multi-company warehouse management. It provides robust inventory tracking across multiple locations, streamlines purchase order management, enables container tracking, and offers full financial accounting and reporting capabilities. Built as a full-stack TypeScript application, its primary purpose is to optimize operations and provide strong financial oversight for businesses managing bulk inventory with complex supply chains, including international container shipments. The system is designed to support multi-entity businesses by ensuring isolated data for each company while providing a unified platform. It now includes an AI Chatbot powered by Google Gemini for intelligent assistance with ERP data.
 
 ## User Preferences
 
@@ -112,16 +16,20 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
 
 ### Technical Implementations
 
--   **Frontend**: Built with React, TypeScript, and Vite. State management relies on TanStack Query for server state, React hooks/context for local UI state (theme, sidebar, location selection), and `react-hook-form` with Zod for form management. Routing is handled by `wouter`.
--   **Backend**: An Express.js server developed with TypeScript. It features RESTful API design with Zod for shared validation schemas between frontend and backend. Development uses a custom Vite integration with HMR, while production builds utilize `esbuild` for the server and Vite for client assets.
+-   **Frontend**: Built with React, TypeScript, and Vite. State management relies on TanStack Query for server state, React hooks/context for local UI state, and `react-hook-form` with Zod for form management. Routing is handled by `wouter`.
+-   **Backend**: An Express.js server developed with TypeScript. It features RESTful API design with Zod for shared validation schemas. Development uses a custom Vite integration with HMR, while production builds utilize `esbuild` for the server and Vite for client assets.
 -   **Data Storage**: PostgreSQL is the chosen database, utilizing the native `pg` driver with connection pooling. Drizzle ORM provides type-safe queries and a schema-first approach, integrated with Zod. The database schema supports users, locations, ledger accounts, employees, suppliers, stock items/groups, bank accounts, fixed assets, purchase orders, and vouchers, including multi-currency and opening balance features. Drizzle Kit is used for schema migrations. Production sessions are managed via `connect-pg-simple` with PostgreSQL-backed storage and SSL.
 -   **Multi-Tenancy**: The system fully supports multiple companies with isolated data for inventory, financials, and locations, while allowing shared global suppliers. Users can have different roles across companies.
--   **Inventory Management**: Stock items are identified by a single `code` for item codes and barcode scanning, and can be assigned to stock groups. All stock operations, including multi-source location transfers and production/consumption adjustments, are wrapped in Drizzle ORM transactions to ensure atomicity and maintain accurate weighted average cost calculations.
--   **Financial Accounting**: Includes automatic voucher creation for purchase orders and container offload charges. It handles auto-generation of ledger account codes (e.g., `PURCHASES`, `IMPORT_CHARGES`) and employee codes. The system supports comprehensive account pages with filters, ensuring all financial calculations (e.g., net profit, sales trends, balances) correctly handle hierarchical accounts and exclude optional (draft) vouchers.
--   **Location Management**: Supports location creation with optional auto-creation of linked CASH ledger accounts.
+-   **Inventory Management**: Stock items are identified by a single `code` and can be assigned to stock groups. All stock operations, including multi-source location transfers and production/consumption adjustments, are wrapped in Drizzle ORM transactions to ensure atomicity and maintain accurate weighted average cost calculations. Recent updates include accurate PO freight costing and comprehensive voucher-based inventory reversal on deletion.
+-   **Financial Accounting**: Includes automatic voucher creation for purchase orders and container offload charges. It handles auto-generation of ledger account codes and employee codes. The system supports comprehensive account pages with filters, ensuring all financial calculations (e.g., net profit, sales trends, balances) correctly handle hierarchical accounts and exclude optional (draft) vouchers. A Net Profit (P&L) report provides Tally Prime-style insights.
+-   **Location Management**: Supports location creation with optional auto-creation of linked CASH ledger accounts. It includes mechanisms for preserving location names on vouchers and managing orphaned records after location deletion.
 -   **Supplier Management**: Suppliers are global entities, with transactions filtered by the selected company.
 -   **Role-Based Access Control**: Granular roles (Admin, Owner, Manager, POS 1-6) are implemented per company, with location-based authentication for POS users.
 -   **Voucher System**: Comprehensive support for creating, editing, and managing all voucher types (Payment, Receipt, Journal, Stock Transfer, Production, Consumption). An "optional" voucher system allows for drafts/templates that are excluded from all inventory movements and financial calculations, with a toggle mechanism that atomically applies or reverses inventory changes.
+-   **Soft Delete System**: Implemented across key tables (locations, ledger accounts, stock items, suppliers, employees, customers, bank accounts) with a `deletedAt` timestamp. Includes admin-only UI for viewing, restoring, and permanently deleting items.
+-   **AI Chatbot**: Integrated Google Gemini for ERP context-aware responses. Features multi-language support, real-time chat with history, and admin controls for user access and chat history viewing.
+-   **Purchase Order Enhancements**: POs now include editable freight and other charges, which are correctly factored into container offload inventory costs and supplier account balances.
+-   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 
 ### System Design Choices
 
@@ -133,6 +41,7 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
 
 ## External Dependencies
 
+-   **AI/ML**: Google Gemini API
 -   **UI Component Libraries**: Radix UI, Tailwind CSS, `shadcn/ui`, `class-variance-authority`, `clsx`, `cmdk`, `embla-carousel-react`, `recharts`, `date-fns`, `react-day-picker`.
 -   **Database & Backend**: `pg` (node-postgres driver), `drizzle-orm`, `connect-pg-simple` (PostgreSQL session store with SSL).
 -   **Form Handling**: `react-hook-form`, `@hookform/resolvers`, `zod`, `drizzle-zod`.

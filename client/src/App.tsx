@@ -50,6 +50,7 @@ import BaleProducts from "@/pages/BaleProducts";
 import BaleTransfer from "@/pages/bale-transfer";
 import OrphanedRecords from "@/pages/OrphanedRecords";
 import DeletedItems from "@/pages/DeletedItems";
+import ChatbotSettings from "@/pages/ChatbotSettings";
 import PurchaseOrderEdit from "@/pages/PurchaseOrderEdit";
 import StockItemHistory from "@/pages/StockItemHistory";
 import StockItemVouchers from "@/pages/StockItemVouchers";
@@ -139,6 +140,7 @@ function Router({ user }: { user: any }) {
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {user?.role === "Admin" && <Route path="/deleted-items" component={DeletedItems} />}
+      {user?.role === "Admin" && <Route path="/chatbot-settings" component={ChatbotSettings} />}
       <Route component={NotFound} />
     </Switch>
   );
