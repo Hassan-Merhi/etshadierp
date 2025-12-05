@@ -72,10 +72,32 @@ interface DailySummary {
 
 type GroupingType = "daily" | "monthly" | "yearly";
 
+// Format currency: adds commas, removes .00 if whole number
+const formatCurrency = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '$0';
+  // If whole number, no decimals; otherwise 2 decimals
+  if (num % 1 === 0) {
+    return '$' + Math.abs(num).toLocaleString('en-US');
+  }
+  return '$' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Format number with commas, remove .00 if whole
+const formatNumber = (value: string | number): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0';
+  if (num % 1 === 0) {
+    return num.toLocaleString('en-US');
+  }
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// For backwards compatibility
 const formatSmartNumber = (value: string | number) => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '0';
-  return num % 1 === 0 ? num.toString() : value.toString();
+  return num % 1 === 0 ? num.toLocaleString('en-US') : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export default function SalesReport() {
@@ -200,6 +222,9 @@ export default function SalesReport() {
     return acc;
   }, []);
 
+  // Sort by date descending (most recent first)
+  groupedData.sort((a, b) => b.date.localeCompare(a.date));
+
   // Calculate totals
   const totals = groupedData.reduce(
     (acc, group) => ({
@@ -305,7 +330,7 @@ export default function SalesReport() {
           <CardHeader className="pb-2">
             <CardDescription>Total Sales</CardDescription>
             <CardTitle className="text-2xl">
-              ${totals.totalSales.toFixed(2)}
+              {formatCurrency(totals.totalSales)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -313,7 +338,7 @@ export default function SalesReport() {
           <CardHeader className="pb-2">
             <CardDescription>Cost Price Total</CardDescription>
             <CardTitle className="text-2xl">
-              ${totals.totalCost.toFixed(2)}
+              {formatCurrency(totals.totalCost)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -322,7 +347,7 @@ export default function SalesReport() {
             <CardDescription>Cost Profit</CardDescription>
             <CardTitle className={`text-2xl flex items-center gap-2 ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
               {totals.costProfit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              ${Math.abs(totals.costProfit).toFixed(2)}
+              {totals.costProfit < 0 ? '-' : ''}{formatCurrency(totals.costProfit)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -330,7 +355,7 @@ export default function SalesReport() {
           <CardHeader className="pb-2">
             <CardDescription>Configured Price Total</CardDescription>
             <CardTitle className="text-2xl">
-              ${totals.totalConfiguredCost.toFixed(2)}
+              {formatCurrency(totals.totalConfiguredCost)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -339,7 +364,7 @@ export default function SalesReport() {
             <CardDescription>Configured Profit</CardDescription>
             <CardTitle className={`text-2xl flex items-center gap-2 ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
               {totals.configuredProfit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              ${Math.abs(totals.configuredProfit).toFixed(2)}
+              {totals.configuredProfit < 0 ? '-' : ''}{formatCurrency(totals.configuredProfit)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -487,22 +512,22 @@ export default function SalesReport() {
                     >
                       <TableCell className="font-medium">{group.displayDate}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {group.itemCount}
+                        {formatNumber(group.itemCount)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${group.totalSales.toFixed(2)}
+                        {formatCurrency(group.totalSales)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${group.totalCost.toFixed(2)}
+                        {formatCurrency(group.totalCost)}
                       </TableCell>
                       <TableCell className={`text-right font-mono font-semibold ${group.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        ${group.costProfit.toFixed(2)}
+                        {group.costProfit < 0 ? '-' : ''}{formatCurrency(group.costProfit)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        ${group.totalConfiguredCost.toFixed(2)}
+                        {formatCurrency(group.totalConfiguredCost)}
                       </TableCell>
                       <TableCell className={`text-right font-mono font-semibold ${group.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        ${group.configuredProfit.toFixed(2)}
+                        {group.configuredProfit < 0 ? '-' : ''}{formatCurrency(group.configuredProfit)}
                       </TableCell>
                       <TableCell>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -513,22 +538,22 @@ export default function SalesReport() {
                   <TableRow className="font-bold bg-muted/50">
                     <TableCell>TOTAL</TableCell>
                     <TableCell className="text-right font-mono">
-                      {salesData.length}
+                      {formatNumber(salesData.length)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${totals.totalSales.toFixed(2)}
+                      {formatCurrency(totals.totalSales)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${totals.totalCost.toFixed(2)}
+                      {formatCurrency(totals.totalCost)}
                     </TableCell>
                     <TableCell className={`text-right font-mono ${totals.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      ${totals.costProfit.toFixed(2)}
+                      {totals.costProfit < 0 ? '-' : ''}{formatCurrency(totals.costProfit)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${totals.totalConfiguredCost.toFixed(2)}
+                      {formatCurrency(totals.totalConfiguredCost)}
                     </TableCell>
                     <TableCell className={`text-right font-mono ${totals.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      ${totals.configuredProfit.toFixed(2)}
+                      {totals.configuredProfit < 0 ? '-' : ''}{formatCurrency(totals.configuredProfit)}
                     </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
@@ -558,7 +583,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Total Qty</CardDescription>
                       <CardTitle className="text-lg">
-                        {formatSmartNumber(selectedDaySummary.items.reduce((sum, item) => sum + parseFloat(item.quantity), 0).toString())}
+                        {formatNumber(selectedDaySummary.items.reduce((sum, item) => sum + parseFloat(item.quantity), 0))}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -566,7 +591,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Total Sales</CardDescription>
                       <CardTitle className="text-lg">
-                        ${selectedDaySummary.totalSales.toFixed(2)}
+                        {formatCurrency(selectedDaySummary.totalSales)}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -574,7 +599,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Cost Total</CardDescription>
                       <CardTitle className="text-lg">
-                        ${selectedDaySummary.totalCost.toFixed(2)}
+                        {formatCurrency(selectedDaySummary.totalCost)}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -582,7 +607,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Cost Profit</CardDescription>
                       <CardTitle className={`text-lg ${selectedDaySummary.costProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        ${selectedDaySummary.costProfit.toFixed(2)}
+                        {selectedDaySummary.costProfit < 0 ? '-' : ''}{formatCurrency(selectedDaySummary.costProfit)}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -590,7 +615,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Hassan's Total</CardDescription>
                       <CardTitle className="text-lg">
-                        ${selectedDaySummary.totalConfiguredCost.toFixed(2)}
+                        {formatCurrency(selectedDaySummary.totalConfiguredCost)}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -598,7 +623,7 @@ export default function SalesReport() {
                     <CardHeader className="pb-2">
                       <CardDescription className="text-xs">Hassan's Profit</CardDescription>
                       <CardTitle className={`text-lg ${selectedDaySummary.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        ${selectedDaySummary.configuredProfit.toFixed(2)}
+                        {selectedDaySummary.configuredProfit < 0 ? '-' : ''}{formatCurrency(selectedDaySummary.configuredProfit)}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -632,31 +657,31 @@ export default function SalesReport() {
                           <TableCell className="font-medium">{item.stockItemName}</TableCell>
                           <TableCell>{item.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatSmartNumber(item.quantity)}
+                            {formatNumber(item.quantity)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(item.actualSellingPrice).toFixed(2)}
+                            {formatCurrency(item.actualSellingPrice)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(item.costPrice).toFixed(2)}
+                            {formatCurrency(item.costPrice)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(item.configuredSellingPrice).toFixed(2)}
+                            {formatCurrency(item.configuredSellingPrice)}
                           </TableCell>
                           <TableCell className={`text-right font-mono ${unitProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            ${unitProfit.toFixed(2)}
+                            {unitProfit < 0 ? '-' : ''}{formatCurrency(unitProfit)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(item.totalCost).toFixed(2)}
+                            {formatCurrency(item.totalCost)}
                           </TableCell>
                           <TableCell className={`text-right font-mono ${parseFloat(item.costProfit) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            ${parseFloat(item.costProfit).toFixed(2)}
+                            {parseFloat(item.costProfit) < 0 ? '-' : ''}{formatCurrency(item.costProfit)}
                           </TableCell>
                           <TableCell className={`text-right font-mono text-sm ${item.costProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
                             {item.costProfitPercentage.toFixed(1)}%
                           </TableCell>
                           <TableCell className={`text-right font-mono ${item.configuredProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            ${item.configuredProfit.toFixed(2)}
+                            {item.configuredProfit < 0 ? '-' : ''}{formatCurrency(item.configuredProfit)}
                           </TableCell>
                           <TableCell className={`text-right font-mono text-sm ${item.configuredProfitPercentage >= 0 ? "text-green-600" : "text-red-600"}`}>
                             {item.configuredProfitPercentage.toFixed(1)}%
