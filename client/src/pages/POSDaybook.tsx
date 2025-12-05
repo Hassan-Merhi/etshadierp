@@ -525,20 +525,20 @@ export default function POSDaybook() {
                             <CommandGroup>
                               {inventory
                                 .filter(item => 
-                                  item.stockItemName.toLowerCase().includes(itemSearch.toLowerCase()) ||
-                                  item.stockItemCode.toLowerCase().includes(itemSearch.toLowerCase())
+                                  (item.stockItemName || "").toLowerCase().includes(itemSearch.toLowerCase()) ||
+                                  (item.stockItemCode || "").toLowerCase().includes(itemSearch.toLowerCase())
                                 )
                                 .map((item) => (
                                   <CommandItem
                                     key={item.stockItemId}
-                                    value={item.stockItemName}
+                                    value={item.stockItemName || ""}
                                     onSelect={() => handleAddItem(item)}
                                     data-testid={`item-${item.stockItemId}`}
                                   >
                                     <div className="flex justify-between w-full">
                                       <div>
-                                        <div className="font-medium">{item.stockItemName}</div>
-                                        <div className="text-xs text-muted-foreground">{item.stockItemCode}</div>
+                                        <div className="font-medium">{item.stockItemName || "Unknown Item"}</div>
+                                        <div className="text-xs text-muted-foreground">{item.stockItemCode || ""}</div>
                                       </div>
                                       <div className="text-sm font-mono">
                                         ${parseFloat(item.lastSellingPrice || item.averageRate).toFixed(2)}

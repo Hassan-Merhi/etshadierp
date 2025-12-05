@@ -98,9 +98,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
 
   // Transform API inventory to POS format with stockItemId
+  // Coalesce null/undefined names and codes to prevent toLowerCase() errors
   const inventory: (InventoryItem & { stockItemId: number })[] = apiInventory.map((item) => ({
-    code: item.stockItemCode,
-    name: item.stockItemName,
+    code: (item.stockItemCode || "").trim(),
+    name: (item.stockItemName || "Unknown Item").trim(),
     stock: parseFloat(item.quantity),
     price: parseFloat(item.lastSellingPrice || item.averageRate),
     stockItemId: item.stockItemId,
@@ -633,9 +634,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const getFilteredInventory = () => {
     if (!searchTerm) return inventory;
+    const searchLower = searchTerm.toLowerCase();
     return inventory.filter((item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase())
+      (item.name || "").toLowerCase().includes(searchLower) ||
+      (item.code || "").toLowerCase().includes(searchLower)
     );
   };
 
