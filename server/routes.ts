@@ -3057,6 +3057,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
+          // DEBUG: Log supplier calculation
+          console.log(`[SUPPLIERS/STATS] Supplier ${supplier.id} (${supplier.legalName}): openingBalance=${openingBalance}, entries=${entries.length}`);
+
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -3064,12 +3067,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Only count if this is a pure credit or pure debit entry
             // This prevents double-counting if both sides of a transaction have supplierId
             if (credit > 0 && debit === 0) {
+              console.log(`  Entry credit: +${credit}`);
               return sum + credit; // Increase payable
             } else if (debit > 0 && credit === 0) {
+              console.log(`  Entry debit: -${debit}`);
               return sum - debit; // Decrease payable
             }
             return sum;
           }, openingBalance);
+
+          console.log(`  Final balance: ${balance}`);
 
           return {
             ...supplier,
@@ -8846,18 +8853,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
           const openingBalance = parseFloat(supplier.openingBalance || "0");
 
+          // DEBUG: Log supplier calculation
+          console.log(`[ACCOUNTS/ALL] Supplier ${supplier.id} (${supplier.legalName}): openingBalance=${openingBalance}, entries=${entries.length}`);
+
           // Calculate balance: Opening Balance + Credits - Debits
           const calculatedBalance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
             // Only count pure credit or pure debit entries
             if (credit > 0 && debit === 0) {
+              console.log(`  Entry credit: +${credit}`);
               return sum + credit;
             } else if (debit > 0 && credit === 0) {
+              console.log(`  Entry debit: -${debit}`);
               return sum - debit;
             }
             return sum;
           }, openingBalance);
+
+          console.log(`  Final balance: ${calculatedBalance}`);
 
           // Determine side based on final balance
           const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
