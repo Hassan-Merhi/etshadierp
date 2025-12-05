@@ -16983,11 +16983,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
+      console.log("[closing-stock-detail] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
 
       const { stockGroupId } = req.params;
+      console.log("[closing-stock-detail] Stock Group ID param:", stockGroupId, "parsed:", parseInt(stockGroupId));
 
       // Get stock items in this group
       const groupItems = await db
@@ -17001,6 +17003,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         )
         .execute();
+      
+      console.log("[closing-stock-detail] Group items found:", groupItems.length, groupItems.map(i => ({ id: i.id, name: i.name, stockGroupId: i.stockGroupId })));
 
       // Get inventory for these items from active locations
       const itemIds = groupItems.map((i) => i.id);
@@ -17044,10 +17048,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log("[closing-stock-detail] Inventory data rows:", inventoryData.length);
+      console.log("[closing-stock-detail] Inventory by item entries:", Array.from(inventoryByItem.entries()));
+
       // Build items list
       const items = groupItems.map((item) => {
         const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
         const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
+        console.log(`[closing-stock-detail] Item ${item.id} (${item.name}):`, invData);
         
         return {
           id: item.id,
@@ -17060,6 +17068,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         };
       }).filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
+      
+      console.log("[closing-stock-detail] Final items (after filter):", items.length, items);
 
       // Calculate totals
       const totals = {
