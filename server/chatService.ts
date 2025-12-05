@@ -230,31 +230,59 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     }
   }
 
-  const supplierBalancesRaw = await db
+  // Fetch full supplier data including opening balances
+  const suppliersWithBalances = await db
     .select({
-      supplierId: schema.voucherEntries.supplierId,
-      totalDebit: sql<string>`COALESCE(SUM(CAST(${schema.voucherEntries.debitAmount} AS NUMERIC)), 0)`,
-      totalCredit: sql<string>`COALESCE(SUM(CAST(${schema.voucherEntries.creditAmount} AS NUMERIC)), 0)`,
+      id: schema.suppliers.id,
+      code: schema.suppliers.code,
+      legalName: schema.suppliers.legalName,
+      openingBalance: schema.suppliers.openingBalance,
     })
-    .from(schema.voucherEntries)
-    .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      isNull(schema.vouchers.deletedAt),
-      sql`${schema.voucherEntries.supplierId} IS NOT NULL`
-    ))
-    .groupBy(schema.voucherEntries.supplierId);
+    .from(schema.suppliers)
+    .where(eq(schema.suppliers.active, true));
 
-  const supplierBalances = supplierBalancesRaw.map(sb => {
-    const supplier = suppliers.find(s => s.id === sb.supplierId);
-    const balance = parseFloat(sb.totalCredit) - parseFloat(sb.totalDebit);
-    return {
-      supplierId: sb.supplierId,
-      supplierName: supplier?.legalName || 'Unknown',
-      balance: balance,
-      status: balance > 0 ? 'PAYABLE' : balance < 0 ? 'OVERPAID' : 'SETTLED',
-    };
-  }).filter(sb => Math.abs(sb.balance) > 0.01);
+  // Get voucher entries for each supplier (matching supplier page calculation)
+  const supplierBalances = await Promise.all(
+    suppliersWithBalances.map(async (supplier) => {
+      const entries = await db
+        .select({
+          debitAmount: schema.voucherEntries.debitAmount,
+          creditAmount: schema.voucherEntries.creditAmount,
+        })
+        .from(schema.voucherEntries)
+        .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
+        .where(and(
+          eq(schema.voucherEntries.supplierId, supplier.id),
+          isNull(schema.vouchers.deletedAt)
+        ));
+
+      // Calculate balance same as supplier page: Opening Balance + Credits - Debits
+      const openingBalance = parseFloat(supplier.openingBalance || "0");
+      const balance = entries.reduce((sum, entry) => {
+        const credit = parseFloat(entry.creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        // Only count pure credit or pure debit entries (same as supplier page)
+        if (credit > 0 && debit === 0) {
+          return sum + credit;
+        } else if (debit > 0 && credit === 0) {
+          return sum - debit;
+        }
+        return sum;
+      }, openingBalance);
+
+      return {
+        supplierId: supplier.id,
+        supplierCode: supplier.code,
+        supplierName: supplier.legalName || 'Unknown',
+        openingBalance: openingBalance,
+        balance: balance,
+        status: balance > 0 ? 'PAYABLE' : balance < 0 ? 'OVERPAID' : 'SETTLED',
+      };
+    })
+  );
+
+  // Filter to only show suppliers with non-zero balances
+  const filteredSupplierBalances = supplierBalances.filter(sb => Math.abs(sb.balance) > 0.01);
 
   let customerBalancesList: any[] = [];
   try {
@@ -282,7 +310,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   }
 
   const financialSummary = {
-    totalPayables: supplierBalances.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0),
+    totalPayables: filteredSupplierBalances.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0),
     totalReceivables: customerBalancesList.filter(c => c.balance > 0).reduce((sum, c) => sum + c.balance, 0),
     openPurchaseOrders: purchaseOrders.filter(po => po.status === 'Open').length,
     pendingContainerSales: containerSales.filter(cs => cs.paymentStatus !== 'PAID').length,
@@ -363,7 +391,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     salesSummary: salesSummary[0] || { totalSales: "0", count: 0 },
     profitAnalysis: profitAnalysis[0] || { totalSales: "0", totalCost: "0", totalProfit: "0", itemsSold: 0 },
     lowStockAlerts,
-    supplierBalances,
+    supplierBalances: filteredSupplierBalances,
     customerBalances: customerBalancesList,
     purchaseOrders,
     containerSales,
