@@ -21747,12 +21747,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const history = await getConversationHistoryForAI(sessionId, 10);
 
       // Get AI response (excluding current message from history context)
-      const response = await chat(message, companyId, history.slice(0, -1));
+      const result = await chat(message, companyId, history.slice(0, -1));
 
       // Save assistant response
-      await saveMessage(companyId, userId, "assistant", response, sessionId);
+      await saveMessage(companyId, userId, "assistant", result.response, sessionId);
 
-      res.json({ response });
+      res.json({ response: result.response, suggestions: result.suggestions });
     } catch (error: any) {
       console.error("Chat error:", error);
       res.status(500).json({ message: error.message });
