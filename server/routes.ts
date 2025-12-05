@@ -16867,15 +16867,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reports/closing-stock-summary", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
+      console.log("[closing-stock-summary] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
 
       // Get all stock groups for the company
       const allStockGroups = await storage.getAllStockGroups(companyId);
+      console.log("[closing-stock-summary] Stock groups found:", allStockGroups.length, allStockGroups.map(g => ({ id: g.id, name: g.name })));
       
       // Get all stock items for the company
       const allStockItems = await storage.getAllStockItems(companyId);
+      console.log("[closing-stock-summary] Stock items found:", allStockItems.length, allStockItems.map(i => ({ id: i.id, name: i.name, stockGroupId: i.stockGroupId })));
       
       // Get inventory data from active locations only
       const inventoryData = await db
@@ -16895,6 +16898,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         )
         .execute();
+      
+      console.log("[closing-stock-summary] Inventory data rows:", inventoryData.length);
+      console.log("[closing-stock-summary] Inventory sample:", inventoryData.slice(0, 5));
 
       // Aggregate inventory by stock item
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
@@ -16913,16 +16919,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+      
+      console.log("[closing-stock-summary] Inventory by item map size:", inventoryByItem.size);
+      console.log("[closing-stock-summary] Inventory by item entries:", Array.from(inventoryByItem.entries()));
 
       // Build stock groups summary
       const stockGroupSummary = allStockGroups.map((group) => {
         const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
+        console.log(`[closing-stock-summary] Group ${group.id} (${group.name}): ${groupItems.length} items`, groupItems.map(i => ({ id: i.id, name: i.name })));
         
         let closingQuantity = 0;
         let closingValue = 0;
         
         for (const item of groupItems) {
           const invData = inventoryByItem.get(item.id);
+          console.log(`[closing-stock-summary] Item ${item.id} (${item.name}) inventory:`, invData);
           if (invData) {
             closingQuantity += invData.quantity;
             closingValue += invData.totalValue;
@@ -16930,6 +16941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
+        console.log(`[closing-stock-summary] Group ${group.name} totals: qty=${closingQuantity}, value=${closingValue}`);
         
         return {
           id: group.id,
@@ -16943,6 +16955,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itemCount: groupItems.length,
         };
       }).filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
+      
+      console.log("[closing-stock-summary] Final summary (after filter):", stockGroupSummary);
 
       // Calculate grand totals
       const grandTotal = {
