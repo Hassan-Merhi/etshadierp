@@ -2243,7 +2243,8 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.supplierId, supplierId),
-      eq(schema.vouchers.optional, false)
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
     ];
     
     if (companyId) {

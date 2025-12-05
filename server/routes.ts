@@ -8657,11 +8657,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assets = await storage.getAllFixedAssets(companyId);
       const suppliers = await storage.getAllSuppliers();
 
-      // Get all voucher entries for this company's vouchers (excluding optional)
+      // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -8938,11 +8938,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const suppliers = await storage.getAllSuppliers();
       const employeesData = await storage.getAllEmployees(companyId);
 
-      // Get all voucher entries for this company's vouchers (excluding optional)
+      // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
