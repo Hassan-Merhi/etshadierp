@@ -253,6 +253,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
         .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
         .where(and(
           eq(schema.voucherEntries.supplierId, supplier.id),
+          eq(schema.vouchers.optional, false),
           isNull(schema.vouchers.deletedAt)
         ));
 
