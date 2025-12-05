@@ -529,9 +529,13 @@ export async function chat(
   }
 
   try {
+    console.log("[ChatService] Getting ERP context for company:", companyId);
     const context = await getERPContext(companyId);
+    console.log("[ChatService] ERP context retrieved successfully");
+    
     const systemPrompt = buildSystemPrompt(context, userPreferences);
     const suggestions = generateQuickSuggestions(context);
+    console.log("[ChatService] System prompt built, suggestions generated");
 
     const contents = [
       { role: "user", parts: [{ text: systemPrompt }] },
@@ -543,27 +547,33 @@ export async function chat(
       { role: "user", parts: [{ text: userMessage }] }
     ];
 
+    console.log("[ChatService] Calling Gemini API...");
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: contents,
     });
+    console.log("[ChatService] Gemini API response received");
 
     return {
       response: response.text || "I couldn't generate a response. Please try again.",
       suggestions,
     };
   } catch (error: any) {
-    console.error("Chat error:", error);
-    if (error.message?.includes("API_KEY")) {
+    console.error("[ChatService] ERROR:", error.message);
+    console.error("[ChatService] Stack:", error.stack);
+    if (error.message?.includes("API_KEY") || error.message?.includes("API key")) {
       return {
         response: "Invalid API key. Please check your GEMINI_API_KEY configuration.",
         suggestions: [],
       };
     }
-    return {
-      response: `An error occurred: ${error.message || "Unknown error"}`,
-      suggestions: [],
-    };
+    if (error.message?.includes("quota") || error.message?.includes("rate limit")) {
+      return {
+        response: "API quota exceeded. Please try again later or check your Gemini API usage limits.",
+        suggestions: [],
+      };
+    }
+    throw error; // Re-throw to show in route logs
   }
 }
 

@@ -21722,7 +21722,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
       
+      console.log("[Chatbot] Message request - userId:", userId, "companyId:", companyId);
+      
       if (!userId || !companyId) {
+        console.log("[Chatbot] Error: No company selected");
         return res.status(400).json({ message: "No company selected" });
       }
 
@@ -21732,30 +21735,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(users.id, userId));
 
       if (!user?.chatbotEnabled) {
+        console.log("[Chatbot] Error: Chatbot not enabled for user");
         return res.status(403).json({ message: "Chatbot is not enabled for your account" });
       }
 
       const { message, sessionId } = req.body;
       if (!message || !sessionId) {
+        console.log("[Chatbot] Error: Missing message or sessionId");
         return res.status(400).json({ message: "Message and sessionId are required" });
       }
 
+      console.log("[Chatbot] Processing message for session:", sessionId);
+
       // Save user message
       await saveMessage(companyId, userId, "user", message, sessionId);
+      console.log("[Chatbot] User message saved");
 
       // Get conversation history for AI context (excluding current message)
       const history = await getConversationHistoryForAI(sessionId, 10);
+      console.log("[Chatbot] Got history, length:", history.length);
 
       // Get AI response (excluding current message from history context)
+      console.log("[Chatbot] Calling AI...");
       const result = await chat(message, companyId, history.slice(0, -1));
+      console.log("[Chatbot] AI response received");
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
+      console.log("[Chatbot] Assistant message saved");
 
       res.json({ response: result.response, suggestions: result.suggestions });
     } catch (error: any) {
-      console.error("Chat error:", error);
-      res.status(500).json({ message: error.message });
+      console.error("[Chatbot] ERROR:", error.message);
+      console.error("[Chatbot] Stack:", error.stack);
+      res.status(500).json({ message: "Chat error: " + error.message });
     }
   });
 
@@ -21763,7 +21776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/chatbot/history/:sessionId", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId;
+      console.log("[Chatbot] History request - userId:", userId, "sessionId:", req.params.sessionId);
+      
       if (!userId) {
+        console.log("[Chatbot] History error: Not authenticated");
         return res.status(401).json({ message: "Not authenticated" });
       }
 
@@ -21773,14 +21789,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(users.id, userId));
 
       if (!user?.chatbotEnabled) {
+        console.log("[Chatbot] History error: Chatbot not enabled");
         return res.status(403).json({ message: "Chatbot is not enabled for your account" });
       }
 
       const { sessionId } = req.params;
       const history = await getConversationHistory(sessionId, 50);
+      console.log("[Chatbot] History retrieved, count:", history.length);
       res.json(history);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error("[Chatbot] History ERROR:", error.message);
+      console.error("[Chatbot] History Stack:", error.stack);
+      res.status(500).json({ message: "History error: " + error.message });
     }
   });
 
