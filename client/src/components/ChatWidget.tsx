@@ -41,7 +41,7 @@ export function ChatWidget() {
 
   const sendMutation = useMutation({
     mutationFn: async (msg: string) => {
-      const response = await apiRequest("/api/chatbot/message", "POST", {
+      const response = await apiRequest("POST", "/api/chatbot/message", {
         message: msg,
         sessionId,
       });
