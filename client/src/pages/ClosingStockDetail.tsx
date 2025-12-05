@@ -45,24 +45,24 @@ function formatValue(value: number): string {
 
 export default function ClosingStockDetail() {
   const [, navigate] = useLocation();
-  const params = useParams<{ stockGroupId: string }>();
+  const params = useParams<{ groupId: string }>();
   const searchString = useSearch();
   const { selectedCompany } = useCompany();
 
   const groupName = new URLSearchParams(searchString).get("name") || "Stock Group";
-  const stockGroupId = params.stockGroupId;
+  const groupId = params.groupId;
 
   const { data, isLoading } = useQuery<ClosingStockDetailData>({
-    queryKey: ["/api/reports/closing-stock-summary", stockGroupId, "items", selectedCompany?.id],
+    queryKey: ["/api/reports/closing-stock-summary", groupId, "items", selectedCompany?.id],
     queryFn: async () => {
       const response = await fetch(
-        `/api/reports/closing-stock-summary/${stockGroupId}/items`,
+        `/api/reports/closing-stock-summary/${groupId}/items`,
         { credentials: "include" }
       );
       if (!response.ok) throw new Error("Failed to fetch closing stock items");
       return response.json();
     },
-    enabled: !!selectedCompany?.id && !!stockGroupId,
+    enabled: !!selectedCompany?.id && !!groupId,
   });
 
   return (
