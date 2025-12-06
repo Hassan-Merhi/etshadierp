@@ -10527,11 +10527,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ));
 
                   if (sourceInv) {
+                    // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
                     const currentQty = parseFloat(sourceInv.quantity);
-                    const currentValue = parseFloat(sourceInv.totalValue);
+                    const currentRate = parseFloat(sourceInv.averageRate || "0");
                     const newQty = currentQty + quantity;
-                    const newValue = currentValue + totalAmount;
-                    const newRate = newQty > 0 ? newValue / newQty : 0;
+                    const newRate = newQty > 0 
+                      ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                      : 0;
+                    const newValue = newQty * newRate;
 
                     await tx.update(inventory)
                       .set({
@@ -10600,11 +10603,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ));
 
                   if (destInv) {
+                    // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                     const currentQty = parseFloat(destInv.quantity);
-                    const currentValue = parseFloat(destInv.totalValue);
+                    const currentRate = parseFloat(destInv.averageRate || "0");
                     const newQty = currentQty + quantity;
-                    const newValue = currentValue + totalAmount;
-                    const newRate = newQty > 0 ? newValue / newQty : 0;
+                    const newRate = newQty > 0 
+                      ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                      : 0;
+                    const newValue = newQty * newRate;
 
                     await tx.update(inventory)
                       .set({
@@ -10655,8 +10661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 if (currentInv) {
                   const currentQty = parseFloat(currentInv.quantity);
-                  const currentValue = parseFloat(currentInv.totalValue);
-                  const currentRate = parseFloat(currentInv.averageRate);
+                  const currentRate = parseFloat(currentInv.averageRate || "0");
                   
                   let newQty: number;
                   let newValue: number;
@@ -10671,17 +10676,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       newRate = currentRate;
                     } else {
                       // Reverse consumption: add back what was subtracted
+                      // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
                       newQty = currentQty + Math.abs(quantity);
-                      newValue = currentValue + totalAmount;
-                      newRate = newQty > 0 ? newValue / newQty : 0;
+                      newRate = newQty > 0 
+                        ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+                        : 0;
+                      newValue = newQty * newRate;
                     }
                   } else {
                     // Applying the adjustment
                     if (adjustment.adjustmentType === "Production") {
                       // Apply production: add to inventory
+                      // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                       newQty = currentQty + quantity;
-                      newValue = currentValue + totalAmount;
-                      newRate = newQty > 0 ? newValue / newQty : 0;
+                      newRate = newQty > 0 
+                        ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                        : 0;
+                      newValue = newQty * newRate;
                     } else {
                       // Apply consumption: subtract from inventory
                       newQty = currentQty - Math.abs(quantity);
@@ -10889,11 +10900,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ));
 
                   if (sourceInv) {
+                    // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
                     const currentQty = parseFloat(sourceInv.quantity);
-                    const currentValue = parseFloat(sourceInv.totalValue);
+                    const currentRate = parseFloat(sourceInv.averageRate || "0");
                     const newQty = currentQty + quantity;
-                    const newValue = currentValue + totalAmount;
-                    const newRate = newQty > 0 ? newValue / newQty : 0;
+                    const newRate = newQty > 0 
+                      ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                      : 0;
+                    const newValue = newQty * newRate;
 
                     await tx.update(inventory)
                       .set({
@@ -10962,11 +10976,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ));
 
                   if (destInv) {
+                    // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                     const currentQty = parseFloat(destInv.quantity);
-                    const currentValue = parseFloat(destInv.totalValue);
+                    const currentRate = parseFloat(destInv.averageRate || "0");
                     const newQty = currentQty + quantity;
-                    const newValue = currentValue + totalAmount;
-                    const newRate = newQty > 0 ? newValue / newQty : 0;
+                    const newRate = newQty > 0 
+                      ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                      : 0;
+                    const newValue = newQty * newRate;
 
                     await tx.update(inventory)
                       .set({
@@ -11017,8 +11034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 if (currentInv) {
                   const currentQty = parseFloat(currentInv.quantity);
-                  const currentValue = parseFloat(currentInv.totalValue);
-                  const currentRate = parseFloat(currentInv.averageRate);
+                  const currentRate = parseFloat(currentInv.averageRate || "0");
                   
                   let newQty: number;
                   let newValue: number;
@@ -11033,17 +11049,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       newRate = currentRate;
                     } else {
                       // Reverse consumption: add back what was subtracted
+                      // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
                       newQty = currentQty + Math.abs(quantity);
-                      newValue = currentValue + totalAmount;
-                      newRate = newQty > 0 ? newValue / newQty : 0;
+                      newRate = newQty > 0 
+                        ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+                        : 0;
+                      newValue = newQty * newRate;
                     }
                   } else {
                     // Applying the adjustment
                     if (adjustment.adjustmentType === "Production") {
                       // Apply production: add to inventory
+                      // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                       newQty = currentQty + quantity;
-                      newValue = currentValue + totalAmount;
-                      newRate = newQty > 0 ? newValue / newQty : 0;
+                      newRate = newQty > 0 
+                        ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                        : 0;
+                      newValue = newQty * newRate;
                     } else {
                       // Apply consumption: subtract from inventory
                       newQty = currentQty - Math.abs(quantity);

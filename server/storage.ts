@@ -3136,12 +3136,16 @@ export class DbStorage implements IStorage {
 
           if (destInventory) {
             // Increase quantity at destination location using weighted average
+            // Use existingQty * existingRate (not totalValue) to avoid data corruption issues
             const currentQty = parseFloat(destInventory.quantity);
-            const currentValue = parseFloat(destInventory.totalValue);
+            const currentRate = parseFloat(destInventory.averageRate || "0");
             
             const newQty = currentQty + quantity;
-            const newValue = currentValue + totalAmount;
-            const newRate = newQty > 0 ? newValue / newQty : 0;
+            // Weighted average: (existing value + new value) / total quantity
+            const newRate = newQty > 0 
+              ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+              : 0;
+            const newValue = newQty * newRate;
             
             await tx
               .update(schema.inventory)
@@ -3263,9 +3267,12 @@ export class DbStorage implements IStorage {
 
             if (adjustmentType === "Production") {
               // Positive adjustment - add to inventory
+              // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
               newQty = currentQty + quantity;
-              newValue = currentValue + totalAmount;
-              newRate = newQty > 0 ? newValue / newQty : 0;
+              newRate = newQty > 0 
+                ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                : 0;
+              newValue = newQty * newRate;
             } else {
               // Consumption - subtract from inventory (use absolute value to ensure reduction)
               newQty = currentQty - Math.abs(quantity);
@@ -3418,12 +3425,15 @@ export class DbStorage implements IStorage {
 
         if (sourceInventory) {
           // Add back to source (reverse the subtraction)
+          // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
           const currentQty = parseFloat(sourceInventory.quantity);
-          const currentValue = parseFloat(sourceInventory.totalValue);
+          const currentRate = parseFloat(sourceInventory.averageRate || "0");
           
           const newQty = currentQty + quantity;
-          const newValue = currentValue + totalAmount;
-          const newRate = newQty > 0 ? newValue / newQty : 0;
+          const newRate = newQty > 0 
+            ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+            : 0;
+          const newValue = newQty * newRate;
 
           await tx
             .update(schema.inventory)
@@ -3570,12 +3580,16 @@ export class DbStorage implements IStorage {
 
         if (destInventory) {
           // Increase quantity at destination location using weighted average
+          // Use existingQty * existingRate (not totalValue) to avoid data corruption issues
           const currentQty = parseFloat(destInventory.quantity);
-          const currentValue = parseFloat(destInventory.totalValue);
+          const currentRate = parseFloat(destInventory.averageRate || "0");
           
           const newQty = currentQty + quantity;
-          const newValue = currentValue + totalAmount;
-          const newRate = newQty > 0 ? newValue / newQty : 0;
+          // Weighted average: (existing value + new value) / total quantity
+          const newRate = newQty > 0 
+            ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+            : 0;
+          const newValue = newQty * newRate;
           
           await tx
             .update(schema.inventory)
@@ -3689,8 +3703,7 @@ export class DbStorage implements IStorage {
 
         if (currentInventory) {
           const currentQty = parseFloat(currentInventory.quantity);
-          const currentValue = parseFloat(currentInventory.totalValue);
-          const currentRate = parseFloat(currentInventory.averageRate);
+          const currentRate = parseFloat(currentInventory.averageRate || "0");
           
           let newQty: number;
           let newValue: number;
@@ -3703,9 +3716,12 @@ export class DbStorage implements IStorage {
             newRate = currentRate;
           } else {
             // REVERSE Consumption: Add back the quantity that was subtracted
+            // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
             newQty = currentQty + Math.abs(quantity);
-            newValue = currentValue + totalAmount;
-            newRate = newQty > 0 ? newValue / newQty : 0;
+            newRate = newQty > 0 
+              ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+              : 0;
+            newValue = newQty * newRate;
           }
           
           await tx
@@ -3796,8 +3812,7 @@ export class DbStorage implements IStorage {
           if (currentInventory) {
           // Adjust quantity at location
           const currentQty = parseFloat(currentInventory.quantity);
-          const currentValue = parseFloat(currentInventory.totalValue);
-          const currentRate = parseFloat(currentInventory.averageRate);
+          const currentRate = parseFloat(currentInventory.averageRate || "0");
           
           let newQty: number;
           let newValue: number;
@@ -3805,9 +3820,12 @@ export class DbStorage implements IStorage {
 
           if (adjustmentType === "Production") {
             // Positive adjustment - add to inventory
+            // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
             newQty = currentQty + quantity;
-            newValue = currentValue + totalAmount;
-            newRate = newQty > 0 ? newValue / newQty : 0;
+            newRate = newQty > 0 
+              ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+              : 0;
+            newValue = newQty * newRate;
           } else {
             // Consumption - subtract from inventory (use absolute value to ensure reduction)
             newQty = currentQty - Math.abs(quantity);
