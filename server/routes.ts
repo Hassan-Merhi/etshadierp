@@ -15186,7 +15186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get supplier balance minus OTW containers
+  // Get supplier balance minus OTW containers, plus loans, minus cash
   app.get("/api/stats/supplier-balance-otw", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -15235,14 +15235,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + parseFloat(container.grandTotal || "0");
       }, 0);
 
-      // Calculate net: supplier balance - OTW containers
-      // When both are accounted properly, this should be 0
-      const supplierBalanceNet = totalSupplierBalance - totalOtwValue;
+      // Get all loans accounts for this company
+      const loansAccounts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Loans"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      // Calculate total loans balance
+      let totalLoans = 0;
+      for (const account of loansAccounts) {
+        // Get voucher entries for this account
+        const entries = await db
+          .select()
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, account.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt)
+            )
+          );
+
+        const openingBalance = parseFloat(account.openingBalance || "0");
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.voucherEntries.creditAmount || "0");
+          const debit = parseFloat(entry.voucherEntries.debitAmount || "0");
+          
+          if (credit > 0 && debit === 0) {
+            return sum + credit; // Debit to loans (we owe more)
+          } else if (debit > 0 && credit === 0) {
+            return sum - debit; // Credit to loans (we paid)
+          }
+          return sum;
+        }, openingBalance);
+        
+        totalLoans += balance;
+      }
+
+      // Get all cash accounts for this company
+      const cashAccounts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Cash"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      // Calculate total cash balance
+      let totalCash = 0;
+      for (const account of cashAccounts) {
+        // Get voucher entries for this account
+        const entries = await db
+          .select()
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, account.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt)
+            )
+          );
+
+        const openingBalance = parseFloat(account.openingBalance || "0");
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.voucherEntries.creditAmount || "0");
+          const debit = parseFloat(entry.voucherEntries.debitAmount || "0");
+          
+          if (credit > 0 && debit === 0) {
+            return sum - credit; // Credit reduces cash
+          } else if (debit > 0 && credit === 0) {
+            return sum + debit; // Debit increases cash
+          }
+          return sum;
+        }, openingBalance);
+        
+        totalCash += balance;
+      }
+
+      // Calculate net: (Supplier Balance + Loans) - (OTW Value + Cash Account)
+      // When balanced, this should be 0
+      const supplierBalanceNet = (totalSupplierBalance + totalLoans) - (totalOtwValue + totalCash);
 
       res.json({
         supplierBalanceNet,
         totalSupplierBalance,
         totalOtwValue,
+        totalLoans,
+        totalCash,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
