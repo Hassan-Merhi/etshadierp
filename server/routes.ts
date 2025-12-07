@@ -15329,9 +15329,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalCash += balance;
       }
 
-      // Calculate net: (Supplier Balance + Loans) - (OTW Value + Cash Account)
+      // Get all fixed assets accounts for this company
+      const assetsAccounts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Fixed Assets"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      // Calculate total assets balance
+      let totalAssets = 0;
+      for (const account of assetsAccounts) {
+        // Get voucher entries for this account
+        const entries = await db
+          .select({
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, account.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt)
+            )
+          );
+
+        const openingBalance = parseFloat(account.openingBalance || "0");
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
+          
+          if (credit > 0 && debit === 0) {
+            return sum - credit; // Credit reduces assets
+          } else if (debit > 0 && credit === 0) {
+            return sum + debit; // Debit increases assets
+          }
+          return sum;
+        }, openingBalance);
+        
+        totalAssets += balance;
+      }
+
+      // Get all inventory in locations for this company and calculate total value
+      const inventoryItems = await db
+        .select()
+        .from(inventory)
+        .where(eq(inventory.companyId, companyId));
+
+      const totalStockValue = inventoryItems.reduce((sum, item) => {
+        const totalValue = parseFloat(item.totalValue || "0");
+        return sum + totalValue;
+      }, 0);
+
+      // Calculate net: (Supplier Balance + Loans + Assets + Stock Value) - (OTW Value + Cash Account)
       // When balanced, this should be 0
-      const supplierBalanceNet = (totalSupplierBalance + totalLoans) - (totalOtwValue + totalCash);
+      const supplierBalanceNet = (totalSupplierBalance + totalLoans + totalAssets + totalStockValue) - (totalOtwValue + totalCash);
 
       res.json({
         supplierBalanceNet,
@@ -15339,6 +15397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalOtwValue,
         totalLoans,
         totalCash,
+        totalAssets,
+        totalStockValue,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
