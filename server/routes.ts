@@ -15376,6 +15376,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalAssets += balance;
       }
 
+      // Get all bank accounts for this company
+      const bankAccounts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Bank"),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      // Calculate total bank balance
+      let totalBank = 0;
+      for (const account of bankAccounts) {
+        // Get voucher entries for this account
+        const entries = await db
+          .select({
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, account.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt)
+            )
+          );
+
+        const openingBalance = parseFloat(account.openingBalance || "0");
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
+          
+          if (credit > 0 && debit === 0) {
+            return sum - credit; // Credit reduces bank balance
+          } else if (debit > 0 && credit === 0) {
+            return sum + debit; // Debit increases bank balance
+          }
+          return sum;
+        }, openingBalance);
+        
+        totalBank += balance;
+      }
+
       // Get all inventory in locations for this company and calculate total value
       const inventoryItems = await db
         .select()
@@ -15387,18 +15434,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + totalValue;
       }, 0);
 
-      // Calculate net: (Supplier Balance + Loans + Assets + Stock Value) - (OTW Value + Cash Account)
-      // When balanced, this should be 0
-      const supplierBalanceNet = (totalSupplierBalance + totalLoans + totalAssets + totalStockValue) - (totalOtwValue + totalCash);
+      // Calculate net: Add all account balances and stock value together
+      // Supplier Balance, Loans, Cash, Assets, Bank, Stock Value, and OTW all get added
+      // Accounts already have correct positive/negative signs
+      const supplierBalanceNet = totalSupplierBalance + totalLoans + totalCash + totalAssets + totalBank + totalStockValue + totalOtwValue;
 
       res.json({
         supplierBalanceNet,
         totalSupplierBalance,
-        totalOtwValue,
         totalLoans,
         totalCash,
         totalAssets,
+        totalBank,
         totalStockValue,
+        totalOtwValue,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
