@@ -5341,39 +5341,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.session.currentCompanyId!,
         );
 
+        // Helper function to find column value with flexible naming
+        const getColumnValue = (row: any, ...possibleNames: string[]): string | undefined => {
+          for (const name of possibleNames) {
+            if (row[name] !== undefined && row[name] !== null && row[name] !== "") {
+              return row[name];
+            }
+          }
+          return undefined;
+        };
+
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           const rowNum = i + 2;
 
           // Check if it's a charge row or item row
-          if (row.Charge_Type && row.Charge_Amount) {
+          const chargeType = getColumnValue(row, "Charge_Type", "Charge Type");
+          const chargeAmount = getColumnValue(row, "Charge_Amount", "Charge Amount");
+          if (chargeType && chargeAmount) {
             chargeRows.push({
               rowNum,
-              chargeType: row.Charge_Type,
-              amount: parseFloat(row.Charge_Amount),
-              containerNumber: row.Container_Number,
+              chargeType,
+              amount: parseFloat(chargeAmount),
+              containerNumber: getColumnValue(row, "Container_Number", "Container Number") || "",
             });
-          } else if (row.Item_Barcode || row.Item_Name) {
+          } else if (getColumnValue(row, "Item_Barcode", "Item Barcode") || getColumnValue(row, "Item_Name", "Item Name")) {
             let stockItem = null;
-            let itemName = row.Item_Name;
+            const itemBarcode = getColumnValue(row, "Item_Barcode", "Item Barcode");
+            const itemNameValue = getColumnValue(row, "Item_Name", "Item Name");
+            let itemName = itemNameValue || "";
 
             // Try to find stock item by code/alias or name (for preview purposes only - validation happens in validate step)
-            if (row.Item_Barcode) {
+            if (itemBarcode) {
               stockItem = await storage.getStockItemByCodeOrAlias(
-                row.Item_Barcode,
+                itemBarcode,
                 req.session.currentCompanyId!,
               );
               if (stockItem) {
                 itemName = stockItem.name;
               }
-            } else if (row.Item_Name) {
+            } else if (itemNameValue) {
               stockItem = allStockItems.find(
-                (item) => item.name === row.Item_Name,
+                (item) => item.name === itemNameValue,
               );
             }
 
-            const quantity = parseFloat(row.Quantity);
-            const rate = parseFloat(row.Rate);
+            const quantity = parseFloat(getColumnValue(row, "Quantity") || "0");
+            const rate = parseFloat(getColumnValue(row, "Rate") || "0");
 
             if (!quantity || quantity <= 0) {
               errors.push(`Row ${rowNum}: Quantity must be greater than 0`);
@@ -5387,21 +5401,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             itemRows.push({
               rowNum,
-              poNumber: row.PO_Number,
-              containerNumber: row.Container_Number,
-              supplierCode: row.Supplier_Code,
-              barcode: row.Item_Barcode || null,
+              poNumber: getColumnValue(row, "PO_Number", "PO Number") || "",
+              containerNumber: getColumnValue(row, "Container_Number", "Container Number") || "",
+              supplierCode: getColumnValue(row, "Supplier_Code", "Supplier Code") || "",
+              barcode: itemBarcode || null,
               stockItemId: stockItem?.id || null,
               itemName: itemName,
               quantity: quantity,
               rate: rate,
               lineTotal: quantity * rate,
-              currency: row.Currency || "USD",
-              freight: parseFloat(row.Freight || 0),
-              surcharge: parseFloat(row.Surcharge || 0),
-              fumigation: parseFloat(row.Fumigation || 0),
-              discount: parseFloat(row.Discount || 0),
-              documentCharges: parseFloat(row.Document_Charges || 0),
+              currency: getColumnValue(row, "Currency") || "USD",
+              freight: parseFloat(getColumnValue(row, "Freight") || "0"),
+              surcharge: parseFloat(getColumnValue(row, "Surcharge") || "0"),
+              fumigation: parseFloat(getColumnValue(row, "Fumigation") || "0"),
+              discount: parseFloat(getColumnValue(row, "Discount") || "0"),
+              documentCharges: parseFloat(getColumnValue(row, "Document_Charges", "Document Charges") || "0"),
             });
           }
         }
