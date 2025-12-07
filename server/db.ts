@@ -2,21 +2,17 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
 
-// In development, prioritize Replit's built-in database
-// In production, use DATABASE_URL (for Render/Neon)
+// Always use PGHOST variables (freshly created Replit database)
+// PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE are created by Replit's database provisioning
 let connectionString: string;
 
-if (process.env.NODE_ENV === "development" && process.env.PGHOST) {
-  // Use Replit's database in development (SSL enabled by default for Neon)
+if (process.env.PGHOST && process.env.PGPORT && process.env.PGUSER && process.env.PGPASSWORD && process.env.PGDATABASE) {
+  // Use Replit's database via individual connection variables
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
   connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
-  console.log('Using Replit database for development');
-} else if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL for production (Render)
-  connectionString = process.env.DATABASE_URL;
-  console.log('Using DATABASE_URL for production');
+  console.log('✓ Using Replit PostgreSQL database');
 } else {
-  throw new Error("No database configuration found. Did you forget to provision a database?");
+  throw new Error("No database configuration found. Please provision a PostgreSQL database for your Replit project.");
 }
 
 console.log('Database connection endpoint:', connectionString.replace(/:[^:@]*@/, ':***@'));
