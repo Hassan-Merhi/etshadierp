@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown } from "lucide-react";
+import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -28,6 +28,12 @@ type ProfitData = {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
+};
+
+type SupplierBalanceData = {
+  supplierBalanceNet: number;
+  totalSupplierBalance: number;
+  totalOtwValue: number;
 };
 
 type MonthlyData = {
@@ -84,6 +90,17 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/stats/net-profit", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch net profit");
+      return await response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch supplier balance OTW data
+  const { data: supplierBalanceData } = useQuery<SupplierBalanceData>({
+    queryKey: ["/api/stats/supplier-balance-otw", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/stats/supplier-balance-otw", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch supplier balance");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -276,7 +293,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPICard
           title="Total Income"
           value={isLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
@@ -292,6 +309,14 @@ export default function Dashboard() {
           changeType={(profitData?.netProfit ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
           data-testid="kpi-net-profit"
+        />
+        <KPICard
+          title="Supplier Balance Net"
+          value={!supplierBalanceData ? "Loading..." : formatCurrency(supplierBalanceData.supplierBalanceNet)}
+          change="Balance minus OTW containers"
+          changeType={(supplierBalanceData?.supplierBalanceNet ?? 0) >= 0 ? "positive" : "negative"}
+          icon={Truck}
+          data-testid="kpi-supplier-balance-net"
         />
       </div>
 

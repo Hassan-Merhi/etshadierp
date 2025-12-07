@@ -15172,6 +15172,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get supplier balance minus OTW containers
+  app.get("/api/stats/supplier-balance-otw", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all suppliers (not filtered by company as suppliers table doesn't have companyId)
+      const allSuppliers = await db.select().from(suppliers);
+
+      // Sum of all supplier opening balances
+      const totalSupplierBalance = allSuppliers.reduce((sum, supplier) => {
+        return sum + parseFloat(supplier.openingBalance || "0");
+      }, 0);
+
+      // Get all containers with status "OTW" for this company
+      const otwContainers = await db
+        .select()
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+
+      // Sum of all OTW container grand totals
+      const totalOtwValue = otwContainers.reduce((sum, container) => {
+        return sum + parseFloat(container.grandTotal || "0");
+      }, 0);
+
+      // Calculate net: supplier balance - OTW containers
+      const supplierBalanceNet = totalSupplierBalance - totalOtwValue;
+
+      res.json({
+        supplierBalanceNet,
+        totalSupplierBalance,
+        totalOtwValue,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Sales Report - gain/loss from POS transactions
   app.get("/api/sales-report", requireAuth, async (req, res) => {
     try {
