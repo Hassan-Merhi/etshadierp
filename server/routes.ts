@@ -18070,14 +18070,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .execute();
           
           entries.forEach((entry: any) => {
-            const amount = parseFloat(String(entry.voucher_entries.amount || 0));
-            const side = entry.voucher_entries.side;
+            const debit = parseFloat(String(entry.voucher_entries.debit_amount || 0));
+            const credit = parseFloat(String(entry.voucher_entries.credit_amount || 0));
             
-            if (side === "Dr") {
-              balance -= amount;
-            } else if (side === "Cr") {
-              balance += amount;
-            }
+            // For liability accounts: debit decreases, credit increases
+            balance -= debit;
+            balance += credit;
           });
           
           return {
