@@ -316,6 +316,7 @@ export default function Dashboard() {
           change="Balance minus OTW containers"
           changeType={(supplierBalanceData?.supplierBalanceNet ?? 0) >= 0 ? "positive" : "negative"}
           icon={Truck}
+          
           data-testid="kpi-supplier-balance-net"
         />
       </div>
