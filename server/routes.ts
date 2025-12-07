@@ -15195,12 +15195,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all suppliers (not filtered by company as suppliers table doesn't have companyId)
-      const allSuppliers = await db.select().from(suppliers);
+      const allSuppliers = await storage.getAllSuppliers();
 
-      // Sum of all supplier opening balances
-      const totalSupplierBalance = allSuppliers.reduce((sum, supplier) => {
-        return sum + parseFloat(supplier.openingBalance || "0");
-      }, 0);
+      // Calculate total supplier balance from voucher entries (same logic as /api/suppliers/stats)
+      let totalSupplierBalance = 0;
+      for (const supplier of allSuppliers) {
+        const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
+        const openingBalance = parseFloat(supplier.openingBalance || "0");
+        
+        const balance = entries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
+          
+          // Only count pure credit or pure debit entries
+          if (credit > 0 && debit === 0) {
+            return sum + credit; // Increase payable
+          } else if (debit > 0 && credit === 0) {
+            return sum - debit; // Decrease payable
+          }
+          return sum;
+        }, openingBalance);
+        
+        totalSupplierBalance += balance;
+      }
 
       // Get all containers with status "OTW" for this company
       const otwContainers = await db
@@ -15219,6 +15236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, 0);
 
       // Calculate net: supplier balance - OTW containers
+      // When both are accounted properly, this should be 0
       const supplierBalanceNet = totalSupplierBalance - totalOtwValue;
 
       res.json({
