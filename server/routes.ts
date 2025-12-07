@@ -15252,7 +15252,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const account of loansAccounts) {
         // Get voucher entries for this account
         const entries = await db
-          .select()
+          .select({
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
@@ -15265,8 +15268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const openingBalance = parseFloat(account.openingBalance || "0");
         const balance = entries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.voucherEntries.creditAmount || "0");
-          const debit = parseFloat(entry.voucherEntries.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
           
           if (credit > 0 && debit === 0) {
             return sum + credit; // Debit to loans (we owe more)
@@ -15296,7 +15299,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const account of cashAccounts) {
         // Get voucher entries for this account
         const entries = await db
-          .select()
+          .select({
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
@@ -15309,8 +15315,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const openingBalance = parseFloat(account.openingBalance || "0");
         const balance = entries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.voucherEntries.creditAmount || "0");
-          const debit = parseFloat(entry.voucherEntries.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
           
           if (credit > 0 && debit === 0) {
             return sum - credit; // Credit reduces cash
