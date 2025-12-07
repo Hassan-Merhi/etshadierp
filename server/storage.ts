@@ -4027,7 +4027,7 @@ export class DbStorage implements IStorage {
         amount: sql<string>`(${schema.stockTransferItems.quantity}::numeric * ${schema.stockTransferItems.rate}::numeric)::text`,
       })
       .from(schema.stockTransferItems)
-      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.stockTransferVoucherId, schema.stockTransferVouchers.id))
+      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.transferId, schema.stockTransferVouchers.id))
       .innerJoin(schema.vouchers, eq(schema.stockTransferVouchers.voucherId, schema.vouchers.id))
       .leftJoin(schema.locations, eq(schema.stockTransferItems.sourceLocationId, schema.locations.id))
       .where(and(
@@ -4052,7 +4052,7 @@ export class DbStorage implements IStorage {
         amount: sql<string>`(${schema.stockTransferItems.quantity}::numeric * ${schema.stockTransferItems.rate}::numeric)::text`,
       })
       .from(schema.stockTransferItems)
-      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.stockTransferVoucherId, schema.stockTransferVouchers.id))
+      .innerJoin(schema.stockTransferVouchers, eq(schema.stockTransferItems.transferId, schema.stockTransferVouchers.id))
       .innerJoin(schema.vouchers, eq(schema.stockTransferVouchers.voucherId, schema.vouchers.id))
       .leftJoin(schema.locations, eq(schema.stockTransferVouchers.destinationLocationId, schema.locations.id))
       .where(and(
@@ -4077,7 +4077,7 @@ export class DbStorage implements IStorage {
         amount: sql<string>`(${schema.stockAdjustmentItems.quantity}::numeric * ${schema.stockAdjustmentItems.rate}::numeric)::text`,
       })
       .from(schema.stockAdjustmentItems)
-      .innerJoin(schema.stockAdjustmentVouchers, eq(schema.stockAdjustmentItems.stockAdjustmentVoucherId, schema.stockAdjustmentVouchers.id))
+      .innerJoin(schema.stockAdjustmentVouchers, eq(schema.stockAdjustmentItems.adjustmentId, schema.stockAdjustmentVouchers.id))
       .innerJoin(schema.vouchers, eq(schema.stockAdjustmentVouchers.voucherId, schema.vouchers.id))
       .leftJoin(schema.locations, eq(schema.stockAdjustmentVouchers.locationId, schema.locations.id))
       .where(and(
@@ -4515,7 +4515,7 @@ export class DbStorage implements IStorage {
   async updateBaleTransferItem(id: number, updates: Partial<schema.InsertBaleTransferItem>): Promise<schema.BaleTransferItem> {
     const [updated] = await db
       .update(schema.baleTransferItems)
-      .set({ ...updates, updatedAt: sql`now()` })
+      .set(updates)
       .where(eq(schema.baleTransferItems.id, id))
       .returning();
     return updated;
