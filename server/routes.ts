@@ -15306,7 +15306,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 9. Indirect Expense accounts (expense)
       const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
 
-      // 10. Stock Value on Floor (inventory in locations)
+      // 10. Income accounts (revenue - offsets cash from sales)
+      const incomeBalance = await getAccountTypeBalance("Income", true);
+
+      // 11. Stock Value on Floor (inventory in locations)
       const inventoryItems = await db
         .select()
         .from(inventory)
@@ -15319,7 +15322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor
-      // Liabilities/Expenses: Supplier Balance + Duty Agent + Transporter Agent + Loans + Expenses
+      // Liabilities/Expenses/Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Expenses + Income
       // Net = Assets - Liabilities (should be 0 when balanced)
       const netImportCycleBalance = 
         (stockOtwValue +            // Asset (debit)
@@ -15331,7 +15334,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transporterAgentBalance +   // Liability (what we owe)
         loansBalance +              // Liability (what we owe)
         directExpenseBalance +      // Expense (costs incurred)
-        indirectExpenseBalance);    // Expense (costs incurred)
+        indirectExpenseBalance +    // Expense (costs incurred)
+        incomeBalance);             // Income (sales revenue)
 
       res.json({
         netImportCycleBalance,
@@ -15345,6 +15349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bankBalance,
           directExpenseBalance,
           indirectExpenseBalance,
+          incomeBalance,
           stockOnFloorValue,
         }
       });
