@@ -15245,8 +15245,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return totalBalance;
       };
 
-      // 1. Supplier Balance (Accounts Payable - liability, shows as negative/credit)
-      const supplierBalance = await getAccountTypeBalance("Accounts Payable", true);
+      // 1. Supplier Balance - calculate from voucher entries only (company-scoped)
+      // Suppliers are global but we only count transactions for the current company
+      // Credits to suppliers increase what we owe (liability), debits decrease it
+      const supplierEntries = await db
+        .select({
+          creditAmount: voucherEntries.creditAmount,
+          debitAmount: voucherEntries.debitAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            isNotNull(voucherEntries.supplierId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
+      
+      // Supplier is a liability: Credits increase (we owe more), Debits decrease (we paid)
+      const supplierBalance = supplierEntries.reduce((sum, entry) => {
+        const credit = parseFloat(entry.creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        return sum + credit - debit;
+      }, 0);
 
       // 2. Stock OTW (containers with OTW status - asset, shows as positive/debit)
       const otwContainers = await db
