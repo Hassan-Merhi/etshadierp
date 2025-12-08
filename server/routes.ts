@@ -15320,22 +15320,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + totalValue;
       }, 0);
 
+      // 12. Cost of Goods Sold (calculated from salesItems for non-optional, non-deleted sales vouchers)
+      // This represents inventory that was sold and is now an expense
+      const cogsData = await db
+        .select({
+          totalCost: salesItems.totalCost,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
+
+      const cogsBalance = cogsData.reduce((sum, item) => {
+        return sum + parseFloat(item.totalCost || "0");
+      }, 0);
+
       // Calculate the net balance:
-      // Assets: Stock OTW + Cash + Bank + Stock on Floor
-      // Liabilities/Expenses/Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Expenses + Income
-      // Net = Assets - Liabilities (should be 0 when balanced)
+      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Direct Expenses + Indirect Expenses + COGS
+      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Income
+      // Net = (Assets + Expenses) - (Liabilities + Income) (should be 0 when balanced)
+      // Note: Expenses are debits (like assets), so they go on the same side
+      // Note: COGS is calculated from salesItems table (not ledger) to match periodic inventory system
       const netImportCycleBalance = 
         (stockOtwValue +            // Asset (debit)
         cashBalance +               // Asset (debit)
         bankBalance +               // Asset (debit)
-        stockOnFloorValue) -        // Inventory value
+        stockOnFloorValue +         // Inventory value (asset)
+        directExpenseBalance +      // Expense (debit)
+        indirectExpenseBalance +    // Expense (debit)
+        cogsBalance) -              // COGS expense (debit) - balances inventory reduction
         (supplierBalance +          // Liability (what we owe)
         dutyAgentBalance +          // Liability (what we owe)
         transporterAgentBalance +   // Liability (what we owe)
         loansBalance +              // Liability (what we owe)
-        directExpenseBalance +      // Expense (costs incurred)
-        indirectExpenseBalance +    // Expense (costs incurred)
-        incomeBalance);             // Income (sales revenue)
+        incomeBalance);             // Income (sales revenue - credit)
 
       res.json({
         netImportCycleBalance,
@@ -15351,6 +15374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           indirectExpenseBalance,
           incomeBalance,
           stockOnFloorValue,
+          cogsBalance,
         }
       });
     } catch (error: any) {
