@@ -15186,6 +15186,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Cycle Balance - tracks the full import/offload cycle to ensure it balances to zero
+  // Formula: Supplier Balance (credit/liability) + Stock OTW (debit/asset) + Loan accounts + Expense charges - Stock Value on Floor
+  app.get("/api/stats/import-cycle-balance", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Helper function to calculate account balance by account type
+      const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
+        const accounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.accountType, accountType),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
+
+        let totalBalance = 0;
+        for (const account of accounts) {
+          const entries = await db
+            .select({
+              creditAmount: voucherEntries.creditAmount,
+              debitAmount: voucherEntries.debitAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(
+              and(
+                eq(voucherEntries.ledgerAccountId, account.id),
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false)
+              )
+            );
+
+          const openingBalance = parseFloat(account.openingBalance || "0");
+          const balance = entries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            
+            if (isLiability) {
+              // Liability accounts: Credits increase (positive), Debits decrease (negative)
+              return sum + credit - debit;
+            } else {
+              // Asset/Expense accounts: Debits increase (positive), Credits decrease (negative)
+              return sum + debit - credit;
+            }
+          }, openingBalance);
+          
+          totalBalance += balance;
+        }
+        return totalBalance;
+      };
+
+      // 1. Supplier Balance (Accounts Payable - liability, shows as negative/credit)
+      const supplierBalance = await getAccountTypeBalance("Accounts Payable", true);
+
+      // 2. Stock OTW (containers with OTW status - asset, shows as positive/debit)
+      const otwContainers = await db
+        .select()
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+      const stockOtwValue = otwContainers.reduce((sum, container) => {
+        return sum + parseFloat(container.grandTotal || "0");
+      }, 0);
+
+      // 3. Duty Agent Loan accounts (liability)
+      const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
+
+      // 4. Transporter Agent Loan accounts (liability)
+      const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
+
+      // 5. Loans accounts (liability)
+      const loansBalance = await getAccountTypeBalance("Loans", true);
+
+      // 6. Cash accounts (asset)
+      const cashBalance = await getAccountTypeBalance("Cash", false);
+
+      // 7. Bank accounts (asset)
+      const bankBalance = await getAccountTypeBalance("Bank", false);
+
+      // 8. Direct Expense accounts (expense - for duty/transport charges)
+      const directExpenseBalance = await getAccountTypeBalance("Direct Expense", false);
+
+      // 9. Indirect Expense accounts (expense)
+      const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
+
+      // 10. Stock Value on Floor (inventory in locations)
+      const inventoryItems = await db
+        .select()
+        .from(inventory)
+        .where(eq(inventory.companyId, companyId));
+
+      const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
+        const totalValue = parseFloat(item.totalValue || "0");
+        return sum + totalValue;
+      }, 0);
+
+      // Calculate the net balance:
+      // Liabilities (negative in double-entry): Supplier Balance + Duty Agent + Transporter Agent + Loans
+      // Assets/Stock (positive in double-entry): Stock OTW + Cash + Bank + Expenses + Stock on Floor
+      // Net should be 0 when balanced
+      const netImportCycleBalance = 
+        supplierBalance +           // Liability (credit = positive here)
+        stockOtwValue +             // Asset (debit)
+        dutyAgentBalance +          // Liability (credit = positive here)
+        transporterAgentBalance +   // Liability (credit = positive here)
+        loansBalance +              // Liability (credit = positive here)
+        cashBalance +               // Asset (debit)
+        bankBalance +               // Asset (debit)
+        directExpenseBalance +      // Expense (debit)
+        indirectExpenseBalance -    // Expense (debit)
+        stockOnFloorValue;          // Stock absorbs all costs when offloaded
+
+      res.json({
+        netImportCycleBalance,
+        components: {
+          supplierBalance,
+          stockOtwValue,
+          dutyAgentBalance,
+          transporterAgentBalance,
+          loansBalance,
+          cashBalance,
+          bankBalance,
+          directExpenseBalance,
+          indirectExpenseBalance,
+          stockOnFloorValue,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Sales Report - gain/loss from POS transactions
   app.get("/api/sales-report", requireAuth, async (req, res) => {
     try {

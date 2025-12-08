@@ -30,10 +30,20 @@ type ProfitData = {
   netProfit: number;
 };
 
-type SupplierBalanceData = {
-  supplierBalanceNet: number;
-  totalSupplierBalance: number;
-  totalOtwValue: number;
+type ImportCycleBalanceData = {
+  netImportCycleBalance: number;
+  components: {
+    supplierBalance: number;
+    stockOtwValue: number;
+    dutyAgentBalance: number;
+    transporterAgentBalance: number;
+    loansBalance: number;
+    cashBalance: number;
+    bankBalance: number;
+    directExpenseBalance: number;
+    indirectExpenseBalance: number;
+    stockOnFloorValue: number;
+  };
 };
 
 type MonthlyData = {
@@ -95,12 +105,12 @@ export default function Dashboard() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch supplier balance OTW data
-  const { data: supplierBalanceData } = useQuery<SupplierBalanceData>({
-    queryKey: ["/api/stats/supplier-balance-otw", selectedCompany?.id],
+  // Fetch import cycle balance data
+  const { data: importCycleData } = useQuery<ImportCycleBalanceData>({
+    queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/stats/supplier-balance-otw", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch supplier balance");
+      const response = await fetch("/api/stats/import-cycle-balance", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch import cycle balance");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -311,13 +321,13 @@ export default function Dashboard() {
           data-testid="kpi-net-profit"
         />
         <KPICard
-          title="Supplier Balance Net"
-          value={!supplierBalanceData ? "Loading..." : formatCurrency(supplierBalanceData.supplierBalanceNet)}
-          change="Balance minus OTW containers"
-          changeType={(supplierBalanceData?.supplierBalanceNet ?? 0) >= 0 ? "positive" : "negative"}
+          title="Import Cycle Balance"
+          value={!importCycleData ? "Loading..." : formatCurrency(importCycleData.netImportCycleBalance)}
+          change="Should be $0 when balanced"
+          changeType={Math.abs(importCycleData?.netImportCycleBalance ?? 0) < 0.01 ? "positive" : "negative"}
           icon={Truck}
           
-          data-testid="kpi-supplier-balance-net"
+          data-testid="kpi-import-cycle-balance"
         />
       </div>
 
