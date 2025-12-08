@@ -15295,20 +15295,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, 0);
 
       // Calculate the net balance:
-      // Liabilities (negative in double-entry): Supplier Balance + Duty Agent + Transporter Agent + Loans
-      // Assets/Stock (positive in double-entry): Stock OTW + Cash + Bank + Expenses + Stock on Floor
-      // Net should be 0 when balanced
+      // Assets: Stock OTW + Cash + Bank + Stock on Floor
+      // Liabilities/Expenses: Supplier Balance + Duty Agent + Transporter Agent + Loans + Expenses
+      // Net = Assets - Liabilities (should be 0 when balanced)
       const netImportCycleBalance = 
-        supplierBalance +           // Liability (credit = positive here)
-        stockOtwValue +             // Asset (debit)
-        dutyAgentBalance +          // Liability (credit = positive here)
-        transporterAgentBalance +   // Liability (credit = positive here)
-        loansBalance +              // Liability (credit = positive here)
+        (stockOtwValue +            // Asset (debit)
         cashBalance +               // Asset (debit)
         bankBalance +               // Asset (debit)
-        directExpenseBalance +      // Expense (debit)
-        indirectExpenseBalance -    // Expense (debit)
-        stockOnFloorValue;          // Stock absorbs all costs when offloaded
+        stockOnFloorValue) -        // Inventory value
+        (supplierBalance +          // Liability (what we owe)
+        dutyAgentBalance +          // Liability (what we owe)
+        transporterAgentBalance +   // Liability (what we owe)
+        loansBalance +              // Liability (what we owe)
+        directExpenseBalance +      // Expense (costs incurred)
+        indirectExpenseBalance);    // Expense (costs incurred)
 
       res.json({
         netImportCycleBalance,
