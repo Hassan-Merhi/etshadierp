@@ -1,10 +1,21 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Factory, Package, Boxes, Layers, Tags } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Bales from "./Bales";
-import MixBatches from "./MixBatches";
-import ProductionBales from "./ProductionBales";
-import BaleProducts from "./BaleProducts";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const Bales = lazy(() => import("./Bales"));
+const MixBatches = lazy(() => import("./MixBatches"));
+const ProductionBales = lazy(() => import("./ProductionBales"));
+const BaleProducts = lazy(() => import("./BaleProducts"));
+
+function LoadingFallback() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
+}
 
 export default function FactoryProduction() {
   const [activeTab, setActiveTab] = useState("bales");
@@ -42,19 +53,27 @@ export default function FactoryProduction() {
         </TabsList>
 
         <TabsContent value="bales" className="mt-4">
-          <Bales />
+          <Suspense fallback={<LoadingFallback />}>
+            <Bales />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="mix-batches" className="mt-4">
-          <MixBatches />
+          <Suspense fallback={<LoadingFallback />}>
+            <MixBatches />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="production-bales" className="mt-4">
-          <ProductionBales />
+          <Suspense fallback={<LoadingFallback />}>
+            <ProductionBales />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="bale-products" className="mt-4">
-          <BaleProducts />
+          <Suspense fallback={<LoadingFallback />}>
+            <BaleProducts />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
