@@ -8177,12 +8177,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Update PO with new items total and charges
           const freight = parseFloat(req.body.freight || existingPO.freight || "0");
+          const surcharge = parseFloat(req.body.surcharge || existingPO.surcharge || "0");
+          const fumigation = parseFloat(req.body.fumigation || existingPO.fumigation || "0");
+          const documentCharges = parseFloat(req.body.documentCharges || existingPO.documentCharges || "0");
+          const discount = parseFloat(req.body.discount || existingPO.discount || "0");
           const otherCharges = parseFloat(req.body.otherCharges || existingPO.otherCharges || "0");
           
           await tx.update(purchaseOrders)
             .set({ 
               itemsTotal: itemsTotal.toFixed(2),
               freight: freight.toFixed(2),
+              surcharge: surcharge.toFixed(2),
+              fumigation: fumigation.toFixed(2),
+              documentCharges: documentCharges.toFixed(2),
+              discount: discount.toFixed(2),
               otherCharges: otherCharges.toFixed(2),
               poNumber: req.body.poNumber || existingPO.poNumber,
               currency: req.body.currency || existingPO.currency,
@@ -8197,24 +8205,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
             const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
             let totalItemsCost = 0;
-            let totalFreight = 0;
-            let totalOtherCharges = 0;
+            let totalCharges = 0;
             
             for (const po of containerPOs) {
               if (po.id === id) {
                 // Use the new values for this PO
                 totalItemsCost += itemsTotal;
-                totalFreight += freight;
-                totalOtherCharges += otherCharges;
+                totalCharges += freight + surcharge + fumigation + documentCharges - discount + otherCharges;
               } else {
                 totalItemsCost += parseFloat(po.itemsTotal || "0");
-                totalFreight += parseFloat(po.freight || "0");
-                totalOtherCharges += parseFloat(po.otherCharges || "0");
+                totalCharges += parseFloat(po.freight || "0") + parseFloat(po.surcharge || "0") + parseFloat(po.fumigation || "0") + parseFloat(po.documentCharges || "0") - parseFloat(po.discount || "0") + parseFloat(po.otherCharges || "0");
               }
             }
             
-            // Update container totals (chargesTotal = sum of PO freight + otherCharges)
-            const chargesTotal = totalFreight + totalOtherCharges;
+            // Update container totals
+            const chargesTotal = totalCharges;
             await tx.update(containers)
               .set({
                 itemsTotal: totalItemsCost.toFixed(2),
@@ -8224,9 +8229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(containers.id, existingPO.containerId));
           }
           
-          // Update the associated voucher with new total (items + freight + otherCharges)
+          // Update the associated voucher with new total (items + all charges)
           if (existingPO.voucherId) {
-            const poGrandTotal = itemsTotal + freight + otherCharges;
+            const poGrandTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
             
             // Update voucher total amount
             await tx.update(vouchers)
@@ -8282,19 +8287,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowedUpdates.status = req.body.status;
       if (req.body.freight !== undefined)
         allowedUpdates.freight = req.body.freight;
+      if (req.body.surcharge !== undefined)
+        allowedUpdates.surcharge = req.body.surcharge;
+      if (req.body.fumigation !== undefined)
+        allowedUpdates.fumigation = req.body.fumigation;
+      if (req.body.documentCharges !== undefined)
+        allowedUpdates.documentCharges = req.body.documentCharges;
+      if (req.body.discount !== undefined)
+        allowedUpdates.discount = req.body.discount;
       if (req.body.otherCharges !== undefined)
         allowedUpdates.otherCharges = req.body.otherCharges;
 
-      // Check if freight or otherCharges changed - need to update voucher entries
+      // Check if any charges changed - need to update voucher entries
       const newFreight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
+      const newSurcharge = parseFloat(req.body.surcharge ?? existingPO.surcharge ?? "0");
+      const newFumigation = parseFloat(req.body.fumigation ?? existingPO.fumigation ?? "0");
+      const newDocumentCharges = parseFloat(req.body.documentCharges ?? existingPO.documentCharges ?? "0");
+      const newDiscount = parseFloat(req.body.discount ?? existingPO.discount ?? "0");
       const newOtherCharges = parseFloat(req.body.otherCharges ?? existingPO.otherCharges ?? "0");
       const newItemsTotal = parseFloat(req.body.itemsTotal ?? existingPO.itemsTotal ?? "0");
       const oldFreight = parseFloat(existingPO.freight || "0");
+      const oldSurcharge = parseFloat(existingPO.surcharge || "0");
+      const oldFumigation = parseFloat(existingPO.fumigation || "0");
+      const oldDocumentCharges = parseFloat(existingPO.documentCharges || "0");
+      const oldDiscount = parseFloat(existingPO.discount || "0");
       const oldOtherCharges = parseFloat(existingPO.otherCharges || "0");
       const oldItemsTotal = parseFloat(existingPO.itemsTotal || "0");
       
-      const newGrandTotal = newItemsTotal + newFreight + newOtherCharges;
-      const oldGrandTotal = oldItemsTotal + oldFreight + oldOtherCharges;
+      const newGrandTotal = newItemsTotal + newFreight + newSurcharge + newFumigation + newDocumentCharges - newDiscount + newOtherCharges;
+      const oldGrandTotal = oldItemsTotal + oldFreight + oldSurcharge + oldFumigation + oldDocumentCharges - oldDiscount + oldOtherCharges;
       
       // Update PO
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
@@ -8334,24 +8355,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
             const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
             let totalItemsCost = 0;
-            let totalFreight = 0;
-            let totalOtherCharges = 0;
+            let totalCharges = 0;
             
             for (const po of containerPOs) {
               if (po.id === id) {
                 // Use the new values for this PO
                 totalItemsCost += newItemsTotal;
-                totalFreight += newFreight;
-                totalOtherCharges += newOtherCharges;
+                totalCharges += newFreight + newSurcharge + newFumigation + newDocumentCharges - newDiscount + newOtherCharges;
               } else {
                 totalItemsCost += parseFloat(po.itemsTotal || "0");
-                totalFreight += parseFloat(po.freight || "0");
-                totalOtherCharges += parseFloat(po.otherCharges || "0");
+                totalCharges += parseFloat(po.freight || "0") + parseFloat(po.surcharge || "0") + parseFloat(po.fumigation || "0") + parseFloat(po.documentCharges || "0") - parseFloat(po.discount || "0") + parseFloat(po.otherCharges || "0");
               }
             }
             
             // Update container totals
-            const chargesTotal = totalFreight + totalOtherCharges;
+            const chargesTotal = totalCharges;
             await tx.update(containers)
               .set({
                 itemsTotal: totalItemsCost.toFixed(2),

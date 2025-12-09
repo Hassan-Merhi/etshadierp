@@ -407,7 +407,7 @@ export default function PurchaseOrderEdit() {
 
           <div className="space-y-4">
             <Label>Freight & Other Charges</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="freight">Freight</Label>
                 <Input
@@ -418,6 +418,54 @@ export default function PurchaseOrderEdit() {
                   onChange={(e) => setFreight(e.target.value)}
                   className="text-right"
                   data-testid="input-freight"
+                />
+              </div>
+              <div>
+                <Label htmlFor="surcharge">Surcharge</Label>
+                <Input
+                  id="surcharge"
+                  type="number"
+                  step="0.01"
+                  value={surcharge}
+                  onChange={(e) => setSurcharge(e.target.value)}
+                  className="text-right"
+                  data-testid="input-surcharge"
+                />
+              </div>
+              <div>
+                <Label htmlFor="fumigation">Fumigation</Label>
+                <Input
+                  id="fumigation"
+                  type="number"
+                  step="0.01"
+                  value={fumigation}
+                  onChange={(e) => setFumigation(e.target.value)}
+                  className="text-right"
+                  data-testid="input-fumigation"
+                />
+              </div>
+              <div>
+                <Label htmlFor="documentCharges">Document Charges</Label>
+                <Input
+                  id="documentCharges"
+                  type="number"
+                  step="0.01"
+                  value={documentCharges}
+                  onChange={(e) => setDocumentCharges(e.target.value)}
+                  className="text-right"
+                  data-testid="input-document-charges"
+                />
+              </div>
+              <div>
+                <Label htmlFor="discount">Discount</Label>
+                <Input
+                  id="discount"
+                  type="number"
+                  step="0.01"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  className="text-right"
+                  data-testid="input-discount"
                 />
               </div>
               <div>
@@ -440,7 +488,7 @@ export default function PurchaseOrderEdit() {
                 <span className="text-xl font-bold font-mono">${calculateGrandTotal()}</span>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Items (${calculateItemsTotal()}) + Freight (${parseFloat(freight) || 0}) + Other Charges (${parseFloat(otherCharges) || 0})
+                Items (${calculateItemsTotal()}) + Charges (${calculateChargesTotal()})
               </p>
             </div>
           </div>
