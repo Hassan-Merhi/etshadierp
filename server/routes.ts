@@ -5794,38 +5794,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get charges for this container
+      const charges = containerPreview.charges;
+      
+      // Container-level charges
+      const containerFreight = charges.freight || 0;
+      const containerSurcharge = charges.surcharge || 0;
+      const containerFumigation = charges.fumigation || 0;
+      const containerDocumentCharges = charges.documentCharges || 0;
+      const containerDiscount = charges.discount || 0;
+      const containerOtherCharges = charges.otherCharges || 0;
+      const hasAnyCharges = containerFreight > 0 || containerSurcharge > 0 || containerFumigation > 0 || 
+                            containerDocumentCharges > 0 || containerDiscount > 0 || containerOtherCharges > 0;
+      
+      // Calculate total items value across all POs for pro-rating charges
+      const totalAllItemsValue = Object.values(poGroups).reduce((sum: number, items: any) => {
+        return sum + (items as any[]).reduce((s, item) => s + item.lineTotal, 0);
+      }, 0);
+      
+      // Track allocated charges for remainder reconciliation
+      let allocatedFreight = 0, allocatedSurcharge = 0, allocatedFumigation = 0;
+      let allocatedDocCharges = 0, allocatedDiscount = 0, allocatedOtherCharges = 0;
+      const poEntries = Object.entries(poGroups);
+      
       // Create POs and line items
-      for (const [poNumber, items] of Object.entries(poGroups)) {
+      for (let poIndex = 0; poIndex < poEntries.length; poIndex++) {
+        const [poNumber, items] = poEntries[poIndex];
+        const isLastPO = poIndex === poEntries.length - 1;
         const poItems = items as any[];
-        const poTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
+        const poItemsTotal = poItems.reduce((sum, item) => sum + item.lineTotal, 0);
+        
+        // Pro-rate charges based on this PO's items proportion of total
+        const proportion = totalAllItemsValue > 0 ? poItemsTotal / totalAllItemsValue : 0;
+        
+        // For last PO, assign remainder to ensure totals match exactly
+        let poFreight, poSurcharge, poFumigation, poDocumentCharges, poDiscount, poOtherCharges;
+        if (isLastPO) {
+          poFreight = Math.round((containerFreight - allocatedFreight) * 100) / 100;
+          poSurcharge = Math.round((containerSurcharge - allocatedSurcharge) * 100) / 100;
+          poFumigation = Math.round((containerFumigation - allocatedFumigation) * 100) / 100;
+          poDocumentCharges = Math.round((containerDocumentCharges - allocatedDocCharges) * 100) / 100;
+          poDiscount = Math.round((containerDiscount - allocatedDiscount) * 100) / 100;
+          poOtherCharges = Math.round((containerOtherCharges - allocatedOtherCharges) * 100) / 100;
+        } else {
+          poFreight = Math.round(containerFreight * proportion * 100) / 100;
+          poSurcharge = Math.round(containerSurcharge * proportion * 100) / 100;
+          poFumigation = Math.round(containerFumigation * proportion * 100) / 100;
+          poDocumentCharges = Math.round(containerDocumentCharges * proportion * 100) / 100;
+          poDiscount = Math.round(containerDiscount * proportion * 100) / 100;
+          poOtherCharges = Math.round(containerOtherCharges * proportion * 100) / 100;
+          // Track allocated amounts
+          allocatedFreight += poFreight;
+          allocatedSurcharge += poSurcharge;
+          allocatedFumigation += poFumigation;
+          allocatedDocCharges += poDocumentCharges;
+          allocatedDiscount += poDiscount;
+          allocatedOtherCharges += poOtherCharges;
+        }
+        
+        // Calculate grand total (items + all charges - discount)
+        const poChargesTotal = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+        const poGrandTotal = poItemsTotal + poChargesTotal;
 
-        // Create voucher for this PO (Purchase voucher with double-entry)
+        // Create voucher for this PO (Purchase voucher with double-entry) - includes ALL charges
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: importDate,
           description: `Purchase Order ${poNumber} - Container ${containerNumber}`,
-          totalAmount: poTotal.toString(),
+          totalAmount: poGrandTotal.toString(),
           optional: false,
         });
 
         // Create voucher entries for double-entry bookkeeping
-        // Debit: Purchases account (Expense increases)
+        // Debit: Purchases account (Expense increases) - full grand total
         await storage.createVoucherEntry({
           voucherId: voucher.id,
           ledgerAccountId: purchasesAccount.id,
-          debitAmount: poTotal.toString(),
+          debitAmount: poGrandTotal.toString(),
           creditAmount: "0",
           narration: `PO ${poNumber} - Container ${containerNumber}`,
         });
 
-        // Credit: Supplier account (Accounts Payable increases)
+        // Credit: Supplier account (Accounts Payable increases) - full grand total
         await storage.createVoucherEntry({
           voucherId: voucher.id,
           supplierId: supplierId,
           debitAmount: "0",
-          creditAmount: poTotal.toString(),
+          creditAmount: poGrandTotal.toString(),
           narration: `PO ${poNumber} - Container ${containerNumber}`,
         });
 
@@ -5836,7 +5893,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           supplierId,
           voucherId: voucher.id,
           currency: poItems[0].currency,
-          itemsTotal: poTotal.toString(),
+          itemsTotal: poItemsTotal.toString(),
+          freight: poFreight.toString(),
+          surcharge: poSurcharge.toString(),
+          fumigation: poFumigation.toString(),
+          documentCharges: poDocumentCharges.toString(),
+          discount: poDiscount.toString(),
+          otherCharges: poOtherCharges.toString(),
+          chargesEdited: hasAnyCharges,
         });
 
         for (const item of poItems) {
@@ -5876,79 +5940,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create container charges and their voucher entries
-      const charges = containerPreview.charges;
-      const chargeTypes = [
+      // Create container charges records (for display in Container Extra Charges section)
+      // Note: Charges are now consolidated into the main PO voucher, no separate vouchers needed
+      const chargeTypesForContainer = [
         { type: "Freight", amount: charges.freight, isNegative: false },
         { type: "Surcharge", amount: charges.surcharge, isNegative: false },
         { type: "Fumigation", amount: charges.fumigation, isNegative: false },
         { type: "Discount", amount: charges.discount, isNegative: true },
-        {
-          type: "Document Charges",
-          amount: charges.documentCharges,
-          isNegative: false,
-        },
+        { type: "Document Charges", amount: charges.documentCharges, isNegative: false },
+        { type: "Other Charges", amount: charges.otherCharges, isNegative: false },
       ];
 
-      for (const charge of chargeTypes) {
+      for (const charge of chargeTypesForContainer) {
         if (charge.amount > 0) {
-          const actualAmount = charge.isNegative
-            ? -charge.amount
-            : charge.amount;
-
-          // Create container charge record
+          const actualAmount = charge.isNegative ? -charge.amount : charge.amount;
+          
+          // Create container charge record (for display only - charges are in PO voucher)
           await storage.createContainerCharge({
             containerId: container.id,
             chargeType: charge.type,
             amount: actualAmount.toString(),
           });
-
-          // Create voucher for this charge to update supplier balance
-          const chargeVoucher = await storage.createVoucher({
-            companyId: req.session.currentCompanyId!,
-            voucherNumber: `CHARGE-${containerNumber}-${charge.type.toUpperCase().replace(/\s+/g, "_")}-${Date.now()}`,
-            voucherType: "Purchase",
-            voucherDate: importDate,
-            description: `${charge.type} - Container ${containerNumber}`,
-            totalAmount: Math.abs(actualAmount).toString(),
-            optional: false,
-          });
-
-          if (!charge.isNegative) {
-            // For normal charges (freight, fumigation, etc.): Debit Import Charges, Credit Supplier
-            await storage.createVoucherEntry({
-              voucherId: chargeVoucher.id,
-              ledgerAccountId: importChargesAccount.id,
-              debitAmount: actualAmount.toString(),
-              creditAmount: "0",
-              narration: `${charge.type} - Container ${containerNumber}`,
-            });
-
-            await storage.createVoucherEntry({
-              voucherId: chargeVoucher.id,
-              supplierId: supplierId,
-              debitAmount: "0",
-              creditAmount: actualAmount.toString(),
-              narration: `${charge.type} - Container ${containerNumber}`,
-            });
-          } else {
-            // For discount: Credit Import Charges, Debit Supplier (reduces payable)
-            await storage.createVoucherEntry({
-              voucherId: chargeVoucher.id,
-              ledgerAccountId: importChargesAccount.id,
-              debitAmount: "0",
-              creditAmount: Math.abs(actualAmount).toString(),
-              narration: `${charge.type} - Container ${containerNumber}`,
-            });
-
-            await storage.createVoucherEntry({
-              voucherId: chargeVoucher.id,
-              supplierId: supplierId,
-              debitAmount: Math.abs(actualAmount).toString(),
-              creditAmount: "0",
-              narration: `${charge.type} - Container ${containerNumber}`,
-            });
-          }
         }
       }
 
