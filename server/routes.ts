@@ -15340,9 +15340,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + parseFloat(item.totalCost || "0");
       }, 0);
 
+      // 13. Payroll Expenses - get from Expense accounts related to salaries
+      // Uses a single optimized query with aggregation instead of N+1 pattern
+      const payrollExpenseAccounts = await db
+        .select({
+          id: ledgerAccounts.id,
+          openingBalance: ledgerAccounts.openingBalance,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.accountType, "Expense"),
+            sql`(${ledgerAccounts.name} ILIKE '%salary%' OR ${ledgerAccounts.name} ILIKE '%payroll%' OR ${ledgerAccounts.name} ILIKE '%wage%')`,
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      let payrollExpenseBalance = 0;
+      if (payrollExpenseAccounts.length > 0) {
+        const payrollAccountIds = payrollExpenseAccounts.map(a => a.id);
+        
+        // Get all entries for payroll accounts in a single query
+        const payrollEntries = await db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            creditAmount: voucherEntries.creditAmount,
+            debitAmount: voucherEntries.debitAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              sql`${voucherEntries.ledgerAccountId} = ANY(${payrollAccountIds})`,
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          );
+
+        // Calculate opening balances
+        const openingTotal = payrollExpenseAccounts.reduce((sum, acc) => {
+          return sum + parseFloat(acc.openingBalance || "0");
+        }, 0);
+
+        // Calculate transaction balance
+        const transactionBalance = payrollEntries.reduce((sum, entry) => {
+          const credit = parseFloat(entry.creditAmount || "0");
+          const debit = parseFloat(entry.debitAmount || "0");
+          // Expense accounts: Debits increase (positive), Credits decrease (negative)
+          return sum + debit - credit;
+        }, 0);
+
+        payrollExpenseBalance = openingTotal + transactionBalance;
+      }
+
+      // 14. Salary Advances - outstanding advances given to employees (asset - recoverable)
+      const advancesData = await db
+        .select({
+          remainingBalance: salaryAdvances.remainingBalance,
+        })
+        .from(salaryAdvances)
+        .where(
+          and(
+            eq(salaryAdvances.companyId, companyId),
+            eq(salaryAdvances.fullyPaid, false)
+          )
+        );
+
+      const salaryAdvancesBalance = advancesData.reduce((sum, advance) => {
+        return sum + parseFloat(advance.remainingBalance || "0");
+      }, 0);
+
+      // 15. Payroll Liabilities - wages owed to employees (from employees.currentBalance)
+      // Positive currentBalance means company owes the employee (liability)
+      const employeesData = await db
+        .select({
+          currentBalance: employees.currentBalance,
+        })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            isNull(employees.deletedAt)
+          )
+        );
+
+      const payrollLiabilitiesBalance = employeesData.reduce((sum, emp) => {
+        const balance = parseFloat(emp.currentBalance || "0");
+        // Only count positive balances (amounts owed to employees)
+        return sum + (balance > 0 ? balance : 0);
+      }, 0);
+
       // Calculate the net balance:
-      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Direct Expenses + Indirect Expenses + COGS
-      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Income
+      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Direct Expenses + Indirect Expenses + COGS + Payroll Expense + Salary Advances
+      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Income + Payroll Liabilities
       // Net = (Assets + Expenses) - (Liabilities + Income) (should be 0 when balanced)
       // Note: Expenses are debits (like assets), so they go on the same side
       // Note: COGS is calculated from salesItems table (not ledger) to match periodic inventory system
@@ -15353,12 +15445,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stockOnFloorValue +         // Inventory value (asset)
         directExpenseBalance +      // Expense (debit)
         indirectExpenseBalance +    // Expense (debit)
-        cogsBalance) -              // COGS expense (debit) - balances inventory reduction
+        cogsBalance +               // COGS expense (debit) - balances inventory reduction
+        payrollExpenseBalance +     // Payroll Expense (debit) - salaries paid
+        salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
         (supplierBalance +          // Liability (what we owe)
         dutyAgentBalance +          // Liability (what we owe)
         transporterAgentBalance +   // Liability (what we owe)
         loansBalance +              // Liability (what we owe)
-        incomeBalance);             // Income (sales revenue - credit)
+        incomeBalance +             // Income (sales revenue - credit)
+        payrollLiabilitiesBalance); // Payroll Liabilities (what we owe employees)
 
       res.json({
         netImportCycleBalance,
@@ -15375,6 +15470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           incomeBalance,
           stockOnFloorValue,
           cogsBalance,
+          payrollExpenseBalance,
+          salaryAdvancesBalance,
+          payrollLiabilitiesBalance,
         }
       });
     } catch (error: any) {
