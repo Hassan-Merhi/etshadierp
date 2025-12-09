@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -64,6 +64,7 @@ import ClosingStockDetail from "@/pages/ClosingStockDetail";
 import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
 import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
+import FactoryProduction from "@/pages/FactoryProduction";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -100,7 +101,6 @@ function Router({ user }: { user: any }) {
       <Route path="/location-inventory">{() => <LocationInventory />}</Route>
       <Route path="/containers" component={Containers} />
       <Route path="/containers/:id" component={ContainerDetail} />
-      <Route path="/sold-containers" component={SoldContainers} />
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/pos-import" component={POSImport} />
@@ -133,10 +133,12 @@ function Router({ user }: { user: any }) {
       <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
       <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
-      <Route path="/bales" component={Bales} />
-      <Route path="/mix-batches" component={MixBatches} />
-      <Route path="/production-bales" component={ProductionBales} />
-      <Route path="/bale-products" component={BaleProducts} />
+      <Route path="/factory-production" component={FactoryProduction} />
+      <Route path="/bales"><Redirect to="/factory-production" /></Route>
+      <Route path="/mix-batches"><Redirect to="/factory-production" /></Route>
+      <Route path="/production-bales"><Redirect to="/factory-production" /></Route>
+      <Route path="/bale-products"><Redirect to="/factory-production" /></Route>
+      <Route path="/sold-containers"><Redirect to="/containers" /></Route>
       {user?.role === "Admin" && <Route path="/settings" component={Settings} />}
       {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {user?.role === "Admin" && <Route path="/deleted-items" component={DeletedItems} />}

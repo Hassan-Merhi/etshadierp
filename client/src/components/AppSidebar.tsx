@@ -22,11 +22,7 @@ import {
   Ship,
   HandCoins,
   ArrowLeftRight,
-  Package2,
-  Layers,
-  Barcode,
-  Tags,
-  AlertCircle,
+  Factory,
   Grid3X3,
 } from "lucide-react";
 import {
@@ -76,34 +72,14 @@ const menuItems = [
     icon: Container,
   },
   {
-    title: "Sold Containers",
-    url: "/sold-containers",
-    icon: HandCoins,
-  },
-  {
     title: "Stock OTW",
     url: "/stock-otw",
     icon: Ship,
   },
   {
-    title: "Factory Bales",
-    url: "/bales",
-    icon: Package2,
-  },
-  {
-    title: "Mix Batches",
-    url: "/mix-batches",
-    icon: Layers,
-  },
-  {
-    title: "Production Bales",
-    url: "/production-bales",
-    icon: Barcode,
-  },
-  {
-    title: "Bale Products",
-    url: "/bale-products",
-    icon: Tags,
+    title: "Factory Production",
+    url: "/factory-production",
+    icon: Factory,
   },
   {
     title: "Analytics",
@@ -165,11 +141,6 @@ const menuItems = [
     url: "/settings",
     icon: Settings,
   },
-  {
-    title: "Orphaned Records",
-    url: "/orphaned-records",
-    icon: AlertCircle,
-  },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
@@ -185,8 +156,8 @@ export function AppSidebar({ user }: { user?: any }) {
     }
     
     // For non-POS users:
-    // Settings and Orphaned Records are Admin only
-    if (item.url === "/settings" || item.url === "/orphaned-records") {
+    // Settings is Admin only
+    if (item.url === "/settings") {
       return user?.role === "Admin";
     }
     
