@@ -57,6 +57,7 @@ import {
   poLineItems,
   containers,
   containerOffloads,
+  containerCharges,
   suppliers,
   fixedAssets,
   ledgerAccounts,
@@ -8099,18 +8100,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         where: eq(containers.id, po.containerId),
       });
 
+      // Check if PO has no charges stored - if so, fetch from containerCharges table
+      const poFreight = parseFloat(po.freight?.toString() || '0');
+      const poSurcharge = parseFloat(po.surcharge?.toString() || '0');
+      const poFumigation = parseFloat(po.fumigation?.toString() || '0');
+      const poDocCharges = parseFloat(po.documentCharges?.toString() || '0');
+      const poDiscount = parseFloat(po.discount?.toString() || '0');
+      const poOtherCharges = parseFloat(po.otherCharges?.toString() || '0');
+      
+      let finalCharges = {
+        freight: poFreight.toString(),
+        surcharge: poSurcharge.toString(),
+        fumigation: poFumigation.toString(),
+        documentCharges: poDocCharges.toString(),
+        discount: poDiscount.toString(),
+        otherCharges: poOtherCharges.toString(),
+      };
+
+      // If all charges are 0, try to fetch from containerCharges table
+      if (poFreight === 0 && poSurcharge === 0 && poFumigation === 0 && 
+          poDocCharges === 0 && poDiscount === 0 && poOtherCharges === 0) {
+        const containerChargesData = await db.query.containerCharges.findMany({
+          where: eq(containerCharges.containerId, po.containerId),
+        });
+        
+        for (const charge of containerChargesData) {
+          const amount = parseFloat(charge.amount?.toString() || '0');
+          switch (charge.chargeType) {
+            case 'Freight':
+              finalCharges.freight = Math.abs(amount).toString();
+              break;
+            case 'Surcharge':
+              finalCharges.surcharge = Math.abs(amount).toString();
+              break;
+            case 'Fumigation':
+              finalCharges.fumigation = Math.abs(amount).toString();
+              break;
+            case 'Document Charges':
+              finalCharges.documentCharges = Math.abs(amount).toString();
+              break;
+            case 'Discount':
+              finalCharges.discount = Math.abs(amount).toString();
+              break;
+          }
+        }
+      }
+
       res.json({
         ...po,
         items: lineItems,
         supplierName: supplier?.legalName || 'Unknown Supplier',
         supplierCode: supplier?.code || '',
         containerNumber: container?.containerNumber || '',
-        freight: po.freight?.toString() || '0',
-        surcharge: po.surcharge?.toString() || '0',
-        fumigation: po.fumigation?.toString() || '0',
-        documentCharges: po.documentCharges?.toString() || '0',
-        discount: po.discount?.toString() || '0',
-        otherCharges: po.otherCharges?.toString() || '0',
+        ...finalCharges,
         itemsTotal: po.itemsTotal?.toString() || '0',
       });
     } catch (error: any) {
