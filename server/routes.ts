@@ -8285,7 +8285,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.otherCharges !== undefined)
         allowedUpdates.otherCharges = req.body.otherCharges;
 
+      // Check if freight or otherCharges changed - need to update voucher entries
+      const newFreight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
+      const newOtherCharges = parseFloat(req.body.otherCharges ?? existingPO.otherCharges ?? "0");
+      const newItemsTotal = parseFloat(req.body.itemsTotal ?? existingPO.itemsTotal ?? "0");
+      const oldFreight = parseFloat(existingPO.freight || "0");
+      const oldOtherCharges = parseFloat(existingPO.otherCharges || "0");
+      const oldItemsTotal = parseFloat(existingPO.itemsTotal || "0");
+      
+      const newGrandTotal = newItemsTotal + newFreight + newOtherCharges;
+      const oldGrandTotal = oldItemsTotal + oldFreight + oldOtherCharges;
+      
+      // Update PO
       const updated = await storage.updatePurchaseOrder(id, allowedUpdates);
+      
+      // If the grand total changed, update voucher entries to reflect new supplier balance
+      if (Math.abs(newGrandTotal - oldGrandTotal) > 0.001 && existingPO.voucherId) {
+        await db.transaction(async (tx) => {
+          // Update voucher total amount
+          await tx.update(vouchers)
+            .set({ totalAmount: newGrandTotal.toFixed(2) })
+            .where(eq(vouchers.id, existingPO.voucherId!));
+          
+          // Update voucher entries - both debit (purchases) and credit (supplier)
+          const existingEntries = await tx
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, existingPO.voucherId!));
+          
+          for (const entry of existingEntries) {
+            if (parseFloat(entry.debitAmount || "0") > 0) {
+              // Update debit entry (Purchases expense)
+              await tx.update(voucherEntries)
+                .set({ debitAmount: newGrandTotal.toFixed(2) })
+                .where(eq(voucherEntries.id, entry.id));
+            } else if (parseFloat(entry.creditAmount || "0") > 0) {
+              // Update credit entry (Supplier payable)
+              await tx.update(voucherEntries)
+                .set({ creditAmount: newGrandTotal.toFixed(2) })
+                .where(eq(voucherEntries.id, entry.id));
+            }
+          }
+          
+          // Update container totals if applicable
+          const container = await storage.getContainerById(existingPO.containerId);
+          if (container) {
+            // Get all POs for this container and recalculate totals
+            const allPOs = await storage.getAllPurchaseOrders(existingPO.companyId);
+            const containerPOs = allPOs.filter((po: any) => po.containerId === existingPO.containerId);
+            let totalItemsCost = 0;
+            let totalFreight = 0;
+            let totalOtherCharges = 0;
+            
+            for (const po of containerPOs) {
+              if (po.id === id) {
+                // Use the new values for this PO
+                totalItemsCost += newItemsTotal;
+                totalFreight += newFreight;
+                totalOtherCharges += newOtherCharges;
+              } else {
+                totalItemsCost += parseFloat(po.itemsTotal || "0");
+                totalFreight += parseFloat(po.freight || "0");
+                totalOtherCharges += parseFloat(po.otherCharges || "0");
+              }
+            }
+            
+            // Update container totals
+            const chargesTotal = totalFreight + totalOtherCharges;
+            await tx.update(containers)
+              .set({
+                itemsTotal: totalItemsCost.toFixed(2),
+                chargesTotal: chargesTotal.toFixed(2),
+                grandTotal: (totalItemsCost + chargesTotal).toFixed(2),
+              })
+              .where(eq(containers.id, existingPO.containerId));
+          }
+        });
+      }
+      
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

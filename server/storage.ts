@@ -1351,7 +1351,10 @@ export class DbStorage implements IStorage {
     }
 
     const containerId = po.containerId;
-    const poTotal = parseFloat(po.itemsTotal || "0");
+    const poItemsTotal = parseFloat(po.itemsTotal || "0");
+    const poFreight = parseFloat(po.freight || "0");
+    const poOtherCharges = parseFloat(po.otherCharges || "0");
+    const poCharges = poFreight + poOtherCharges;
 
     // Delete PO line items
     await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, id));
@@ -1359,7 +1362,7 @@ export class DbStorage implements IStorage {
     // Delete the PO
     await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, id));
 
-    // Delete the voucher if it exists
+    // Delete the voucher if it exists (this removes the supplier payable entry)
     if (po.voucherId) {
       await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, po.voucherId));
       await db.delete(schema.vouchers).where(eq(schema.vouchers.id, po.voucherId));
@@ -1378,7 +1381,7 @@ export class DbStorage implements IStorage {
       await db.delete(schema.importLogs).where(eq(schema.importLogs.containerId, containerId));
       await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
     } else {
-      // Update container totals
+      // Update container totals - subtract both items and charges from the PO
       const [container] = await db
         .select()
         .from(schema.containers)
@@ -1386,14 +1389,15 @@ export class DbStorage implements IStorage {
         .limit(1);
 
       if (container) {
-        const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - poTotal);
-        const chargesTotal = parseFloat(container.chargesTotal || "0");
-        const newGrandTotal = newItemsTotal + chargesTotal;
+        const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - poItemsTotal);
+        const newChargesTotal = Math.max(0, parseFloat(container.chargesTotal || "0") - poCharges);
+        const newGrandTotal = newItemsTotal + newChargesTotal;
 
         await db
           .update(schema.containers)
           .set({
             itemsTotal: newItemsTotal.toString(),
+            chargesTotal: newChargesTotal.toString(),
             grandTotal: newGrandTotal.toString(),
           })
           .where(eq(schema.containers.id, containerId));
