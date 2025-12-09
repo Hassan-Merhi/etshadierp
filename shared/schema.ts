@@ -444,6 +444,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   documentCharges: decimal("document_charges", { precision: 20, scale: 2 }).default("0"),
   discount: decimal("discount", { precision: 20, scale: 2 }).default("0"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
+  chargesEdited: boolean("charges_edited").default(false),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -462,6 +463,7 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   documentCharges: z.string().optional(),
   discount: z.string().optional(),
   otherCharges: z.string().optional(),
+  chargesEdited: z.boolean().optional(),
 });
 
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;

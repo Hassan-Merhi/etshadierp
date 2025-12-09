@@ -8117,9 +8117,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otherCharges: poOtherCharges.toString(),
       };
 
-      // If all charges are 0, try to fetch from containerCharges table
+      // If all charges are 0 AND charges haven't been explicitly edited, try to fetch from containerCharges table
+      // This ensures that if user edited charges to 0, we respect that instead of showing container charges
       if (poFreight === 0 && poSurcharge === 0 && poFumigation === 0 && 
-          poDocCharges === 0 && poDiscount === 0 && poOtherCharges === 0) {
+          poDocCharges === 0 && poDiscount === 0 && poOtherCharges === 0 &&
+          !po.chargesEdited) {
         const containerChargesData = await db.query.containerCharges.findMany({
           where: eq(containerCharges.containerId, po.containerId),
         });
@@ -8228,12 +8230,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Update PO with new items total and charges
-          const freight = parseFloat(req.body.freight || existingPO.freight || "0");
-          const surcharge = parseFloat(req.body.surcharge || existingPO.surcharge || "0");
-          const fumigation = parseFloat(req.body.fumigation || existingPO.fumigation || "0");
-          const documentCharges = parseFloat(req.body.documentCharges || existingPO.documentCharges || "0");
-          const discount = parseFloat(req.body.discount || existingPO.discount || "0");
-          const otherCharges = parseFloat(req.body.otherCharges || existingPO.otherCharges || "0");
+          // Use ?? to correctly handle explicit zero values from the request
+          const freight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
+          const surcharge = parseFloat(req.body.surcharge ?? existingPO.surcharge ?? "0");
+          const fumigation = parseFloat(req.body.fumigation ?? existingPO.fumigation ?? "0");
+          const documentCharges = parseFloat(req.body.documentCharges ?? existingPO.documentCharges ?? "0");
+          const discount = parseFloat(req.body.discount ?? existingPO.discount ?? "0");
+          const otherCharges = parseFloat(req.body.otherCharges ?? existingPO.otherCharges ?? "0");
+          
+          // Check if any charge field was explicitly provided in the request
+          const chargesWereEdited = req.body.freight !== undefined || 
+                                    req.body.surcharge !== undefined || 
+                                    req.body.fumigation !== undefined || 
+                                    req.body.documentCharges !== undefined || 
+                                    req.body.discount !== undefined || 
+                                    req.body.otherCharges !== undefined;
           
           await tx.update(purchaseOrders)
             .set({ 
@@ -8244,6 +8255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               documentCharges: documentCharges.toFixed(2),
               discount: discount.toFixed(2),
               otherCharges: otherCharges.toFixed(2),
+              chargesEdited: chargesWereEdited ? true : existingPO.chargesEdited,
               poNumber: req.body.poNumber || existingPO.poNumber,
               currency: req.body.currency || existingPO.currency,
               status: req.body.status || existingPO.status,
@@ -8349,6 +8361,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allowedUpdates.discount = req.body.discount;
       if (req.body.otherCharges !== undefined)
         allowedUpdates.otherCharges = req.body.otherCharges;
+      
+      // Set chargesEdited flag if any charge field was modified
+      const chargesWereEdited = req.body.freight !== undefined || 
+                                req.body.surcharge !== undefined || 
+                                req.body.fumigation !== undefined || 
+                                req.body.documentCharges !== undefined || 
+                                req.body.discount !== undefined || 
+                                req.body.otherCharges !== undefined;
+      if (chargesWereEdited) {
+        allowedUpdates.chargesEdited = true;
+      }
 
       // Check if any charges changed - need to update voucher entries
       const newFreight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
