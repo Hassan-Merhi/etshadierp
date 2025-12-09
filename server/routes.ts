@@ -14206,6 +14206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Reverse old inventory movements
         for (const oldItem of oldSalesItems) {
           const oldQty = parseFloat(oldItem.quantity);
+          const oldCost = parseFloat(oldItem.costPrice || "0");
           
           // Add back the old quantity to inventory
           const [existingInventory] = await tx
@@ -14227,6 +14228,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .update(inventory)
               .set({ quantity: newQty.toString() })
               .where(eq(inventory.id, existingInventory.id));
+          } else {
+            // Create inventory record if it doesn't exist (e.g., was deleted)
+            await tx.insert(inventory).values({
+              companyId: existingVoucher.companyId,
+              locationId: existingVoucher.locationId!,
+              stockItemId: oldItem.stockItemId,
+              quantity: oldQty.toString(),
+              averageRate: oldCost.toString(),
+              lastUpdated: new Date(),
+            });
           }
         }
 
@@ -14234,13 +14245,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
+        // Check if user can sell negative stock
+        const canSellNegativeStock = req.user?.canSellNegativeStock || false;
+
         // Create new sales items and apply new inventory movements
         let grandTotal = 0;
         for (const item of items) {
           const { id, stockItemId, quantity, sellingPrice } = item;
 
           // Get inventory record for validation and deduction
-          const [inventoryRecord] = await tx
+          let [inventoryRecord] = await tx
             .select()
             .from(inventory)
             .where(
@@ -14251,14 +14265,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             .limit(1);
 
+          // If no inventory record exists, create one with 0 quantity
+          // This can happen if the inventory record was deleted after the original sale
           if (!inventoryRecord) {
-            throw new Error(`Inventory not found for stock item ${stockItemId}`);
+            const [newInvRecord] = await tx
+              .insert(inventory)
+              .values({
+                companyId: existingVoucher.companyId,
+                locationId: existingVoucher.locationId!,
+                stockItemId: stockItemId,
+                quantity: "0",
+                averageRate: "0",
+                lastUpdated: new Date(),
+              })
+              .returning();
+            inventoryRecord = newInvRecord;
           }
 
           const currentQty = parseFloat(inventoryRecord.quantity);
           const sellQty = parseFloat(quantity);
 
-          if (currentQty < sellQty) {
+          // Only check stock if user cannot sell negative stock
+          if (currentQty < sellQty && !canSellNegativeStock) {
             throw new Error(`Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`);
           }
 
