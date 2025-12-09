@@ -8322,6 +8322,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           }
+          
+          // Sync container_charges table when PO charges are edited
+          if (chargesWereEdited && existingPO.containerId) {
+            const chargeTypeMap = [
+              { field: 'freight', chargeType: 'Freight', amount: freight },
+              { field: 'surcharge', chargeType: 'Surcharge', amount: surcharge },
+              { field: 'fumigation', chargeType: 'Fumigation', amount: fumigation },
+              { field: 'documentCharges', chargeType: 'Document Charges', amount: documentCharges },
+              { field: 'discount', chargeType: 'Discount', amount: -discount }, // Discount stored as negative
+              { field: 'otherCharges', chargeType: 'Other Charges', amount: otherCharges },
+            ];
+            
+            for (const { chargeType, amount } of chargeTypeMap) {
+              // Find existing container charge entry
+              const existingCharge = await tx
+                .select()
+                .from(containerCharges)
+                .where(and(
+                  eq(containerCharges.containerId, existingPO.containerId),
+                  eq(containerCharges.chargeType, chargeType)
+                ))
+                .limit(1);
+              
+              if (amount === 0) {
+                // Delete entry if charge is 0
+                if (existingCharge.length > 0) {
+                  await tx.delete(containerCharges)
+                    .where(eq(containerCharges.id, existingCharge[0].id));
+                }
+              } else {
+                // Upsert: update if exists, insert if not
+                if (existingCharge.length > 0) {
+                  await tx.update(containerCharges)
+                    .set({ amount: amount.toFixed(2) })
+                    .where(eq(containerCharges.id, existingCharge[0].id));
+                } else {
+                  await tx.insert(containerCharges).values({
+                    containerId: existingPO.containerId,
+                    chargeType: chargeType,
+                    amount: amount.toFixed(2),
+                  });
+                }
+              }
+            }
+          }
         });
         
         // Get updated PO with items
@@ -8453,7 +8498,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(containers.id, existingPO.containerId));
           }
+          
+          // Sync container_charges table when PO charges are edited
+          if (chargesWereEdited && existingPO.containerId) {
+            const chargeTypeMap = [
+              { field: 'freight', chargeType: 'Freight', amount: newFreight },
+              { field: 'surcharge', chargeType: 'Surcharge', amount: newSurcharge },
+              { field: 'fumigation', chargeType: 'Fumigation', amount: newFumigation },
+              { field: 'documentCharges', chargeType: 'Document Charges', amount: newDocumentCharges },
+              { field: 'discount', chargeType: 'Discount', amount: -newDiscount }, // Discount stored as negative
+              { field: 'otherCharges', chargeType: 'Other Charges', amount: newOtherCharges },
+            ];
+            
+            for (const { chargeType, amount } of chargeTypeMap) {
+              // Find existing container charge entry
+              const existingCharge = await tx
+                .select()
+                .from(containerCharges)
+                .where(and(
+                  eq(containerCharges.containerId, existingPO.containerId),
+                  eq(containerCharges.chargeType, chargeType)
+                ))
+                .limit(1);
+              
+              if (amount === 0) {
+                // Delete entry if charge is 0
+                if (existingCharge.length > 0) {
+                  await tx.delete(containerCharges)
+                    .where(eq(containerCharges.id, existingCharge[0].id));
+                }
+              } else {
+                // Upsert: update if exists, insert if not
+                if (existingCharge.length > 0) {
+                  await tx.update(containerCharges)
+                    .set({ amount: amount.toFixed(2) })
+                    .where(eq(containerCharges.id, existingCharge[0].id));
+                } else {
+                  await tx.insert(containerCharges).values({
+                    containerId: existingPO.containerId,
+                    chargeType: chargeType,
+                    amount: amount.toFixed(2),
+                  });
+                }
+              }
+            }
+          }
         });
+      } else if (chargesWereEdited && existingPO.containerId) {
+        // If charges were edited but grand total didn't change (or no voucher), still sync container_charges
+        const chargeTypeMap = [
+          { field: 'freight', chargeType: 'Freight', amount: newFreight },
+          { field: 'surcharge', chargeType: 'Surcharge', amount: newSurcharge },
+          { field: 'fumigation', chargeType: 'Fumigation', amount: newFumigation },
+          { field: 'documentCharges', chargeType: 'Document Charges', amount: newDocumentCharges },
+          { field: 'discount', chargeType: 'Discount', amount: -newDiscount }, // Discount stored as negative
+          { field: 'otherCharges', chargeType: 'Other Charges', amount: newOtherCharges },
+        ];
+        
+        for (const { chargeType, amount } of chargeTypeMap) {
+          // Find existing container charge entry
+          const existingCharge = await db
+            .select()
+            .from(containerCharges)
+            .where(and(
+              eq(containerCharges.containerId, existingPO.containerId),
+              eq(containerCharges.chargeType, chargeType)
+            ))
+            .limit(1);
+          
+          if (amount === 0) {
+            // Delete entry if charge is 0
+            if (existingCharge.length > 0) {
+              await db.delete(containerCharges)
+                .where(eq(containerCharges.id, existingCharge[0].id));
+            }
+          } else {
+            // Upsert: update if exists, insert if not
+            if (existingCharge.length > 0) {
+              await db.update(containerCharges)
+                .set({ amount: amount.toFixed(2) })
+                .where(eq(containerCharges.id, existingCharge[0].id));
+            } else {
+              await db.insert(containerCharges).values({
+                containerId: existingPO.containerId,
+                chargeType: chargeType,
+                amount: amount.toFixed(2),
+              });
+            }
+          }
+        }
       }
       
       res.json(updated);
