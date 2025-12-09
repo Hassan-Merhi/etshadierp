@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck } from "lucide-react";
+import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, Percent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -17,11 +17,15 @@ import {
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 type ProfitData = {
@@ -56,6 +60,19 @@ type MonthlyData = {
   sales: number;
   profit: number;
 };
+
+type ExpenseBreakdownData = {
+  name: string;
+  value: number;
+};
+
+const EXPENSE_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 type DashboardCashAccount = {
   id: number;
@@ -127,6 +144,17 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await fetch("/api/stats/monthly-data", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch monthly data");
+      return await response.json();
+    },
+    enabled: !!selectedCompany,
+  });
+
+  // Fetch expense breakdown data for donut chart
+  const { data: expenseBreakdownData = [], isLoading: expenseBreakdownLoading } = useQuery<ExpenseBreakdownData[]>({
+    queryKey: ["/api/stats/expense-breakdown", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/stats/expense-breakdown", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch expense breakdown");
       return await response.json();
     },
     enabled: !!selectedCompany,
@@ -336,7 +364,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Sales & Profit Trend</h3>
           {monthlyDataLoading ? (
@@ -367,6 +395,41 @@ export default function Dashboard() {
                   strokeWidth={2}
                 />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Expense Breakdown</h3>
+          {expenseBreakdownLoading ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">Loading chart data...</p>
+            </div>
+          ) : expenseBreakdownData.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px]">
+              <p className="text-muted-foreground">No expense data available</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={expenseBreakdownData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  dataKey="value"
+                  nameKey="name"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {expenseBreakdownData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              </PieChart>
             </ResponsiveContainer>
           )}
         </Card>
@@ -514,9 +577,50 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* Daily Cash Analysis Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Available Money (Left) */}
+      {/* Bottom Row: Profit Margin, Available Cash, Cash to Pay */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Profit Margin */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <Percent className="h-5 w-5 text-blue-600" />
+              Profit Margin
+            </h3>
+          </div>
+          <div className="flex flex-col items-center justify-center py-6">
+            {isLoading ? (
+              <p className="text-muted-foreground">Loading...</p>
+            ) : (
+              <>
+                <p className={cn(
+                  "text-4xl font-bold",
+                  (profitData?.totalIncome ?? 0) > 0 && (profitData?.netProfit ?? 0) >= 0 
+                    ? "text-green-600" 
+                    : "text-red-600"
+                )} data-testid="text-profit-margin">
+                  {profitData?.totalIncome && profitData.totalIncome > 0
+                    ? `${((profitData.netProfit / profitData.totalIncome) * 100).toFixed(1)}%`
+                    : "0.0%"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Net Profit / Total Income
+                </p>
+                <div className="mt-4 pt-4 border-t w-full text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Net Profit:</span>
+                    <span className="font-medium">{formatCurrency(profitData?.netProfit ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-muted-foreground">Total Income:</span>
+                    <span className="font-medium">{formatCurrency(profitData?.totalIncome ?? 0)}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+
+        {/* Available Cash */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center gap-2">

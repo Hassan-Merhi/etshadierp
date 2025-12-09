@@ -15214,6 +15214,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get expense breakdown by account type for Dashboard donut chart
+  app.get("/api/stats/expense-breakdown", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all expense-related ledger accounts
+      const allAccounts = await storage.getAllLedgerAccounts(companyId);
+      const expenseAccounts = allAccounts.filter(acc => 
+        acc.accountType === "Expense" ||
+        acc.accountType === "Direct Expense" ||
+        acc.accountType === "Indirect Expense"
+      );
+
+      // Get all non-optional vouchers for this company
+      const companyVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false)
+          )
+        )
+        .execute();
+
+      const companyVoucherIds = companyVouchers.map(v => v.id);
+
+      // Get all entries for company vouchers
+      const entries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
+
+      // Create a map of account ID to account type
+      const accountTypeMap = new Map<number, string>();
+      for (const acc of expenseAccounts) {
+        accountTypeMap.set(acc.id, acc.accountType);
+      }
+
+      // Sum balances by expense type
+      const expenseByType = new Map<string, number>();
+      
+      for (const entry of entries) {
+        if (!entry.ledgerAccountId) continue;
+        
+        const accountType = accountTypeMap.get(entry.ledgerAccountId);
+        if (!accountType) continue;
+
+        // Expense accounts: debits increase expense, credits decrease it
+        const amount = parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+        if (amount <= 0) continue;
+
+        const current = expenseByType.get(accountType) || 0;
+        expenseByType.set(accountType, current + amount);
+      }
+
+      // Convert to array format for chart
+      const result = Array.from(expenseByType.entries())
+        .filter(([_, value]) => value > 0)
+        .map(([name, value]) => ({
+          name: name.replace(" Expense", ""),
+          value: Math.round(value * 100) / 100,
+        }))
+        .sort((a, b) => b.value - a.value);
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Import Cycle Balance - tracks the full import/offload cycle to ensure it balances to zero
   // Formula: Supplier Balance (credit/liability) + Stock OTW (debit/asset) + Loan accounts + Expense charges - Stock Value on Floor
   app.get("/api/stats/import-cycle-balance", requireAuth, async (req, res) => {
