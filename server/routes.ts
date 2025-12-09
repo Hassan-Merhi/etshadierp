@@ -8142,6 +8142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             case 'Discount':
               finalCharges.discount = Math.abs(amount).toString();
               break;
+            case 'Other Charges':
+              finalCharges.otherCharges = Math.abs(amount).toString();
+              break;
           }
         }
       }
