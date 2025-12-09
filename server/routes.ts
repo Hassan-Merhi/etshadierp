@@ -15400,7 +15400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(
             and(
-              sql`${voucherEntries.ledgerAccountId} = ANY(${payrollAccountIds})`,
+              inArray(voucherEntries.ledgerAccountId, payrollAccountIds),
               eq(vouchers.companyId, companyId),
               isNull(vouchers.deletedAt),
               eq(vouchers.optional, false)
