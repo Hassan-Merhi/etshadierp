@@ -8105,6 +8105,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplierName: supplier?.legalName || 'Unknown Supplier',
         supplierCode: supplier?.code || '',
         containerNumber: container?.containerNumber || '',
+        freight: po.freight?.toString() || '0',
+        surcharge: po.surcharge?.toString() || '0',
+        fumigation: po.fumigation?.toString() || '0',
+        documentCharges: po.documentCharges?.toString() || '0',
+        discount: po.discount?.toString() || '0',
+        otherCharges: po.otherCharges?.toString() || '0',
+        itemsTotal: po.itemsTotal?.toString() || '0',
       });
     } catch (error: any) {
       console.error("Get PO error:", error);
