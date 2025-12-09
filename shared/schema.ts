@@ -1515,3 +1515,28 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+// Dashboard Account Selections - stores user-selected accounts for dashboard widgets
+export const dashboardAccountSelections = pgTable("dashboard_account_selections", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  selectionType: text("selection_type").notNull(), // 'availableCash' or 'cashToPay'
+  accountIds: integer("account_ids").array().notNull().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyType: uniqueIndex("dashboard_account_selections_company_type_unique").on(t.companyId, t.selectionType),
+}));
+
+export const insertDashboardAccountSelectionSchema = createInsertSchema(dashboardAccountSelections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  selectionType: z.enum(["availableCash", "cashToPay"]),
+  accountIds: z.array(z.number()).default([]),
+});
+
+export type InsertDashboardAccountSelection = z.infer<typeof insertDashboardAccountSelectionSchema>;
+export type DashboardAccountSelection = typeof dashboardAccountSelections.$inferSelect;
