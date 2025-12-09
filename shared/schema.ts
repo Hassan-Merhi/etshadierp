@@ -439,6 +439,10 @@ export const purchaseOrders = pgTable("purchase_orders", {
   currency: text("currency").notNull().default("USD"),
   itemsTotal: decimal("items_total", { precision: 20, scale: 2 }).default("0"),
   freight: decimal("freight", { precision: 20, scale: 2 }).default("0"),
+  surcharge: decimal("surcharge", { precision: 20, scale: 2 }).default("0"),
+  fumigation: decimal("fumigation", { precision: 20, scale: 2 }).default("0"),
+  documentCharges: decimal("document_charges", { precision: 20, scale: 2 }).default("0"),
+  discount: decimal("discount", { precision: 20, scale: 2 }).default("0"),
   otherCharges: decimal("other_charges", { precision: 20, scale: 2 }).default("0"),
   status: text("status").notNull().default("Open"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -453,6 +457,10 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
   containerId: z.number().min(1, "Container is required"),
   supplierId: z.number().min(1, "Supplier is required"),
   freight: z.string().optional(),
+  surcharge: z.string().optional(),
+  fumigation: z.string().optional(),
+  documentCharges: z.string().optional(),
+  discount: z.string().optional(),
   otherCharges: z.string().optional(),
 });
 

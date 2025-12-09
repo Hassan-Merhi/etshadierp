@@ -1356,6 +1356,13 @@ export class DbStorage implements IStorage {
     const poOtherCharges = parseFloat(po.otherCharges || "0");
     const poCharges = poFreight + poOtherCharges;
 
+    // Get container info for deleting charge vouchers
+    const [container] = await db
+      .select()
+      .from(schema.containers)
+      .where(eq(schema.containers.id, containerId))
+      .limit(1);
+
     // Delete PO line items
     await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, id));
 
@@ -1375,37 +1382,57 @@ export class DbStorage implements IStorage {
       .where(eq(schema.purchaseOrders.containerId, containerId))
       .limit(1);
 
-    if (remainingPOs.length === 0) {
+    if (remainingPOs.length === 0 && container) {
+      // Delete container charge vouchers (Freight, Surcharge, Fumigation, Document Charges, Discount)
+      // These vouchers have descriptions like "Freight - Container MRKUS557707"
+      const chargeVouchers = await db
+        .select()
+        .from(schema.vouchers)
+        .where(
+          and(
+            eq(schema.vouchers.companyId, po.companyId),
+            sql`${schema.vouchers.description} LIKE ${'% - Container ' + container.containerNumber}`
+          )
+        );
+
+      for (const chargeVoucher of chargeVouchers) {
+        await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+        await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
+      }
+
       // Delete the container and all its charges if no POs remain
       await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
       await db.delete(schema.importLogs).where(eq(schema.importLogs.containerId, containerId));
       await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
-    } else {
+    } else if (container) {
       // Update container totals - subtract both items and charges from the PO
-      const [container] = await db
-        .select()
-        .from(schema.containers)
-        .where(eq(schema.containers.id, containerId))
-        .limit(1);
+      const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - poItemsTotal);
+      const newChargesTotal = Math.max(0, parseFloat(container.chargesTotal || "0") - poCharges);
+      const newGrandTotal = newItemsTotal + newChargesTotal;
 
-      if (container) {
-        const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - poItemsTotal);
-        const newChargesTotal = Math.max(0, parseFloat(container.chargesTotal || "0") - poCharges);
-        const newGrandTotal = newItemsTotal + newChargesTotal;
-
-        await db
-          .update(schema.containers)
-          .set({
-            itemsTotal: newItemsTotal.toString(),
-            chargesTotal: newChargesTotal.toString(),
-            grandTotal: newGrandTotal.toString(),
-          })
-          .where(eq(schema.containers.id, containerId));
-      }
+      await db
+        .update(schema.containers)
+        .set({
+          itemsTotal: newItemsTotal.toString(),
+          chargesTotal: newChargesTotal.toString(),
+          grandTotal: newGrandTotal.toString(),
+        })
+        .where(eq(schema.containers.id, containerId));
     }
   }
 
   async deleteContainer(id: number): Promise<void> {
+    // Get container info for deleting charge vouchers
+    const [container] = await db
+      .select()
+      .from(schema.containers)
+      .where(eq(schema.containers.id, id))
+      .limit(1);
+
+    if (!container) {
+      throw new Error("Container not found");
+    }
+
     // Get all purchase orders in this container
     const pos = await db
       .select()
@@ -1425,6 +1452,23 @@ export class DbStorage implements IStorage {
 
       // Delete the PO
       await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.id, po.id));
+    }
+
+    // Delete container charge vouchers (Freight, Surcharge, Fumigation, Document Charges, Discount)
+    // These vouchers have descriptions like "Freight - Container MRKUS557707"
+    const chargeVouchers = await db
+      .select()
+      .from(schema.vouchers)
+      .where(
+        and(
+          eq(schema.vouchers.companyId, container.companyId),
+          sql`${schema.vouchers.description} LIKE ${'% - Container ' + container.containerNumber}`
+        )
+      );
+
+    for (const chargeVoucher of chargeVouchers) {
+      await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+      await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
     }
 
     // Delete container charges

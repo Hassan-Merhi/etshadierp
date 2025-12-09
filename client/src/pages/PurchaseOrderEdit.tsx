@@ -32,6 +32,10 @@ interface PurchaseOrder {
   currency: string;
   itemsTotal: string;
   freight: string;
+  surcharge: string;
+  fumigation: string;
+  documentCharges: string;
+  discount: string;
   otherCharges: string;
   status: string;
   items: LineItem[];
@@ -48,6 +52,10 @@ export default function PurchaseOrderEdit() {
   const [status, setStatus] = useState("Open");
   const [items, setItems] = useState<LineItem[]>([]);
   const [freight, setFreight] = useState("0");
+  const [surcharge, setSurcharge] = useState("0");
+  const [fumigation, setFumigation] = useState("0");
+  const [documentCharges, setDocumentCharges] = useState("0");
+  const [discount, setDiscount] = useState("0");
   const [otherCharges, setOtherCharges] = useState("0");
 
   const { data: stockItems } = useQuery<any[]>({
@@ -73,12 +81,27 @@ export default function PurchaseOrderEdit() {
         lineTotal: item.lineTotal,
       })));
       setFreight(po.freight || "0");
+      setSurcharge(po.surcharge || "0");
+      setFumigation(po.fumigation || "0");
+      setDocumentCharges(po.documentCharges || "0");
+      setDiscount(po.discount || "0");
       setOtherCharges(po.otherCharges || "0");
     }
   }, [po]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { poNumber: string; currency: string; status: string; items: LineItem[]; freight: string; otherCharges: string }) => {
+    mutationFn: async (data: { 
+      poNumber: string; 
+      currency: string; 
+      status: string; 
+      items: LineItem[]; 
+      freight: string; 
+      surcharge: string;
+      fumigation: string;
+      documentCharges: string;
+      discount: string;
+      otherCharges: string;
+    }) => {
       return apiRequest("PATCH", `/api/purchase-orders/${poId}`, data);
     },
     onSuccess: () => {
@@ -142,11 +165,20 @@ export default function PurchaseOrderEdit() {
     }, 0).toFixed(2);
   };
 
+  const calculateChargesTotal = () => {
+    const freightAmount = parseFloat(freight) || 0;
+    const surchargeAmount = parseFloat(surcharge) || 0;
+    const fumigationAmount = parseFloat(fumigation) || 0;
+    const documentChargesAmount = parseFloat(documentCharges) || 0;
+    const discountAmount = parseFloat(discount) || 0;
+    const otherChargesAmount = parseFloat(otherCharges) || 0;
+    return (freightAmount + surchargeAmount + fumigationAmount + documentChargesAmount - discountAmount + otherChargesAmount).toFixed(2);
+  };
+
   const calculateGrandTotal = () => {
     const itemsTotal = parseFloat(calculateItemsTotal());
-    const freightAmount = parseFloat(freight) || 0;
-    const otherChargesAmount = parseFloat(otherCharges) || 0;
-    return (itemsTotal + freightAmount + otherChargesAmount).toFixed(2);
+    const chargesTotal = parseFloat(calculateChargesTotal());
+    return (itemsTotal + chargesTotal).toFixed(2);
   };
 
   const handleSave = () => {
@@ -179,6 +211,10 @@ export default function PurchaseOrderEdit() {
         rate: item.rate,
       })),
       freight,
+      surcharge,
+      fumigation,
+      documentCharges,
+      discount,
       otherCharges,
     });
   };
