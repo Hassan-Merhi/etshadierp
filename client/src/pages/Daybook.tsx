@@ -1191,26 +1191,27 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     const isPOSUser = !user || user?.role?.startsWith("POS");
                     
                     // Separate ledger entries from purchase items
-                    // Filter out supplier accounts and "Purchases" - keep only actual charge types
-                    const supplierName = purchaseOrderData?.supplierName || "";
+                    // Use positive allow-list to keep only charge-type accounts (Freight, Fumigation, Surcharge, Discount, etc.)
+                    const chargeKeywords = ["freight", "fumigation", "surcharge", "discount", "other charges", "handling", "insurance", "customs", "duty"];
                     const ledgerEntries = viewVoucherEntries.filter(e => {
                       if (e.isPurchaseItem || e.isStockItem) return false;
                       const name = (e.accountName || "").toLowerCase();
-                      // Exclude supplier account and generic "Purchases" entries
-                      if (name === "purchases" || name === supplierName.toLowerCase()) return false;
-                      if (supplierName && name.startsWith(supplierName.toLowerCase())) return false;
-                      return true;
+                      // Keep only entries that start with known charge types
+                      return chargeKeywords.some(keyword => name.startsWith(keyword));
                     });
                     const purchaseItems = viewVoucherEntries.filter(e => e.isPurchaseItem || e.isStockItem);
                     
                     return (
                       <div className="space-y-4">
-                        {/* Purchase Order Info - Show only container tracking number */}
+                        {/* Purchase Order Info - Show supplier name and container tracking number */}
                         {purchaseOrderData && (
                           <div className="p-3 bg-muted/50 rounded-md space-y-2">
                             <div className="flex justify-between items-center">
                               <div>
-                                <div className="font-medium">Container: {purchaseOrderData.containerNumber}</div>
+                                <div className="font-medium">{purchaseOrderData.supplierName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Container: {purchaseOrderData.containerNumber}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {!isPOSUser && purchaseOrderData.itemsTotal && (
