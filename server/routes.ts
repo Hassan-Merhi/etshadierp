@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import CryptoJS from "crypto-js";
 import { storage } from "./storage";
