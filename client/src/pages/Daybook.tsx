@@ -1191,23 +1191,28 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     const isPOSUser = !user || user?.role?.startsWith("POS");
                     
                     // Separate ledger entries from purchase items
-                    const ledgerEntries = viewVoucherEntries.filter(e => !e.isPurchaseItem && !e.isStockItem);
+                    // Filter out supplier accounts and "Purchases" - keep only actual charge types
+                    const supplierName = purchaseOrderData?.supplierName || "";
+                    const ledgerEntries = viewVoucherEntries.filter(e => {
+                      if (e.isPurchaseItem || e.isStockItem) return false;
+                      const name = (e.accountName || "").toLowerCase();
+                      // Exclude supplier account and generic "Purchases" entries
+                      if (name === "purchases" || name === supplierName.toLowerCase()) return false;
+                      if (supplierName && name.startsWith(supplierName.toLowerCase())) return false;
+                      return true;
+                    });
                     const purchaseItems = viewVoucherEntries.filter(e => e.isPurchaseItem || e.isStockItem);
                     
                     return (
                       <div className="space-y-4">
-                        {/* Purchase Order Info */}
+                        {/* Purchase Order Info - Show only container tracking number */}
                         {purchaseOrderData && (
                           <div className="p-3 bg-muted/50 rounded-md space-y-2">
                             <div className="flex justify-between items-center">
                               <div>
-                                <div className="font-medium">{purchaseOrderData.supplierName}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {purchaseOrderData.supplierCode && <span>{purchaseOrderData.supplierCode} | </span>}
-                                  PO: {purchaseOrderData.poNumber} | Container: {purchaseOrderData.containerNumber}
-                                </div>
+                                <div className="font-medium">Container: {purchaseOrderData.containerNumber}</div>
                               </div>
-                              <div className="text-right">
+                              <div className="flex items-center gap-2">
                                 {!isPOSUser && purchaseOrderData.itemsTotal && (
                                   <div className="font-mono font-bold">
                                     ${parseFloat(purchaseOrderData.itemsTotal || "0").toFixed(2)}
@@ -1324,22 +1329,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     </TableRow>
                                   );
                                 })}
-                                
-                                {/* Charges Subtotal Row */}
-                                {ledgerEntries.length > 0 && (
-                                  <TableRow className="bg-muted/30">
-                                    <TableCell className="font-semibold">Charges Subtotal</TableCell>
-                                    <TableCell></TableCell>
-                                    {!isPOSUser && (
-                                      <>
-                                        <TableCell></TableCell>
-                                        <TableCell className="text-right font-mono font-semibold">
-                                          ${ledgerEntries.reduce((sum, entry) => sum + (parseFloat(entry.debitAmount || "0") > 0 ? parseFloat(entry.debitAmount) : parseFloat(entry.creditAmount || "0")), 0).toFixed(2)}
-                                        </TableCell>
-                                      </>
-                                    )}
-                                  </TableRow>
-                                )}
                                 
                                 {/* Grand Total Row */}
                                 <TableRow className="font-bold bg-muted/50">
