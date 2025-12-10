@@ -8,9 +8,11 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Plus, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Save, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 interface LineItem {
   id?: number;
@@ -20,6 +22,120 @@ interface LineItem {
   rate: string;
   lineTotal?: string;
 }
+
+interface StockItem {
+  id: number;
+  name: string;
+  code: string;
+}
+
+const LineItemRow = memo(function LineItemRow({
+  item,
+  index,
+  stockItems,
+  onItemChange,
+  onRemove,
+  lineTotal,
+}: {
+  item: LineItem;
+  index: number;
+  stockItems: StockItem[];
+  onItemChange: (index: number, field: keyof LineItem, value: string | number | null, stockItem?: StockItem) => void;
+  onRemove: (index: number) => void;
+  lineTotal: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  
+  const filteredStockItems = useMemo(() => {
+    if (!searchValue) return stockItems.slice(0, 50);
+    const search = searchValue.toLowerCase();
+    return stockItems
+      .filter(si => (si.name || '').toLowerCase().includes(search) || (si.code || '').toLowerCase().includes(search))
+      .slice(0, 50);
+  }, [stockItems, searchValue]);
+
+  return (
+    <TableRow data-testid={`row-item-${index}`}>
+      <TableCell>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between font-normal"
+              data-testid={`select-item-${index}`}
+            >
+              <span className="truncate">{item.itemName || "Select item..."}</span>
+              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0" align="start">
+            <Command shouldFilter={false}>
+              <CommandInput 
+                placeholder="Search items..." 
+                value={searchValue}
+                onValueChange={setSearchValue}
+              />
+              <CommandList>
+                <CommandEmpty>No items found.</CommandEmpty>
+                <CommandGroup>
+                  {filteredStockItems.map((si) => (
+                    <CommandItem
+                      key={si.id}
+                      value={si.id.toString()}
+                      onSelect={() => {
+                        onItemChange(index, "stockItemId", si.id, si);
+                        setOpen(false);
+                        setSearchValue("");
+                      }}
+                    >
+                      {si.name}{si.code ? ` (${si.code})` : ''}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          step="0.01"
+          value={item.quantity}
+          onChange={(e) => onItemChange(index, "quantity", e.target.value)}
+          className="text-right"
+          data-testid={`input-quantity-${index}`}
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          type="number"
+          step="0.01"
+          value={item.rate}
+          onChange={(e) => onItemChange(index, "rate", e.target.value)}
+          className="text-right"
+          data-testid={`input-rate-${index}`}
+        />
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        ${lineTotal}
+      </TableCell>
+      <TableCell>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => onRemove(index)}
+          data-testid={`button-remove-item-${index}`}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+});
 
 interface PurchaseOrder {
   id: number;
@@ -123,49 +239,65 @@ export default function PurchaseOrderEdit() {
     },
   });
 
-  const handleAddItem = () => {
-    setItems([...items, {
+  const handleAddItem = useCallback(() => {
+    setItems(prev => [...prev, {
       stockItemId: null,
       itemName: "",
       quantity: "1",
       rate: "0",
     }]);
-  };
+  }, []);
 
-  const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
+  const handleRemoveItem = useCallback((index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-  const handleItemChange = (index: number, field: keyof LineItem, value: string | number | null) => {
-    const newItems = [...items];
-    if (field === "stockItemId" && value) {
-      const stockItem = stockItems?.find(si => si.id === value);
-      if (stockItem) {
+  const handleItemChange = useCallback((index: number, field: keyof LineItem, value: string | number | null, stockItem?: StockItem) => {
+    setItems(prev => {
+      const newItems = [...prev];
+      const existingItem = newItems[index];
+      if (field === "stockItemId") {
+        // Normalize value to number for comparison
+        const numericId = typeof value === 'string' ? parseInt(value, 10) : value;
+        // If stockItem is passed directly, use it; otherwise fallback to lookup
+        const foundItem = stockItem || stockItems?.find((si: any) => si.id === numericId);
+        if (foundItem) {
+          newItems[index] = {
+            ...existingItem,
+            stockItemId: foundItem.id,
+            itemName: foundItem.name,
+          };
+        } else {
+          // Preserve existing itemName if lookup fails (defensive - don't lose data)
+          newItems[index] = {
+            ...existingItem,
+            stockItemId: typeof numericId === 'number' && !isNaN(numericId) ? numericId : existingItem.stockItemId,
+            // Keep existing itemName - don't clear it
+          };
+        }
+      } else {
         newItems[index] = {
-          ...newItems[index],
-          stockItemId: value as number,
-          itemName: stockItem.name,
+          ...existingItem,
+          [field]: value,
         };
       }
-    } else {
-      (newItems[index] as any)[field] = value;
-    }
-    setItems(newItems);
-  };
+      return newItems;
+    });
+  }, [stockItems]);
 
-  const calculateLineTotal = (item: LineItem) => {
-    const qty = parseFloat(item.quantity) || 0;
-    const rate = parseFloat(item.rate) || 0;
-    return (qty * rate).toFixed(2);
-  };
+  const lineTotals = useMemo(() => {
+    return items.map(item => {
+      const qty = parseFloat(item.quantity) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      return (qty * rate).toFixed(2);
+    });
+  }, [items]);
 
-  const calculateItemsTotal = () => {
-    return items.reduce((sum, item) => {
-      return sum + parseFloat(calculateLineTotal(item));
-    }, 0).toFixed(2);
-  };
+  const itemsTotal = useMemo(() => {
+    return lineTotals.reduce((sum, lt) => sum + parseFloat(lt), 0).toFixed(2);
+  }, [lineTotals]);
 
-  const calculateChargesTotal = () => {
+  const chargesTotal = useMemo(() => {
     const freightAmount = parseFloat(freight) || 0;
     const surchargeAmount = parseFloat(surcharge) || 0;
     const fumigationAmount = parseFloat(fumigation) || 0;
@@ -173,13 +305,13 @@ export default function PurchaseOrderEdit() {
     const discountAmount = parseFloat(discount) || 0;
     const otherChargesAmount = parseFloat(otherCharges) || 0;
     return (freightAmount + surchargeAmount + fumigationAmount + documentChargesAmount - discountAmount + otherChargesAmount).toFixed(2);
-  };
+  }, [freight, surcharge, fumigation, documentCharges, discount, otherCharges]);
 
-  const calculateGrandTotal = () => {
-    const itemsTotal = parseFloat(calculateItemsTotal());
-    const chargesTotal = parseFloat(calculateChargesTotal());
-    return (itemsTotal + chargesTotal).toFixed(2);
-  };
+  const grandTotal = useMemo(() => {
+    return (parseFloat(itemsTotal) + parseFloat(chargesTotal)).toFixed(2);
+  }, [itemsTotal, chargesTotal]);
+  
+  const stockItemsList = useMemo(() => (stockItems || []) as StockItem[], [stockItems]);
 
   const handleSave = () => {
     if (!poNumber.trim()) {
@@ -327,60 +459,15 @@ export default function PurchaseOrderEdit() {
                 </TableHeader>
                 <TableBody>
                   {items.map((item, index) => (
-                    <TableRow key={index} data-testid={`row-item-${index}`}>
-                      <TableCell>
-                        <Select
-                          value={item.stockItemId?.toString() || ""}
-                          onValueChange={(v) => handleItemChange(index, "stockItemId", v ? parseInt(v) : null)}
-                        >
-                          <SelectTrigger data-testid={`select-item-${index}`}>
-                            <SelectValue placeholder="Select item">
-                              {item.itemName || "Select item"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stockItems?.map((si) => (
-                              <SelectItem key={si.id} value={si.id.toString()}>
-                                {si.name} ({si.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                          className="text-right"
-                          data-testid={`input-quantity-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.rate}
-                          onChange={(e) => handleItemChange(index, "rate", e.target.value)}
-                          className="text-right"
-                          data-testid={`input-rate-${index}`}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${calculateLineTotal(item)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleRemoveItem(index)}
-                          data-testid={`button-remove-item-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <LineItemRow
+                      key={item.id || `new-${index}`}
+                      item={item}
+                      index={index}
+                      stockItems={stockItemsList}
+                      onItemChange={handleItemChange}
+                      onRemove={handleRemoveItem}
+                      lineTotal={lineTotals[index] || "0.00"}
+                    />
                   ))}
                   {items.length === 0 && (
                     <TableRow>
@@ -395,7 +482,7 @@ export default function PurchaseOrderEdit() {
                         Items Total:
                       </TableCell>
                       <TableCell className="text-right font-mono font-bold">
-                        ${calculateItemsTotal()}
+                        ${itemsTotal}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -485,10 +572,10 @@ export default function PurchaseOrderEdit() {
             <div className="bg-muted/50 rounded-md p-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Grand Total:</span>
-                <span className="text-xl font-bold font-mono">${calculateGrandTotal()}</span>
+                <span className="text-xl font-bold font-mono">${grandTotal}</span>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Items (${calculateItemsTotal()}) + Charges (${calculateChargesTotal()})
+                Items (${itemsTotal}) + Charges (${chargesTotal})
               </p>
             </div>
           </div>
