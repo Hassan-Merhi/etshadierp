@@ -53,6 +53,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined>;
 
   // Companies
@@ -364,6 +365,13 @@ export class DbStorage implements IStorage {
     return user;
   }
 
+  async deleteUser(id: string): Promise<void> {
+    // First delete all user company roles
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.userId, id));
+    // Then delete the user
+    await db.delete(schema.users).where(eq(schema.users.id, id));
+  }
+
   async getUserCompanyRole(userId: string, companyId: number): Promise<schema.UserCompanyRole | undefined> {
     const [role] = await db
       .select()
@@ -462,29 +470,61 @@ export class DbStorage implements IStorage {
     // Delete stock groups
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, id));
     
-    // Delete mix batch sources
-    await db.execute(sql`DELETE FROM mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
+    // Delete mix batch sources (ignore if table doesn't exist)
+    try {
+      await db.execute(sql`DELETE FROM mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM mix_batches WHERE company_id = ${id})`);
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete mix batches
-    await db.delete(schema.mixBatches).where(eq(schema.mixBatches.companyId, id));
+    // Delete mix batches (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.mixBatches).where(eq(schema.mixBatches.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete production bales
-    await db.delete(schema.productionBales).where(eq(schema.productionBales.companyId, id));
+    // Delete production bales (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.productionBales).where(eq(schema.productionBales.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete bale transfer items
-    await db.execute(sql`DELETE FROM bale_transfer_items WHERE transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
+    // Delete bale transfer items (ignore if table doesn't exist)
+    try {
+      await db.execute(sql`DELETE FROM bale_transfer_items WHERE transfer_id IN (SELECT id FROM bale_transfers WHERE company_id = ${id})`);
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete bale transfers
-    await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.companyId, id));
+    // Delete bale transfers (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.baleTransfers).where(eq(schema.baleTransfers.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete bale products
-    await db.delete(schema.baleProducts).where(eq(schema.baleProducts.companyId, id));
+    // Delete bale products (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.baleProducts).where(eq(schema.baleProducts.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete bale sequences
-    await db.delete(schema.baleSequences).where(eq(schema.baleSequences.companyId, id));
+    // Delete bale sequences (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.baleSequences).where(eq(schema.baleSequences.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
-    // Delete bales
-    await db.delete(schema.bales).where(eq(schema.bales.companyId, id));
+    // Delete bales (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.bales).where(eq(schema.bales.companyId, id));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
     // Delete salary advances
     await db.delete(schema.salaryAdvances).where(eq(schema.salaryAdvances.companyId, id));

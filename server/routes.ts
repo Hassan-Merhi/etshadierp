@@ -384,6 +384,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  app.delete(
+    "/api/users/:id",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        
+        // Prevent deleting yourself
+        if (req.user?.id === id) {
+          return res.status(400).json({ message: "Cannot delete your own account" });
+        }
+        
+        await storage.deleteUser(id);
+        res.json({ message: "User deleted successfully" });
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
   // User-Company-Role management routes
   app.get(
     "/api/users/:userId/company-roles",
@@ -1402,6 +1423,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.deleteLedgerAccount(accountId);
         res.json({ message: "Ledger account deleted successfully" });
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  // Zero opening balances for selected ledger accounts
+  app.post(
+    "/api/ledger-accounts/zero-balances",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { accountIds } = req.body;
+        if (!accountIds || !Array.isArray(accountIds) || accountIds.length === 0) {
+          return res.status(400).json({ message: "No accounts selected" });
+        }
+
+        // Get all accounts for this company
+        const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+        const validAccountIds = allAccounts.map(a => a.id);
+        
+        // Filter to only accounts that belong to this company
+        const accountsToUpdate = accountIds.filter((id: number) => validAccountIds.includes(id));
+        
+        if (accountsToUpdate.length === 0) {
+          return res.status(400).json({ message: "No valid accounts found" });
+        }
+
+        // Update each account to zero its opening balance
+        let count = 0;
+        for (const accountId of accountsToUpdate) {
+          await storage.updateLedgerAccount({
+            id: accountId,
+            openingBalance: "0",
+            openingBalanceSide: null,
+          });
+          count++;
+        }
+
+        res.json({ message: `Opening balances zeroed for ${count} account(s)`, count });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
       }

@@ -53,7 +53,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, Shield, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
@@ -89,8 +89,11 @@
     const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<any>(null);
     const [companyToDelete, setCompanyToDelete] = useState<any>(null);
+    const [userToDelete, setUserToDelete] = useState<any>(null);
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
     const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+    const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
+    const [selectedAccountsToZero, setSelectedAccountsToZero] = useState<number[]>([]);
     const [editingRole, setEditingRole] = useState<any>(null);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
@@ -101,28 +104,22 @@
     const { data: users = [], isLoading } = useQuery<any[]>({
       queryKey: ["/api/users"],
     });
+
+    // Get current user role for fiscal period access
+    const { data: currentUser } = useQuery<{ role?: string }>({
+      queryKey: ["/api/auth/me"],
+    });
+
+    // Query for ledger accounts for zero balance feature
+    const { data: allLedgerAccounts = [] } = useQuery<any[]>({
+      queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+      enabled: !!selectedCompany && isZeroBalanceDialogOpen,
+    });
   
     // Query for user company roles when a user is expanded
     const { data: userCompanyRoles = [] } = useQuery<any[]>({
       queryKey: [`/api/users/${expandedUserId}/company-roles`],
       enabled: !!expandedUserId,
-    });
-  
-    // Query for all user company roles (for the permissions tab)
-    const { data: allUserCompanyRoles = [], isLoading: isLoadingPermissions } = useQuery<any[]>({
-      queryKey: ["/api/user-company-roles"],
-      queryFn: async () => {
-        const roles: any[] = [];
-        for (const user of users) {
-          const res = await fetch(`/api/users/${user.id}/company-roles`);
-          if (res.ok) {
-            const userRoles = await res.json();
-            roles.push(...userRoles.map((role: any) => ({ ...role, username: user.username })));
-          }
-        }
-        return roles;
-      },
-      enabled: users.length > 0,
     });
   
     const companyForm = useForm<CompanyFormData>({
@@ -179,8 +176,8 @@
       enabled: !!selectedCompanyId && isRoleDialogOpen,
     });
   
-    // Load ledger accounts for the selected company
-    const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    // Load ledger accounts for the selected company (for role dialog)
+    const { data: roleDialogLedgerAccounts = [] } = useQuery<any[]>({
       queryKey: ["/api/ledger-accounts", { companyId: selectedCompanyId }],
       queryFn: async () => {
         if (!selectedCompanyId) return [];
@@ -192,7 +189,7 @@
     });
   
     // Filter for Cash type ledger accounts only
-    const cashAccounts = ledgerAccounts.filter((account: any) => account.accountType === "Cash");
+    const cashAccounts = roleDialogLedgerAccounts.filter((account: any) => account.accountType === "Cash");
   
     const createCompanyMutation = useMutation({
       mutationFn: async (data: CompanyFormData) => {
@@ -282,6 +279,28 @@
         });
       },
     });
+
+    const deleteUserMutation = useMutation({
+      mutationFn: async (userId: string) => {
+        const res = await apiRequest("DELETE", `/api/users/${userId}`);
+        return await res.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "User deleted successfully",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+        setUserToDelete(null);
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete user",
+          variant: "destructive",
+        });
+      },
+    });
   
     const createRoleMutation = useMutation({
       mutationFn: async (data: RoleAssignmentData) => {
@@ -338,6 +357,29 @@
         toast({
           title: "Error",
           description: error.message || "Failed to delete role",
+          variant: "destructive",
+        });
+      },
+    });
+
+    const zeroBalancesMutation = useMutation({
+      mutationFn: async (accountIds: number[]) => {
+        const res = await apiRequest("POST", "/api/ledger-accounts/zero-balances", { accountIds });
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        toast({
+          title: "Success",
+          description: `Opening balances zeroed for ${data.count} account(s)`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        setIsZeroBalanceDialogOpen(false);
+        setSelectedAccountsToZero([]);
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to zero balances",
           variant: "destructive",
         });
       },
@@ -490,10 +532,6 @@
             <TabsTrigger value="users" data-testid="tab-users">
               <Users className="h-4 w-4 mr-2" />
               Users
-            </TabsTrigger>
-            <TabsTrigger value="permissions" data-testid="tab-permissions">
-              <Shield className="h-4 w-4 mr-2" />
-              User Permissions
             </TabsTrigger>
             <TabsTrigger value="fiscal" data-testid="tab-fiscal">
               <CalendarRange className="h-4 w-4 mr-2" />
@@ -703,6 +741,37 @@
           </AlertDialog>
         </div>
           </TabsContent>
+
+          {/* User Delete Confirmation Dialog */}
+          <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <p>
+                    Are you sure you want to delete user <strong>{userToDelete?.username}</strong>?
+                  </p>
+                  <p className="text-destructive font-medium">
+                    This will permanently delete the user and all their company role assignments.
+                  </p>
+                  <p className="font-bold text-destructive mt-2">
+                    This action cannot be undone!
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete-user">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => userToDelete && deleteUserMutation.mutate(userToDelete.id)}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteUserMutation.isPending}
+                  data-testid="button-confirm-delete-user"
+                >
+                  {deleteUserMutation.isPending ? "Deleting..." : "Delete User"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
   
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4">
@@ -746,7 +815,6 @@
                               {...field}
                               placeholder="john.doe"
                               data-testid="input-username"
-                              disabled={!!editingUser}
                             />
                           </FormControl>
                           <FormMessage />
@@ -868,14 +936,24 @@
                             </Button>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEdit(user)}
-                              data-testid={`button-edit-${user.id}`}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEdit(user)}
+                                data-testid={`button-edit-${user.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setUserToDelete(user)}
+                                data-testid={`button-delete-${user.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                         {expandedUserId === user.id && (
@@ -979,87 +1057,12 @@
         </div>
           </TabsContent>
   
-          {/* User Permissions Tab */}
-          <TabsContent value="permissions" className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  <h2 className="text-2xl font-semibold">User Permissions</h2>
-                </div>
-              </div>
-  
-              <Card className="p-6">
-                {isLoadingPermissions ? (
-                  <p className="text-center text-muted-foreground">Loading permissions...</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Username</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="text-center">Can Sell Negative Stock</TableHead>
-                        <TableHead className="text-center">Can Edit Daybook</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allUserCompanyRoles.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
-                            No user permissions found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        allUserCompanyRoles.map((role: any) => {
-                          const company = companies.find((c: any) => c.id === role.companyId);
-                          return (
-                            <TableRow key={role.id} data-testid={`permission-row-${role.id}`}>
-                              <TableCell className="font-medium" data-testid={`text-permission-username-${role.id}`}>
-                                {role.username}
-                              </TableCell>
-                              <TableCell data-testid={`text-permission-company-${role.id}`}>
-                                {company?.name || "Unknown Company"}
-                              </TableCell>
-                              <TableCell data-testid={`text-permission-role-${role.id}`}>
-                                <Badge variant="outline">{role.role}</Badge>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Switch
-                                  checked={role.role === "Admin" ? true : role.canSellNegativeStock}
-                                  onCheckedChange={(checked) =>
-                                    handlePermissionToggle(role.id, role.userId, role.companyId, "canSellNegativeStock", checked)
-                                  }
-                                  disabled={updatePermissionMutation.isPending || role.role === "Admin"}
-                                  data-testid={`toggle-sell-negative-stock-${role.id}`}
-                                />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Switch
-                                  checked={role.canEditDaybook}
-                                  onCheckedChange={(checked) =>
-                                    handlePermissionToggle(role.id, role.userId, role.companyId, "canEditDaybook", checked)
-                                  }
-                                  disabled={updatePermissionMutation.isPending}
-                                  data-testid={`toggle-edit-daybook-${role.id}`}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                )}
-              </Card>
-            </div>
-          </TabsContent>
   
           {/* Fiscal Period Tab */}
           <TabsContent value="fiscal" className="space-y-4">
             <FiscalPeriodTab 
               currentCompanyId={selectedCompany?.id} 
-              userRole={undefined} 
+              userRole={currentUser?.role} 
             />
           </TabsContent>
   
