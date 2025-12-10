@@ -1993,20 +1993,36 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
 
     // Validate quantities against available inventory
+    // When editing, we need to add back the original transfer quantities to available stock
+    const isEditMode = !!voucherIdToEdit;
+    const originalItems = isEditMode && stockTransferToEdit?.items ? stockTransferToEdit.items : [];
+    
     const inventoryValidationPromises = validEntries.map(entry =>
       fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
         .then(res => res.json())
         .then(inventory => {
           const availableItem = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
-          const availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
+          let availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           const requestedQty = parseFloat(entry.quantity);
+          
+          // In edit mode, add back the original quantity for this item from this source location
+          // This accounts for the fact that the original transfer is already reflected in inventory
+          if (isEditMode) {
+            const originalItem = originalItems.find((orig: any) => 
+              orig.stockItemId === entry.stockItemId && 
+              orig.sourceLocationId === entry.sourceLocationId
+            );
+            if (originalItem) {
+              availableQty += parseFloat(originalItem.quantity || "0");
+            }
+          }
           
           if (requestedQty > availableQty) {
             const item = stockItems.find(s => s.id === entry.stockItemId);
             const sourceLocation = locations.find(l => l.id === entry.sourceLocationId);
             return {
               success: false,
-              error: `${item?.name} has only ${availableQty} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
+              error: `${item?.name} has only ${availableQty.toFixed(2)} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
             };
           }
           return { success: true };
