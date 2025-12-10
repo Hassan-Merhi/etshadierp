@@ -1325,6 +1325,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   );
                                 })}
                                 
+                                {/* Charges Subtotal Row */}
+                                {ledgerEntries.length > 0 && (
+                                  <TableRow className="bg-muted/30">
+                                    <TableCell className="font-semibold">Charges Subtotal</TableCell>
+                                    <TableCell></TableCell>
+                                    {!isPOSUser && (
+                                      <>
+                                        <TableCell></TableCell>
+                                        <TableCell className="text-right font-mono font-semibold">
+                                          ${ledgerEntries.reduce((sum, entry) => sum + (parseFloat(entry.debitAmount || "0") > 0 ? parseFloat(entry.debitAmount) : parseFloat(entry.creditAmount || "0")), 0).toFixed(2)}
+                                        </TableCell>
+                                      </>
+                                    )}
+                                  </TableRow>
+                                )}
+                                
                                 {/* Grand Total Row */}
                                 <TableRow className="font-bold bg-muted/50">
                                   <TableCell>GRAND TOTAL</TableCell>
