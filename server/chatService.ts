@@ -639,8 +639,14 @@ export async function saveMessage(
 
 export async function getConversationHistory(
   sessionId: string,
+  userId?: string,
   limit: number = 10
 ): Promise<{ id: number; role: string; message: string; createdAt: Date }[]> {
+  // Filter by sessionId AND userId for security (if userId provided)
+  const whereClause = userId 
+    ? and(eq(schema.chatMessages.sessionId, sessionId), eq(schema.chatMessages.userId, userId))
+    : eq(schema.chatMessages.sessionId, sessionId);
+    
   const messages = await db
     .select({
       id: schema.chatMessages.id,
@@ -649,7 +655,7 @@ export async function getConversationHistory(
       createdAt: schema.chatMessages.createdAt,
     })
     .from(schema.chatMessages)
-    .where(eq(schema.chatMessages.sessionId, sessionId))
+    .where(whereClause)
     .orderBy(desc(schema.chatMessages.createdAt))
     .limit(limit);
 

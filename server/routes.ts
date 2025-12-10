@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import crypto from "crypto-js";
+import bcrypt from "bcrypt";
+import { createHash } from "crypto";
+import CryptoJS from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
 import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
@@ -78,11 +80,45 @@ import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
 import { format } from "date-fns";
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Configure multer with file size limit (10MB) to prevent memory exhaustion
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
-// Helper function to hash passwords
-function hashPassword(password: string): string {
-  return crypto.SHA256(password).toString();
+// Bcrypt configuration
+const BCRYPT_SALT_ROUNDS = 12;
+
+// Helper function to hash passwords with bcrypt (async)
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+}
+
+// Check if a hash is a legacy SHA256 hash
+function isLegacySHA256Hash(hash: string): boolean {
+  return hash.length === 64 && /^[a-f0-9]+$/i.test(hash);
+}
+
+// Verify password using legacy SHA256 (for migration)
+// Normalize case since some hashes may be stored uppercase
+function verifyLegacyPassword(password: string, hash: string): boolean {
+  const sha256Hash = CryptoJS.SHA256(password).toString().toLowerCase();
+  return sha256Hash === hash.toLowerCase();
+}
+
+// Helper function to verify password against hash
+async function verifyPassword(password: string, hash: string): Promise<{ valid: boolean; needsMigration: boolean }> {
+  // Handle legacy SHA256 hashes (for backward compatibility during migration)
+  if (isLegacySHA256Hash(hash)) {
+    // Verify using legacy SHA256
+    const isValid = verifyLegacyPassword(password, hash);
+    return { valid: isValid, needsMigration: isValid }; // Flag for migration if valid
+  }
+  // Use bcrypt for new hashes
+  const isValid = await bcrypt.compare(password, hash);
+  return { valid: isValid, needsMigration: false };
 }
 
 // Helper function to sync employee payroll balances from voucher entries
@@ -219,9 +255,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const hashedPassword = hashPassword(password);
-      if (user.password !== hashedPassword) {
+      const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
+      if (!passwordValid) {
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Migrate legacy SHA256 password to bcrypt on successful login
+      if (needsMigration) {
+        console.log("Migrating legacy password hash to bcrypt for user:", user.id);
+        const newHash = await hashPassword(password);
+        await storage.updateUser(user.id, { password: newHash });
+        console.log("Password migration complete for user:", user.id);
       }
 
       if (!user.active) {
@@ -302,8 +346,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Username already exists" });
         }
 
-        // Hash the password
-        const hashedPassword = hashPassword(parsed.password);
+        // Hash the password with bcrypt
+        const hashedPassword = await hashPassword(parsed.password);
         const user = await storage.createUser({
           ...parsed,
           password: hashedPassword,
@@ -326,9 +370,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { id } = req.params;
         const updates = req.body;
 
-        // If password is being updated, hash it
+        // If password is being updated, hash it with bcrypt
         if (updates.password) {
-          updates.password = hashPassword(updates.password);
+          updates.password = await hashPassword(updates.password);
         }
 
         const user = await storage.updateUser(id, updates);
@@ -5317,9 +5361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Calculate file hash for idempotency
-        const fileHash = crypto
-          .MD5(req.file.buffer.toString("base64"))
-          .toString();
+        const fileHash = createHash('md5')
+          .update(req.file.buffer)
+          .digest('hex');
 
         // Check if file already imported
         const existingImport = await storage.getImportLogByHash(fileHash);
@@ -22694,7 +22738,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { sessionId } = req.params;
-      const history = await getConversationHistory(sessionId, 50);
+      // Pass userId to ensure users can only access their own chat history
+      const history = await getConversationHistory(sessionId, userId, 50);
       console.log("[Chatbot] History retrieved, count:", history.length);
       res.json(history);
     } catch (error: any) {
