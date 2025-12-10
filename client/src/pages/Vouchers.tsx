@@ -838,15 +838,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, form]);
 
+  // Get selected payment account - moved up to use in filtered accounts
+  const paymentAccountType = form.watch("paymentAccountType");
+  const paymentAccountId = form.watch("paymentAccountId");
+  const paymentAccountName = form.watch("paymentAccountName");
+
   // Compute filtered accounts based on search (lifted from AccountSidebar)
+  // Also exclude the currently selected payment account to prevent duplicate entries
   const filteredSidebarAccounts = useMemo(() => {
     return sidebarAccounts
-      .filter((acc) =>
-        acc.name.toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
-        acc.code.toLowerCase().includes(sidebarSearchValue.toLowerCase())
-      )
+      .filter((acc) => {
+        // Exclude the currently selected payment account from the entries list
+        if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
+          return false;
+        }
+        return acc.name.toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
+          acc.code.toLowerCase().includes(sidebarSearchValue.toLowerCase());
+      })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [sidebarAccounts, sidebarSearchValue]);
+  }, [sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType]);
 
   // Track active row's account for sync
   const activeRowAccountId = activeRowIndex !== null && entries[activeRowIndex] 
@@ -889,11 +899,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   }, [filteredSidebarAccounts.length]);
 
-  // Get selected payment account and calculate balance
-  const paymentAccountType = form.watch("paymentAccountType");
-  const paymentAccountId = form.watch("paymentAccountId");
-  const paymentAccountName = form.watch("paymentAccountName");
-  
   // Find the selected account in allAccounts to get openingBalance
   const selectedAccount = useMemo(() => {
     return allAccounts.find(acc => acc.type === paymentAccountType && acc.id === paymentAccountId);
