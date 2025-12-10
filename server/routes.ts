@@ -13046,6 +13046,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 currency: purchaseOrder.currency,
                 itemsTotal: isPOSUser ? null : purchaseOrder.itemsTotal,
                 status: purchaseOrder.status,
+                // Include individual charges for display
+                freight: isPOSUser ? null : purchaseOrder.freight,
+                fumigation: isPOSUser ? null : purchaseOrder.fumigation,
+                surcharge: isPOSUser ? null : purchaseOrder.surcharge,
+                documentCharges: isPOSUser ? null : purchaseOrder.documentCharges,
+                otherCharges: isPOSUser ? null : purchaseOrder.otherCharges,
+                discount: isPOSUser ? null : purchaseOrder.discount,
               }
             });
           }

@@ -1300,36 +1300,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   </TableRow>
                                 )}
                                 
-                                {/* Charges/Adjustments - Extract charge type from account name */}
-                                {ledgerEntries.length > 0 && ledgerEntries.map((entry) => {
-                                  const amount = parseFloat(entry.debitAmount || "0") > 0 
-                                    ? parseFloat(entry.debitAmount)
-                                    : parseFloat(entry.creditAmount || "0");
+                                {/* Individual Charges from Purchase Order */}
+                                {purchaseOrderData && (() => {
+                                  const charges = [
+                                    { label: "Freight", amount: parseFloat(purchaseOrderData.freight || "0") },
+                                    { label: "Fumigation", amount: parseFloat(purchaseOrderData.fumigation || "0") },
+                                    { label: "Surcharge", amount: parseFloat(purchaseOrderData.surcharge || "0") },
+                                    { label: "Document Charges", amount: parseFloat(purchaseOrderData.documentCharges || "0") },
+                                    { label: "Other Charges", amount: parseFloat(purchaseOrderData.otherCharges || "0") },
+                                    { label: "Discount", amount: -parseFloat(purchaseOrderData.discount || "0") },
+                                  ].filter(c => c.amount !== 0);
                                   
-                                  // Extract charge type from account name (e.g., "Freight - Container..." -> "Freight")
-                                  let chargeLabel = entry.accountName;
-                                  const dashIndex = entry.accountName.indexOf(" - ");
-                                  if (dashIndex > 0) {
-                                    chargeLabel = entry.accountName.substring(0, dashIndex);
-                                  }
-                                  
-                                  return (
-                                    <TableRow key={entry.id} className="bg-muted/20">
+                                  return charges.map((charge, idx) => (
+                                    <TableRow key={`charge-${idx}`} className="bg-muted/20">
                                       <TableCell>
-                                        <div className="font-medium text-sm">{chargeLabel}</div>
+                                        <div className="font-medium text-sm">{charge.label}</div>
                                       </TableCell>
                                       <TableCell></TableCell>
                                       {!isPOSUser && (
                                         <>
                                           <TableCell></TableCell>
                                           <TableCell className="text-right font-mono">
-                                            ${amount.toFixed(2)}
+                                            {charge.amount < 0 ? `-$${Math.abs(charge.amount).toFixed(2)}` : `$${charge.amount.toFixed(2)}`}
                                           </TableCell>
                                         </>
                                       )}
                                     </TableRow>
-                                  );
-                                })}
+                                  ));
+                                })()}
                                 
                                 {/* Grand Total Row */}
                                 <TableRow className="font-bold bg-muted/50">
@@ -1342,7 +1340,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                       <TableCell></TableCell>
                                       <TableCell className="text-right font-mono">
                                         ${(purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0) + 
-                                            ledgerEntries.reduce((sum, entry) => sum + (parseFloat(entry.debitAmount || "0") > 0 ? parseFloat(entry.debitAmount) : parseFloat(entry.creditAmount || "0")), 0)).toFixed(2)}
+                                            (purchaseOrderData ? 
+                                              parseFloat(purchaseOrderData.freight || "0") +
+                                              parseFloat(purchaseOrderData.fumigation || "0") +
+                                              parseFloat(purchaseOrderData.surcharge || "0") +
+                                              parseFloat(purchaseOrderData.documentCharges || "0") +
+                                              parseFloat(purchaseOrderData.otherCharges || "0") -
+                                              parseFloat(purchaseOrderData.discount || "0")
+                                            : 0)).toFixed(2)}
                                       </TableCell>
                                     </>
                                   )}
