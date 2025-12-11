@@ -20402,7 +20402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
-      // Find vouchers that have a locationId but the location no longer exists
+      // Find vouchers that have a locationId but the location is deleted or no longer exists
       const orphanedVouchers = await db
         .select({
           id: vouchers.id,
@@ -20421,7 +20421,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             sql`${vouchers.locationId} IS NOT NULL`,
-            sql`${locations.id} IS NULL`
+            or(
+              sql`${locations.id} IS NULL`,
+              isNotNull(locations.deletedAt)
+            )
           )
         )
         .orderBy(sql`${vouchers.createdAt} DESC`);
