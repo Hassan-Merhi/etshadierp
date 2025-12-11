@@ -71,6 +71,7 @@ interface DailySummary {
 }
 
 type GroupingType = "daily" | "monthly" | "yearly";
+type ProfitFilter = "all" | "positive" | "negative";
 
 // Format currency: adds commas, removes .00 if whole number
 const formatCurrency = (value: string | number): string => {
@@ -107,6 +108,7 @@ export default function SalesReport() {
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
+  const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
   const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -225,8 +227,16 @@ export default function SalesReport() {
   // Sort by date descending (most recent first)
   groupedData.sort((a, b) => b.date.localeCompare(a.date));
 
+  // Apply profit filter
+  const filteredGroupedData = groupedData.filter(group => {
+    if (profitFilter === "all") return true;
+    if (profitFilter === "positive") return group.configuredProfit >= 0;
+    if (profitFilter === "negative") return group.configuredProfit < 0;
+    return true;
+  });
+
   // Calculate totals
-  const totals = groupedData.reduce(
+  const totals = filteredGroupedData.reduce(
     (acc, group) => ({
       totalSales: acc.totalSales + group.totalSales,
       totalCost: acc.totalCost + group.totalCost,
@@ -243,6 +253,7 @@ export default function SalesReport() {
     setSelectedLocation("");
     setSelectedStockItem("");
     setSearchTerm("");
+    setProfitFilter("all");
   };
 
   const handleRowClick = (summary: DailySummary) => {
@@ -394,6 +405,22 @@ export default function SalesReport() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="profitFilter">Profit Filter</Label>
+              <Select
+                value={profitFilter}
+                onValueChange={(value) => setProfitFilter(value as ProfitFilter)}
+              >
+                <SelectTrigger id="profitFilter" data-testid="select-profit-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Profits</SelectItem>
+                  <SelectItem value="positive">Positive Only</SelectItem>
+                  <SelectItem value="negative">Negative Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
               <DatePickerInput
                 value={startDate}
@@ -475,7 +502,7 @@ export default function SalesReport() {
       {/* Data Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)} ({groupedData.length})</CardTitle>
+          <CardTitle>Sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)} ({filteredGroupedData.length})</CardTitle>
           <CardDescription>Click on any row to view detailed breakdown</CardDescription>
         </CardHeader>
         <CardContent>
@@ -483,7 +510,7 @@ export default function SalesReport() {
             <div className="text-center py-8 text-muted-foreground">
               Loading sales data...
             </div>
-          ) : groupedData.length === 0 ? (
+          ) : filteredGroupedData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No sales transactions found. Try adjusting your filters.
             </div>
@@ -503,7 +530,7 @@ export default function SalesReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {groupedData.map((group) => (
+                  {filteredGroupedData.map((group) => (
                     <TableRow 
                       key={group.date} 
                       data-testid={`row-sale-${group.date}`}
