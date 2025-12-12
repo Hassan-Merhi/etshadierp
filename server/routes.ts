@@ -15847,10 +15847,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const incomeBalance = await getAccountTypeBalance("Income", true);
 
       // 11. Stock Value on Floor (inventory in locations)
+      // Only include inventory at valid, non-deleted locations (excludes orphaned inventory)
       const inventoryItems = await db
-        .select()
+        .select({
+          totalValue: inventory.totalValue,
+        })
         .from(inventory)
-        .where(eq(inventory.companyId, companyId));
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            isNull(locations.deletedAt)
+          )
+        );
 
       const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
         const totalValue = parseFloat(item.totalValue || "0");
