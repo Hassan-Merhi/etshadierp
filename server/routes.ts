@@ -15978,9 +15978,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + (balance > 0 ? balance : 0);
       }, 0);
 
+      // 16. Asset accounts (properties, guarantees, receivables - asset/debit side)
+      const assetBalance = await getAccountTypeBalance("Asset", false);
+
+      // 17. General Expense accounts (Purchases, Duties, Transport - expense/debit side)
+      // This is different from payrollExpenseBalance which only includes salary-related expenses
+      const generalExpenseBalance = await getAccountTypeBalance("Expense", false);
+
+      // 18. Government Taxes accounts (expense/debit side)
+      const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
+
+      // 19. Liability accounts (non-payroll liabilities - credit side)
+      const liabilityBalance = await getAccountTypeBalance("Liability", true);
+
+      // 20. Profit/Equity accounts (retained earnings - credit side)
+      const profitBalance = await getAccountTypeBalance("Profit", true);
+
       // Calculate the net balance:
-      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Direct Expenses + Indirect Expenses + COGS + Payroll Expense + Salary Advances
-      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Income + Payroll Liabilities
+      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Direct Expenses + Indirect Expenses + General Expenses + Government Taxes + COGS + Payroll Expense + Salary Advances
+      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability accounts + Profit/Equity + Income + Payroll Liabilities
       // Net = (Assets + Expenses) - (Liabilities + Income) (should be 0 when balanced)
       // Note: Expenses are debits (like assets), so they go on the same side
       // Note: COGS is calculated from salesItems table (not ledger) to match periodic inventory system
@@ -15989,15 +16005,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cashBalance +               // Asset (debit)
         bankBalance +               // Asset (debit)
         stockOnFloorValue +         // Inventory value (asset)
+        assetBalance +              // Asset accounts (properties, guarantees)
         directExpenseBalance +      // Expense (debit)
         indirectExpenseBalance +    // Expense (debit)
+        generalExpenseBalance +     // General Expense (Purchases, Duties, Transport) - includes payroll expenses
+        governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction
-        payrollExpenseBalance +     // Payroll Expense (debit) - salaries paid
         salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
         (supplierBalance +          // Liability (what we owe)
         dutyAgentBalance +          // Liability (what we owe)
         transporterAgentBalance +   // Liability (what we owe)
         loansBalance +              // Liability (what we owe)
+        liabilityBalance +          // Other Liability accounts
+        profitBalance +             // Profit/Equity (retained earnings)
         incomeBalance +             // Income (sales revenue - credit)
         payrollLiabilitiesBalance); // Payroll Liabilities (what we owe employees)
 
@@ -16011,9 +16031,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           loansBalance,
           cashBalance,
           bankBalance,
+          assetBalance,
           directExpenseBalance,
           indirectExpenseBalance,
+          generalExpenseBalance,
+          governmentTaxesBalance,
           incomeBalance,
+          liabilityBalance,
+          profitBalance,
           stockOnFloorValue,
           cogsBalance,
           payrollExpenseBalance,
