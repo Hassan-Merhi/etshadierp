@@ -15995,27 +15995,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profitBalance = await getAccountTypeBalance("Profit", true);
 
       // Calculate the net balance:
-      // Assets + Expenses: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Direct Expenses + Indirect Expenses + General Expenses + Government Taxes + COGS + Payroll Expense + Salary Advances
+      // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
+      // Operating Expenses: Direct Expenses + Indirect Expenses + Government Taxes
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability accounts + Profit/Equity + Income + Payroll Liabilities
-      // Net = (Assets + Expenses) - (Liabilities + Income) (should be 0 when balanced)
-      // Note: Expenses are debits (like assets), so they go on the same side
-      // Note: COGS is calculated from salesItems table (not ledger) to match periodic inventory system
+      // Net = (Assets + Operating Expenses) - (Liabilities + Income) (should be 0 when balanced)
+      // NOTE: generalExpenseBalance (Purchases) is EXCLUDED because it double-counts with stockOnFloorValue
+      //       When containers are offloaded, Purchases expense is debited AND Stock on Floor increases
+      //       The inventory value already captures the cost of goods, so we don't add Purchases again
+      // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
       const netImportCycleBalance = 
-        (stockOtwValue +            // Asset (debit)
-        cashBalance +               // Asset (debit)
-        bankBalance +               // Asset (debit)
-        stockOnFloorValue +         // Inventory value (asset)
-        assetBalance +              // Asset accounts (properties, guarantees)
-        directExpenseBalance +      // Expense (debit)
-        indirectExpenseBalance +    // Expense (debit)
-        generalExpenseBalance +     // General Expense (Purchases, Duties, Transport) - includes payroll expenses
+        (stockOtwValue +            // Asset (debit) - containers in transit
+        cashBalance +               // Asset (debit) - cash on hand
+        bankBalance +               // Asset (debit) - bank balances
+        stockOnFloorValue +         // Asset - inventory at cost (includes capitalized expenses)
+        assetBalance +              // Asset accounts (properties, guarantees, receivables)
+        directExpenseBalance +      // Expense (debit) - not capitalized into inventory
+        indirectExpenseBalance +    // Expense (debit) - operating expenses
         governmentTaxesBalance +    // Government Taxes (expense)
-        cogsBalance +               // COGS expense (debit) - balances inventory reduction
+        cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
         salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
-        (supplierBalance +          // Liability (what we owe)
-        dutyAgentBalance +          // Liability (what we owe)
-        transporterAgentBalance +   // Liability (what we owe)
-        loansBalance +              // Liability (what we owe)
+        (supplierBalance +          // Liability (what we owe to suppliers)
+        dutyAgentBalance +          // Liability (what we owe to duty agents)
+        transporterAgentBalance +   // Liability (what we owe to transporters)
+        loansBalance +              // Liability (loans/borrowings)
         liabilityBalance +          // Other Liability accounts
         profitBalance +             // Profit/Equity (retained earnings)
         incomeBalance +             // Income (sales revenue - credit)
