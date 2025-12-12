@@ -1462,7 +1462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateLedgerAccount({
             id: accountId,
             openingBalance: "0",
-            openingBalanceSide: null,
+            openingBalanceSide: undefined,
           });
           count++;
         }
@@ -1470,6 +1470,331 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ message: `Opening balances zeroed for ${count} account(s)`, count });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
+  // Initialize Accounting Balances - creates Owner's Capital accounts to balance the Import Cycle
+  app.post(
+    "/api/admin/initialize-accounting-balances",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const results: Array<{
+          companyId: number;
+          companyName: string;
+          imbalance: number;
+          accountCreated: boolean;
+          accountCode?: string;
+          accountName?: string;
+          openingBalance?: string;
+          openingBalanceSide?: string;
+          message: string;
+        }> = [];
+
+        // Get all companies
+        const allCompanies = await storage.getAllCompanies();
+
+        for (const company of allCompanies) {
+          const companyId = company.id;
+
+          // Helper function to calculate account balance by account type
+          const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
+            const accounts = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  eq(ledgerAccounts.accountType, accountType),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              );
+
+            let totalBalance = 0;
+            for (const account of accounts) {
+              const entries = await db
+                .select({
+                  creditAmount: voucherEntries.creditAmount,
+                  debitAmount: voucherEntries.debitAmount,
+                })
+                .from(voucherEntries)
+                .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+                .where(
+                  and(
+                    eq(voucherEntries.ledgerAccountId, account.id),
+                    eq(vouchers.companyId, companyId),
+                    isNull(vouchers.deletedAt),
+                    eq(vouchers.optional, false)
+                  )
+                );
+
+              const openingBalance = parseFloat(account.openingBalance || "0");
+              const balance = entries.reduce((sum, entry) => {
+                const credit = parseFloat(entry.creditAmount || "0");
+                const debit = parseFloat(entry.debitAmount || "0");
+                
+                if (isLiability) {
+                  return sum + credit - debit;
+                } else {
+                  return sum + debit - credit;
+                }
+              }, openingBalance);
+              
+              totalBalance += balance;
+            }
+            return totalBalance;
+          };
+
+          // Calculate all balances (same logic as import-cycle-balance endpoint)
+          // 1. Supplier Balance
+          const supplierEntries = await db
+            .select({
+              creditAmount: voucherEntries.creditAmount,
+              debitAmount: voucherEntries.debitAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(
+              and(
+                isNotNull(voucherEntries.supplierId),
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false)
+              )
+            );
+          
+          const supplierBalance = supplierEntries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            return sum + credit - debit;
+          }, 0);
+
+          // 2. Stock OTW
+          const otwContainers = await db
+            .select()
+            .from(containers)
+            .where(
+              and(
+                eq(containers.companyId, companyId),
+                eq(containers.status, "OTW")
+              )
+            );
+          const stockOtwValue = otwContainers.reduce((sum, container) => {
+            return sum + parseFloat(container.grandTotal || "0");
+          }, 0);
+
+          // 3-5. Agent and Loan balances
+          const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
+          const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
+          const loansBalance = await getAccountTypeBalance("Loans", true);
+
+          // 6-7. Cash and Bank balances
+          const cashBalance = await getAccountTypeBalance("Cash", false);
+          const bankBalance = await getAccountTypeBalance("Bank", false);
+
+          // 8-9. Expense balances
+          const directExpenseBalance = await getAccountTypeBalance("Direct Expense", false);
+          const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
+
+          // 10. Income balance
+          const incomeBalance = await getAccountTypeBalance("Income", true);
+
+          // 11. Stock on Floor
+          const inventoryItems = await db
+            .select({
+              totalValue: inventory.totalValue,
+            })
+            .from(inventory)
+            .innerJoin(locations, eq(inventory.locationId, locations.id))
+            .where(
+              and(
+                eq(inventory.companyId, companyId),
+                isNull(locations.deletedAt)
+              )
+            );
+
+          const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
+            const totalValue = parseFloat(item.totalValue || "0");
+            return sum + totalValue;
+          }, 0);
+
+          // 12. COGS
+          const cogsData = await db
+            .select({
+              totalCost: salesItems.totalCost,
+            })
+            .from(salesItems)
+            .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false)
+              )
+            );
+
+          const cogsBalance = cogsData.reduce((sum, item) => {
+            return sum + parseFloat(item.totalCost || "0");
+          }, 0);
+
+          // 14. Salary Advances
+          const advancesData = await db
+            .select({
+              remainingBalance: salaryAdvances.remainingBalance,
+            })
+            .from(salaryAdvances)
+            .where(
+              and(
+                eq(salaryAdvances.companyId, companyId),
+                eq(salaryAdvances.fullyPaid, false)
+              )
+            );
+
+          const salaryAdvancesBalance = advancesData.reduce((sum, advance) => {
+            return sum + parseFloat(advance.remainingBalance || "0");
+          }, 0);
+
+          // 15. Payroll Liabilities
+          const employeesData = await db
+            .select({
+              currentBalance: employees.currentBalance,
+            })
+            .from(employees)
+            .where(
+              and(
+                eq(employees.companyId, companyId),
+                isNull(employees.deletedAt)
+              )
+            );
+
+          const payrollLiabilitiesBalance = employeesData.reduce((sum, emp) => {
+            const balance = parseFloat(emp.currentBalance || "0");
+            return sum + (balance > 0 ? balance : 0);
+          }, 0);
+
+          // 16-19. Other account type balances
+          const assetBalance = await getAccountTypeBalance("Asset", false);
+          const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
+          const liabilityBalance = await getAccountTypeBalance("Liability", true);
+          const profitBalance = await getAccountTypeBalance("Profit", true);
+
+          // Calculate the net import cycle balance (imbalance)
+          const netImportCycleBalance = 
+            (stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
+            directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
+            cogsBalance + salaryAdvancesBalance) -
+            (supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
+            liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance);
+
+          // If imbalance is very small (< $1), consider it balanced
+          if (Math.abs(netImportCycleBalance) < 1) {
+            results.push({
+              companyId,
+              companyName: company.name,
+              imbalance: netImportCycleBalance,
+              accountCreated: false,
+              message: "Already balanced (imbalance < $1)"
+            });
+            continue;
+          }
+
+          // Check if Owner's Capital account already exists
+          const existingCapitalAccounts = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                eq(ledgerAccounts.accountType, "Profit"),
+                like(ledgerAccounts.name, "%Capital%"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+
+          if (existingCapitalAccounts.length > 0) {
+            results.push({
+              companyId,
+              companyName: company.name,
+              imbalance: netImportCycleBalance,
+              accountCreated: false,
+              message: `Owner's Capital account already exists (${existingCapitalAccounts[0].code}). Delete it first to re-initialize.`
+            });
+            continue;
+          }
+
+          // Generate unique code for the capital account
+          const existingProfitAccounts = await db
+            .select({ code: ledgerAccounts.code })
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                eq(ledgerAccounts.accountType, "Profit"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            );
+
+          let nextCodeNum = 1;
+          for (const acc of existingProfitAccounts) {
+            const match = acc.code.match(/CAP-(\d+)/);
+            if (match) {
+              const num = parseInt(match[1]);
+              if (num >= nextCodeNum) nextCodeNum = num + 1;
+            }
+          }
+
+          const accountCode = `CAP-${String(nextCodeNum).padStart(3, '0')}`;
+          const accountName = "Owner's Capital";
+          
+          // If imbalance is positive (assets > liabilities), we need Cr balance
+          // If imbalance is negative (liabilities > assets), we need Dr balance
+          const openingBalanceSide: "Dr" | "Cr" = netImportCycleBalance > 0 ? "Cr" : "Dr";
+          const openingBalanceAmount = Math.abs(netImportCycleBalance).toFixed(2);
+
+          // Create the Owner's Capital account
+          await storage.createLedgerAccount({
+            companyId,
+            code: accountCode,
+            name: accountName,
+            accountType: "Profit",
+            openingBalance: openingBalanceAmount,
+            openingBalanceSide: openingBalanceSide,
+            active: true,
+          });
+
+          results.push({
+            companyId,
+            companyName: company.name,
+            imbalance: netImportCycleBalance,
+            accountCreated: true,
+            accountCode,
+            accountName,
+            openingBalance: openingBalanceAmount,
+            openingBalanceSide,
+            message: `Created ${accountCode} - ${accountName} with opening balance ${openingBalanceAmount} ${openingBalanceSide}`
+          });
+        }
+
+        // Generate SQL summary for production database
+        const sqlStatements: string[] = [];
+        for (const result of results) {
+          if (result.accountCreated) {
+            sqlStatements.push(
+              `INSERT INTO ledger_accounts (company_id, code, name, account_type, opening_balance, opening_balance_side, active)\nVALUES (${result.companyId}, '${result.accountCode}', '${result.accountName}', 'Profit', ${result.openingBalance}, '${result.openingBalanceSide}', true);`
+            );
+          }
+        }
+
+        res.json({
+          message: `Processed ${results.length} companies`,
+          results,
+          sqlForProduction: sqlStatements.length > 0 ? sqlStatements.join('\n\n') : "No accounts needed to be created"
+        });
+      } catch (error: any) {
+        console.error("Error initializing accounting balances:", error);
+        res.status(500).json({ message: error.message });
       }
     },
   );
