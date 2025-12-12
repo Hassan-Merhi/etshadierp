@@ -96,6 +96,8 @@
     const [selectedAccountsToZero, setSelectedAccountsToZero] = useState<number[]>([]);
     const [editingRole, setEditingRole] = useState<any>(null);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
+    const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -380,6 +382,29 @@
         toast({
           title: "Error",
           description: error.message || "Failed to zero balances",
+          variant: "destructive",
+        });
+      },
+    });
+
+    const initializeBalancesMutation = useMutation({
+      mutationFn: async () => {
+        const res = await apiRequest("POST", "/api/admin/initialize-accounting-balances", {});
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        setInitBalancesResult(data);
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to initialize balances",
           variant: "destructive",
         });
       },
@@ -1173,10 +1198,100 @@
                     </div>
                   </Card>
                 </Link>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-500/10 rounded-lg">
+                        <Calculator className="h-6 w-6 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-init-balances-title">Initialize Accounting Balances</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create Owner's Capital accounts to balance the Import Cycle for all companies
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setInitBalancesResult(null);
+                        setIsInitBalancesDialogOpen(true);
+                      }}
+                      disabled={initializeBalancesMutation.isPending}
+                      data-testid="button-init-accounting"
+                    >
+                      {initializeBalancesMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Initialize"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
               </div>
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Initialize Accounting Balances Dialog */}
+        <AlertDialog open={isInitBalancesDialogOpen} onOpenChange={setIsInitBalancesDialogOpen}>
+          <AlertDialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Initialize Accounting Balances</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!initBalancesResult ? (
+                  <p>This will create Owner's Capital accounts for each company to balance the Import Cycle. This action cannot be easily undone.</p>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{initBalancesResult.message}</div>
+                    {initBalancesResult.results?.map((r: any) => (
+                      <div key={r.companyId} className="p-3 border rounded-md">
+                        <div className="font-medium">{r.companyName}</div>
+                        <div className="text-sm">Imbalance: ${r.imbalance?.toFixed(2)}</div>
+                        <div className="text-sm">{r.message}</div>
+                      </div>
+                    ))}
+                    {initBalancesResult.sqlForProduction && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium">SQL for Production (Copy to Render):</div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText(initBalancesResult.sqlForProduction);
+                              toast({
+                                title: "Copied",
+                                description: "SQL copied to clipboard",
+                              });
+                            }}
+                            data-testid="button-copy-sql"
+                          >
+                            Copy SQL
+                          </Button>
+                        </div>
+                        <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto whitespace-pre-wrap">
+                          {initBalancesResult.sqlForProduction}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+              {!initBalancesResult && (
+                <AlertDialogAction
+                  onClick={() => initializeBalancesMutation.mutate()}
+                  disabled={initializeBalancesMutation.isPending}
+                >
+                  {initializeBalancesMutation.isPending ? "Processing..." : "Initialize All Companies"}
+                </AlertDialogAction>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
   
         {/* Role Assignment Dialog */}
         <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
