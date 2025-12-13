@@ -98,6 +98,7 @@
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
     const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
+    const [expandedBreakdownId, setExpandedBreakdownId] = useState<number | null>(null);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -1251,42 +1252,58 @@
                         <div className="text-sm">{r.message}</div>
                         
                         {r.components && (
-                          <details className="text-sm mt-3 border-t pt-2">
-                            <summary className="cursor-pointer text-primary hover:underline font-medium">
-                              Click to View Calculation Breakdown
-                            </summary>
-                            <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
-                              <div>
-                                <div className="font-medium text-green-600 dark:text-green-400 mb-1">Assets (Debit)</div>
-                                {r.components.assets?.map((c: any, i: number) => (
-                                  <div key={i} className="flex justify-between">
-                                    <span>{c.name}</span>
-                                    <span>${c.value.toFixed(2)}</span>
+                          <div className="text-sm mt-3 border-t pt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-between"
+                              onClick={() => setExpandedBreakdownId(expandedBreakdownId === r.companyId ? null : r.companyId)}
+                              data-testid={`button-expand-breakdown-${r.companyId}`}
+                            >
+                              <span>View Calculation Breakdown</span>
+                              {expandedBreakdownId === r.companyId ? (
+                                <ChevronUp className="h-4 w-4 ml-2" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              )}
+                            </Button>
+                            {expandedBreakdownId === r.companyId && (
+                              <>
+                                <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
+                                  <div>
+                                    <div className="font-medium text-green-600 dark:text-green-400 mb-1">Assets (Debit)</div>
+                                    {r.components.assets?.map((c: any, i: number) => (
+                                      <div key={i} className="flex justify-between">
+                                        <span>{c.name}</span>
+                                        <span>${c.value.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                      <span>Total Assets</span>
+                                      <span>${r.components.totalAssets?.toFixed(2)}</span>
+                                    </div>
                                   </div>
-                                ))}
-                                <div className="border-t mt-1 pt-1 font-medium flex justify-between">
-                                  <span>Total Assets</span>
-                                  <span>${r.components.totalAssets?.toFixed(2)}</span>
-                                </div>
-                              </div>
-                              <div>
-                                <div className="font-medium text-red-600 dark:text-red-400 mb-1">Liabilities (Credit)</div>
-                                {r.components.liabilities?.map((c: any, i: number) => (
-                                  <div key={i} className="flex justify-between">
-                                    <span>{c.name}</span>
-                                    <span>${c.value.toFixed(2)}</span>
+                                  <div>
+                                    <div className="font-medium text-red-600 dark:text-red-400 mb-1">Liabilities (Credit)</div>
+                                    {r.components.liabilities?.map((c: any, i: number) => (
+                                      <div key={i} className="flex justify-between">
+                                        <span>{c.name}</span>
+                                        <span>${c.value.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                      <span>Total Liabilities</span>
+                                      <span>${r.components.totalLiabilities?.toFixed(2)}</span>
+                                    </div>
                                   </div>
-                                ))}
-                                <div className="border-t mt-1 pt-1 font-medium flex justify-between">
-                                  <span>Total Liabilities</span>
-                                  <span>${r.components.totalLiabilities?.toFixed(2)}</span>
                                 </div>
-                              </div>
-                            </div>
-                            <div className="mt-2 p-2 bg-muted rounded text-center font-medium">
-                              Net Imbalance = ${r.components.totalAssets?.toFixed(2)} - ${r.components.totalLiabilities?.toFixed(2)} = ${r.imbalance?.toFixed(2)}
-                            </div>
-                          </details>
+                                <div className="mt-2 p-2 bg-muted rounded text-center font-medium">
+                                  Net Imbalance = ${r.components.totalAssets?.toFixed(2)} - ${r.components.totalLiabilities?.toFixed(2)} = ${r.imbalance?.toFixed(2)}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}
