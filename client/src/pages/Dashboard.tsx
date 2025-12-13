@@ -115,6 +115,7 @@ export default function Dashboard() {
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
   const [selectedPayableAccountId, setSelectedPayableAccountId] = useState<number>(0);
   const [payableComboboxOpen, setPayableComboboxOpen] = useState(false);
+  const [cashComboboxOpen, setCashComboboxOpen] = useState(false);
   
   // Fetch net profit data
   const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
@@ -522,27 +523,50 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Account</label>
-                    <Select
-                      value={selectedAccountId.toString()}
-                      onValueChange={(value) => setSelectedAccountId(parseInt(value))}
-                    >
-                      <SelectTrigger data-testid="select-account">
-                        <SelectValue placeholder="Select an account..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCashAccounts.length === 0 ? (
-                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                            No available accounts
-                          </div>
-                        ) : (
-                          availableCashAccounts.map((account) => (
-                            <SelectItem key={account.id} value={account.accountId.toString()}>
-                              {account.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={cashComboboxOpen} onOpenChange={setCashComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={cashComboboxOpen}
+                          className="w-full justify-between"
+                          data-testid="select-account"
+                        >
+                          {selectedAccountId > 0
+                            ? availableCashAccounts.find((acc) => acc.accountId === selectedAccountId)?.name || "Select account..."
+                            : "Search accounts..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search accounts..." />
+                          <CommandList>
+                            <CommandEmpty>No account found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableCashAccounts.map((account) => (
+                                <CommandItem
+                                  key={account.id}
+                                  value={account.name}
+                                  onSelect={() => {
+                                    setSelectedAccountId(account.accountId);
+                                    setCashComboboxOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedAccountId === account.accountId ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {account.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <Button
                     onClick={() => {
