@@ -1754,52 +1754,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Check if Owner's Capital account already exists
-          const existingCapitalAccounts = await db
+          // Check if any Profit account exists - if so, update the first one instead of creating new
+          const existingProfitAccounts = await db
             .select()
             .from(ledgerAccounts)
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
                 eq(ledgerAccounts.accountType, "Profit"),
-                like(ledgerAccounts.name, "%Capital%"),
                 isNull(ledgerAccounts.deletedAt)
               )
             );
 
-          if (existingCapitalAccounts.length > 0) {
+          if (existingProfitAccounts.length > 0) {
+            // Update the first/main Profit account instead of creating new
+            const profitAccount = existingProfitAccounts[0];
+            const currentBalance = parseFloat(profitAccount.openingBalance || "0");
+            const currentSide = profitAccount.openingBalanceSide || "Cr";
+            
+            // Convert current balance to signed value (Cr = positive for equity accounts)
+            const currentSigned = currentSide === "Cr" ? currentBalance : -currentBalance;
+            
+            // netImportCycleBalance represents the signed adjustment needed
+            // Positive = need more Cr (equity increase), Negative = need more Dr (equity decrease)
+            const newSigned = currentSigned + netImportCycleBalance;
+            
+            // Convert back to absolute value and side
+            const newOpeningBalance = Math.abs(newSigned).toFixed(2);
+            const newOpeningBalanceSide: "Dr" | "Cr" = newSigned >= 0 ? "Cr" : "Dr";
+
+            // Update the account using raw query since storage.updateLedgerAccount may not support all fields
+            await db.update(ledgerAccounts).set({
+              openingBalance: newOpeningBalance,
+              openingBalanceSide: newOpeningBalanceSide,
+            }).where(eq(ledgerAccounts.id, profitAccount.id));
+
             results.push({
               companyId,
               companyName: company.name,
               imbalance: netImportCycleBalance,
               accountCreated: false,
-              message: `Owner's Capital account already exists (${existingCapitalAccounts[0].code}). Delete it first to re-initialize.`,
+              accountUpdated: true,
+              accountCode: profitAccount.code,
+              accountName: profitAccount.name,
+              previousBalance: `${currentBalance.toFixed(2)} ${currentSide}`,
+              openingBalance: newOpeningBalance,
+              openingBalanceSide: newOpeningBalanceSide,
+              message: `Updated ${profitAccount.code} - ${profitAccount.name}: ${currentBalance.toFixed(2)} ${currentSide} → ${newOpeningBalance} ${newOpeningBalanceSide}`,
               components: componentsBreakdown,
             });
             continue;
           }
 
-          // Generate unique code for the capital account
-          const existingProfitAccounts = await db
-            .select({ code: ledgerAccounts.code })
-            .from(ledgerAccounts)
-            .where(
-              and(
-                eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.accountType, "Profit"),
-                isNull(ledgerAccounts.deletedAt)
-              )
-            );
-
+          // No existing Profit account - generate unique code for new capital account
           let nextCodeNum = 1;
-          for (const acc of existingProfitAccounts) {
-            const match = acc.code.match(/CAP-(\d+)/);
-            if (match) {
-              const num = parseInt(match[1]);
-              if (num >= nextCodeNum) nextCodeNum = num + 1;
-            }
-          }
-
           const accountCode = `CAP-${String(nextCodeNum).padStart(3, '0')}`;
           const accountName = "Owner's Capital";
           
@@ -1840,13 +1848,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sqlStatements.push(
               `INSERT INTO ledger_accounts (company_id, code, name, account_type, opening_balance, opening_balance_side, active)\nVALUES (${result.companyId}, '${result.accountCode}', '${result.accountName}', 'Profit', ${result.openingBalance}, '${result.openingBalanceSide}', true);`
             );
+          } else if ((result as any).accountUpdated) {
+            sqlStatements.push(
+              `UPDATE ledger_accounts SET opening_balance = '${result.openingBalance}', opening_balance_side = '${result.openingBalanceSide}'\nWHERE company_id = ${result.companyId} AND code = '${result.accountCode}';`
+            );
           }
         }
 
         res.json({
           message: `Processed ${results.length} companies`,
           results,
-          sqlForProduction: sqlStatements.length > 0 ? sqlStatements.join('\n\n') : "No accounts needed to be created"
+          sqlForProduction: sqlStatements.length > 0 ? sqlStatements.join('\n\n') : "No accounts needed to be created or updated"
         });
       } catch (error: any) {
         console.error("Error initializing accounting balances:", error);
