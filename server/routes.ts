@@ -16339,6 +16339,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         incomeBalance +             // Income (sales revenue - credit)
         payrollLiabilitiesBalance); // Payroll Liabilities (what we owe employees)
 
+      // Log components for debugging
+      console.log("Import Cycle Balance Components:", JSON.stringify({
+        assets: {
+          stockOtwValue,
+          cashBalance,
+          bankBalance,
+          stockOnFloorValue,
+          assetBalance,
+          salaryAdvancesBalance,
+        },
+        expenses: {
+          directExpenseBalance,
+          indirectExpenseBalance,
+          governmentTaxesBalance,
+          cogsBalance,
+        },
+        liabilities: {
+          supplierBalance,
+          dutyAgentBalance,
+          transporterAgentBalance,
+          loansBalance,
+          liabilityBalance,
+          profitBalance,
+          incomeBalance,
+          payrollLiabilitiesBalance,
+        },
+        netImportCycleBalance,
+      }, null, 2));
+
       res.json({
         netImportCycleBalance,
         components: {
