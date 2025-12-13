@@ -19298,6 +19298,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(dashboardPayableAccounts.displayOrder)
         .execute();
 
+      // Helper function to calculate account balance from voucher entries
+      const calculateAccountBalance = async (accountId: number, openingBalance: string, openingBalanceSide: string | null) => {
+        const entries = await db
+          .select({
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+          .where(
+            and(
+              eq(voucherEntries.ledgerAccountId, accountId),
+              eq(vouchersTable.companyId, companyId),
+              isNull(vouchersTable.deletedAt),
+              eq(vouchersTable.optional, false)
+            )
+          )
+          .execute();
+
+        // Calculate balance: opening + (debits - credits)
+        let balance = parseFloat(openingBalance || "0");
+        if (openingBalanceSide === "Cr") {
+          balance = -balance;
+        }
+        
+        for (const entry of entries) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          balance += debit - credit;
+        }
+        
+        return balance;
+      };
+
       // Enrich with ledger account details and calculate balance from voucher entries
       const enrichedAccounts = await Promise.all(
         accounts.map(async (account) => {
@@ -19311,27 +19345,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return null;
           }
           
-          // Calculate balance from voucher entries
-          let balance = parseFloat(ledgerAccount?.openingBalance || "0");
-          
-          const entries = await db
-            .select()
-            .from(voucherEntries)
-            .leftJoin(vouchersTable, eq(vouchersTable.id, voucherEntries.voucherId))
-            .where(and(
-              eq(voucherEntries.ledgerAccountId, account.accountId),
-              eq(vouchersTable.companyId, companyId)
-            ))
-            .execute();
-          
-          entries.forEach((entry: any) => {
-            const debit = parseFloat(String(entry.voucher_entries.debit_amount || 0));
-            const credit = parseFloat(String(entry.voucher_entries.credit_amount || 0));
-            
-            // For liability accounts: debit decreases, credit increases
-            balance -= debit;
-            balance += credit;
-          });
+          const balance = await calculateAccountBalance(
+            ledgerAccount.id,
+            ledgerAccount.openingBalance || "0",
+            ledgerAccount.openingBalanceSide
+          );
           
           return {
             id: account.accountId,

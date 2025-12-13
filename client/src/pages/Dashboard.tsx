@@ -598,7 +598,6 @@ export default function Dashboard() {
                   <div key={dca.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`cash-account-row-${dca.id}`}>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{dca.account.name}</p>
-                      <p className="text-xs text-muted-foreground">{dca.account.code}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${dca.id}`}>
@@ -704,7 +703,7 @@ export default function Dashboard() {
                     onClick={() => {
                       if (selectedPayableAccountId > 0) {
                         addPayableAccountMutation.mutate({
-                          accountId: selectedPayableAccountId,
+                          supplierId: selectedPayableAccountId,
                         });
                       }
                     }}
@@ -729,7 +728,6 @@ export default function Dashboard() {
                 <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`payable-account-row-${account.id}`}>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{account.name}</p>
-                    <p className="text-xs text-muted-foreground">{account.code}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold font-mono text-red-600" data-testid={`text-payable-${account.id}`}>
