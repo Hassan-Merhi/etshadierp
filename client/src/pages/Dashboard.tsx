@@ -291,11 +291,8 @@ export default function Dashboard() {
     return !alreadyAdded;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
-  // Filter cash accounts with non-zero balance
-  const displayedCashAccounts = dashboardCashAccounts.filter(dca => {
-    const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
-    return balance !== 0;
-  });
+  // Show all added cash accounts (regardless of balance)
+  const displayedCashAccounts = dashboardCashAccounts;
 
   // Get available payable accounts (excluding ones already added)
   const availablePayableAccounts = allPayableAccounts.filter(acc => {

@@ -19086,7 +19086,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(dashboardCashAccounts.displayOrder)
         .execute();
 
-      // Enrich with account details
+      // Helper function to calculate account balance from voucher entries
+      const calculateAccountBalance = async (accountId: number, accountType: string, openingBalance: string, openingBalanceSide: string | null) => {
+        const { voucherEntries, vouchers: vouchersTable } = await import("@shared/schema");
+        
+        let entries: { debitAmount: string | null; creditAmount: string | null }[] = [];
+        if (accountType === "ledger") {
+          entries = await db
+            .select({
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .where(
+              and(
+                eq(voucherEntries.ledgerAccountId, accountId),
+                eq(vouchersTable.companyId, companyId),
+                isNull(vouchersTable.deletedAt),
+                eq(vouchersTable.optional, false)
+              )
+            )
+            .execute();
+        } else if (accountType === "bank") {
+          entries = await db
+            .select({
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchersTable, eq(voucherEntries.voucherId, vouchersTable.id))
+            .where(
+              and(
+                eq(voucherEntries.bankAccountId, accountId),
+                eq(vouchersTable.companyId, companyId),
+                isNull(vouchersTable.deletedAt),
+                eq(vouchersTable.optional, false)
+              )
+            )
+            .execute();
+        } else {
+          entries = [];
+        }
+
+        // Calculate balance: opening + (debits - credits)
+        let balance = parseFloat(openingBalance || "0");
+        if (openingBalanceSide === "Cr") {
+          balance = -balance;
+        }
+        
+        for (const entry of entries) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          balance += debit - credit;
+        }
+        
+        return balance;
+      };
+
+      // Enrich with account details and calculated balances
       const enrichedAccounts = await Promise.all(
         accounts.map(async (account) => {
           let accountDetails: any = null;
@@ -19097,7 +19155,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(ledgerAccounts)
               .where(eq(ledgerAccounts.id, account.accountId))
               .execute();
-            accountDetails = ledger ? { ...ledger, type: "Ledger" } : null;
+            if (ledger) {
+              const balance = await calculateAccountBalance(
+                ledger.id,
+                "ledger",
+                ledger.openingBalance || "0",
+                ledger.openingBalanceSide
+              );
+              accountDetails = { ...ledger, type: "Ledger", balance, currentBalance: balance };
+            }
           } else if (account.accountType === "bank") {
             const { bankAccounts } = await import("@shared/schema");
             const [bank] = await db
@@ -19105,7 +19171,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(bankAccounts)
               .where(eq(bankAccounts.id, account.accountId))
               .execute();
-            accountDetails = bank ? { ...bank, type: "Bank" } : null;
+            if (bank) {
+              const balance = await calculateAccountBalance(
+                bank.id,
+                "bank",
+                bank.openingBalance || "0",
+                bank.openingBalanceSide
+              );
+              accountDetails = { ...bank, type: "Bank", balance, currentBalance: balance };
+            }
           }
 
           return {
