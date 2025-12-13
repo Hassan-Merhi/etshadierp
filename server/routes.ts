@@ -1536,7 +1536,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   )
                 );
 
-              const openingBalance = parseFloat(account.openingBalance || "0");
+              // Fix: Properly sign opening balance based on openingBalanceSide
+              const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+              const openingSide = account.openingBalanceSide || "Dr";
+              let signedOpening: number;
+              if (isLiability) {
+                // Liability/Income accounts: Cr opening = positive, Dr opening = negative
+                signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
+              } else {
+                // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
+                signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
+              }
+              
               const balance = entries.reduce((sum, entry) => {
                 const credit = parseFloat(entry.creditAmount || "0");
                 const debit = parseFloat(entry.debitAmount || "0");
@@ -1546,7 +1557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else {
                   return sum + debit - credit;
                 }
-              }, openingBalance);
+              }, signedOpening);
               
               totalBalance += balance;
             }
@@ -16130,7 +16141,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               )
             );
 
-          const openingBalance = parseFloat(account.openingBalance || "0");
+          // Fix: Properly sign opening balance based on openingBalanceSide
+          const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+          const openingSide = account.openingBalanceSide || "Dr";
+          let signedOpening: number;
+          if (isLiability) {
+            // Liability/Income accounts: Cr opening = positive, Dr opening = negative
+            signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
+          } else {
+            // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
+            signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
+          }
+          
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -16142,7 +16164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Asset/Expense accounts: Debits increase (positive), Credits decrease (negative)
               return sum + debit - credit;
             }
-          }, openingBalance);
+          }, signedOpening);
           
           totalBalance += balance;
         }
