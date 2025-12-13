@@ -241,7 +241,7 @@ export default function Dashboard() {
 
   // Add dashboard payable account mutation
   const addPayableAccountMutation = useMutation({
-    mutationFn: async (data: { supplierId: number }) => {
+    mutationFn: async (data: { accountId: number }) => {
       return await apiRequest("POST", "/api/dashboard-payable-accounts", data);
     },
     onSuccess: () => {
@@ -703,7 +703,7 @@ export default function Dashboard() {
                     onClick={() => {
                       if (selectedPayableAccountId > 0) {
                         addPayableAccountMutation.mutate({
-                          supplierId: selectedPayableAccountId,
+                          accountId: selectedPayableAccountId,
                         });
                       }
                     }}
