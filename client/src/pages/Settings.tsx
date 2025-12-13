@@ -1251,9 +1251,9 @@
                         <div className="text-sm">{r.message}</div>
                         
                         {r.components && (
-                          <details className="text-xs mt-2">
-                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              View Calculation Breakdown (for verification)
+                          <details className="text-sm mt-3 border-t pt-2">
+                            <summary className="cursor-pointer text-primary hover:underline font-medium">
+                              Click to View Calculation Breakdown
                             </summary>
                             <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
                               <div>
