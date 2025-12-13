@@ -2336,23 +2336,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Get or create employee liability account
-        const employeeAccountCode = `EMP-${employee.code}`;
-        let employeeAccount = allAccounts.find(
-          (a: any) => a.code === employeeAccountCode,
-        );
-
-        if (!employeeAccount) {
-          employeeAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: employeeAccountCode,
-            name: `${employee.firstName} ${employee.lastName} - Salary Account`,
-            accountType: "Liability",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
         // Create voucher
         const voucherNumber = `SAL-DEP-${Date.now()}`;
         const [voucher] = await db
@@ -2380,10 +2363,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           narration: `Salary deposit - ${voucherNumber}`,
         });
 
-        // Credit: Employee Liability Account
+        // Credit: Employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: employeeAccount.id,
+          ledgerAccountId: null,
+          employeeId: employee.id,
           debitAmount: "0",
           creditAmount: depositAmount.toFixed(2),
           narration: `Salary deposit - ${voucherNumber}`,
@@ -2516,29 +2500,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const depositAmount = parseFloat(deposit.amount);
 
-          // Get or create employee liability account
-          const employeeAccountCode = `EMP-${employee.code}`;
-          let employeeAccount = allAccounts.find(
-            (a: any) => a.code === employeeAccountCode,
-          );
-
-          if (!employeeAccount) {
-            employeeAccount = await storage.createLedgerAccount({
-              companyId: req.session.currentCompanyId,
-              code: employeeAccountCode,
-              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
-              accountType: "Liability",
-              openingBalance: "0",
-              active: true,
-            });
-            // Refresh accounts list
-            allAccounts.push(employeeAccount);
-          }
-
-          // Credit employee liability account
+          // Credit employee (using employeeId field directly instead of separate ledger account)
           await db.insert(voucherEntries).values({
             voucherId: voucher.id,
-            ledgerAccountId: employeeAccount.id,
+            ledgerAccountId: null,
+            employeeId: employee.id,
             debitAmount: "0",
             creditAmount: depositAmount.toFixed(2),
             narration: `Salary deposit for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
@@ -2677,29 +2643,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const bonusAmount = parseFloat(bonus.amount);
 
-          // Get or create employee liability account
-          const employeeAccountCode = `EMP-${employee.code}`;
-          let employeeAccount = allAccounts.find(
-            (a: any) => a.code === employeeAccountCode,
-          );
-
-          if (!employeeAccount) {
-            employeeAccount = await storage.createLedgerAccount({
-              companyId: req.session.currentCompanyId,
-              code: employeeAccountCode,
-              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
-              accountType: "Liability",
-              openingBalance: "0",
-              active: true,
-            });
-            // Refresh accounts list
-            allAccounts.push(employeeAccount);
-          }
-
-          // Credit employee liability account
+          // Credit employee (using employeeId field directly instead of separate ledger account)
           await db.insert(voucherEntries).values({
             voucherId: voucher.id,
-            ledgerAccountId: employeeAccount.id,
+            ledgerAccountId: null,
+            employeeId: employee.id,
             debitAmount: "0",
             creditAmount: bonusAmount.toFixed(2),
             narration: `Bonus for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
@@ -2866,26 +2814,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const withdrawAmount = parseFloat(withdrawal.amount);
 
-          // Get or create employee liability account
-          const employeeAccountCode = `EMP-${employee.code}`;
-          let employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
-
-          if (!employeeAccount) {
-            employeeAccount = await storage.createLedgerAccount({
-              companyId: req.session.currentCompanyId,
-              code: employeeAccountCode,
-              name: `${employee.firstName} ${employee.lastName} - Salary Account`,
-              accountType: "Liability",
-              openingBalance: "0",
-              active: true,
-            });
-            allAccounts.push(employeeAccount);
-          }
-
-          // Debit employee liability account
+          // Debit employee (using employeeId field directly instead of separate ledger account)
           await db.insert(voucherEntries).values({
             voucherId: voucher.id,
-            ledgerAccountId: employeeAccount.id,
+            ledgerAccountId: null,
+            employeeId: employee.id,
             debitAmount: withdrawAmount.toFixed(2),
             creditAmount: "0",
             narration: `Withdrawal for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
@@ -2976,23 +2909,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Get or create employee liability account
-        const employeeAccountCode = `EMP-${employee.code}`;
-        let employeeAccount = allAccounts.find(
-          (a: any) => a.code === employeeAccountCode,
-        );
-
-        if (!employeeAccount) {
-          employeeAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: employeeAccountCode,
-            name: `${employee.firstName} ${employee.lastName} - Salary Account`,
-            accountType: "Liability",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
         // Create voucher
         const voucherNumber = `BONUS-${Date.now()}`;
         const [voucher] = await db
@@ -3020,10 +2936,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           narration: `Bonus payment - ${voucherNumber}`,
         });
 
-        // Credit: Employee Liability Account
+        // Credit: Employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: employeeAccount.id,
+          ledgerAccountId: null,
+          employeeId: employee.id,
           debitAmount: "0",
           creditAmount: bonusAmount.toFixed(2),
           narration: `Bonus payment - ${voucherNumber}`,
@@ -4402,26 +4319,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Employee belongs to a different company" });
         }
 
-        // Get employee's ledger account or create one
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        const employeeAccountCode = `EMP-${employee[0].code}`;
-        let employeeAccount = allAccounts.find(
-          (a: any) => a.code === employeeAccountCode,
-        );
-
-        if (!employeeAccount) {
-          employeeAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: employeeAccountCode,
-            name: `${employee[0].firstName} ${employee[0].lastName} - Salary Account`,
-            accountType: "Liability",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
         // Get default cash account from request or use a default one
         const cashAccountId =
           req.body.cashAccountId || req.session.cashAccountId;
@@ -4447,10 +4344,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Create voucher entries (double-entry)
-        // Debit: Employee Liability Account (they owe us)
+        // Debit: Employee (using employeeId field directly - they owe us)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: employeeAccount.id,
+          ledgerAccountId: null,
+          employeeId: employee[0].id,
           debitAmount: parsed.amount,
           creditAmount: "0",
           narration: `Salary advance - ${voucherNumber}`,
