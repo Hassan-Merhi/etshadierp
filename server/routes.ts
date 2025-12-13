@@ -20851,7 +20851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orphaned Records Cleanup API - Find and reassign vouchers with deleted locations
+  // Orphaned Records Cleanup API - Find and reassign vouchers with deleted locations + unbalanced vouchers
   app.get("/api/orphaned-records", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -20884,7 +20884,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .orderBy(sql`${vouchers.createdAt} DESC`);
       
-      res.json(orphanedVouchers);
+      // Find unbalanced vouchers (debits != credits)
+      const unbalancedVouchers = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          locationId: vouchers.locationId,
+          locationName: vouchers.locationName,
+          totalAmount: vouchers.totalAmount,
+          description: vouchers.description,
+          createdAt: vouchers.createdAt,
+          totalDebits: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)::text`,
+          totalCredits: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)::text`,
+          imbalance: sql<string>`(COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0) - COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0))::text`,
+        })
+        .from(vouchers)
+        .leftJoin(voucherEntries, eq(vouchers.id, voucherEntries.voucherId))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        )
+        .groupBy(vouchers.id)
+        .having(sql`ABS(COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0) - COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)) > 0.01`)
+        .orderBy(sql`${vouchers.createdAt} DESC`);
+      
+      res.json({
+        orphanedVouchers,
+        unbalancedVouchers,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

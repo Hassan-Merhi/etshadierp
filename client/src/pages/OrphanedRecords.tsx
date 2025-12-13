@@ -6,9 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -30,6 +29,26 @@ interface OrphanedVoucher {
   createdAt: string;
 }
 
+interface UnbalancedVoucher {
+  id: number;
+  voucherNumber: string;
+  voucherType: string;
+  voucherDate: string;
+  locationId: number | null;
+  locationName: string | null;
+  totalAmount: string;
+  description: string | null;
+  createdAt: string;
+  totalDebits: string;
+  totalCredits: string;
+  imbalance: string;
+}
+
+interface OrphanedRecordsResponse {
+  orphanedVouchers: OrphanedVoucher[];
+  unbalancedVouchers: UnbalancedVoucher[];
+}
+
 export default function OrphanedRecordsPage() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -37,9 +56,12 @@ export default function OrphanedRecordsPage() {
   const [selectedVouchers, setSelectedVouchers] = useState<number[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
 
-  const { data: orphanedRecords = [], isLoading } = useQuery<OrphanedVoucher[]>({
+  const { data: recordsData, isLoading } = useQuery<OrphanedRecordsResponse>({
     queryKey: ["/api/orphaned-records"],
   });
+
+  const orphanedRecords = recordsData?.orphanedVouchers || [];
+  const unbalancedRecords = recordsData?.unbalancedVouchers || [];
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
@@ -95,16 +117,88 @@ export default function OrphanedRecordsPage() {
     });
   };
 
+  const formatCurrency = (value: string | number) => {
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(num);
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
         <AlertCircle className="h-8 w-8 text-orange-500" />
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-orphaned-records">Orphaned Records</h1>
-          <p className="text-muted-foreground">Records with deleted locations that need reassignment</p>
+          <p className="text-muted-foreground">Records with deleted locations or accounting imbalances</p>
         </div>
       </div>
 
+      {/* Unbalanced Vouchers Section */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <AlertTriangle className="h-6 w-6 text-red-500" />
+          <div>
+            <h2 className="text-xl font-semibold" data-testid="heading-unbalanced-vouchers">Unbalanced Vouchers</h2>
+            <p className="text-sm text-muted-foreground">Vouchers where debits do not equal credits</p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        ) : unbalancedRecords.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <p className="text-lg font-medium text-green-600">All vouchers are balanced</p>
+            <p className="text-muted-foreground">No accounting imbalances detected</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Voucher #</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Total Debits</TableHead>
+                <TableHead className="text-right">Total Credits</TableHead>
+                <TableHead className="text-right">Imbalance</TableHead>
+                <TableHead>Description</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {unbalancedRecords.map((voucher) => (
+                <TableRow key={voucher.id} data-testid={`row-unbalanced-${voucher.id}`}>
+                  <TableCell className="font-mono" data-testid={`text-unbalanced-number-${voucher.id}`}>
+                    {voucher.voucherNumber}
+                  </TableCell>
+                  <TableCell data-testid={`text-unbalanced-type-${voucher.id}`}>
+                    {voucher.voucherType}
+                  </TableCell>
+                  <TableCell data-testid={`text-unbalanced-date-${voucher.id}`}>
+                    {voucher.voucherDate}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid={`text-debits-${voucher.id}`}>
+                    {formatCurrency(voucher.totalDebits)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid={`text-credits-${voucher.id}`}>
+                    {formatCurrency(voucher.totalCredits)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-red-600 font-bold" data-testid={`text-imbalance-${voucher.id}`}>
+                    {formatCurrency(voucher.imbalance)}
+                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate" data-testid={`text-unbalanced-desc-${voucher.id}`}>
+                    {voucher.description || "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      {/* Orphaned Location Vouchers Section */}
       {orphanedRecords.length > 0 && (
         <Card className="p-4">
           <div className="flex items-center gap-4 flex-wrap">
@@ -135,6 +229,14 @@ export default function OrphanedRecordsPage() {
       )}
 
       <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <AlertCircle className="h-6 w-6 text-orange-500" />
+          <div>
+            <h2 className="text-xl font-semibold">Deleted Location Vouchers</h2>
+            <p className="text-sm text-muted-foreground">Vouchers referencing locations that have been deleted</p>
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading...</div>
         ) : orphanedRecords.length === 0 ? (
@@ -185,7 +287,7 @@ export default function OrphanedRecordsPage() {
                     {voucher.locationName || <span className="text-muted-foreground">Not saved</span>}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-amount-${voucher.id}`}>
-                    ${parseFloat(voucher.totalAmount).toLocaleString()}
+                    {formatCurrency(voucher.totalAmount)}
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" data-testid={`text-description-${voucher.id}`}>
                     {voucher.description || "-"}
@@ -200,10 +302,9 @@ export default function OrphanedRecordsPage() {
       <Card className="p-4 bg-muted/50">
         <h3 className="font-semibold mb-2">How this works:</h3>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li>These are vouchers/sales that reference locations that have been deleted</li>
-          <li>Select the records you want to fix and choose a new location to assign them to</li>
-          <li>The location name will also be saved so it persists if this location is deleted in the future</li>
-          <li>For new sales, the location name is automatically saved to prevent this issue</li>
+          <li><strong>Unbalanced Vouchers:</strong> These have accounting errors where debits don't equal credits. Review and fix manually in the voucher editor.</li>
+          <li><strong>Deleted Location Vouchers:</strong> These reference locations that have been deleted. Select records and reassign to a valid location.</li>
+          <li>The location name is saved on vouchers to preserve history if the location is deleted in the future.</li>
         </ul>
       </Card>
     </div>
