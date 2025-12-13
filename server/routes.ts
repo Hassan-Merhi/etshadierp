@@ -1565,7 +1565,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           // Calculate all balances (same logic as import-cycle-balance endpoint)
-          // 1. Supplier Balance
+          // 1. Supplier Balance - calculated from voucher entries only (company-scoped)
+          // NOTE: Supplier opening balances are global and cannot be attributed to a single company
+          // Future enhancement: Add per-company supplier opening balances table
           const supplierEntries = await db
             .select({
               creditAmount: voucherEntries.creditAmount,
@@ -1582,6 +1584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               )
             );
           
+          // Supplier is a liability: Credits increase (we owe more), Debits decrease (we paid)
           const supplierBalance = supplierEntries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
             const debit = parseFloat(entry.debitAmount || "0");
@@ -15766,7 +15769,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : [];
 
       // Calculate total income (credits - debits for income accounts)
+      // Start with opening balances for income accounts
+      const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
       let totalIncome = 0;
+      
+      // Add opening balances for income accounts
+      // Income accounts (like liabilities): Cr opening = positive, Dr opening = negative
+      for (const acc of incomeAccounts) {
+        const openingBalanceRaw = parseFloat(acc.openingBalance || "0");
+        const openingSide = acc.openingBalanceSide || "Cr";
+        // Income is a credit-normal account: Cr = positive, Dr = negative
+        const signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
+        totalIncome += signedOpening;
+      }
+      
+      // Add voucher entry movements
       for (const entry of companyEntries) {
         if (
           entry.ledgerAccountId &&
@@ -15780,7 +15797,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate total expenses (debits - credits for expense accounts)
       // Excludes PURCHASES and IMPORT_CHARGES (inventory costs)
+      // Start with opening balances for expense accounts
       let totalExpenses = 0;
+      
+      // Add opening balances for expense accounts
+      // Expense accounts (like assets): Dr opening = positive, Cr opening = negative
+      for (const acc of expenseAccounts) {
+        const openingBalanceRaw = parseFloat(acc.openingBalance || "0");
+        const openingSide = acc.openingBalanceSide || "Dr";
+        // Expense is a debit-normal account: Dr = positive, Cr = negative
+        const signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
+        totalExpenses += signedOpening;
+      }
+      
+      // Add voucher entry movements
       for (const entry of companyEntries) {
         if (
           entry.ledgerAccountId &&
@@ -16171,8 +16201,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return totalBalance;
       };
 
-      // 1. Supplier Balance - calculate from voucher entries only (company-scoped)
-      // Suppliers are global but we only count transactions for the current company
+      // 1. Supplier Balance - calculated from voucher entries only (company-scoped)
+      // NOTE: Supplier opening balances are global and cannot be attributed to a single company
+      // Future enhancement: Add per-company supplier opening balances table
       // Credits to suppliers increase what we owe (liability), debits decrease it
       const supplierEntries = await db
         .select({
