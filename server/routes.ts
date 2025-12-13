@@ -3032,21 +3032,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
         }
 
-        // Get employee liability account
-        const employeeAccountCode = `EMP-${employee.code}`;
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        const employeeAccount = allAccounts.find(
-          (a: any) => a.code === employeeAccountCode,
-        );
-
-        if (!employeeAccount) {
-          return res
-            .status(404)
-            .json({ message: "Employee account not found" });
-        }
-
         // Create voucher
         const voucherNumber = `SAL-WD-${Date.now()}`;
         const [voucher] = await db
@@ -3065,10 +3050,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Create voucher entries (double-entry)
-        // Debit: Employee Liability Account
+        // Debit: Employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: employeeAccount.id,
+          ledgerAccountId: null,
+          employeeId: employee.id,
           debitAmount: withdrawalAmount.toFixed(2),
           creditAmount: "0",
           narration: `Salary withdrawal - ${voucherNumber}`,
