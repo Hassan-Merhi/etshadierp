@@ -1245,10 +1245,49 @@
                   <div className="space-y-4 mt-4">
                     <div className="text-foreground font-medium">{initBalancesResult.message}</div>
                     {initBalancesResult.results?.map((r: any) => (
-                      <div key={r.companyId} className="p-3 border rounded-md">
+                      <div key={r.companyId} className="p-3 border rounded-md space-y-2">
                         <div className="font-medium">{r.companyName}</div>
                         <div className="text-sm">Imbalance: ${r.imbalance?.toFixed(2)}</div>
                         <div className="text-sm">{r.message}</div>
+                        
+                        {r.components && (
+                          <details className="text-xs mt-2">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              View Calculation Breakdown (for verification)
+                            </summary>
+                            <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
+                              <div>
+                                <div className="font-medium text-green-600 dark:text-green-400 mb-1">Assets (Debit)</div>
+                                {r.components.assets?.map((c: any, i: number) => (
+                                  <div key={i} className="flex justify-between">
+                                    <span>{c.name}</span>
+                                    <span>${c.value.toFixed(2)}</span>
+                                  </div>
+                                ))}
+                                <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                  <span>Total Assets</span>
+                                  <span>${r.components.totalAssets?.toFixed(2)}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div className="font-medium text-red-600 dark:text-red-400 mb-1">Liabilities (Credit)</div>
+                                {r.components.liabilities?.map((c: any, i: number) => (
+                                  <div key={i} className="flex justify-between">
+                                    <span>{c.name}</span>
+                                    <span>${c.value.toFixed(2)}</span>
+                                  </div>
+                                ))}
+                                <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                  <span>Total Liabilities</span>
+                                  <span>${r.components.totalLiabilities?.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2 p-2 bg-muted rounded text-center font-medium">
+                              Net Imbalance = ${r.components.totalAssets?.toFixed(2)} - ${r.components.totalLiabilities?.toFixed(2)} = ${r.imbalance?.toFixed(2)}
+                            </div>
+                          </details>
+                        )}
                       </div>
                     ))}
                     {initBalancesResult.sqlForProduction && (

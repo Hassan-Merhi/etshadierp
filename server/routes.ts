@@ -1491,6 +1491,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           openingBalance?: string;
           openingBalanceSide?: string;
           message: string;
+          components?: {
+            assets: { name: string; value: number }[];
+            liabilities: { name: string; value: number }[];
+            totalAssets: number;
+            totalLiabilities: number;
+          };
         }> = [];
 
         // Get all companies
@@ -1680,13 +1686,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const liabilityBalance = await getAccountTypeBalance("Liability", true);
           const profitBalance = await getAccountTypeBalance("Profit", true);
 
-          // Calculate the net import cycle balance (imbalance)
-          const netImportCycleBalance = 
-            (stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
+          // Build components breakdown for verification
+          const assetComponents = [
+            { name: "Stock OTW", value: stockOtwValue },
+            { name: "Cash", value: cashBalance },
+            { name: "Bank", value: bankBalance },
+            { name: "Stock on Floor", value: stockOnFloorValue },
+            { name: "Assets", value: assetBalance },
+            { name: "Direct Expenses", value: directExpenseBalance },
+            { name: "Indirect Expenses", value: indirectExpenseBalance },
+            { name: "Government Taxes", value: governmentTaxesBalance },
+            { name: "COGS", value: cogsBalance },
+            { name: "Salary Advances", value: salaryAdvancesBalance },
+          ].filter(c => Math.abs(c.value) >= 0.01);
+
+          const liabilityComponents = [
+            { name: "Supplier Balance", value: supplierBalance },
+            { name: "Duty Agent", value: dutyAgentBalance },
+            { name: "Transporter Agent", value: transporterAgentBalance },
+            { name: "Loans", value: loansBalance },
+            { name: "Liabilities", value: liabilityBalance },
+            { name: "Profit/Equity", value: profitBalance },
+            { name: "Income", value: incomeBalance },
+            { name: "Payroll Liabilities", value: payrollLiabilitiesBalance },
+          ].filter(c => Math.abs(c.value) >= 0.01);
+
+          const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
             directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
-            cogsBalance + salaryAdvancesBalance) -
-            (supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
-            liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance);
+            cogsBalance + salaryAdvancesBalance;
+          const totalLiabilities = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
+            liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
+
+          // Calculate the net import cycle balance (imbalance)
+          const netImportCycleBalance = totalAssets - totalLiabilities;
+
+          const componentsBreakdown = {
+            assets: assetComponents,
+            liabilities: liabilityComponents,
+            totalAssets,
+            totalLiabilities,
+          };
 
           // If imbalance is very small (< $1), consider it balanced
           if (Math.abs(netImportCycleBalance) < 1) {
@@ -1695,7 +1734,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               companyName: company.name,
               imbalance: netImportCycleBalance,
               accountCreated: false,
-              message: "Already balanced (imbalance < $1)"
+              message: "Already balanced (imbalance < $1)",
+              components: componentsBreakdown,
             });
             continue;
           }
@@ -1719,7 +1759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               companyName: company.name,
               imbalance: netImportCycleBalance,
               accountCreated: false,
-              message: `Owner's Capital account already exists (${existingCapitalAccounts[0].code}). Delete it first to re-initialize.`
+              message: `Owner's Capital account already exists (${existingCapitalAccounts[0].code}). Delete it first to re-initialize.`,
+              components: componentsBreakdown,
             });
             continue;
           }
@@ -1773,7 +1814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             accountName,
             openingBalance: openingBalanceAmount,
             openingBalanceSide,
-            message: `Created ${accountCode} - ${accountName} with opening balance ${openingBalanceAmount} ${openingBalanceSide}`
+            message: `Created ${accountCode} - ${accountName} with opening balance ${openingBalanceAmount} ${openingBalanceSide}`,
+            components: componentsBreakdown,
           });
         }
 
