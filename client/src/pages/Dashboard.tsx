@@ -355,9 +355,9 @@ export default function Dashboard() {
         />
         <KPICard
           title="Import Cycle Balance"
-          value={!importCycleData ? "Loading..." : formatCurrency(importCycleData.netImportCycleBalance)}
+          value={!importCycleData ? "Loading..." : Math.abs(importCycleData.netImportCycleBalance) < 1 ? "$0.00" : formatCurrency(importCycleData.netImportCycleBalance)}
           change="Should be $0 when balanced"
-          changeType={Math.abs(importCycleData?.netImportCycleBalance ?? 0) < 0.01 ? "positive" : "negative"}
+          changeType={Math.abs(importCycleData?.netImportCycleBalance ?? 0) < 1 ? "positive" : "negative"}
           icon={Truck}
           
           data-testid="kpi-import-cycle-balance"
