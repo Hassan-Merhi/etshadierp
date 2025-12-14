@@ -15611,11 +15611,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude inventory acquisition costs from net profit calculation
-      // These costs are capitalized to inventory until sold, NOT operating expenses
-      // COGS is NOT excluded - it represents sold inventory and should reduce profit
+      // Include ALL expenses in net profit calculation for consistency with P&L report
+      // PURCHASES are now included (previously excluded) to match P&L calculation
+      // Only exclude container-related import charges that are capitalized to inventory
       const excludedExpenseCodes = [
-        "PURCHASES",           // Direct inventory purchases (capitalized)
         "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
         "IMPORT_CHARGES",      // Alternative format
         "DUTIES",              // Container import duties (capitalized)
@@ -15630,10 +15629,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "LIC",                 // Abbreviated licenses code
       ];
       
-      // Name patterns to exclude (inventory acquisition costs)
+      // Name patterns to exclude (container-related costs only)
       const excludedNamePatterns = [
         "duties",
-        "purchases", 
         "transport charges",
         "container license",
         "import charge",
@@ -15645,6 +15643,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code.toUpperCase().replace(/[\s_-]/g, "");
       
       const expenseAccounts = companyAccounts.filter((acc) => {
+        // Include Purchase accounts by code (for P&L consistency)
+        const isPurchaseAccount = acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-");
+        if (isPurchaseAccount) return true;
+        
         // Support both correct format (accountType="Expense") and legacy format
         // (accountType="Indirect Expense" or "Direct Expense")
         const isExpenseAccount = 
@@ -15718,7 +15720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate total expenses (debits - credits for expense accounts)
-      // Excludes PURCHASES and IMPORT_CHARGES (inventory costs)
+      // Now includes PURCHASES for consistency with P&L report
       // Start with opening balances for expense accounts
       let totalExpenses = 0;
       
@@ -15744,7 +15746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Calculate net profit
+      // Calculate net profit (Purchases now included in expenseAccounts for P&L consistency)
       const netProfit = totalIncome - totalExpenses;
 
       res.json({
@@ -15784,11 +15786,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
       
-      // Exclude inventory acquisition costs from monthly profit calculation
-      // These costs are capitalized to inventory until sold, NOT operating expenses
-      // COGS is NOT excluded - it represents sold inventory and should reduce profit
+      // Include ALL expenses in monthly profit calculation for consistency with P&L report
+      // PURCHASES are now included (previously excluded) to match P&L calculation
+      // Only exclude container-related import charges that are capitalized to inventory
       const excludedExpenseCodes = [
-        "PURCHASES",           // Direct inventory purchases (capitalized)
         "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
         "IMPORT_CHARGES",      // Alternative format
         "DUTIES",              // Container import duties (capitalized)
@@ -15803,10 +15804,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "LIC",                 // Abbreviated licenses code
       ];
       
-      // Name patterns to exclude (inventory acquisition costs)
+      // Name patterns to exclude (container-related costs only)
       const excludedNamePatterns = [
         "duties",
-        "purchases", 
         "transport charges",
         "container license",
         "import charge",
@@ -15818,6 +15818,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code.toUpperCase().replace(/[\s_-]/g, "");
       
       const expenseAccounts = companyAccounts.filter((acc) => {
+        // Include Purchase accounts by code (for P&L consistency)
+        const isPurchaseAccount = acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-");
+        if (isPurchaseAccount) return true;
+        
         // Support both correct format (accountType="Expense") and legacy format
         // (accountType="Indirect Expense" or "Direct Expense")
         const isExpenseAccount = 
@@ -15928,7 +15932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parseFloat(entry.debitAmount || "0");
         }
 
-        // Expense accounts: debits decrease profit, credits increase it
+        // Expense accounts (including Purchases): debits decrease profit, credits increase it
         if (
           entry.ledgerAccountId &&
           expenseAccountIds.includes(entry.ledgerAccountId)
