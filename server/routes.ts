@@ -18031,8 +18031,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // 7. Net Profit = Gross Profit - Indirect Expenses
-      const netProfit = grossProfit - indirectExpensesTotal;
+      // 6b. Indirect Incomes - accounts with accountType="Income" AND subType="Indirect Income"
+      // Must be calculated before Net Profit so it can be included
+      const indirectIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Indirect Income"
+      );
+      let indirectIncomesTotal = 0;
+      const indirectIncomesDetails = indirectIncomeAccounts.map((acc) => {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        const netBalance = balance.credit - balance.debit; // Income is credits
+        indirectIncomesTotal += netBalance;
+        return {
+          id: acc.id,
+          code: acc.code,
+          name: acc.name,
+          debit: balance.debit,
+          credit: balance.credit,
+          balance: netBalance,
+        };
+      });
+
+      // 7. Net Profit = Gross Profit + Indirect Incomes - Indirect Expenses
+      const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
       // Calculate totals for left pane
       const leftPaneTotal = openingStockValue + purchaseAccountsTotal + directIncomesTotal + directExpensesTotal;
@@ -18097,24 +18117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Gross Profit b/f - Same as gross profit from left pane
       const grossProfitBf = grossProfit;
 
-      // 4. Indirect Incomes - accounts with accountType="Income" AND subType="Indirect Income"
-      const indirectIncomeAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Income" && acc.subType === "Indirect Income"
-      );
-      let indirectIncomesTotal = 0;
-      const indirectIncomesDetails = indirectIncomeAccounts.map((acc) => {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        const netBalance = balance.credit - balance.debit; // Income is credits
-        indirectIncomesTotal += netBalance;
-        return {
-          id: acc.id,
-          code: acc.code,
-          name: acc.name,
-          debit: balance.debit,
-          credit: balance.credit,
-          balance: netBalance,
-        };
-      });
+      // Note: Indirect Incomes already calculated above (before Net Profit calculation)
 
       // Right pane total should equal left pane total for the P&L to balance
       const rightPaneTotal = salesAccountsTotal + closingStockValue + grossProfitBf + indirectIncomesTotal;
