@@ -142,14 +142,16 @@
       // Admin always has all permissions
       if (role === "Admin") return true;
       const key = `${role}:${featureKey}`;
-      // Default to true if not explicitly set (existing behavior)
-      return permissionMap.has(key) ? permissionMap.get(key)! : true;
+      // Default to false if not explicitly set (disabled by default)
+      return permissionMap.has(key) ? permissionMap.get(key)! : false;
     };
 
     // Mutation for updating role permissions
     const updateRolePermissionMutation = useMutation({
       mutationFn: async ({ role, featureKey, enabled }: { role: string; featureKey: string; enabled: boolean }) => {
+        if (!selectedCompany?.id) throw new Error("No company selected");
         const res = await apiRequest("PUT", "/api/settings/role-permissions", {
+          companyId: selectedCompany.id,
           permissions: [{ role, featureKey, enabled }],
         });
         return await res.json();

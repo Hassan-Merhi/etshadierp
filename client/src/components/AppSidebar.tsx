@@ -175,18 +175,14 @@ export function AppSidebar({ user }: { user?: any }) {
       return true;
     }
 
-    // If we have permissions data, use it
+    // If we have permissions data from the API, use it exclusively
     if (myPermissions.length > 0 && featureKey) {
-      // Check if the feature is in the allowed set
-      // If the feature is not in the permissions data, default to true (backward compatible)
       const permissionEntry = myPermissions.find((p: any) => p.featureKey === featureKey);
-      if (permissionEntry) {
-        return permissionEntry.enabled;
-      }
-      // Default to the old behavior for features not yet configured
+      // If permission exists, use its enabled value; if not found, default to false (disabled)
+      return permissionEntry ? permissionEntry.enabled : false;
     }
     
-    // Fallback to old behavior if no permissions are configured
+    // Fallback to old behavior only if no permissions are configured at all
     // POS users only see: POS, POS Daybook, and Location Inventory
     if (isPOSUser) {
       return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
