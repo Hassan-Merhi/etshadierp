@@ -15617,11 +15617,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const excludedExpenseCodes = [
         "PURCHASES",           // Direct inventory purchases (capitalized)
         "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
+        "IMPORT_CHARGES",      // Alternative format
         "DUTIES",              // Container import duties (capitalized)
+        "DUT",                 // Abbreviated duties code
         "TRANSPORTCHARGES",    // Container transport costs (capitalized)
         "TRANSPORT",           // Alternative transport account name (capitalized)
+        "TRA",                 // Abbreviated transport code
+        "TRANSFER_CHARGES",    // Transfer charges (capitalized)
         "CONTAINERLICENSES",   // Container license fees (capitalized)
+        "CONLIC",              // Abbreviated container licenses
         "LICENSES",            // Alternative license account name (capitalized)
+        "LIC",                 // Abbreviated licenses code
+      ];
+      
+      // Name patterns to exclude (inventory acquisition costs)
+      const excludedNamePatterns = [
+        "duties",
+        "purchases", 
+        "transport charges",
+        "container license",
+        "import charge",
+        "transfer charge",
       ];
       
       // Normalize function: uppercase + remove spaces/underscores for comparison
@@ -15638,10 +15654,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!isExpenseAccount) return false;
         
+        // Check if code matches exclusion list
         const normalizedCode = normalizeCode(acc.code);
-        return !excludedExpenseCodes.some(excluded => 
+        const codeExcluded = excludedExpenseCodes.some(excluded => 
           normalizeCode(excluded) === normalizedCode
         );
+        
+        // Check if name contains excluded patterns
+        const nameLower = (acc.name || "").toLowerCase();
+        const nameExcluded = excludedNamePatterns.some(pattern => 
+          nameLower.includes(pattern)
+        );
+        
+        // Exclude if either code or name matches
+        return !codeExcluded && !nameExcluded;
       });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
@@ -15764,11 +15790,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const excludedExpenseCodes = [
         "PURCHASES",           // Direct inventory purchases (capitalized)
         "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
+        "IMPORT_CHARGES",      // Alternative format
         "DUTIES",              // Container import duties (capitalized)
+        "DUT",                 // Abbreviated duties code
         "TRANSPORTCHARGES",    // Container transport costs (capitalized)
         "TRANSPORT",           // Alternative transport account name (capitalized)
+        "TRA",                 // Abbreviated transport code
+        "TRANSFER_CHARGES",    // Transfer charges (capitalized)
         "CONTAINERLICENSES",   // Container license fees (capitalized)
+        "CONLIC",              // Abbreviated container licenses
         "LICENSES",            // Alternative license account name (capitalized)
+        "LIC",                 // Abbreviated licenses code
+      ];
+      
+      // Name patterns to exclude (inventory acquisition costs)
+      const excludedNamePatterns = [
+        "duties",
+        "purchases", 
+        "transport charges",
+        "container license",
+        "import charge",
+        "transfer charge",
       ];
       
       // Normalize function: uppercase + remove spaces/underscores for comparison
@@ -15785,10 +15827,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!isExpenseAccount) return false;
         
+        // Check if code matches exclusion list
         const normalizedCode = normalizeCode(acc.code);
-        return !excludedExpenseCodes.some(excluded => 
+        const codeExcluded = excludedExpenseCodes.some(excluded => 
           normalizeCode(excluded) === normalizedCode
         );
+        
+        // Check if name contains excluded patterns
+        const nameLower = (acc.name || "").toLowerCase();
+        const nameExcluded = excludedNamePatterns.some(pattern => 
+          nameLower.includes(pattern)
+        );
+        
+        // Exclude if either code or name matches
+        return !codeExcluded && !nameExcluded;
       });
       const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
 
