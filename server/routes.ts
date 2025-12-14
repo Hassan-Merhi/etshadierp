@@ -23771,13 +23771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const allPermissions = await storage.getRoleFeaturePermissions(companyId);
         const rolePermissions = allPermissions.filter(p => p.role === role);
 
-        // Build a map of feature -> enabled
-        const permissionMap: Record<string, boolean> = {};
-        for (const p of rolePermissions) {
-          permissionMap[p.featureKey] = p.enabled;
-        }
-
-        res.json({ role, permissions: permissionMap });
+        res.json(rolePermissions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
