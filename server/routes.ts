@@ -23702,6 +23702,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Role Feature Permissions API
+  // Get all role permissions for the current company
+  app.get(
+    "/api/settings/role-permissions",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const permissions = await storage.getRoleFeaturePermissions(companyId);
+        res.json(permissions);
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // Update role permissions (bulk upsert)
+  app.put(
+    "/api/settings/role-permissions",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { permissions } = req.body;
+        if (!Array.isArray(permissions)) {
+          return res.status(400).json({ message: "permissions must be an array" });
+        }
+
+        // Add companyId to each permission
+        const permissionsWithCompany = permissions.map((p: any) => ({
+          ...p,
+          companyId,
+        }));
+
+        const results = await storage.bulkUpsertRoleFeaturePermissions(permissionsWithCompany);
+        res.json({ message: "Permissions updated successfully", permissions: results });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // Get permissions for the current user's role (used by sidebar)
+  app.get(
+    "/api/my-permissions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        const role = req.session.currentRole;
+
+        if (!companyId || !role) {
+          return res.status(400).json({ message: "No company or role selected" });
+        }
+
+        // Get all permissions for this company and role
+        const allPermissions = await storage.getRoleFeaturePermissions(companyId);
+        const rolePermissions = allPermissions.filter(p => p.role === role);
+
+        // Build a map of feature -> enabled
+        const permissionMap: Record<string, boolean> = {};
+        for (const p of rolePermissions) {
+          permissionMap[p.featureKey] = p.enabled;
+        }
+
+        res.json({ role, permissions: permissionMap });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useQuery } from "@tanstack/react-query";
+import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
 
 const menuItems = [
   {
@@ -146,24 +148,59 @@ const menuItems = [
 export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
 
-  // Filter menu items based on user role
+  // Fetch user's permissions from the API
+  const { data: myPermissions = [] } = useQuery<any[]>({
+    queryKey: ["/api/my-permissions"],
+    enabled: !!user,
+  });
+
+  // Build a set of allowed feature keys for the current user
+  const allowedFeatures = new Set<string>();
+  myPermissions.forEach((p: any) => {
+    if (p.enabled) {
+      allowedFeatures.add(p.featureKey);
+    }
+  });
+
+  // Filter menu items based on user role and permissions
   const visibleMenuItems = menuItems.filter((item) => {
     const isPOSUser = user?.role?.startsWith("POS");
+    const isAdmin = user?.role === "Admin";
     
+    // Get the feature key for this route
+    const featureKey = ROUTE_TO_FEATURE[item.url];
+    
+    // Admin always has all permissions
+    if (isAdmin) {
+      return true;
+    }
+
+    // If we have permissions data, use it
+    if (myPermissions.length > 0 && featureKey) {
+      // Check if the feature is in the allowed set
+      // If the feature is not in the permissions data, default to true (backward compatible)
+      const permissionEntry = myPermissions.find((p: any) => p.featureKey === featureKey);
+      if (permissionEntry) {
+        return permissionEntry.enabled;
+      }
+      // Default to the old behavior for features not yet configured
+    }
+    
+    // Fallback to old behavior if no permissions are configured
     // POS users only see: POS, POS Daybook, and Location Inventory
     if (isPOSUser) {
       return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
     }
     
     // For non-POS users:
-    // Settings is Admin only
+    // Settings is Admin only (already handled above)
     if (item.url === "/settings") {
-      return user?.role === "Admin";
+      return false;
     }
     
     // POS Daybook is only for POS users (hide from others)
     if (item.url === "/pos-daybook") {
-      return isPOSUser; // This is redundant now but kept for clarity
+      return isPOSUser;
     }
     
     // All other items are visible to non-POS users

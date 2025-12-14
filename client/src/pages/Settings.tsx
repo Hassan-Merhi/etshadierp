@@ -53,10 +53,10 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2 } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
+  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
   import { useCompany } from "@/contexts/CompanyContext";
   
@@ -124,6 +124,78 @@
       queryKey: [`/api/users/${expandedUserId}/company-roles`],
       enabled: !!expandedUserId,
     });
+
+    // Query for role feature permissions
+    const { data: rolePermissions = [], isLoading: isLoadingPermissions } = useQuery<any[]>({
+      queryKey: ["/api/settings/role-permissions", selectedCompany?.id],
+      enabled: !!selectedCompany,
+    });
+
+    // Build a lookup map for role permissions: { "role:featureKey": enabled }
+    const permissionMap = new Map<string, boolean>();
+    rolePermissions.forEach((p: any) => {
+      permissionMap.set(`${p.role}:${p.featureKey}`, p.enabled);
+    });
+
+    // Get permission value for a role/feature
+    const getPermission = (role: string, featureKey: string): boolean => {
+      // Admin always has all permissions
+      if (role === "Admin") return true;
+      const key = `${role}:${featureKey}`;
+      // Default to true if not explicitly set (existing behavior)
+      return permissionMap.has(key) ? permissionMap.get(key)! : true;
+    };
+
+    // Mutation for updating role permissions
+    const updateRolePermissionMutation = useMutation({
+      mutationFn: async ({ role, featureKey, enabled }: { role: string; featureKey: string; enabled: boolean }) => {
+        const res = await apiRequest("PUT", "/api/settings/role-permissions", {
+          permissions: [{ role, featureKey, enabled }],
+        });
+        return await res.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/settings/role-permissions", selectedCompany?.id] });
+        toast({
+          title: "Permission Updated",
+          description: "Role permission has been updated successfully.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to update permission",
+          variant: "destructive",
+        });
+      },
+    });
+
+    // Roles that can be configured (exclude Admin since they always have full access)
+    const configurableRoles = ["Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"];
+
+    // Feature key to readable name
+    const featureLabels: Record<FeatureKey, string> = {
+      dashboard: "Dashboard",
+      pos: "Point of Sale",
+      pos_daybook: "POS Daybook",
+      stock_items: "Stock Items",
+      location_inventory: "Location Inventory",
+      containers: "Containers",
+      stock_otw: "Stock OTW",
+      factory_production: "Factory Production",
+      analytics: "Analytics",
+      accounts: "Accounts",
+      suppliers: "Suppliers",
+      customers: "Customers",
+      vouchers: "Vouchers",
+      daybook: "Daybook",
+      payroll: "Payroll",
+      create: "Create",
+      stock_query: "Stock Query",
+      location_summary: "Location Summary",
+      sales_report: "Sales Report",
+      settings: "Settings",
+    };
   
     const companyForm = useForm<CompanyFormData>({
       resolver: zodResolver(companyFormSchema),
@@ -570,6 +642,10 @@
             <TabsTrigger value="system" data-testid="tab-system">
               <Wrench className="h-4 w-4 mr-2" />
               System
+            </TabsTrigger>
+            <TabsTrigger value="role-permissions" data-testid="tab-role-permissions">
+              <Shield className="h-4 w-4 mr-2" />
+              Role Permissions
             </TabsTrigger>
           </TabsList>
   
@@ -1230,6 +1306,75 @@
                   </div>
                 </Card>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Role Permissions Tab */}
+          <TabsContent value="role-permissions" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">Role Permissions</h2>
+              </div>
+
+              <p className="text-muted-foreground">
+                Configure which menu features are accessible for each role. Admin users always have full access.
+              </p>
+
+              {!selectedCompany ? (
+                <Card className="p-6">
+                  <p className="text-muted-foreground">Please select a company to configure role permissions.</p>
+                </Card>
+              ) : isLoadingPermissions ? (
+                <Card className="p-6">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading permissions...</span>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-0 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky left-0 bg-background z-10 min-w-[160px]">Feature</TableHead>
+                          {configurableRoles.map((role) => (
+                            <TableHead key={role} className="text-center min-w-[80px]">
+                              {role}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {FEATURE_KEYS.map((featureKey) => (
+                          <TableRow key={featureKey}>
+                            <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                              {featureLabels[featureKey]}
+                            </TableCell>
+                            {configurableRoles.map((role) => (
+                              <TableCell key={role} className="text-center">
+                                <Switch
+                                  checked={getPermission(role, featureKey)}
+                                  onCheckedChange={(checked) => {
+                                    updateRolePermissionMutation.mutate({
+                                      role,
+                                      featureKey,
+                                      enabled: checked,
+                                    });
+                                  }}
+                                  disabled={updateRolePermissionMutation.isPending}
+                                  data-testid={`switch-permission-${role}-${featureKey}`}
+                                />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>

@@ -337,6 +337,12 @@ export interface IStorage {
   updateBaleTransferItem(id: number, updates: Partial<schema.InsertBaleTransferItem>): Promise<schema.BaleTransferItem>;
   deleteBaleTransferItem(id: number): Promise<void>;
   getProductionBalesByLocation(companyId: number, locationId: number): Promise<schema.ProductionBale[]>;
+
+  // Role Feature Permissions
+  getRoleFeaturePermissions(companyId: number): Promise<schema.RoleFeaturePermission[]>;
+  getRoleFeaturePermission(companyId: number, role: string, featureKey: string): Promise<schema.RoleFeaturePermission | undefined>;
+  upsertRoleFeaturePermission(permission: schema.InsertRoleFeaturePermission): Promise<schema.RoleFeaturePermission>;
+  bulkUpsertRoleFeaturePermissions(permissions: schema.InsertRoleFeaturePermission[]): Promise<schema.RoleFeaturePermission[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -5033,6 +5039,56 @@ export class DbStorage implements IStorage {
       .from(schema.customerBalances)
       .where(and(...conditions))
       .orderBy(schema.customerBalances.transactionDate);
+  }
+
+  // Role Feature Permissions
+  async getRoleFeaturePermissions(companyId: number): Promise<schema.RoleFeaturePermission[]> {
+    return await db
+      .select()
+      .from(schema.roleFeaturePermissions)
+      .where(eq(schema.roleFeaturePermissions.companyId, companyId));
+  }
+
+  async getRoleFeaturePermission(companyId: number, role: string, featureKey: string): Promise<schema.RoleFeaturePermission | undefined> {
+    const [permission] = await db
+      .select()
+      .from(schema.roleFeaturePermissions)
+      .where(and(
+        eq(schema.roleFeaturePermissions.companyId, companyId),
+        eq(schema.roleFeaturePermissions.role, role),
+        eq(schema.roleFeaturePermissions.featureKey, featureKey)
+      ));
+    return permission;
+  }
+
+  async upsertRoleFeaturePermission(permission: schema.InsertRoleFeaturePermission): Promise<schema.RoleFeaturePermission> {
+    const [result] = await db
+      .insert(schema.roleFeaturePermissions)
+      .values(permission)
+      .onConflictDoUpdate({
+        target: [
+          schema.roleFeaturePermissions.companyId,
+          schema.roleFeaturePermissions.role,
+          schema.roleFeaturePermissions.featureKey
+        ],
+        set: {
+          enabled: permission.enabled,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async bulkUpsertRoleFeaturePermissions(permissions: schema.InsertRoleFeaturePermission[]): Promise<schema.RoleFeaturePermission[]> {
+    if (permissions.length === 0) return [];
+    
+    const results: schema.RoleFeaturePermission[] = [];
+    for (const permission of permissions) {
+      const result = await this.upsertRoleFeaturePermission(permission);
+      results.push(result);
+    }
+    return results;
   }
 }
 

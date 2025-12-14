@@ -1550,3 +1550,85 @@ export const insertDashboardAccountSelectionSchema = createInsertSchema(dashboar
 
 export type InsertDashboardAccountSelection = z.infer<typeof insertDashboardAccountSelectionSchema>;
 export type DashboardAccountSelection = typeof dashboardAccountSelections.$inferSelect;
+
+// Role Feature Permissions - controls which features are accessible by each role per company
+export const roleFeaturePermissions = pgTable("role_feature_permissions", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  role: text("role").notNull(),
+  featureKey: text("feature_key").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyRoleFeature: uniqueIndex("role_feature_permissions_unique").on(t.companyId, t.role, t.featureKey),
+}));
+
+export const insertRoleFeaturePermissionSchema = createInsertSchema(roleFeaturePermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  role: z.enum(["Admin", "Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"]),
+  featureKey: z.string().min(1, "Feature key is required"),
+  enabled: z.boolean().default(true),
+});
+
+export type InsertRoleFeaturePermission = z.infer<typeof insertRoleFeaturePermissionSchema>;
+export type RoleFeaturePermission = typeof roleFeaturePermissions.$inferSelect;
+
+// List of all available features for permission control
+export const FEATURE_KEYS = [
+  "dashboard",
+  "pos",
+  "pos_daybook",
+  "stock_items",
+  "location_inventory",
+  "containers",
+  "stock_otw",
+  "factory_production",
+  "analytics",
+  "accounts",
+  "suppliers",
+  "customers",
+  "vouchers",
+  "daybook",
+  "payroll",
+  "create",
+  "stock_query",
+  "location_summary",
+  "sales_report",
+  "settings",
+] as const;
+
+export type FeatureKey = typeof FEATURE_KEYS[number];
+
+// Map feature keys to their route paths
+export const FEATURE_ROUTES: Record<FeatureKey, string> = {
+  dashboard: "/",
+  pos: "/pos",
+  pos_daybook: "/pos-daybook",
+  stock_items: "/stock-items",
+  location_inventory: "/location-inventory",
+  containers: "/containers",
+  stock_otw: "/stock-otw",
+  factory_production: "/factory-production",
+  analytics: "/analytics",
+  accounts: "/accounts",
+  suppliers: "/suppliers",
+  customers: "/customers",
+  vouchers: "/vouchers",
+  daybook: "/daybook",
+  payroll: "/payroll",
+  create: "/create",
+  stock_query: "/stock-query",
+  location_summary: "/location-summary",
+  sales_report: "/sales-report",
+  settings: "/settings",
+};
+
+// Map routes to feature keys (reverse lookup)
+export const ROUTE_TO_FEATURE: Record<string, FeatureKey> = Object.fromEntries(
+  Object.entries(FEATURE_ROUTES).map(([key, route]) => [route, key as FeatureKey])
+) as Record<string, FeatureKey>;
