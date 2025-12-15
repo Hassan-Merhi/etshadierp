@@ -1,0 +1,43 @@
+tatus 1 while building your code.
+Read our docs for common ways to troubleshoot your deploy.
+
+All logs
+Search
+Search
+
+Dec 15, 10:53 AM - 10:57 AM
+GMT+2
+
+Menu
+
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Build failed 😞
+    at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:11284:15)
+    at CallExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:2653:23)
+    at MemberExpression.bind (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:6922:49)
+    at FunctionBodyScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+    at FunctionScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:5283:38)
+    at ModuleScope.findVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:13820:39)
+    at Module.traceVariable (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:16037:29)
+    at Module.error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/node-entry.js:15588:16)
+    at error (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:392:42)
+    at getRollupError (file:///opt/render/project/src/node_modules/rollup/dist/es/shared/parseAst.js:396:41)
+61:   import { useCompany } from "@/contexts/CompanyContext";
+60:   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+                                                                                   ^
+59:   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "...
+58:   import { useDateFormat } from "@/contexts/DateFormatContext";
+57:   import { Link } from "wouter";
+file: /opt/render/project/src/client/src/pages/Settings.tsx:59:79
+client/src/pages/Settings.tsx (59:79): "FEATURE_KEYS" is not exported by "shared/schema.ts", imported by "client/src/pages/Settings.tsx".
+error during build:
+x Build failed in 5.96s
+✓ 3807 modules transformed.
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+  npx update-browserslist-db@latest
+Browserslist: browsers data (caniuse-lite) is 14 months old. Please run:
+transforming...
+vite v5.4.20 building for production...
+> vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+> rest-express@1.0.0 build
