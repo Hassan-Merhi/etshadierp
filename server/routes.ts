@@ -15748,9 +15748,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 10. NET PROFIT = Gross Profit + Indirect Incomes - Indirect Expenses
       const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
-      // For backward compatibility, also calculate totalIncome and totalExpenses
-      const totalIncome = salesAccountsTotal + directIncomesTotal + indirectIncomesTotal;
-      const totalExpenses = purchaseAccountsTotal + directExpensesTotal + indirectExpensesTotal;
+      // For backward compatibility, calculate totalIncome and totalExpenses from ledger balances
+      // This matches the original dashboard display values
+      const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
+      let totalIncome = 0;
+      for (const acc of incomeAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        totalIncome += balance.credit - balance.debit; // Income is credits
+      }
+
+      const expenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Expense" || 
+                 acc.accountType === "Direct Expense" || 
+                 acc.accountType === "Indirect Expense" ||
+                 acc.code === "PURCHASES" || 
+                 acc.code?.startsWith("PURCHASES-")
+      );
+      let totalExpenses = 0;
+      for (const acc of expenseAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        totalExpenses += balance.debit - balance.credit; // Expenses are debits
+      }
 
       res.json({
         totalIncome,
