@@ -1622,9 +1622,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const incomeBalance = await getAccountTypeBalance("Income", true);
 
           // 11. Stock on Floor
+          // Calculate from quantity * averageRate to ensure accuracy (totalValue can get out of sync)
           const inventoryItems = await db
             .select({
-              totalValue: inventory.totalValue,
+              quantity: inventory.quantity,
+              averageRate: inventory.averageRate,
             })
             .from(inventory)
             .innerJoin(locations, eq(inventory.locationId, locations.id))
@@ -1636,8 +1638,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
           const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
-            const totalValue = parseFloat(item.totalValue || "0");
-            return sum + totalValue;
+            const qty = parseFloat(item.quantity || "0");
+            const rate = parseFloat(item.averageRate || "0");
+            return sum + (qty * rate);
           }, 0);
 
           // 12. COGS
