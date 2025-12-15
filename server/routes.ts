@@ -18010,13 +18010,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // 5. Gross Profit Calculation
-      // Gross Profit = Direct Incomes - (Opening Stock + Purchases + Direct Expenses)
-      // Note: In traditional P&L, Gross Profit = Sales - COGS, where COGS = Opening Stock + Purchases - Closing Stock
-      // For now using simplified: Gross Profit = Direct Incomes - Purchases - Direct Expenses
-      const grossProfit = directIncomesTotal - purchaseAccountsTotal - directExpensesTotal;
+      // 5. Sales Accounts - Sum of all sales from Receipt vouchers (POS sales)
+      // NOTE: Must calculate Sales BEFORE Gross Profit for Tally-style calculation
+      const salesConditions = [
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false)
+      ];
+      if (startDate) {
+        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+      }
+      if (endDate) {
+        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+      }
+      
+      const salesData = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(...salesConditions))
+        .execute();
+      const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
 
-      // 6. Indirect Expenses - accounts with accountType="Indirect Expense"
+      // 6. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
+      const activeLocationsData = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(
+          and(
+            eq(locations.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+      const activeLocationIds = activeLocationsData.map((l) => l.id);
+
+      let closingStockValue = 0;
+      if (activeLocationIds.length > 0) {
+        const inventoryData = await db
+          .select({
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+          })
+          .from(inventory)
+          .where(inArray(inventory.locationId, activeLocationIds))
+          .execute();
+
+        for (const inv of inventoryData) {
+          const qty = parseFloat(inv.quantity || "0");
+          const rate = parseFloat(inv.averageRate || "0");
+          closingStockValue += qty * rate;
+        }
+      }
+
+      // 7. Gross Profit Calculation - TALLY PRIME TRADING ACCOUNT STYLE
+      // Trading Account format:
+      // - Credit side: Sales + Closing Stock + Direct Incomes
+      // - Debit side: Opening Stock + Purchases + Direct Expenses
+      // - Gross Profit = Credit side - Debit side
+      const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
+      const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
+      const grossProfit = tradingCreditSide - tradingDebitSide;
+
+      // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
       const indirectExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Indirect Expense"
       );
@@ -18055,83 +18113,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // 7. Net Profit = Gross Profit + Indirect Incomes - Indirect Expenses
+      // 9. Net Profit = Gross Profit + Indirect Incomes - Indirect Expenses
+      // This follows Tally Prime's P&L methodology where:
+      // - Gross Profit comes from Trading Account (direct expenses already included there)
+      // - Then we add indirect incomes and subtract indirect expenses
       const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
 
-      // Calculate totals for left pane
-      const leftPaneTotal = openingStockValue + purchaseAccountsTotal + directIncomesTotal + directExpensesTotal;
+      // Calculate totals for panes (Tally Trading Account format)
+      // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
+      // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
+      const leftPaneTotal = tradingDebitSide; // Opening Stock + Purchases + Direct Expenses
+      const rightTradingTotal = tradingCreditSide; // Sales + Closing Stock + Direct Incomes
 
       // === RIGHT PANE DATA ===
+      // Note: salesAccountsTotal, closingStockValue, directIncomesTotal already calculated above for Gross Profit
       
-      // 1. Sales Accounts - Sum of all sales from Receipt vouchers (POS sales)
-      // Calculate from salesItems table with date filtering
-      const salesConditions = [
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.optional, false)
-      ];
-      if (startDate) {
-        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
-      }
-      if (endDate) {
-        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
-      }
-      
-      const salesData = await db
-        .select({
-          total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
-        })
-        .from(salesItems)
-        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(and(...salesConditions))
-        .execute();
-      const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
-
-      // 2. Closing Stock - Current inventory value (quantity × weighted average cost) across all active locations
-      const activeLocationsData = await db
-        .select({ id: locations.id })
-        .from(locations)
-        .where(
-          and(
-            eq(locations.companyId, companyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt)
-          )
-        )
-        .execute();
-      const activeLocationIds = activeLocationsData.map((l) => l.id);
-
-      let closingStockValue = 0;
-      if (activeLocationIds.length > 0) {
-        const inventoryData = await db
-          .select({
-            quantity: inventory.quantity,
-            averageRate: inventory.averageRate,
-          })
-          .from(inventory)
-          .where(inArray(inventory.locationId, activeLocationIds))
-          .execute();
-
-        for (const inv of inventoryData) {
-          const qty = parseFloat(inv.quantity || "0");
-          const rate = parseFloat(inv.averageRate || "0");
-          closingStockValue += qty * rate;
-        }
-      }
-
-      // 3. Gross Profit b/f - Same as gross profit from left pane
+      // Gross Profit b/f - Same as gross profit from Trading Account
       const grossProfitBf = grossProfit;
 
-      // Note: Indirect Incomes already calculated above (before Net Profit calculation)
-
-      // Right pane total should equal left pane total for the P&L to balance
-      const rightPaneTotal = salesAccountsTotal + closingStockValue + grossProfitBf + indirectIncomesTotal;
+      // Right pane total for P&L display (trading credit side + indirect incomes for balancing)
+      const rightPaneTotal = rightTradingTotal + indirectIncomesTotal;
 
       res.json({
         dateRange: {
           startDate: startDate ? startDate.toISOString().split('T')[0] : null,
           endDate: endDate ? endDate.toISOString().split('T')[0] : null,
         },
+        // TALLY PRIME TRADING ACCOUNT STRUCTURE
+        // Left pane (Debit side): Opening Stock + Purchases + Direct Expenses
+        // Right pane (Credit side): Sales + Closing Stock + Direct Incomes
         leftPane: {
+          // Trading Account - Debit Side
           openingStock: {
             value: openingStockValue,
           },
@@ -18140,18 +18152,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             accounts: purchaseAccountsDetails,
             count: purchaseAccounts.length,
           },
-          directIncomes: {
-            total: directIncomesTotal,
-            accounts: directIncomesDetails,
-            count: directIncomeAccounts.length,
-          },
           directExpenses: {
             total: directExpensesTotal,
             accounts: directExpensesDetails,
             count: directExpenseAccounts.length,
           },
-          grossProfit: grossProfit,
-          subtotal: leftPaneTotal + grossProfit,
+          tradingTotal: leftPaneTotal, // Sum of debit side
+          grossProfit: grossProfit, // Balancing figure (credit - debit)
+          // P&L Section
           indirectExpenses: {
             total: indirectExpensesTotal,
             accounts: indirectExpensesDetails,
@@ -18160,13 +18168,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           netProfit: netProfit,
         },
         rightPane: {
+          // Trading Account - Credit Side
           salesAccounts: {
             total: salesAccountsTotal,
+          },
+          directIncomes: {
+            total: directIncomesTotal,
+            accounts: directIncomesDetails,
+            count: directIncomeAccounts.length,
           },
           closingStock: {
             value: closingStockValue,
           },
+          tradingTotal: rightTradingTotal, // Sum of credit side
           grossProfitBf: grossProfitBf,
+          // P&L Section
           indirectIncomes: {
             total: indirectIncomesTotal,
             accounts: indirectIncomesDetails,
