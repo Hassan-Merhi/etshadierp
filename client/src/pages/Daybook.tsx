@@ -531,10 +531,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       return true;
     }).sort((a, b) => {
-      // Sort by date (newest first), then by voucher number
-      const dateCompare = b.voucherDate.localeCompare(a.voucherDate);
+      // Sort by date chronologically (oldest first), then group by voucher type within same date
+      const dateCompare = a.voucherDate.localeCompare(b.voucherDate);
       if (dateCompare !== 0) return dateCompare;
-      return b.voucherNumber.localeCompare(a.voucherNumber);
+      const typeCompare = a.voucherType.localeCompare(b.voucherType);
+      if (typeCompare !== 0) return typeCompare;
+      return a.voucherNumber.localeCompare(b.voucherNumber);
     });
   }, [vouchers, filters]);
 
