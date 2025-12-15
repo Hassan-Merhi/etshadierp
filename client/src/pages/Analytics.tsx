@@ -1022,68 +1022,14 @@ export default function Analytics() {
 
         {/* Profit & Loss Tab */}
         <TabsContent value="profit-loss" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {accountsLoading ? "Loading..." : formatCurrency(totalIncome)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {accountsLoading ? "Loading..." : formatCurrency(totalExpenses)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div
-                  className={`text-2xl font-bold ${
-                    netProfit >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {accountsLoading ? "Loading..." : formatCurrency(netProfit)}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           <Card>
             <CardContent className="p-6">
-              <Tabs defaultValue="direct-income" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="direct-income">Direct Income</TabsTrigger>
-                  <TabsTrigger value="indirect-income">Indirect Income</TabsTrigger>
+              <Tabs defaultValue="assets" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="assets">Assets</TabsTrigger>
                   <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
                   <TabsTrigger value="cash">Cash</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="direct-income" className="mt-4">
-                  <h4 className="font-medium mb-4">Direct Income Accounts</h4>
-                  {renderPLAccountTable(directIncomeAccounts)}
-                </TabsContent>
-
-                <TabsContent value="indirect-income" className="mt-4">
-                  <h4 className="font-medium mb-4">Indirect Income Accounts</h4>
-                  {renderPLAccountTable(indirectIncomeAccounts)}
-                </TabsContent>
 
                 <TabsContent value="assets" className="mt-4">
                   <div className="flex items-center justify-between mb-4">
