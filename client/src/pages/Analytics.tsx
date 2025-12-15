@@ -245,18 +245,13 @@ interface NetProfitStatementData {
       accounts: NetProfitAccount[];
       count: number;
     };
-    directIncomes: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
     directExpenses: {
       total: number;
       accounts: NetProfitAccount[];
       count: number;
     };
+    tradingTotal: number;
     grossProfit: number;
-    subtotal: number;
     indirectExpenses: {
       total: number;
       accounts: NetProfitAccount[];
@@ -268,9 +263,15 @@ interface NetProfitStatementData {
     salesAccounts: {
       total: number;
     };
+    directIncomes: {
+      total: number;
+      accounts: NetProfitAccount[];
+      count: number;
+    };
     closingStock: {
       value: number;
     };
+    tradingTotal: number;
     grossProfitBf: number;
     indirectIncomes: {
       total: number;

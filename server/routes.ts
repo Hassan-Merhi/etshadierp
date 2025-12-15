@@ -15596,7 +15596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Financial Stats
+  // Financial Stats - Uses same Tally Trading Account calculation as /api/reports/net-profit-statement
   app.get("/api/stats/net-profit", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -15604,155 +15604,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Get all Income and Expense ledger accounts for this company
+      // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
 
-      const incomeAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Income")
-        .map((acc) => acc.id);
-      
-      // Include ALL expenses in net profit calculation for consistency with P&L report
-      // PURCHASES are now included (previously excluded) to match P&L calculation
-      // Only exclude container-related import charges that are capitalized to inventory
-      const excludedExpenseCodes = [
-        "IMPORTCHARGES",       // Old consolidated import charges (deprecated, capitalized)
-        "IMPORT_CHARGES",      // Alternative format
-        "DUTIES",              // Container import duties (capitalized)
-        "DUT",                 // Abbreviated duties code
-        "TRANSPORTCHARGES",    // Container transport costs (capitalized)
-        "TRANSPORT",           // Alternative transport account name (capitalized)
-        "TRA",                 // Abbreviated transport code
-        "TRANSFER_CHARGES",    // Transfer charges (capitalized)
-        "CONTAINERLICENSES",   // Container license fees (capitalized)
-        "CONLIC",              // Abbreviated container licenses
-        "LICENSES",            // Alternative license account name (capitalized)
-        "LIC",                 // Abbreviated licenses code
-      ];
-      
-      // Name patterns to exclude (container-related costs only)
-      const excludedNamePatterns = [
-        "duties",
-        "transport charges",
-        "container license",
-        "import charge",
-        "transfer charge",
-      ];
-      
-      // Normalize function: uppercase + remove spaces/underscores for comparison
-      const normalizeCode = (code: string) => 
-        code.toUpperCase().replace(/[\s_-]/g, "");
-      
-      const expenseAccounts = companyAccounts.filter((acc) => {
-        // Include Purchase accounts by code (for P&L consistency)
-        const isPurchaseAccount = acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-");
-        if (isPurchaseAccount) return true;
-        
-        // Support both correct format (accountType="Expense") and legacy format
-        // (accountType="Indirect Expense" or "Direct Expense")
-        const isExpenseAccount = 
-          acc.accountType === "Expense" || 
-          acc.accountType === "Indirect Expense" || 
-          acc.accountType === "Direct Expense";
-        
-        if (!isExpenseAccount) return false;
-        
-        // Check if code matches exclusion list
-        const normalizedCode = normalizeCode(acc.code);
-        const codeExcluded = excludedExpenseCodes.some(excluded => 
-          normalizeCode(excluded) === normalizedCode
-        );
-        
-        // Check if name contains excluded patterns
-        const nameLower = (acc.name || "").toLowerCase();
-        const nameExcluded = excludedNamePatterns.some(pattern => 
-          nameLower.includes(pattern)
-        );
-        
-        // Exclude if either code or name matches
-        return !codeExcluded && !nameExcluded;
-      });
-      const expenseAccountIds = expenseAccounts.map((acc) => acc.id);
-
-      // Get voucher IDs for this company (excluding optional)
+      // Get all non-optional vouchers for this company
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
         .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
         .execute();
-
       const companyVoucherIds = companyVouchers.map((v) => v.id);
 
-      // Get voucher entries only for this company's vouchers
-      const companyEntries =
-        companyVoucherIds.length > 0
-          ? await db
-              .select()
-              .from(voucherEntries)
-              .where(inArray(voucherEntries.voucherId, companyVoucherIds))
-              .execute()
-          : [];
+      // Get all voucher entries
+      const companyEntries = companyVoucherIds.length > 0
+        ? await db
+            .select()
+            .from(voucherEntries)
+            .where(inArray(voucherEntries.voucherId, companyVoucherIds))
+            .execute()
+        : [];
 
-      // Calculate total income (credits - debits for income accounts)
-      // Start with opening balances for income accounts
-      const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
-      let totalIncome = 0;
-      
-      // Add opening balances for income accounts
-      // Income accounts (like liabilities): Cr opening = positive, Dr opening = negative
-      for (const acc of incomeAccounts) {
-        const openingBalanceRaw = parseFloat(acc.openingBalance || "0");
-        const openingSide = acc.openingBalanceSide || "Cr";
-        // Income is a credit-normal account: Cr = positive, Dr = negative
-        const signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
-        totalIncome += signedOpening;
-      }
-      
-      // Add voucher entry movements
+      // Calculate balances for each account (debit/credit totals)
+      const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of companyEntries) {
-        if (
-          entry.ledgerAccountId &&
-          incomeAccountIds.includes(entry.ledgerAccountId)
-        ) {
-          totalIncome +=
-            parseFloat(entry.creditAmount || "0") -
-            parseFloat(entry.debitAmount || "0");
+        if (entry.ledgerAccountId) {
+          const debit = parseFloat(entry.debitAmount || "0");
+          const credit = parseFloat(entry.creditAmount || "0");
+          const current = accountBalances.get(entry.ledgerAccountId) || { debit: 0, credit: 0 };
+          accountBalances.set(entry.ledgerAccountId, {
+            debit: current.debit + debit,
+            credit: current.credit + credit,
+          });
         }
       }
 
-      // Calculate total expenses (debits - credits for expense accounts)
-      // Now includes PURCHASES for consistency with P&L report
-      // Start with opening balances for expense accounts
-      let totalExpenses = 0;
-      
-      // Add opening balances for expense accounts
-      // Expense accounts (like assets): Dr opening = positive, Cr opening = negative
-      for (const acc of expenseAccounts) {
-        const openingBalanceRaw = parseFloat(acc.openingBalance || "0");
-        const openingSide = acc.openingBalanceSide || "Dr";
-        // Expense is a debit-normal account: Dr = positive, Cr = negative
-        const signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-        totalExpenses += signedOpening;
+      // 1. Opening Stock - FROZEN value from stock items' opening values
+      const allStockItems = await storage.getAllStockItems(companyId);
+      let openingStockValue = 0;
+      for (const item of allStockItems) {
+        openingStockValue += parseFloat(item.openingValue || "0");
       }
-      
-      // Add voucher entry movements
-      for (const entry of companyEntries) {
-        if (
-          entry.ledgerAccountId &&
-          expenseAccountIds.includes(entry.ledgerAccountId)
-        ) {
-          totalExpenses +=
-            parseFloat(entry.debitAmount || "0") -
-            parseFloat(entry.creditAmount || "0");
+
+      // 2. Purchase Accounts - accounts with code starting with PURCHASES
+      const purchaseAccounts = companyAccounts.filter(
+        (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
+      );
+      let purchaseAccountsTotal = 0;
+      for (const acc of purchaseAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        purchaseAccountsTotal += balance.debit - balance.credit; // Purchases are debits
+      }
+
+      // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
+      const directIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+      );
+      let directIncomesTotal = 0;
+      for (const acc of directIncomeAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        directIncomesTotal += balance.credit - balance.debit; // Income is credits
+      }
+
+      // 4. Direct Expenses - accounts with accountType="Direct Expense"
+      const directExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Direct Expense"
+      );
+      let directExpensesTotal = 0;
+      for (const acc of directExpenseAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        directExpensesTotal += balance.debit - balance.credit; // Expenses are debits
+      }
+
+      // 5. Sales - Sum from salesItems table
+      const salesData = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .execute();
+      const salesAccountsTotal = parseFloat(salesData[0]?.total || "0");
+
+      // 6. Closing Stock - Current inventory value from active locations
+      const activeLocationsData = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(
+          and(
+            eq(locations.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+      const activeLocationIds = activeLocationsData.map((l) => l.id);
+
+      let closingStockValue = 0;
+      if (activeLocationIds.length > 0) {
+        const inventoryData = await db
+          .select({
+            quantity: inventory.quantity,
+            averageRate: inventory.averageRate,
+          })
+          .from(inventory)
+          .where(inArray(inventory.locationId, activeLocationIds))
+          .execute();
+
+        for (const inv of inventoryData) {
+          const qty = parseFloat(inv.quantity || "0");
+          const rate = parseFloat(inv.averageRate || "0");
+          closingStockValue += qty * rate;
         }
       }
 
-      // Calculate net profit (Purchases now included in expenseAccounts for P&L consistency)
-      const netProfit = totalIncome - totalExpenses;
+      // 7. GROSS PROFIT - Tally Trading Account Style
+      // Credit side: Sales + Closing Stock + Direct Incomes
+      // Debit side: Opening Stock + Purchases + Direct Expenses
+      const tradingCreditSide = salesAccountsTotal + closingStockValue + directIncomesTotal;
+      const tradingDebitSide = openingStockValue + purchaseAccountsTotal + directExpensesTotal;
+      const grossProfit = tradingCreditSide - tradingDebitSide;
+
+      // 8. Indirect Expenses - accounts with accountType="Indirect Expense"
+      const indirectExpenseAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Indirect Expense"
+      );
+      let indirectExpensesTotal = 0;
+      for (const acc of indirectExpenseAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        indirectExpensesTotal += balance.debit - balance.credit;
+      }
+
+      // 9. Indirect Incomes - accounts with accountType="Income" AND subType="Indirect Income"
+      const indirectIncomeAccounts = companyAccounts.filter(
+        (acc) => acc.accountType === "Income" && acc.subType === "Indirect Income"
+      );
+      let indirectIncomesTotal = 0;
+      for (const acc of indirectIncomeAccounts) {
+        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+        indirectIncomesTotal += balance.credit - balance.debit;
+      }
+
+      // 10. NET PROFIT = Gross Profit + Indirect Incomes - Indirect Expenses
+      const netProfit = grossProfit + indirectIncomesTotal - indirectExpensesTotal;
+
+      // For backward compatibility, also calculate totalIncome and totalExpenses
+      const totalIncome = salesAccountsTotal + directIncomesTotal + indirectIncomesTotal;
+      const totalExpenses = purchaseAccountsTotal + directExpensesTotal + indirectExpensesTotal;
 
       res.json({
         totalIncome,
         totalExpenses,
         netProfit,
+        // Additional Tally-style breakdown for Dashboard if needed
+        tradingAccount: {
+          openingStock: openingStockValue,
+          purchases: purchaseAccountsTotal,
+          directExpenses: directExpensesTotal,
+          sales: salesAccountsTotal,
+          closingStock: closingStockValue,
+          directIncomes: directIncomesTotal,
+          grossProfit,
+        },
+        profitAndLoss: {
+          indirectExpenses: indirectExpensesTotal,
+          indirectIncomes: indirectIncomesTotal,
+          netProfit,
+        },
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
