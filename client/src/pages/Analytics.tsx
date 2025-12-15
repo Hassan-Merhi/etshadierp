@@ -1860,41 +1860,41 @@ export default function Analytics() {
                       )}
                     </div>
 
-                    {/* Direct Incomes */}
-                    <div>
-                      <div 
-                        className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
-                        onClick={() => toggleNetProfitSection("directIncomes")}
-                        data-testid="row-direct-incomes"
-                      >
-                        <span className="flex items-center gap-2">
-                          {expandedNetProfitSections.has("directIncomes") ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                          Direct Incomes
-                          {netProfitData.leftPane.directIncomes.count > 0 && (
+                    {/* Direct Incomes - Moved to Right Pane (Credit side) */}
+                    {netProfitData.rightPane?.directIncomes?.count > 0 && (
+                      <div>
+                        <div 
+                          className="flex justify-between items-center p-3 cursor-pointer hover-elevate"
+                          onClick={() => toggleNetProfitSection("directIncomes")}
+                          data-testid="row-direct-incomes"
+                        >
+                          <span className="flex items-center gap-2">
+                            {expandedNetProfitSections.has("directIncomes") ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            Direct Incomes
                             <span className="text-xs text-muted-foreground">
-                              ({netProfitData.leftPane.directIncomes.count})
+                              ({netProfitData.rightPane.directIncomes.count})
                             </span>
-                          )}
-                        </span>
-                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.directIncomes.total)}</span>
-                      </div>
-                      {expandedNetProfitSections.has("directIncomes") && netProfitData.leftPane.directIncomes.accounts.length > 0 && (
-                        <div className="bg-muted/30 divide-y">
-                          {netProfitData.leftPane.directIncomes.accounts.map((acc) => (
-                            <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
-                              <span>{acc.name}</span>
-                              <span className="font-mono">
-                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
-                              </span>
-                            </div>
-                          ))}
+                          </span>
+                          <span className="font-mono">${formatSmartNumber(netProfitData.rightPane.directIncomes.total)}</span>
                         </div>
-                      )}
-                    </div>
+                        {expandedNetProfitSections.has("directIncomes") && netProfitData.rightPane.directIncomes.accounts.length > 0 && (
+                          <div className="bg-muted/30 divide-y">
+                            {netProfitData.rightPane.directIncomes.accounts.map((acc) => (
+                              <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
+                                <span>{acc.name}</span>
+                                <span className="font-mono">
+                                  Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Direct Expenses */}
                     {netProfitData.leftPane.directExpenses.count > 0 && (
@@ -1944,7 +1944,7 @@ export default function Analytics() {
                     {/* Total */}
                     <div className="flex justify-between items-center p-3 bg-primary/10 font-semibold border-t-2">
                       <span>Total</span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.subtotal)}</span>
+                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.tradingTotal)}</span>
                     </div>
 
                     {/* Separator */}
