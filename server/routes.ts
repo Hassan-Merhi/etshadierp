@@ -5462,13 +5462,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           stockItemId: inventory.stockItemId,
           quantity: inventory.quantity,
-          totalValue: inventory.totalValue,
+          averageRate: inventory.averageRate,
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
         .where(eq(locations.companyId, req.session.currentCompanyId));
 
-      // Aggregate inventory by stock item
+      // Aggregate inventory by stock item - calculate value dynamically as qty * rate
       const inventoryMap = new Map<
         number,
         { totalQty: number; totalValue: number }
@@ -5479,8 +5479,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalQty: 0,
           totalValue: 0,
         };
-        existing.totalQty += parseFloat(record.quantity || "0");
-        existing.totalValue += parseFloat(record.totalValue || "0");
+        const qty = parseFloat(record.quantity || "0");
+        const rate = parseFloat(record.averageRate || "0");
+        existing.totalQty += qty;
+        existing.totalValue += qty * rate;
         inventoryMap.set(record.stockItemId, existing);
       }
 
@@ -17235,14 +17237,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationName: locations.name,
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
         .where(and(...inventoryConditions))
         .execute();
 
-      // Build movement report
+      // Build movement report - calculate value dynamically as qty * rate
       const movementData = stockItemsToReport
         .map((item) => {
           const itemInventory = inventoryRecords.filter(
@@ -17253,7 +17254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             0,
           );
           const totalValue = itemInventory.reduce(
-            (sum, inv) => sum + parseFloat(inv.totalValue),
+            (sum, inv) => sum + parseFloat(inv.quantity) * parseFloat(inv.averageRate),
             0,
           );
 
@@ -17261,13 +17262,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemId: item.id,
             stockItemCode: item.code,
             stockItemName: item.name,
-            locations: itemInventory.map((inv) => ({
-              locationId: inv.locationId,
-              locationName: inv.locationName,
-              quantity: parseFloat(inv.quantity),
-              averageRate: parseFloat(inv.averageRate),
-              totalValue: parseFloat(inv.totalValue),
-            })),
+            locations: itemInventory.map((inv) => {
+              const qty = parseFloat(inv.quantity);
+              const rate = parseFloat(inv.averageRate);
+              return {
+                locationId: inv.locationId,
+                locationName: inv.locationName,
+                quantity: qty,
+                averageRate: rate,
+                totalValue: qty * rate,
+              };
+            }),
             totalQuantity,
             totalValue,
           };
@@ -17551,7 +17556,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemId: inventory.stockItemId,
             quantity: inventory.quantity,
             averageRate: inventory.averageRate,
-            totalValue: inventory.totalValue,
             locationId: inventory.locationId,
             locationName: locations.name,
           })
@@ -17571,7 +17575,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemId: inventory.stockItemId,
             quantity: inventory.quantity,
             averageRate: inventory.averageRate,
-            totalValue: inventory.totalValue,
             locationId: inventory.locationId,
             locationName: locations.name,
           })
@@ -17587,11 +17590,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create a map of stock item ID to inventory aggregated across locations
-      // For weighted average rate: use totalValue/quantity (since totalValue = qty * averageRate)
+      // Calculate value dynamically as qty * averageRate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
         const qty = parseFloat(inv.quantity);
-        const val = parseFloat(inv.totalValue);
+        const rate = parseFloat(inv.averageRate);
+        const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
@@ -17724,7 +17728,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemId: inventory.stockItemId,
             quantity: inventory.quantity,
             averageRate: inventory.averageRate,
-            totalValue: inventory.totalValue,
           })
           .from(inventory)
           .innerJoin(locations, eq(inventory.locationId, locations.id))
@@ -17733,11 +17736,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create inventory map aggregated by item
-      // For weighted average rate: use totalValue/quantity
+      // Calculate value dynamically as qty * averageRate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
         const qty = parseFloat(inv.quantity);
-        const val = parseFloat(inv.totalValue);
+        const rate = parseFloat(inv.averageRate);
+        const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
@@ -17845,7 +17849,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationActive: locations.active,
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
           lastUpdated: inventory.lastUpdated,
         })
         .from(inventory)
@@ -17859,13 +17862,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .execute();
 
       // Calculate totals - separately for all records and active-only records
+      // Calculate value dynamically as qty * averageRate
       let totalQty = 0;
       let totalValue = 0;
       let activeQty = 0;
       let activeValue = 0;
       for (const rec of inventoryRecords) {
         const qty = parseFloat(rec.quantity);
-        const val = parseFloat(rec.totalValue);
+        const rate = parseFloat(rec.averageRate);
+        const val = qty * rate;
         totalQty += qty;
         totalValue += val;
         // Only count if location exists AND is active
@@ -18261,7 +18266,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockItemId: inventory.stockItemId,
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
@@ -18277,11 +18281,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[closing-stock-summary] Inventory data rows:", inventoryData.length);
       console.log("[closing-stock-summary] Inventory sample:", inventoryData.slice(0, 5));
 
-      // Aggregate inventory by stock item
+      // Aggregate inventory by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
         const qty = parseFloat(inv.quantity);
-        const val = parseFloat(inv.totalValue);
+        const rate = parseFloat(inv.averageRate);
+        const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
@@ -18390,7 +18395,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stockItemId: inventory.stockItemId,
               quantity: inventory.quantity,
               averageRate: inventory.averageRate,
-              totalValue: inventory.totalValue,
             })
             .from(inventory)
             .innerJoin(locations, eq(inventory.locationId, locations.id))
@@ -18405,11 +18409,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .execute()
         : [];
 
-      // Aggregate by stock item
+      // Aggregate by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
         const qty = parseFloat(inv.quantity);
-        const val = parseFloat(inv.totalValue);
+        const rate = parseFloat(inv.averageRate);
+        const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
@@ -21947,7 +21952,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
         })
         .from(inventory)
         .where(and(
@@ -21958,7 +21962,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const actualQty = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].quantity) : 0;
       const actualRate = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].averageRate) : 0;
-      const actualValue = currentInventoryResult.length > 0 ? parseFloat(currentInventoryResult[0].totalValue) : 0;
+      // Calculate value dynamically as qty * rate
+      const actualValue = actualQty * actualRate;
       
       // Calculate total movements for the year from vouchers
       const totalYearInQty = Object.values(monthBuckets).reduce((s, b) => s + b.inQty, 0);
@@ -22200,7 +22205,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
         })
         .from(inventory)
         .where(and(
@@ -22209,8 +22213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
       
       const currentQty = currentInventory ? parseFloat(currentInventory.quantity) : 0;
-      const currentValue = currentInventory ? parseFloat(currentInventory.totalValue) : 0;
       const currentRate = currentInventory ? parseFloat(currentInventory.averageRate) : 0;
+      // Calculate value dynamically as qty * rate
+      const currentValue = currentQty * currentRate;
       
       // Calculate voucher-derived opening balance
       let voucherOpeningQty = priorInwardQty - priorOutwardQty;
@@ -22776,7 +22781,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockItemId: inventory.stockItemId,
           quantity: inventory.quantity,
           averageRate: inventory.averageRate,
-          totalValue: inventory.totalValue,
         })
         .from(inventory)
         .where(
@@ -22786,14 +22790,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
-      // Create lookup maps for inventory data
+      // Create lookup maps for inventory data - calculate value dynamically as qty * rate
       const inventoryMap = new Map<string, { quantity: number; rate: number; value: number }>();
       for (const inv of inventoryData) {
         const key = `${inv.locationId}-${inv.stockItemId}`;
+        const qty = parseFloat(inv.quantity || "0");
+        const rate = parseFloat(inv.averageRate || "0");
         inventoryMap.set(key, {
-          quantity: parseFloat(inv.quantity || "0"),
-          rate: parseFloat(inv.averageRate || "0"),
-          value: parseFloat(inv.totalValue || "0"),
+          quantity: qty,
+          rate: rate,
+          value: qty * rate,
         });
       }
       
