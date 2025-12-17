@@ -477,11 +477,14 @@
         queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
       },
       onError: (error: any) => {
+        console.error("Initialize balances error:", error);
         toast({
           title: "Error",
           description: error.message || "Failed to initialize balances",
           variant: "destructive",
         });
+        // Reset the result so button shows again for retry
+        setInitBalancesResult(null);
       },
     });
   
