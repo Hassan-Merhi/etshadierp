@@ -1486,8 +1486,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           companyName: string;
           imbalance: number;
           accountCreated: boolean;
+          accountUpdated?: boolean;
           accountCode?: string;
           accountName?: string;
+          previousBalance?: string;
           openingBalance?: string;
           openingBalanceSide?: string;
           message: string;
@@ -8080,7 +8082,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   if (newQty <= 0) {
                     await db.delete(inventory).where(eq(inventory.id, inv.id));
                   } else {
-                    await db.update(inventory).set({ quantity: newQty.toString() }).where(eq(inventory.id, inv.id));
+                    // Recalculate totalValue as newQty * averageRate
+                    const rate = parseFloat(inv.averageRate);
+                    const newTotalValue = (newQty * rate).toFixed(2);
+                    await db.update(inventory).set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue,
+                    }).where(eq(inventory.id, inv.id));
                   }
                 }
               }
@@ -8219,10 +8227,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     .delete(inventory)
                     .where(eq(inventory.id, inv.id));
                 } else {
-                  // Otherwise just reduce the quantity
+                  // Otherwise reduce the quantity and recalculate totalValue
+                  const rate = parseFloat(inv.averageRate);
+                  const newTotalValue = (newQty * rate).toFixed(2);
                   await tx
                     .update(inventory)
-                    .set({ quantity: newQty.toString() })
+                    .set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue,
+                    })
                     .where(eq(inventory.id, inv.id));
                 }
               }
@@ -17904,15 +17917,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             displayName = `[INACTIVE] ${r.locationName}`;
           }
           
+          const qty = parseFloat(r.quantity);
+          const rate = parseFloat(r.averageRate);
           return {
             id: r.id,
             locationId: r.locationId,
             locationName: displayName,
             locationDeleted: isDeleted || isInactive,
             locationStatus: status,
-            quantity: parseFloat(r.quantity),
-            averageRate: parseFloat(r.averageRate),
-            totalValue: parseFloat(r.totalValue),
+            quantity: qty,
+            averageRate: rate,
+            totalValue: qty * rate,
             lastUpdated: r.lastUpdated,
           };
         }),
