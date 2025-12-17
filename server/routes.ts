@@ -15912,8 +15912,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 4. Direct Expenses - accounts with accountType="Direct Expense"
+      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
+      // and should only hit P&L through COGS when goods are sold
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        // Also add all children of IMPORT_CHARGES
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
       );
       let directExpensesTotal = 0;
       for (const acc of directExpenseAccounts) {
@@ -16003,12 +16019,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalIncome += balance.credit - balance.debit; // Income is credits
       }
 
+      // Exclude IMPORT_CHARGES from totalExpenses as well (reuse the Set from above)
       const expenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Expense" || 
+        (acc) => (acc.accountType === "Expense" || 
                  acc.accountType === "Direct Expense" || 
                  acc.accountType === "Indirect Expense" ||
                  acc.code === "PURCHASES" || 
-                 acc.code?.startsWith("PURCHASES-")
+                 acc.code?.startsWith("PURCHASES-")) &&
+                 !importChargesAccountIds.has(acc.id)
       );
       let totalExpenses = 0;
       for (const acc of expenseAccounts) {
@@ -18417,8 +18435,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 4. Direct Expenses - accounts with accountType="Direct Expense"
+      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
       );
       let directExpensesTotal = 0;
       const directExpensesDetails = directExpenseAccounts.map((acc) => {
@@ -18995,8 +19027,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      
+      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
       );
 
       const companyVouchers = await db
