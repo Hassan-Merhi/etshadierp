@@ -1970,15 +1970,16 @@ export class DbStorage implements IStorage {
     // Create voucher entries for charges with associated supplier accounts
     const voucherDate = offloadDate || new Date().toISOString().split('T')[0];
     
-    // Helper function to find or create parent EXPENSES account
-    const findOrCreateExpensesParent = async () => {
+    // Helper function to find or create parent IMPORT_CHARGES account
+    // This is a DEDICATED parent for import cycle tracking - separate from general EXPENSES
+    const findOrCreateImportChargesParent = async () => {
       let [parentAccount] = await db
         .select()
         .from(schema.ledgerAccounts)
         .where(
           and(
             eq(schema.ledgerAccounts.companyId, location.companyId),
-            eq(schema.ledgerAccounts.code, "EXPENSES")
+            eq(schema.ledgerAccounts.code, "IMPORT_CHARGES")
           )
         )
         .limit(1);
@@ -1986,10 +1987,10 @@ export class DbStorage implements IStorage {
       if (!parentAccount) {
         [parentAccount] = await db.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
-          code: "EXPENSES",
-          name: "Expenses",
-          accountType: "Expense",
-          subType: "Expense",
+          code: "IMPORT_CHARGES",
+          name: "Import Charges",
+          accountType: "Direct Expense",
+          subType: "Direct Expense",
           openingBalance: "0",
           openingBalanceSide: "Dr",
         }).returning();
@@ -2024,36 +2025,17 @@ export class DbStorage implements IStorage {
           openingBalanceSide: "Dr",
         }).returning();
         account = [newAccount];
-      } else {
-        // Update existing account if it has wrong accountType or missing parent
-        const needsUpdate = 
-          account[0].accountType !== "Direct Expense" || 
-          account[0].parentId !== parentId;
-        
-        if (needsUpdate) {
-          await db
-            .update(schema.ledgerAccounts)
-            .set({ 
-              accountType: "Direct Expense",
-              subType: "Direct Expense",
-              parentId 
-            })
-            .where(eq(schema.ledgerAccounts.id, account[0].id));
-          account[0].accountType = "Direct Expense";
-          account[0].subType = "Direct Expense";
-          account[0].parentId = parentId;
-        }
       }
 
       return account[0].id;
     };
     
-    // Get or create parent EXPENSES account
-    const expensesParentId = await findOrCreateExpensesParent();
+    // Get or create parent IMPORT_CHARGES account
+    const importChargesParentId = await findOrCreateImportChargesParent();
     
     // Duties voucher entry
     if (dutiesAccountId && parseFloat(duties) > 0) {
-      const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", expensesParentId);
+      const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", importChargesParentId);
       const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -2085,7 +2067,7 @@ export class DbStorage implements IStorage {
 
     // Office charges voucher entry
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
-      const officeExpenseAccountId = await findOrCreateExpenseAccount("OFFICE_CHARGES", "Office Charges", expensesParentId);
+      const officeExpenseAccountId = await findOrCreateExpenseAccount("OFFICE_CHARGES", "Office Charges", importChargesParentId);
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -2117,7 +2099,7 @@ export class DbStorage implements IStorage {
 
     // Transport fees voucher entry
     if (parseFloat(transportFees) > 0) {
-      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges", expensesParentId);
+      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges", importChargesParentId);
       
       // Determine the credit account
       // Valid types: Transporter Agent, Liability, Current Liability (any liability-like account)
@@ -2216,7 +2198,7 @@ export class DbStorage implements IStorage {
     // We need to create a corresponding liability entry to balance the import cycle
     if (parseFloat(transferCharges) > 0) {
       // Create Direct Expense account for transfer charges (same pattern as duties/transport)
-      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", expensesParentId);
+      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", importChargesParentId);
       
       // Find or create a "Transfer Charges Payable" liability account (exclude soft-deleted)
       let transferPayableAccount = await db
@@ -2290,7 +2272,7 @@ export class DbStorage implements IStorage {
         const additionalExpenseAccountId = await findOrCreateExpenseAccount(
           "ADDITIONAL_CHARGES", 
           "Additional Container Charges",
-          expensesParentId
+          importChargesParentId
         );
         await db.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
