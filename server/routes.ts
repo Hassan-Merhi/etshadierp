@@ -1761,11 +1761,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
             directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
             cogsBalance + consumptionBalance + salaryAdvancesBalance;
-          const totalLiabilities = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
-            liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
+          
+          // Calculate liabilities WITHOUT profit (to avoid circular dependency)
+          const totalLiabilitiesWithoutProfit = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
+            liabilityBalance + incomeBalance + payrollLiabilitiesBalance;
+          
+          // Total liabilities includes profit for display purposes
+          const totalLiabilities = totalLiabilitiesWithoutProfit + profitBalance;
 
           // Calculate the net import cycle balance (imbalance)
           const netImportCycleBalance = totalAssets - totalLiabilities;
+          
+          // The TARGET profit to zero the balance: Profit = Assets - Liabilities_without_profit
+          const targetProfitSigned = totalAssets - totalLiabilitiesWithoutProfit;
 
           const componentsBreakdown = {
             assets: assetComponents,
@@ -1805,11 +1813,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const currentBalance = parseFloat(profitAccount.openingBalance || "0");
             const currentSide = profitAccount.openingBalanceSide || "Cr";
             
-            // To balance the import cycle, set Profit = -netImportCycleBalance
-            // This ensures: Assets + Expenses + Profit - Liabilities - Income = 0
-            const newSigned = -netImportCycleBalance;
+            // Set Profit = Assets - Liabilities_without_profit (this zeros the import cycle)
+            // Equation: Assets - (Liabilities_without_profit + Profit) = 0
+            // Therefore: Profit = Assets - Liabilities_without_profit = targetProfitSigned
+            const newSigned = targetProfitSigned;
             
-            // Convert to absolute value and side
+            // Convert to absolute value and side (positive = Cr for equity/profit accounts)
             const newOpeningBalance = Math.abs(newSigned).toFixed(2);
             const newOpeningBalanceSide: "Dr" | "Cr" = newSigned >= 0 ? "Cr" : "Dr";
 
@@ -1841,10 +1850,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const accountCode = `CAP-${String(nextCodeNum).padStart(3, '0')}`;
           const accountName = "Owner's Capital";
           
-          // If imbalance is positive (assets > liabilities), we need Cr balance
-          // If imbalance is negative (liabilities > assets), we need Dr balance
-          const openingBalanceSide: "Dr" | "Cr" = netImportCycleBalance > 0 ? "Cr" : "Dr";
-          const openingBalanceAmount = Math.abs(netImportCycleBalance).toFixed(2);
+          // Set Profit = Assets - Liabilities_without_profit to zero the import cycle
+          // Positive target = Cr (equity), Negative target = Dr
+          const openingBalanceSide: "Dr" | "Cr" = targetProfitSigned >= 0 ? "Cr" : "Dr";
+          const openingBalanceAmount = Math.abs(targetProfitSigned).toFixed(2);
 
           // Create the Owner's Capital account
           await storage.createLedgerAccount({
