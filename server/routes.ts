@@ -1664,6 +1664,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return sum + parseFloat(item.totalCost || "0");
           }, 0);
 
+          // 12b. Consumption expense
+          const consumptionData = await db
+            .select({
+              totalAmount: stockAdjustmentItems.totalAmount,
+            })
+            .from(stockAdjustmentItems)
+            .innerJoin(
+              stockAdjustmentVouchers,
+              eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id)
+            )
+            .innerJoin(
+              vouchers,
+              eq(stockAdjustmentVouchers.voucherId, vouchers.id)
+            )
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false),
+                sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption'`
+              )
+            );
+
+          const consumptionBalance = consumptionData.reduce((sum, item) => {
+            return sum + parseFloat(item.totalAmount || "0");
+          }, 0);
+
           // 14. Salary Advances
           const advancesData = await db
             .select({
@@ -1716,6 +1743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { name: "Indirect Expenses", value: indirectExpenseBalance },
             { name: "Government Taxes", value: governmentTaxesBalance },
             { name: "COGS", value: cogsBalance },
+            { name: "Consumption", value: consumptionBalance },
             { name: "Salary Advances", value: salaryAdvancesBalance },
           ].filter(c => Math.abs(c.value) >= 0.01);
 
@@ -1732,7 +1760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
             directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
-            cogsBalance + salaryAdvancesBalance;
+            cogsBalance + consumptionBalance + salaryAdvancesBalance;
           const totalLiabilities = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
             liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
 
