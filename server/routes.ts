@@ -16394,6 +16394,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + parseFloat(item.totalCost || "0");
       }, 0);
 
+      // 12b. Consumption expense (from stock adjustment items where adjustmentType = 'consumption')
+      // This represents inventory that was consumed (not sold) and is now an expense
+      // Consumption reduces inventory but the value should be tracked as an expense to balance
+      const consumptionData = await db
+        .select({
+          totalAmount: stockAdjustmentItems.totalAmount,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption'`
+          )
+        );
+
+      const consumptionBalance = consumptionData.reduce((sum, item) => {
+        // Consumption totalAmount is negative (qty is negative), so we take absolute value
+        return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+      }, 0);
+
       // 13. Payroll Expenses - get from Expense accounts related to salaries
       // Uses a single optimized query with aggregation instead of N+1 pattern
       const payrollExpenseAccounts = await db
@@ -16504,13 +16528,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
-      // Operating Expenses: Direct Expenses + Indirect Expenses + Government Taxes
+      // Operating Expenses: Direct Expenses + Indirect Expenses + Government Taxes + COGS + Consumption
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability accounts + Profit/Equity + Income + Payroll Liabilities
       // Net = (Assets + Operating Expenses) - (Liabilities + Income) (should be 0 when balanced)
       // NOTE: generalExpenseBalance (Purchases) is EXCLUDED because it double-counts with stockOnFloorValue
       //       When containers are offloaded, Purchases expense is debited AND Stock on Floor increases
       //       The inventory value already captures the cost of goods, so we don't add Purchases again
       // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
+      // NOTE: consumptionBalance balances the inventory reduction when goods are consumed (not sold)
       const netImportCycleBalance = 
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
@@ -16521,6 +16546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         indirectExpenseBalance +    // Expense (debit) - operating expenses
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
+        consumptionBalance +        // Consumption expense (debit) - balances inventory reduction on consumption
         salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
         (supplierBalance +          // Liability (what we owe to suppliers)
         dutyAgentBalance +          // Liability (what we owe to duty agents)
@@ -16546,6 +16572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           indirectExpenseBalance,
           governmentTaxesBalance,
           cogsBalance,
+          consumptionBalance,
         },
         liabilities: {
           supplierBalance,
@@ -16560,8 +16587,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netImportCycleBalance,
       }, null, 2));
 
+      // Round to 2 decimal places to eliminate floating-point noise
+      const roundedBalance = Math.round(netImportCycleBalance * 100) / 100;
+      
       res.json({
-        netImportCycleBalance,
+        netImportCycleBalance: roundedBalance,
         components: {
           supplierBalance,
           stockOtwValue,
@@ -16580,6 +16610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profitBalance,
           stockOnFloorValue,
           cogsBalance,
+          consumptionBalance,
           payrollExpenseBalance,
           salaryAdvancesBalance,
           payrollLiabilitiesBalance,
