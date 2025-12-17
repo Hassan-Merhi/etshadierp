@@ -1566,6 +1566,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return totalBalance;
           };
 
+          // Helper function: Get Import Charges balance (only under IMPORT_CHARGES parent account)
+          // This must match the calculation in the import-cycle-balance endpoint
+          const getImportChargesBalance = async () => {
+            // First find the IMPORT_CHARGES parent account
+            const [importChargesParent] = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  eq(ledgerAccounts.code, "IMPORT_CHARGES"),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              )
+              .limit(1);
+            
+            if (!importChargesParent) {
+              return 0; // No import charges yet
+            }
+            
+            // Get all accounts under IMPORT_CHARGES parent (including the parent itself)
+            const importChargeAccounts = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  or(
+                    eq(ledgerAccounts.id, importChargesParent.id),
+                    eq(ledgerAccounts.parentId, importChargesParent.id)
+                  ),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              );
+            
+            if (importChargeAccounts.length === 0) {
+              return 0;
+            }
+            
+            const accountIds = importChargeAccounts.map(a => a.id);
+            
+            // Get opening balances
+            let totalBalance = importChargeAccounts.reduce((sum, account) => {
+              const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+              const openingSide = account.openingBalanceSide || "Dr";
+              // Expense accounts: Dr opening = positive
+              return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+            }, 0);
+            
+            // Get all voucher entries for these accounts
+            const entries = await db
+              .select({
+                creditAmount: voucherEntries.creditAmount,
+                debitAmount: voucherEntries.debitAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  inArray(voucherEntries.ledgerAccountId, accountIds),
+                  eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
+                  eq(vouchers.optional, false)
+                )
+              );
+            
+            // Expense accounts: Debits increase (positive), Credits decrease (negative)
+            totalBalance += entries.reduce((sum, entry) => {
+              const credit = parseFloat(entry.creditAmount || "0");
+              const debit = parseFloat(entry.debitAmount || "0");
+              return sum + debit - credit;
+            }, 0);
+            
+            return totalBalance;
+          };
+
           // Calculate all balances (same logic as import-cycle-balance endpoint)
           // 1. Supplier Balance - calculated from voucher entries only (company-scoped)
           // NOTE: Supplier opening balances are global and cannot be attributed to a single company
@@ -1617,7 +1693,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const bankBalance = await getAccountTypeBalance("Bank", false);
 
           // 8-9. Expense balances
-          const directExpenseBalance = await getAccountTypeBalance("Direct Expense", false);
+          // Use getImportChargesBalance() instead of generic Direct Expense to match import-cycle-balance calculation
+          const directExpenseBalance = await getImportChargesBalance();
           const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
 
           // 10. Income balance
