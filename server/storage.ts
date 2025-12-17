@@ -1818,11 +1818,12 @@ export class DbStorage implements IStorage {
     }, 0);
 
     // Calculate total charges including additional charges AND PO charges (freight + otherCharges)
+    // NOTE: Office charges are NOT included because they are assets (money set aside for later use),
+    // not expenses to be capitalized into inventory. They have their own asset account tracking.
     const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
     const poCharges = parseFloat(container.chargesTotal || "0"); // Freight + otherCharges from POs
     const totalCharges = 
       parseFloat(duties) + 
-      parseFloat(officeCharges) + 
       parseFloat(transferCharges) + 
       parseFloat(transportFees) +
       additionalChargesTotal +
@@ -2011,24 +2012,37 @@ export class DbStorage implements IStorage {
         .limit(1);
 
       if (!account.length) {
+        // Use accountType: "Direct Expense" so it's included in import cycle's directExpenseBalance
         const [newAccount] = await db.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
           code,
           name,
-          accountType: "Expense",
+          accountType: "Direct Expense",
           subType: "Direct Expense",
           parentId,
           openingBalance: "0",
           openingBalanceSide: "Dr",
         }).returning();
         account = [newAccount];
-      } else if (account[0].parentId !== parentId) {
-        // Update existing account to have the parent if it doesn't already
-        await db
-          .update(schema.ledgerAccounts)
-          .set({ parentId })
-          .where(eq(schema.ledgerAccounts.id, account[0].id));
-        account[0].parentId = parentId;
+      } else {
+        // Update existing account if it has wrong accountType or missing parent
+        const needsUpdate = 
+          account[0].accountType !== "Direct Expense" || 
+          account[0].parentId !== parentId;
+        
+        if (needsUpdate) {
+          await db
+            .update(schema.ledgerAccounts)
+            .set({ 
+              accountType: "Direct Expense",
+              subType: "Direct Expense",
+              parentId 
+            })
+            .where(eq(schema.ledgerAccounts.id, account[0].id));
+          account[0].accountType = "Direct Expense";
+          account[0].subType = "Direct Expense";
+          account[0].parentId = parentId;
+        }
       }
 
       return account[0].id;
@@ -2102,8 +2116,72 @@ export class DbStorage implements IStorage {
     }
 
     // Transport fees voucher entry
-    if (transportAccountId && parseFloat(transportFees) > 0) {
+    if (parseFloat(transportFees) > 0) {
       const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges", expensesParentId);
+      
+      // Determine the credit account
+      // Valid types: Transporter Agent, Liability, Current Liability (any liability-like account)
+      // Invalid: Expense types (Direct Expense, Indirect Expense, Expense) - these would break import cycle
+      let creditAccountId = transportAccountId;
+      const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+      
+      // Helper to find or create Transport Fees Payable liability
+      const getTransportPayableAccount = async () => {
+        let transportPayableAccount = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, location.companyId),
+              eq(schema.ledgerAccounts.code, "TRANSPORT_PAYABLE"),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+
+        if (!transportPayableAccount.length) {
+          const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+            companyId: location.companyId,
+            code: "TRANSPORT_PAYABLE",
+            name: "Transport Fees Payable",
+            accountType: "Liability",
+            subType: "Current Liability",
+            openingBalance: "0",
+            openingBalanceSide: "Cr",
+          }).returning();
+          transportPayableAccount = [newAccount];
+        }
+        return transportPayableAccount[0].id;
+      };
+      
+      if (transportAccountId) {
+        // Check if the selected account exists and is a valid type
+        const [selectedAccount] = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.id, transportAccountId),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        if (!selectedAccount || expenseTypes.includes(selectedAccount.accountType)) {
+          // Account not found, deleted, or is an expense type - use Transport Fees Payable liability
+          creditAccountId = await getTransportPayableAccount();
+        }
+        // Otherwise, use the user-selected account (Transporter Agent, Liability, etc.)
+      } else {
+        // No transporter selected, use Transport Fees Payable liability
+        creditAccountId = await getTransportPayableAccount();
+      }
+      
+      // Final safety check - ensure we always have a valid creditAccountId
+      if (!creditAccountId) {
+        creditAccountId = await getTransportPayableAccount();
+      }
+      
       const voucherNumber = `TRANS-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -2114,7 +2192,7 @@ export class DbStorage implements IStorage {
         totalAmount: transportFees,
       }).returning();
 
-      // Debit: Transport Expense (Expense increases)
+      // Debit: Transport Expense (Direct Expense - included in import cycle)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transportExpenseAccountId,
@@ -2123,10 +2201,10 @@ export class DbStorage implements IStorage {
         narration: `Transport fees for container ${container.containerNumber}`,
       });
 
-      // Credit: Transporter account (Liability increases)
+      // Credit: Transporter Agent or Transport Fees Payable (Liability increases)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: transportAccountId,
+        ledgerAccountId: creditAccountId,
         debitAmount: "0",
         creditAmount: transportFees,
         narration: `Transport fees for container ${container.containerNumber}`,
@@ -2137,6 +2215,9 @@ export class DbStorage implements IStorage {
     // NOTE: Transfer charges are capitalized into inventory value (stockOnFloorValue increases)
     // We need to create a corresponding liability entry to balance the import cycle
     if (parseFloat(transferCharges) > 0) {
+      // Create Direct Expense account for transfer charges (same pattern as duties/transport)
+      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", expensesParentId);
+      
       // Find or create a "Transfer Charges Payable" liability account (exclude soft-deleted)
       let transferPayableAccount = await db
         .select()
@@ -2163,47 +2244,20 @@ export class DbStorage implements IStorage {
         transferPayableAccount = [newAccount];
       }
 
-      // Find or create a "Purchases" account to track the capitalized inventory cost
-      // Using "Expense" type but subType "Purchases" to match the PO pattern
-      let purchasesAccount = await db
-        .select()
-        .from(schema.ledgerAccounts)
-        .where(
-          and(
-            eq(schema.ledgerAccounts.companyId, location.companyId),
-            eq(schema.ledgerAccounts.code, "PURCHASES"),
-            isNull(schema.ledgerAccounts.deletedAt)
-          )
-        )
-        .limit(1);
-
-      if (!purchasesAccount.length) {
-        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-          companyId: location.companyId,
-          code: "PURCHASES",
-          name: "Purchases",
-          accountType: "Expense",
-          subType: "Purchases",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-        }).returning();
-        purchasesAccount = [newAccount];
-      }
-
       const voucherNumber = `XFER-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
         voucherNumber,
-        voucherType: "Purchase",
+        voucherType: "Payment",
         voucherDate,
         description: `Transfer charges for container ${container.containerNumber}`,
         totalAmount: transferCharges,
       }).returning();
 
-      // Debit: Purchases account (same pattern as PO creation - excluded from import cycle)
+      // Debit: Transfer Charges Expense (Direct Expense - included in import cycle)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: purchasesAccount[0].id,
+        ledgerAccountId: transferExpenseAccountId,
         debitAmount: transferCharges,
         creditAmount: "0",
         narration: `Transfer charges for container ${container.containerNumber}`,
