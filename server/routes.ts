@@ -8125,8 +8125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db.delete(containerOffloads).where(eq(containerOffloads.id, existingOffload.id));
           }
 
-          // Set status back to IN_TRANSIT so offloadContainer can proceed
-          await storage.updateContainer(containerId, { status: "IN_TRANSIT" });
+          // Set status back to OTW so offloadContainer can proceed
+          await storage.updateContainer(containerId, { status: "OTW" });
         }
 
         // Perform offload
@@ -8196,11 +8196,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!offloadRecord) {
           await db
             .update(containers)
-            .set({ status: "IN_TRANSIT" })
+            .set({ status: "OTW" })
             .where(eq(containers.id, containerId));
           
           return res.json({ 
-            message: "Container status reversed to IN_TRANSIT (no offload record to clean up)" 
+            message: "Container status reversed to OTW (no offload record to clean up)" 
           });
         }
 
@@ -8279,11 +8279,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .delete(containerOffloads)
             .where(eq(containerOffloads.id, offloadRecord.id));
 
-          // Update container status back to IN_TRANSIT
+          // Update container status back to OTW (On The Way) so it's properly counted in import cycle balance
           await tx
             .update(containers)
             .set({
-              status: "IN_TRANSIT",
+              status: "OTW",
             })
             .where(eq(containers.id, containerId));
         });
