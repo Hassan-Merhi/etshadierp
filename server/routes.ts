@@ -1765,6 +1765,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
           const consumptionBalance = consumptionData.reduce((sum, item) => {
+            return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+          }, 0);
+
+          // 12c. Production balance (from stock adjustment items where adjustmentType = 'production')
+          // Production INCREASES inventory (stockOnFloorValue goes up)
+          // To balance: we need to track the production value and SUBTRACT from assets
+          const productionData = await db
+            .select({
+              totalAmount: stockAdjustmentItems.totalAmount,
+            })
+            .from(stockAdjustmentItems)
+            .innerJoin(
+              stockAdjustmentVouchers,
+              eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id)
+            )
+            .innerJoin(
+              vouchers,
+              eq(stockAdjustmentVouchers.voucherId, vouchers.id)
+            )
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false),
+                sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production'`
+              )
+            );
+
+          const productionBalance = productionData.reduce((sum, item) => {
             return sum + parseFloat(item.totalAmount || "0");
           }, 0);
 
@@ -1821,6 +1850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { name: "Government Taxes", value: governmentTaxesBalance },
             { name: "COGS", value: cogsBalance },
             { name: "Consumption", value: consumptionBalance },
+            { name: "Production (offset)", value: -productionBalance },
             { name: "Salary Advances", value: salaryAdvancesBalance },
           ].filter(c => Math.abs(c.value) >= 0.01);
 
@@ -1837,7 +1867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
             directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
-            cogsBalance + consumptionBalance + salaryAdvancesBalance;
+            cogsBalance + consumptionBalance + salaryAdvancesBalance - productionBalance;
           
           // Calculate liabilities WITHOUT profit (to avoid circular dependency)
           const totalLiabilitiesWithoutProfit = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
@@ -16612,6 +16642,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + Math.abs(parseFloat(item.totalAmount || "0"));
       }, 0);
 
+      // 12c. Production balance (from stock adjustment items where adjustmentType = 'production')
+      // Production INCREASES inventory (stockOnFloorValue goes up)
+      // To balance: we need to track the production value and SUBTRACT from assets
+      // This ensures that when production adds inventory, the import cycle stays balanced
+      const productionData = await db
+        .select({
+          totalAmount: stockAdjustmentItems.totalAmount,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production'`
+          )
+        );
+
+      const productionBalance = productionData.reduce((sum, item) => {
+        // Production totalAmount is positive (qty is positive)
+        return sum + parseFloat(item.totalAmount || "0");
+      }, 0);
+
       // 13. Payroll Expenses - get from Expense accounts related to salaries
       // Uses a single optimized query with aggregation instead of N+1 pattern
       const payrollExpenseAccounts = await db
@@ -16730,6 +16785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //       The inventory value already captures the cost of goods, so we don't add Purchases again
       // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
       // NOTE: consumptionBalance balances the inventory reduction when goods are consumed (not sold)
+      // NOTE: productionBalance is SUBTRACTED because production ADDS to inventory, so we offset it
       const netImportCycleBalance = 
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
@@ -16741,7 +16797,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
         consumptionBalance +        // Consumption expense (debit) - balances inventory reduction on consumption
-        salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
+        salaryAdvancesBalance -     // Salary Advances (asset) - recoverable from employees
+        productionBalance) -        // Production (subtract) - offsets inventory increase from production
         (supplierBalance +          // Liability (what we owe to suppliers)
         dutyAgentBalance +          // Liability (what we owe to duty agents)
         transporterAgentBalance +   // Liability (what we owe to transporters)
@@ -16767,6 +16824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           governmentTaxesBalance,
           cogsBalance,
           consumptionBalance,
+          productionBalance,
         },
         liabilities: {
           supplierBalance,
@@ -16805,6 +16863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stockOnFloorValue,
           cogsBalance,
           consumptionBalance,
+          productionBalance,
           payrollExpenseBalance,
           salaryAdvancesBalance,
           payrollLiabilitiesBalance,
