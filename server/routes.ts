@@ -14876,7 +14876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { description, items } = req.body;
+      const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -14954,19 +14954,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingInventory) {
             const currentQty = parseFloat(existingInventory.quantity);
             const newQty = currentQty + oldQty; // Add back what was sold
+            // Recalculate totalValue as newQty * averageRate
+            const rate = parseFloat(existingInventory.averageRate || "0");
+            const newTotalValue = (newQty * rate).toFixed(2);
             
             await tx
               .update(inventory)
-              .set({ quantity: newQty.toString() })
+              .set({ 
+                quantity: newQty.toString(),
+                totalValue: newTotalValue,
+              })
               .where(eq(inventory.id, existingInventory.id));
           } else {
             // Create inventory record if it doesn't exist (e.g., was deleted)
+            const totalValue = (oldQty * oldCost).toFixed(2);
             await tx.insert(inventory).values({
               companyId: existingVoucher.companyId,
               locationId: existingVoucher.locationId!,
               stockItemId: oldItem.stockItemId,
               quantity: oldQty.toString(),
               averageRate: oldCost.toString(),
+              totalValue: totalValue,
               lastUpdated: new Date(),
             });
           }
@@ -15007,6 +15015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 stockItemId: stockItemId,
                 quantity: "0",
                 averageRate: "0",
+                totalValue: "0",
                 lastUpdated: new Date(),
               })
               .returning();
@@ -15028,16 +15037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? parseFloat(oldItem.costPrice || "0")
             : parseFloat(inventoryRecord.averageRate || "0");
           
-          // Get stock item to check for configured selling price
-          const [stockItemData] = await tx
-            .select()
-            .from(stockItems)
-            .where(eq(stockItems.id, stockItemId))
-            .limit(1);
-          
-          // Use configured selling price if available, otherwise use entered price
-          const configuredPrice = stockItemData?.sellingPrice ? parseFloat(stockItemData.sellingPrice) : 0;
-          const effectiveSellingPrice = configuredPrice > 0 ? configuredPrice : parseFloat(sellingPrice);
+          // Use the entered selling price directly - don't override with configured price during edits
+          // This preserves the original sale price and prevents unintended cash balance changes
+          const effectiveSellingPrice = parseFloat(sellingPrice);
           
           const totalSales = sellQty * effectiveSellingPrice;
           const totalCost = sellQty * costPrice;
@@ -15055,27 +15057,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             profit: profit.toFixed(2),
           });
 
-          // Deduct from inventory
+          // Deduct from inventory and recalculate totalValue
           const newQty = currentQty - sellQty;
+          const invRate = parseFloat(inventoryRecord.averageRate || "0");
+          const newTotalValue = (newQty * invRate).toFixed(2);
           await tx
             .update(inventory)
-            .set({ quantity: newQty.toString() })
+            .set({ 
+              quantity: newQty.toString(),
+              totalValue: newTotalValue,
+            })
             .where(eq(inventory.id, inventoryRecord.id));
 
           grandTotal += totalSales;
         }
 
-        // Update voucher description and total amount
+        // Update voucher description, total amount, and optionally date
+        const voucherUpdate: any = {
+          description: description || null,
+          totalAmount: grandTotal.toString(),
+        };
+        if (voucherDate) {
+          voucherUpdate.voucherDate = new Date(voucherDate);
+        }
         await tx
           .update(vouchers)
-          .set({
-            description: description || null,
-            totalAmount: grandTotal.toString(),
-          })
+          .set(voucherUpdate)
           .where(eq(vouchers.id, voucherId));
 
         // Recreate voucher entries with new total
-        // Preserve the original payment account information from old entries
+        // Get original entries for reference
         const paymentEntry = oldEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
         const revenueEntry = oldEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
 
@@ -15083,20 +15094,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw new Error("Original voucher entries not found");
         }
 
-        // Create new debit entry (payment account)
-        await tx.insert(voucherEntries).values({
+        // Determine payment account - use new values if provided, otherwise preserve original
+        let newDebitEntry: any = {
           voucherId,
-          ledgerAccountId: paymentEntry.ledgerAccountId,
-          bankAccountId: paymentEntry.bankAccountId,
-          supplierId: paymentEntry.supplierId,
-          employeeId: paymentEntry.employeeId,
-          fixedAssetId: paymentEntry.fixedAssetId,
           debitAmount: grandTotal.toString(),
           creditAmount: "0",
           narration: paymentEntry.narration || "",
-        });
+        };
 
-        // Create new credit entry (sales revenue)
+        if (paymentAccountType && paymentAccountId) {
+          // User changed payment account - use new values
+          if (paymentAccountType === "cash" || paymentAccountType === "credit") {
+            newDebitEntry.ledgerAccountId = parseInt(paymentAccountId);
+            newDebitEntry.bankAccountId = null;
+          } else if (paymentAccountType === "bank") {
+            newDebitEntry.bankAccountId = parseInt(paymentAccountId);
+            newDebitEntry.ledgerAccountId = null;
+          }
+          newDebitEntry.supplierId = null;
+          newDebitEntry.employeeId = null;
+          newDebitEntry.fixedAssetId = null;
+        } else {
+          // Preserve original payment account
+          newDebitEntry.ledgerAccountId = paymentEntry.ledgerAccountId;
+          newDebitEntry.bankAccountId = paymentEntry.bankAccountId;
+          newDebitEntry.supplierId = paymentEntry.supplierId;
+          newDebitEntry.employeeId = paymentEntry.employeeId;
+          newDebitEntry.fixedAssetId = paymentEntry.fixedAssetId;
+        }
+
+        // Create new debit entry (payment account)
+        await tx.insert(voucherEntries).values(newDebitEntry);
+
+        // Create new credit entry (sales revenue) - always preserve original
         await tx.insert(voucherEntries).values({
           voucherId,
           ledgerAccountId: revenueEntry.ledgerAccountId,

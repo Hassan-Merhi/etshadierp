@@ -561,6 +561,13 @@ export default function VoucherEdit() {
   const isConsumption = voucherType === "Consumption" || voucherType === "Production" || voucherType === "Mixed";
   const isStockTransfer = voucherType === "Stock Transfer";
 
+  // Redirect Sales vouchers to POS-style edit interface
+  useEffect(() => {
+    if (isSales && id) {
+      navigate(`/pos/edit/${id}`);
+    }
+  }, [isSales, id, navigate]);
+
   // Initialize forms first (needed for balance tracking)
   const paymentForm = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),

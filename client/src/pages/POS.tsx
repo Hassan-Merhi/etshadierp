@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -36,6 +36,7 @@ interface SaleRow {
   rate: number;
   amount: number;
   stockItemId?: number;
+  salesItemId?: number; // Original sales item ID for edit mode
 }
 
 interface InventoryItem {
@@ -213,11 +214,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       console.log('[POS Edit] Loading voucher for edit:', editVoucher);
       console.log('[POS Edit] Sales items:', editVoucher.salesItems);
       
-      // Populate rows with sales items
+      // Populate rows with sales items, preserving salesItemId for edit mode
       const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
         id: String(index + 1),
         itemName: item.stockItemName || "",
         stockItemId: item.stockItemId,
+        salesItemId: item.id, // Preserve original sales item ID for proper cost tracking
         quantity: parseFloat(item.quantity),
         rate: parseFloat(item.sellingPrice),
         amount: parseFloat(item.totalSales),
@@ -337,20 +339,23 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {
       if (editVoucherId) {
-        // Update existing voucher - use the sales voucher update endpoint
+        // Update existing voucher - use the PUT sales voucher update endpoint
+        // which properly handles inventory reversal and cost preservation
         const updateData = {
-          locationId: saleData.locationId,
           description: saleData.notes,
+          locationId: saleData.locationId,
           paymentAccountType: saleData.paymentAccountType,
           paymentAccountId: saleData.paymentAccountId,
           isCreditSale: saleData.isCreditSale,
+          voucherDate: saleData.voucherDate,
           items: saleData.items.map((item: any) => ({
+            id: item.salesItemId, // Preserve original sales item ID for cost tracking
             stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            sellingPrice: item.rate,
+            quantity: String(item.quantity),
+            sellingPrice: String(item.rate),
           })),
         };
-        const res = await apiRequest("PATCH", `/api/vouchers/${editVoucherId}/sales`, updateData);
+        const res = await apiRequest("PUT", `/api/vouchers/${editVoucherId}/sales`, updateData);
         return await res.json();
       } else {
         // Create new sale
@@ -916,6 +921,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       voucherDate: saleDate,
       items: validItems.map(row => ({
         stockItemId: row.stockItemId,
+        salesItemId: row.salesItemId, // Preserve for edit mode
         quantity: row.quantity.toString(),
         rate: row.rate.toString(),
       })),
@@ -931,9 +937,30 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Point of Sale</h1>
+        <div className="flex items-center gap-3">
+          {editVoucherId && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate("/pos-daybook")}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-semibold">
+              {editVoucherId ? "Edit Sale" : "Point of Sale"}
+            </h1>
+            {editVoucherId && editVoucher && (
+              <p className="text-sm text-muted-foreground">
+                Voucher #{editVoucher.voucherNumber}
+              </p>
+            )}
+          </div>
+        </div>
         <div className="flex gap-2">
-          {!posUser && (
+          {!posUser && !editVoucherId && (
             <Link href="/pos-import">
               <Button variant="outline" className="gap-2" data-testid="button-import-sales">
                 <Upload className="h-4 w-4" />
@@ -941,22 +968,26 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </Button>
             </Link>
           )}
-          <Button 
-            variant="outline"
-            onClick={() => setShowDraftDialog(true)}
-            disabled={drafts.length === 0}
-            data-testid="button-load-draft"
-          >
-            Load Draft {drafts.length > 0 && `(${drafts.length})`}
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => saveDraftMutation.mutate()}
-            disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
-            data-testid="button-save-draft"
-          >
-            {saveDraftMutation.isPending ? "Saving..." : currentDraftId ? "Update Draft" : "Save as Draft"}
-          </Button>
+          {!editVoucherId && (
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => setShowDraftDialog(true)}
+                disabled={drafts.length === 0}
+                data-testid="button-load-draft"
+              >
+                Load Draft {drafts.length > 0 && `(${drafts.length})`}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => saveDraftMutation.mutate()}
+                disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
+                data-testid="button-save-draft"
+              >
+                {saveDraftMutation.isPending ? "Saving..." : currentDraftId ? "Update Draft" : "Save as Draft"}
+              </Button>
+            </>
+          )}
           <Button 
             onClick={handleSaveSale}
             disabled={saveMutation.isPending}
