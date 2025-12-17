@@ -1805,14 +1805,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const currentBalance = parseFloat(profitAccount.openingBalance || "0");
             const currentSide = profitAccount.openingBalanceSide || "Cr";
             
-            // Convert current balance to signed value (Cr = positive for equity accounts)
-            const currentSigned = currentSide === "Cr" ? currentBalance : -currentBalance;
+            // To balance the import cycle, set Profit = -netImportCycleBalance
+            // This ensures: Assets + Expenses + Profit - Liabilities - Income = 0
+            const newSigned = -netImportCycleBalance;
             
-            // netImportCycleBalance represents the signed adjustment needed
-            // Positive = need more Cr (equity increase), Negative = need more Dr (equity decrease)
-            const newSigned = currentSigned + netImportCycleBalance;
-            
-            // Convert back to absolute value and side
+            // Convert to absolute value and side
             const newOpeningBalance = Math.abs(newSigned).toFixed(2);
             const newOpeningBalanceSide: "Dr" | "Cr" = newSigned >= 0 ? "Cr" : "Dr";
 
