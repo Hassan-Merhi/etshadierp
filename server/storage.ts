@@ -2133,11 +2133,90 @@ export class DbStorage implements IStorage {
       });
     }
 
-    // Transfer charges (if any)
+    // Transfer charges (if any) - creates a liability account for tracking
+    // NOTE: Transfer charges are capitalized into inventory value (stockOnFloorValue increases)
+    // We need to create a corresponding liability entry to balance the import cycle
     if (parseFloat(transferCharges) > 0) {
-      const transferExpenseAccountId = await findOrCreateExpenseAccount("TRANSFER_CHARGES", "Transfer Charges", expensesParentId);
-      // Note: Transfer charges don't have a supplier account, so we'll need to specify one in the UI
-      // For now, we'll skip creating a voucher entry if no supplier is specified
+      // Find or create a "Transfer Charges Payable" liability account (exclude soft-deleted)
+      let transferPayableAccount = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, location.companyId),
+            eq(schema.ledgerAccounts.code, "TRANSFER_PAYABLE"),
+            isNull(schema.ledgerAccounts.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (!transferPayableAccount.length) {
+        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: location.companyId,
+          code: "TRANSFER_PAYABLE",
+          name: "Transfer Charges Payable",
+          accountType: "Liability",
+          subType: "Current Liability",
+          openingBalance: "0",
+          openingBalanceSide: "Cr",
+        }).returning();
+        transferPayableAccount = [newAccount];
+      }
+
+      // Find or create a "Purchases" account to track the capitalized inventory cost
+      // Using "Expense" type but subType "Purchases" to match the PO pattern
+      let purchasesAccount = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, location.companyId),
+            eq(schema.ledgerAccounts.code, "PURCHASES"),
+            isNull(schema.ledgerAccounts.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (!purchasesAccount.length) {
+        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: location.companyId,
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          subType: "Purchases",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+        }).returning();
+        purchasesAccount = [newAccount];
+      }
+
+      const voucherNumber = `XFER-${container.containerNumber}-${Date.now()}`;
+      const [voucher] = await db.insert(schema.vouchers).values({
+        companyId: location.companyId,
+        voucherNumber,
+        voucherType: "Purchase",
+        voucherDate,
+        description: `Transfer charges for container ${container.containerNumber}`,
+        totalAmount: transferCharges,
+      }).returning();
+
+      // Debit: Purchases account (same pattern as PO creation - excluded from import cycle)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: purchasesAccount[0].id,
+        debitAmount: transferCharges,
+        creditAmount: "0",
+        narration: `Transfer charges for container ${container.containerNumber}`,
+      });
+
+      // Credit: Transfer Charges Payable (Liability increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: transferPayableAccount[0].id,
+        debitAmount: "0",
+        creditAmount: transferCharges,
+        narration: `Transfer charges for container ${container.containerNumber}`,
+      });
     }
 
     // Additional charges voucher entries
