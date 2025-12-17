@@ -1813,14 +1813,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const currentBalance = parseFloat(profitAccount.openingBalance || "0");
             const currentSide = profitAccount.openingBalanceSide || "Cr";
             
-            // Set Profit = Assets - Liabilities_without_profit (this zeros the import cycle)
-            // Equation: Assets - (Liabilities_without_profit + Profit) = 0
-            // Therefore: Profit = Assets - Liabilities_without_profit = targetProfitSigned
-            const newSigned = targetProfitSigned;
+            // Calculate the current opening balance as a signed value
+            // For Profit accounts: Cr is positive (normal), Dr is negative
+            const currentOpeningSigned = currentSide === "Cr" ? currentBalance : -currentBalance;
+            
+            // profitBalance = opening balance + voucher entries
+            // So netEntries = profitBalance - currentOpeningSigned
+            const netEntries = profitBalance - currentOpeningSigned;
+            
+            // We want total Profit balance (opening + entries) = targetProfitSigned
+            // So: newOpening + netEntries = targetProfitSigned
+            // Therefore: newOpening = targetProfitSigned - netEntries
+            const newOpeningSigned = targetProfitSigned - netEntries;
             
             // Convert to absolute value and side (positive = Cr for equity/profit accounts)
-            const newOpeningBalance = Math.abs(newSigned).toFixed(2);
-            const newOpeningBalanceSide: "Dr" | "Cr" = newSigned >= 0 ? "Cr" : "Dr";
+            const newOpeningBalance = Math.abs(newOpeningSigned).toFixed(2);
+            const newOpeningBalanceSide: "Dr" | "Cr" = newOpeningSigned >= 0 ? "Cr" : "Dr";
 
             // Update the account using raw query since storage.updateLedgerAccount may not support all fields
             await db.update(ledgerAccounts).set({
