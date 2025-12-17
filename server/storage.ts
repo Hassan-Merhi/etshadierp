@@ -2810,10 +2810,13 @@ export class DbStorage implements IStorage {
           .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
         for (const item of adjustmentItems) {
-          // Reverse the adjustment (negate the quantity)
-          const quantity = parseFloat(item.quantity);
+          const quantity = Math.abs(parseFloat(item.quantity));
           const rate = parseFloat(item.rate);
-          const reversedQuantity = -quantity; // Flip the sign to reverse
+          
+          // For consumption: we subtracted, so we need to ADD back
+          // For production: we added, so we need to SUBTRACT back
+          const isConsumption = adjustmentVoucher.adjustmentType === "Consumption";
+          const reversedQuantity = isConsumption ? quantity : -quantity;
 
           const [currentInventory] = await db
             .select()
@@ -2824,10 +2827,22 @@ export class DbStorage implements IStorage {
             ));
 
           if (currentInventory) {
-            const newQuantity = Math.max(0, parseFloat(currentInventory.quantity) + reversedQuantity);
-            const currentTotalValue = parseFloat(currentInventory.totalValue);
-            const newTotalValue = Math.max(0, currentTotalValue + (reversedQuantity * rate));
-            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+            const currentQty = parseFloat(currentInventory.quantity);
+            const currentRate = parseFloat(currentInventory.averageRate);
+            const newQuantity = Math.max(0, currentQty + reversedQuantity);
+            
+            let newTotalValue: number;
+            let newAverageRate: number;
+            
+            if (isConsumption) {
+              // Restoring consumed items: use the rate they were consumed at
+              newTotalValue = (currentQty * currentRate) + (quantity * rate);
+              newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+            } else {
+              // Removing produced items: just reduce value proportionally
+              newTotalValue = Math.max(0, newQuantity * currentRate);
+              newAverageRate = currentRate;
+            }
 
             await db
               .update(schema.inventory)
@@ -2837,6 +2852,23 @@ export class DbStorage implements IStorage {
                 totalValue: newTotalValue.toFixed(2),
               })
               .where(eq(schema.inventory.id, currentInventory.id));
+          } else if (isConsumption) {
+            // Restoring consumed items when no inventory exists - create new record
+            const [location] = await db
+              .select()
+              .from(schema.locations)
+              .where(eq(schema.locations.id, adjustmentVoucher.locationId));
+            
+            if (location) {
+              await db.insert(schema.inventory).values({
+                companyId: location.companyId,
+                locationId: adjustmentVoucher.locationId,
+                stockItemId: item.stockItemId,
+                quantity: quantity.toFixed(3),
+                averageRate: rate.toFixed(2),
+                totalValue: (quantity * rate).toFixed(2),
+              });
+            }
           }
         }
 
