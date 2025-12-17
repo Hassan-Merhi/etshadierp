@@ -14015,7 +14015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   if (inv) {
                     const existingQty = parseFloat(inv.quantity);
                     const existingRate = parseFloat(inv.averageRate || "0");
-                    const newQty = existingQty + qty;
+                    const newQty = existingQty + Math.abs(qty);
                     // Keep the same rate - consumption didn't change it
                     const newValue = newQty * existingRate;
 
