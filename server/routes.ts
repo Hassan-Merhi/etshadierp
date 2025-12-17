@@ -6806,10 +6806,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update or create inventory record - allow negative stock
           if (inventoryRecord) {
             // Update existing inventory - reduce quantity (can go negative)
+            const newQty = currentQty - item.quantity;
+            const rate = parseFloat(inventoryRecord.averageRate || "0");
+            const newTotalValue = (newQty * rate).toFixed(2);
             await tx
               .update(inventory)
               .set({
-                quantity: (currentQty - item.quantity).toString(),
+                quantity: newQty.toString(),
+                totalValue: newTotalValue,
               })
               .where(
                 and(
@@ -20794,10 +20798,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             throw new Error(`Insufficient stock for item ${item.stockItemId}`);
           }
           
+          // Recalculate totalValue as newQty * averageRate
+          const sourceRate = parseFloat(sourceInv.averageRate || "0");
+          const newTotalValue = (newQty * sourceRate).toFixed(2);
           await db
             .update(inventory)
             .set({
               quantity: newQty.toString(),
+              totalValue: newTotalValue,
               lastUpdated: new Date(),
             })
             .where(eq(inventory.id, sourceInv.id));
