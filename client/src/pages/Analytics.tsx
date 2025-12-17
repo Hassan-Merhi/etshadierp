@@ -907,12 +907,11 @@ export default function Analytics() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="sales">Sales Analytics</TabsTrigger>
-          <TabsTrigger value="stock">Stock Movement</TabsTrigger>
           <TabsTrigger value="containers">Containers</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
@@ -1443,119 +1442,6 @@ export default function Analytics() {
           </Dialog>
         </TabsContent>
 
-        {/* Stock Movement Tab */}
-        <TabsContent value="stock" className="space-y-4">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Stock Movement Report
-              </h3>
-              <Button
-                size="sm"
-                onClick={() => refetchStockMovement()}
-                disabled={loadingStock}
-              >
-                {loadingStock ? "Loading..." : "Generate"}
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <Label htmlFor="stock-start-date">Start Date</Label>
-                <DatePickerInput
-                  value={reportStartDate}
-                  onChange={setReportStartDate}
-                  placeholder="Start date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="stock-end-date">End Date</Label>
-                <DatePickerInput
-                  value={reportEndDate}
-                  onChange={setReportEndDate}
-                  placeholder="End date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="stock-location">Location</Label>
-                <Select value={reportLocationId} onValueChange={setReportLocationId}>
-                  <SelectTrigger id="stock-location">
-                    <SelectValue placeholder="All Locations" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Locations</SelectItem>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="stock-group">Stock Group</Label>
-                <Select value={reportStockGroupId} onValueChange={setReportStockGroupId}>
-                  <SelectTrigger id="stock-group">
-                    <SelectValue placeholder="All Groups" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Groups</SelectItem>
-                    {stockGroups.map((group) => (
-                      <SelectItem key={group.id} value={group.id.toString()}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {loadingStock ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
-            ) : stockMovementData ? (
-              <div className="space-y-4">
-                {stockMovementData.items.map((item) => (
-                  <div key={item.stockItemId} className="border rounded-md p-4">
-                    <div className="flex justify-between mb-2">
-                      <div>
-                        <div className="font-medium">{item.stockItemName}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-muted-foreground">Total</div>
-                        <div className="font-mono">{formatSmartNumber(item.totalQuantity)} units</div>
-                        <div className="font-mono">${formatSmartNumber(item.totalValue)}</div>
-                      </div>
-                    </div>
-                    <div className="space-y-1 mt-2 pt-2 border-t">
-                      {item.locations.map((loc) => (
-                        <div key={loc.locationId} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground ml-4">{loc.locationName}</span>
-                          <span className="font-mono">
-                            {formatSmartNumber(loc.quantity)} × ${formatSmartNumber(loc.averageRate)} = ${formatSmartNumber(loc.totalValue)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <div className="border-t-2 pt-4 font-semibold">
-                  <div className="flex justify-between">
-                    <span>Grand Totals</span>
-                    <span className="font-mono">
-                      {formatSmartNumber(stockMovementData.summary.grandTotalQuantity)} units | ${formatSmartNumber(stockMovementData.summary.grandTotalValue)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No data available. Click Generate to load report.
-              </div>
-            )}
-          </Card>
-        </TabsContent>
-
         {/* Containers Tab */}
         <TabsContent value="containers" className="space-y-4">
           <Card className="p-6">
@@ -1614,6 +1500,7 @@ export default function Analytics() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="OTW">OTW</SelectItem>
                     <SelectItem value="In Transit">In Transit</SelectItem>
                     <SelectItem value="Arrived">Arrived</SelectItem>
                     <SelectItem value="Offloaded">Offloaded</SelectItem>
