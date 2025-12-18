@@ -3051,6 +3051,40 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             placeholder="Type to search..."
                                             data-testid={`input-journal-account-${index}`}
                                             onKeyDown={(e) => {
+                                              // If sidebar is open, use arrow keys to navigate accounts
+                                              if (showAccountSidebar) {
+                                                if (e.key === "ArrowUp") {
+                                                  e.preventDefault();
+                                                  setJournalAccountHighlightedIndex(prev => 
+                                                    prev > 0 ? prev - 1 : Math.max(0, filteredJournalAccounts.length - 1)
+                                                  );
+                                                  // Scroll highlighted item into view
+                                                  setTimeout(() => {
+                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.max(0, journalAccountHighlightedIndex - 1)}"]`) as HTMLElement;
+                                                    if (button) button.scrollIntoView({ block: "nearest" });
+                                                  }, 0);
+                                                } else if (e.key === "ArrowDown") {
+                                                  e.preventDefault();
+                                                  setJournalAccountHighlightedIndex(prev => 
+                                                    prev < filteredJournalAccounts.length - 1 ? prev + 1 : 0
+                                                  );
+                                                  // Scroll highlighted item into view
+                                                  setTimeout(() => {
+                                                    const button = document.querySelector(`[data-testid="journal-account-option-${Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1)}"]`) as HTMLElement;
+                                                    if (button) button.scrollIntoView({ block: "nearest" });
+                                                  }, 0);
+                                                } else if (e.key === "Enter") {
+                                                  e.preventDefault();
+                                                  const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
+                                                  if (selectedAccount) {
+                                                    handleJournalAccountSelect(selectedAccount);
+                                                    setShowAccountSidebar(false);
+                                                  }
+                                                }
+                                                return;
+                                              }
+
+                                              // Normal row navigation when sidebar is not open
                                               if (e.key === "Tab" && !e.shiftKey) {
                                                 e.preventDefault();
                                                 setTimeout(() => {
@@ -3087,12 +3121,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                   const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
                                                   if (typeInput) typeInput.focus();
                                                 }, 50);
-                                              } else if (e.key === "Enter" && filteredJournalAccounts.length > 0) {
-                                                e.preventDefault();
-                                                const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
-                                                if (selectedAccount) {
-                                                  handleJournalAccountSelect(selectedAccount);
-                                                }
                                               }
                                             }}
                                           />
