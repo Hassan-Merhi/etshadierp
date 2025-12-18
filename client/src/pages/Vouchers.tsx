@@ -1274,16 +1274,33 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Auto-fill CR amount when the user switches to CR on a row
   const handleJournalTypeChange = (index: number, newType: "DR" | "CR") => {
+    // Get fresh values from form, not from watched values which may be stale
+    const currentEntries = journalForm.getValues("entries");
+    const currentAmount = parseFloat(currentEntries[index]?.amount || "0");
+    
+    // Set the new type first
     journalForm.setValue(`entries.${index}.type`, newType);
     
     // If switching to CR and there's a balance to fill, auto-fill the remaining amount
     if (newType === "CR") {
-      const currentAmount = parseFloat(journalEntries[index]?.amount || "0");
-      const otherCredits = journalEntries.reduce(
+      // Create a modified entries array that reflects the type change we just made
+      const updatedEntries = currentEntries.map((entry, i) => 
+        i === index ? { ...entry, type: newType } : entry
+      );
+      
+      // Calculate total debits from all entries (now that current row is CR, it won't be counted)
+      const totalDebits = updatedEntries.reduce(
+        (sum, entry) => sum + (entry.type === "DR" ? (parseFloat(entry.amount) || 0) : 0),
+        0
+      );
+      
+      // Calculate credits from other rows only (not the current row being changed)
+      const otherCredits = updatedEntries.reduce(
         (sum, entry, i) => i !== index && entry.type === "CR" ? sum + (parseFloat(entry.amount) || 0) : sum,
         0
       );
-      const remainingToBalance = totalDebit - otherCredits;
+      
+      const remainingToBalance = totalDebits - otherCredits;
       
       // Only auto-fill if current amount is 0 and there's a positive remaining amount
       if (currentAmount === 0 && remainingToBalance > 0) {
@@ -2402,62 +2419,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   ) => {
     const isLastRow = rowIndex === journalFields.length - 1;
     
-    // Arrow key navigation for type field
-    if (fieldName === "type") {
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        if (rowIndex > 0) {
-          setTimeout(() => {
-            const prevTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex - 1}"]`) as HTMLInputElement;
-            if (prevTypeInput) {
-              prevTypeInput.focus();
-              prevTypeInput.select();
-            }
-          }, 50);
-        }
-        return;
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        if (rowIndex < journalFields.length - 1) {
-          setTimeout(() => {
-            const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
-            if (nextTypeInput) {
-              nextTypeInput.focus();
-              nextTypeInput.select();
-            }
-          }, 50);
-        }
-        return;
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        setTimeout(() => {
-          const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
-          if (accountInput) accountInput.focus();
-        }, 50);
-        return;
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        // Wrap to current row's Amount field (circular navigation)
-        setTimeout(() => {
-          const amountInput = document.querySelector(`[data-testid="input-journal-amount-${rowIndex}"]`) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        }, 50);
-        return;
-      } else if (e.key === "Tab" && !e.shiftKey) {
-        e.preventDefault();
-        setTimeout(() => {
-          const accountInput = document.querySelector(`[data-testid="input-journal-account-${rowIndex}"]`) as HTMLInputElement;
-          if (accountInput) {
-            accountInput.focus();
-          }
-        }, 50);
-        return;
-      }
-    }
-    
     // Arrow key navigation for amount field
     if (fieldName === "amount") {
       if (e.key === "ArrowUp") {
@@ -2495,10 +2456,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         e.preventDefault();
         if (rowIndex < journalFields.length - 1) {
           setTimeout(() => {
-            const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+            const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLElement;
             if (nextTypeInput) {
               nextTypeInput.focus();
-              nextTypeInput.select();
             }
           }, 50);
         }
@@ -2520,10 +2480,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         });
       }
       setTimeout(() => {
-        const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+        const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLElement;
         if (nextRowInput) {
           nextRowInput.focus();
-          nextRowInput.select();
         }
       }, 100);
     }
@@ -2541,19 +2500,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           amount: "",
         });
         setTimeout(() => {
-          const newRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+          const newRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLElement;
           if (newRowInput) {
             newRowInput.focus();
-            newRowInput.select();
           }
         }, 100);
       } else {
         // Not last row - move to DR/CR of next row
         setTimeout(() => {
-          const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLInputElement;
+          const nextRowInput = document.querySelector(`[data-testid="input-journal-type-${rowIndex + 1}"]`) as HTMLElement;
           if (nextRowInput) {
             nextRowInput.focus();
-            nextRowInput.select();
           }
         }, 50);
       }
@@ -2990,6 +2947,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                   amountInput.select();
                                                 }
                                               }, 50);
+                                            } else if (e.key === "ArrowUp" && index > 0) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const prevTypeInput = document.querySelector(`[data-testid="input-journal-type-${index - 1}"]`) as HTMLElement;
+                                                if (prevTypeInput) prevTypeInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const nextTypeInput = document.querySelector(`[data-testid="input-journal-type-${index + 1}"]`) as HTMLElement;
+                                                if (nextTypeInput) nextTypeInput.focus();
+                                              }, 50);
                                             }
                                           }}
                                         >
@@ -3086,6 +3055,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             rowIndex={index}
                                             placeholder="Select account..."
                                             testId={`input-journal-account-${index}`}
+                                            dropdownPosition="right"
                                           />
                                           {entry?.accountId > 0 && (
                                             <div className="text-xs text-muted-foreground pl-1 flex items-center gap-2">

@@ -28,6 +28,7 @@ export interface AccountAutocompleteProps {
   onArrowRight?: () => void;
   testId?: string;
   rowIndex?: number;
+  dropdownPosition?: "below" | "right";
 }
 
 export interface AccountAutocompleteHandle {
@@ -53,6 +54,7 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       onArrowRight,
       testId,
       rowIndex = 0,
+      dropdownPosition = "below",
     },
     ref
   ) => {
@@ -199,7 +201,12 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           <div 
             ref={listRef}
             id={listboxId}
-            className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto"
+            className={cn(
+              "absolute z-50 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto",
+              dropdownPosition === "right" 
+                ? "left-full ml-1 top-0 w-64" 
+                : "w-full mt-1"
+            )}
             role="listbox"
           >
             {filteredAccounts.map((account, idx) => (
