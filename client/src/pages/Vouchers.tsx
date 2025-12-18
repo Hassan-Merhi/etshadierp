@@ -1261,6 +1261,45 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Helper function to get account balance from sidebarAccounts
+  const getAccountBalance = (accountType: string, accountId: number): number => {
+    const account = sidebarAccounts.find(
+      (acc) => acc.type === accountType && acc.id === accountId
+    );
+    return account?.balance ?? 0;
+  };
+
+  // Calculate the remaining CR amount to balance the journal
+  const remainingCrAmount = totalDebit - totalCredit;
+
+  // Auto-fill CR amount when the user switches to CR on a row
+  const handleJournalTypeChange = (index: number, newType: "DR" | "CR") => {
+    journalForm.setValue(`entries.${index}.type`, newType);
+    
+    // If switching to CR and there's a balance to fill, auto-fill the remaining amount
+    if (newType === "CR") {
+      const currentAmount = parseFloat(journalEntries[index]?.amount || "0");
+      const otherCredits = journalEntries.reduce(
+        (sum, entry, i) => i !== index && entry.type === "CR" ? sum + (parseFloat(entry.amount) || 0) : sum,
+        0
+      );
+      const remainingToBalance = totalDebit - otherCredits;
+      
+      // Only auto-fill if current amount is 0 and there's a positive remaining amount
+      if (currentAmount === 0 && remainingToBalance > 0) {
+        journalForm.setValue(`entries.${index}.amount`, remainingToBalance.toFixed(2));
+        // Focus the amount field after setting it
+        setTimeout(() => {
+          const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
+        }, 50);
+      }
+    }
+  };
+
   // Pre-populate journal form when editing
   useEffect(() => {
     if (voucherToEdit && voucherToEdit.voucherType === "Journal" && voucherToEdit.entries && allAccounts.length > 0) {
@@ -2921,22 +2960,47 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 name={`entries.${index}.type`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="DR/CR"
-                                        className="uppercase text-center"
-                                        maxLength={2}
-                                        data-testid={`input-journal-type-${index}`}
-                                        onChange={(e) => {
-                                          const value = e.target.value.toUpperCase();
-                                          if (value === "" || value === "D" || value === "DR" || value === "C" || value === "CR") {
-                                            field.onChange(value === "D" ? "DR" : value === "C" ? "CR" : value);
-                                          }
-                                        }}
-                                        onKeyDown={(e) => handleJournalKeyDown(e, index, "type")}
-                                      />
-                                    </FormControl>
+                                    <Select
+                                      value={field.value}
+                                      onValueChange={(value: "DR" | "CR") => handleJournalTypeChange(index, value)}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger 
+                                          className="w-20 text-center font-medium"
+                                          data-testid={`input-journal-type-${index}`}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Tab" && !e.shiftKey) {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+                                                if (accountInput) accountInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowRight") {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+                                                if (accountInput) accountInput.focus();
+                                              }, 50);
+                                            } else if (e.key === "ArrowLeft") {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                if (amountInput) {
+                                                  amountInput.focus();
+                                                  amountInput.select();
+                                                }
+                                              }, 50);
+                                            }
+                                          }}
+                                        >
+                                          <SelectValue placeholder="DR" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="DR">DR</SelectItem>
+                                        <SelectItem value="CR">CR</SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -2946,76 +3010,103 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               <FormField
                                 control={journalForm.control}
                                 name={`entries.${index}.accountId`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <AccountAutocomplete
-                                        value={
-                                          journalEntries[index].accountId > 0
-                                            ? {
-                                                type: journalEntries[index].accountType,
-                                                id: journalEntries[index].accountId,
-                                                name: journalEntries[index].accountName,
+                                render={({ field }) => {
+                                  const entry = journalEntries[index];
+                                  const currentBalance = entry?.accountId > 0 
+                                    ? getAccountBalance(entry.accountType, entry.accountId) 
+                                    : 0;
+                                  const entryAmount = parseFloat(entry?.amount || "0");
+                                  const isDebit = entry?.type === "DR";
+                                  const projectedBalance = isDebit 
+                                    ? currentBalance + entryAmount 
+                                    : currentBalance - entryAmount;
+                                    
+                                  return (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="space-y-1">
+                                          <AccountAutocomplete
+                                            value={
+                                              entry?.accountId > 0
+                                                ? {
+                                                    type: entry.accountType,
+                                                    id: entry.accountId,
+                                                    name: entry.accountName,
+                                                  }
+                                                : null
+                                            }
+                                            onChange={(type, id, name) => {
+                                              journalForm.setValue(`entries.${index}.accountType`, type);
+                                              journalForm.setValue(`entries.${index}.accountId`, id);
+                                              journalForm.setValue(`entries.${index}.accountName`, name);
+                                            }}
+                                            onTabPressed={() => {
+                                              setTimeout(() => {
+                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                if (amountInput) {
+                                                  amountInput.focus();
+                                                  amountInput.select();
+                                                }
+                                              }, 50);
+                                            }}
+                                            onArrowUp={() => {
+                                              if (index > 0) {
+                                                setTimeout(() => {
+                                                  const prevAccountInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                                  if (prevAccountInput) prevAccountInput.focus();
+                                                }, 50);
                                               }
-                                            : null
-                                        }
-                                        onChange={(type, id, name) => {
-                                          journalForm.setValue(`entries.${index}.accountType`, type);
-                                          journalForm.setValue(`entries.${index}.accountId`, id);
-                                          journalForm.setValue(`entries.${index}.accountName`, name);
-                                        }}
-                                        onTabPressed={() => {
-                                          setTimeout(() => {
-                                            const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                            if (amountInput) {
-                                              amountInput.focus();
-                                              amountInput.select();
-                                            }
-                                          }, 50);
-                                        }}
-                                        onArrowUp={() => {
-                                          if (index > 0) {
-                                            setTimeout(() => {
-                                              const prevAccountInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
-                                              if (prevAccountInput) prevAccountInput.focus();
-                                            }, 50);
-                                          }
-                                        }}
-                                        onArrowDown={() => {
-                                          if (index < journalFields.length - 1) {
-                                            setTimeout(() => {
-                                              const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
-                                              if (nextAccountInput) nextAccountInput.focus();
-                                            }, 50);
-                                          }
-                                        }}
-                                        onArrowRight={() => {
-                                          setTimeout(() => {
-                                            const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                            if (amountInput) {
-                                              amountInput.focus();
-                                              amountInput.select();
-                                            }
-                                          }, 50);
-                                        }}
-                                        onArrowLeft={() => {
-                                          setTimeout(() => {
-                                            const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLInputElement;
-                                            if (typeInput) {
-                                              typeInput.focus();
-                                              typeInput.select();
-                                            }
-                                          }, 50);
-                                        }}
-                                        allAccounts={allAccounts}
-                                        rowIndex={index}
-                                        placeholder="Select account..."
-                                        testId={`input-journal-account-${index}`}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
+                                            }}
+                                            onArrowDown={() => {
+                                              if (index < journalFields.length - 1) {
+                                                setTimeout(() => {
+                                                  const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                                  if (nextAccountInput) nextAccountInput.focus();
+                                                }, 50);
+                                              }
+                                            }}
+                                            onArrowRight={() => {
+                                              setTimeout(() => {
+                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                if (amountInput) {
+                                                  amountInput.focus();
+                                                  amountInput.select();
+                                                }
+                                              }, 50);
+                                            }}
+                                            onArrowLeft={() => {
+                                              setTimeout(() => {
+                                                const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLInputElement;
+                                                if (typeInput) {
+                                                  typeInput.focus();
+                                                }
+                                              }, 50);
+                                            }}
+                                            allAccounts={allAccounts}
+                                            rowIndex={index}
+                                            placeholder="Select account..."
+                                            testId={`input-journal-account-${index}`}
+                                          />
+                                          {entry?.accountId > 0 && (
+                                            <div className="text-xs text-muted-foreground pl-1 flex items-center gap-2">
+                                              <span>Cur Bal: <span className={cn("font-mono", currentBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                                ${Math.abs(currentBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currentBalance >= 0 ? "Dr" : "Cr"}
+                                              </span></span>
+                                              {entryAmount > 0 && (
+                                                <span className="text-muted-foreground/70">
+                                                  → <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                                    ${Math.abs(projectedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {projectedBalance >= 0 ? "Dr" : "Cr"}
+                                                  </span>
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  );
+                                }}
                               />
                             </td>
                             <td className="p-2">
