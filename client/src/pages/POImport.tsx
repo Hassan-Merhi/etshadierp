@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+
+// Format number to remove unnecessary .00 and add commas
+const formatCurrency = (num: number) => {
+  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -485,9 +490,9 @@ export default function POImport() {
                         <TableRow key={itemIdx}>
                           <TableCell>{item.poNumber}</TableCell>
                           <TableCell>{item.itemName}</TableCell>
-                          <TableCell className="text-right">{Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{item.rate.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-medium">{item.lineTotal.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(Number(item.quantity))}</TableCell>
+                          <TableCell className="text-right">${formatCurrency(Number(item.rate))}</TableCell>
+                          <TableCell className="text-right font-medium">${formatCurrency(Number(item.lineTotal))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -497,41 +502,41 @@ export default function POImport() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted rounded-md">
                   <div>
                     <p className="text-sm text-muted-foreground">Items Total</p>
-                    <p className="text-lg font-semibold">${container.itemsTotal.toFixed(2)}</p>
+                    <p className="text-lg font-semibold">${formatCurrency(Number(container.itemsTotal))}</p>
                   </div>
                   {container.charges.freight > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Freight</p>
-                      <p className="text-lg font-semibold">${container.charges.freight.toFixed(2)}</p>
+                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.freight))}</p>
                     </div>
                   )}
                   {container.charges.surcharge > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Surcharge</p>
-                      <p className="text-lg font-semibold">${container.charges.surcharge.toFixed(2)}</p>
+                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.surcharge))}</p>
                     </div>
                   )}
                   {container.charges.fumigation > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Fumigation</p>
-                      <p className="text-lg font-semibold">${container.charges.fumigation.toFixed(2)}</p>
+                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.fumigation))}</p>
                     </div>
                   )}
                   {container.charges.discount > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Discount</p>
-                      <p className="text-lg font-semibold text-red-500">-${container.charges.discount.toFixed(2)}</p>
+                      <p className="text-lg font-semibold text-red-500">-${formatCurrency(Number(container.charges.discount))}</p>
                     </div>
                   )}
                   {container.charges.documentCharges > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Document Charges</p>
-                      <p className="text-lg font-semibold">${container.charges.documentCharges.toFixed(2)}</p>
+                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.documentCharges))}</p>
                     </div>
                   )}
                   <div className="col-span-full border-t pt-2">
                     <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold">${container.grandTotal.toFixed(2)}</p>
+                    <p className="text-xl font-bold">${formatCurrency(Number(container.grandTotal))}</p>
                   </div>
                 </div>
               </div>

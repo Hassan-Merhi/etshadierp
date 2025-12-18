@@ -20,6 +20,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
 
+// Format number to remove unnecessary .00 and add commas
+const formatCurrency = (num: number) => {
+  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
+
 interface ContainerDetailData {
   container: any;
   pos: any[];
@@ -357,7 +362,7 @@ export default function ContainerDetail() {
               <div>
                 <p className="text-sm text-muted-foreground">Sale Price</p>
                 <p className="font-semibold" data-testid="text-sale-price">
-                  ${parseFloat(containerSale.containerCost).toFixed(2)}
+                  ${formatCurrency(parseFloat(containerSale.containerCost))}
                 </p>
               </div>
             </div>
@@ -366,14 +371,14 @@ export default function ContainerDetail() {
               <div>
                 <p className="text-sm text-muted-foreground">Commission</p>
                 <p className="font-semibold" data-testid="text-sale-commission">
-                  ${parseFloat(containerSale.commission).toFixed(2)}
+                  ${formatCurrency(parseFloat(containerSale.commission))}
                 </p>
               </div>
             </div>
             <div className="pt-2 border-t">
               <p className="text-sm text-muted-foreground">Total Amount</p>
               <p className="text-xl font-bold" data-testid="text-sale-total">
-                ${parseFloat(containerSale.totalAmount).toFixed(2)}
+                ${formatCurrency(parseFloat(containerSale.totalAmount))}
               </p>
             </div>
           </CardContent>
@@ -403,7 +408,7 @@ export default function ContainerDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-items-total">
-              ${itemsTotal.toFixed(2)}
+              ${formatCurrency(itemsTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
               {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
@@ -418,10 +423,10 @@ export default function ContainerDetail() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-grand-total">
-              ${grandTotal.toFixed(2)}
+              ${formatCurrency(grandTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Including ${Math.abs(chargesTotal).toFixed(2)} in charges
+              Including ${formatCurrency(Math.abs(chargesTotal))} in charges
             </p>
           </CardContent>
         </Card>
@@ -447,7 +452,7 @@ export default function ContainerDetail() {
                         <span className="text-muted-foreground">Currency: </span>
                         <span className="font-medium">{po.currency}</span>
                         <span className="text-muted-foreground ml-4">Total: </span>
-                        <span className="font-semibold">${parseFloat(po.itemsTotal).toFixed(2)}</span>
+                        <span className="font-semibold">${formatCurrency(parseFloat(po.itemsTotal))}</span>
                       </div>
                       <Button
                         variant="outline"
@@ -483,10 +488,10 @@ export default function ContainerDetail() {
                         {po.items.map((item: any) => (
                           <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                             <TableCell className="font-medium">{item.itemName}</TableCell>
-                            <TableCell className="text-right">{parseFloat(item.quantity).toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${parseFloat(item.rate).toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(parseFloat(item.quantity))}</TableCell>
+                            <TableCell className="text-right">${formatCurrency(parseFloat(item.rate))}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              ${parseFloat(item.lineTotal).toFixed(2)}
+                              ${formatCurrency(parseFloat(item.lineTotal))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -519,14 +524,14 @@ export default function ContainerDetail() {
                     <TableRow key={charge.id} data-testid={`row-charge-${charge.chargeType.toLowerCase().replace(/\s/g, "-")}`}>
                       <TableCell className="font-medium">{charge.chargeType}</TableCell>
                       <TableCell className={`text-right font-semibold ${parseFloat(charge.amount) < 0 ? "text-red-500" : ""}`}>
-                        ${parseFloat(charge.amount).toFixed(2)}
+                        ${formatCurrency(parseFloat(charge.amount))}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell className="font-bold">Total Charges</TableCell>
                     <TableCell className="text-right font-bold">
-                      ${chargesTotal.toFixed(2)}
+                      ${formatCurrency(chargesTotal)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -552,7 +557,7 @@ export default function ContainerDetail() {
             </div>
             <div className="flex justify-between pt-2 border-t">
               <span className="text-lg font-bold">Grand Total:</span>
-              <span className="text-lg font-bold">${grandTotal.toFixed(2)}</span>
+              <span className="text-lg font-bold">${formatCurrency(grandTotal)}</span>
             </div>
           </div>
         </CardContent>
@@ -618,7 +623,7 @@ export default function ContainerDetail() {
               <div className="rounded-md border p-4 bg-muted/50">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Container Cost</span>
-                  <span className="text-lg font-bold">${grandTotal.toFixed(2)}</span>
+                  <span className="text-lg font-bold">${formatCurrency(grandTotal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Full balance will be charged to customer
