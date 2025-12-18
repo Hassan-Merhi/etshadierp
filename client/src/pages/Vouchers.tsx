@@ -3039,12 +3039,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             onFocus={() => {
                                               setActiveJournalRow(index);
                                               setShowAccountSidebar(true);
-                                              setJournalAccountSearchTerm(entry?.accountName || "");
+                                              setJournalAccountSearchTerm("");
                                             }}
                                             onBlur={() => {
                                               setTimeout(() => {
                                                 if (activeJournalRow === index) {
                                                   setJournalAccountSearchTerm("");
+                                                  setActiveJournalRow(null);
                                                 }
                                               }, 200);
                                             }}
@@ -3125,17 +3126,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             }}
                                           />
                                           {entry?.accountId > 0 && (
-                                            <div className="text-xs text-muted-foreground pl-1 flex items-center gap-2">
-                                              <span>Cur Bal: <span className={cn("font-mono", currentBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                                ${Math.abs(currentBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currentBalance >= 0 ? "Dr" : "Cr"}
+                                            <div className="text-xs text-muted-foreground pl-1">
+                                              <span>New Bal: <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                                ${Math.abs(projectedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {projectedBalance >= 0 ? "Dr" : "Cr"}
                                               </span></span>
-                                              {entryAmount > 0 && (
-                                                <span className="text-muted-foreground/70">
-                                                  → <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                                    ${Math.abs(projectedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {projectedBalance >= 0 ? "Dr" : "Cr"}
-                                                  </span>
-                                                </span>
-                                              )}
                                             </div>
                                           )}
                                         </div>
