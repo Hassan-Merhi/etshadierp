@@ -8,11 +8,15 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Plus, Trash2, Save, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Save, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+// Format number to remove unnecessary .00 and add commas
+const formatCurrency = (num: number) => {
+  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
 
 interface LineItem {
   id?: number;
@@ -28,114 +32,6 @@ interface StockItem {
   name: string;
   code: string;
 }
-
-const LineItemRow = memo(function LineItemRow({
-  item,
-  index,
-  stockItems,
-  onItemChange,
-  onRemove,
-  lineTotal,
-}: {
-  item: LineItem;
-  index: number;
-  stockItems: StockItem[];
-  onItemChange: (index: number, field: keyof LineItem, value: string | number | null, stockItem?: StockItem) => void;
-  onRemove: (index: number) => void;
-  lineTotal: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-  
-  const filteredStockItems = useMemo(() => {
-    if (!searchValue) return stockItems.slice(0, 50);
-    const search = searchValue.toLowerCase();
-    return stockItems
-      .filter(si => (si.name || '').toLowerCase().includes(search) || (si.code || '').toLowerCase().includes(search))
-      .slice(0, 50);
-  }, [stockItems, searchValue]);
-
-  return (
-    <TableRow data-testid={`row-item-${index}`}>
-      <TableCell>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-full justify-between font-normal"
-              data-testid={`select-item-${index}`}
-            >
-              <span className="truncate">{item.itemName || "Select item..."}</span>
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0" align="start">
-            <Command shouldFilter={false}>
-              <CommandInput 
-                placeholder="Search items..." 
-                value={searchValue}
-                onValueChange={setSearchValue}
-              />
-              <CommandList>
-                <CommandEmpty>No items found.</CommandEmpty>
-                <CommandGroup>
-                  {filteredStockItems.map((si) => (
-                    <CommandItem
-                      key={si.id}
-                      value={si.id.toString()}
-                      onSelect={() => {
-                        onItemChange(index, "stockItemId", si.id, si);
-                        setOpen(false);
-                        setSearchValue("");
-                      }}
-                    >
-                      {si.name}{si.code ? ` (${si.code})` : ''}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          step="0.01"
-          value={item.quantity}
-          onChange={(e) => onItemChange(index, "quantity", e.target.value)}
-          className="text-right"
-          data-testid={`input-quantity-${index}`}
-        />
-      </TableCell>
-      <TableCell>
-        <Input
-          type="number"
-          step="0.01"
-          value={item.rate}
-          onChange={(e) => onItemChange(index, "rate", e.target.value)}
-          className="text-right"
-          data-testid={`input-rate-${index}`}
-        />
-      </TableCell>
-      <TableCell className="text-right font-mono">
-        ${lineTotal}
-      </TableCell>
-      <TableCell>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => onRemove(index)}
-          data-testid={`button-remove-item-${index}`}
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-});
 
 interface PurchaseOrder {
   id: number;
@@ -173,6 +69,14 @@ export default function PurchaseOrderEdit() {
   const [documentCharges, setDocumentCharges] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [otherCharges, setOtherCharges] = useState("0");
+
+  // Sidebar state for item search
+  const [showItemSidebar, setShowItemSidebar] = useState(false);
+  const [activeRow, setActiveRow] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const focusIdRef = useRef(0);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   const { data: stockItems } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
@@ -310,8 +214,37 @@ export default function PurchaseOrderEdit() {
   const grandTotal = useMemo(() => {
     return (parseFloat(itemsTotal) + parseFloat(chargesTotal)).toFixed(2);
   }, [itemsTotal, chargesTotal]);
+
+  const totalQuantity = useMemo(() => {
+    return items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+  }, [items]);
   
   const stockItemsList = useMemo(() => (stockItems || []) as StockItem[], [stockItems]);
+
+  const filteredStockItems = useMemo(() => {
+    if (!searchTerm.trim()) return stockItemsList.slice(0, 100);
+    const term = searchTerm.toLowerCase();
+    return stockItemsList
+      .filter(si => 
+        (si.name || '').toLowerCase().includes(term) || 
+        (si.code || '').toLowerCase().includes(term)
+      )
+      .slice(0, 100);
+  }, [stockItemsList, searchTerm]);
+
+  const handleSelectItem = useCallback((stockItem: StockItem) => {
+    if (activeRow !== null) {
+      handleItemChange(activeRow, "stockItemId", stockItem.id, stockItem);
+      setShowItemSidebar(false);
+      setSearchTerm("");
+      setActiveRow(null);
+      // Focus quantity input
+      setTimeout(() => {
+        const qtyInput = document.querySelector(`[data-testid="input-quantity-${activeRow}"]`) as HTMLInputElement;
+        if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+      }, 50);
+    }
+  }, [activeRow, handleItemChange]);
 
   const handleSave = () => {
     if (!poNumber.trim()) {
@@ -389,7 +322,8 @@ export default function PurchaseOrderEdit() {
         </div>
       </div>
 
-      <Card>
+      <div className="flex gap-4">
+      <Card className="flex-1">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>PO Details</span>
@@ -459,15 +393,93 @@ export default function PurchaseOrderEdit() {
                 </TableHeader>
                 <TableBody>
                   {items.map((item, index) => (
-                    <LineItemRow
-                      key={item.id || `new-${index}`}
-                      item={item}
-                      index={index}
-                      stockItems={stockItemsList}
-                      onItemChange={handleItemChange}
-                      onRemove={handleRemoveItem}
-                      lineTotal={lineTotals[index] || "0.00"}
-                    />
+                    <TableRow key={item.id || `new-${index}`} data-testid={`row-item-${index}`}>
+                      <TableCell>
+                        <input
+                          type="text"
+                          value={activeRow === index ? searchTerm : (item.itemName || "")}
+                          onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setHighlightedIndex(0);
+                          }}
+                          onFocus={() => {
+                            focusIdRef.current += 1;
+                            setActiveRow(index);
+                            setSearchTerm(item.itemName || "");
+                            setHighlightedIndex(0);
+                            setShowItemSidebar(true);
+                          }}
+                          onBlur={() => {
+                            const focusIdAtBlur = focusIdRef.current;
+                            setTimeout(() => {
+                              if (focusIdRef.current === focusIdAtBlur) {
+                                setActiveRow(null);
+                                setSearchTerm("");
+                                setShowItemSidebar(false);
+                              }
+                            }, 200);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              if (showItemSidebar && filteredStockItems.length > 0) {
+                                setHighlightedIndex(Math.min(filteredStockItems.length - 1, highlightedIndex + 1));
+                              }
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              if (showItemSidebar && filteredStockItems.length > 0) {
+                                setHighlightedIndex(Math.max(0, highlightedIndex - 1));
+                              }
+                            } else if (e.key === "Enter") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (showItemSidebar && filteredStockItems.length > 0) {
+                                handleSelectItem(filteredStockItems[highlightedIndex]);
+                              }
+                            } else if (e.key === "Tab") {
+                              setShowItemSidebar(false);
+                              setSearchTerm("");
+                            }
+                          }}
+                          placeholder="Type to search..."
+                          className="w-full h-9 px-3 rounded-md border bg-background outline-none focus:ring-2 focus:ring-ring"
+                          data-testid={`input-item-name-${index}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                          className="text-right"
+                          data-testid={`input-quantity-${index}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.rate}
+                          onChange={(e) => handleItemChange(index, "rate", e.target.value)}
+                          className="text-right"
+                          data-testid={`input-rate-${index}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${formatCurrency(parseFloat(lineTotals[index] || "0"))}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveItem(index)}
+                          data-testid={`button-remove-item-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
                   {items.length === 0 && (
                     <TableRow>
@@ -478,11 +490,15 @@ export default function PurchaseOrderEdit() {
                   )}
                   {items.length > 0 && (
                     <TableRow className="bg-muted/50">
-                      <TableCell colSpan={3} className="text-right font-medium">
-                        Items Total:
+                      <TableCell className="text-right font-medium">
+                        Total:
                       </TableCell>
                       <TableCell className="text-right font-mono font-bold">
-                        ${itemsTotal}
+                        {formatCurrency(totalQuantity)}
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right font-mono font-bold">
+                        ${formatCurrency(parseFloat(itemsTotal))}
                       </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -572,10 +588,10 @@ export default function PurchaseOrderEdit() {
             <div className="bg-muted/50 rounded-md p-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Grand Total:</span>
-                <span className="text-xl font-bold font-mono">${grandTotal}</span>
+                <span className="text-xl font-bold font-mono">${formatCurrency(parseFloat(grandTotal))}</span>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Items (${itemsTotal}) + Charges (${chargesTotal})
+                Items (${formatCurrency(parseFloat(itemsTotal))}) + Charges (${formatCurrency(parseFloat(chargesTotal))})
               </p>
             </div>
           </div>
@@ -594,6 +610,52 @@ export default function PurchaseOrderEdit() {
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Search Items Sidebar */}
+      {showItemSidebar && (
+        <Card className="w-80 flex-shrink-0" ref={sidebarRef}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Search Items
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[400px]">
+              <div className="p-2 space-y-1">
+                {filteredStockItems.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No items found
+                  </div>
+                ) : (
+                  filteredStockItems.map((item, idx) => {
+                    const isHighlighted = idx === highlightedIndex;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`w-full text-left px-3 py-2 rounded-md hover-elevate active-elevate-2 ${
+                          isHighlighted ? "bg-accent" : ""
+                        }`}
+                        data-testid={`button-suggest-item-${item.id}`}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectItem(item);
+                        }}
+                      >
+                        <div className="text-sm font-medium truncate">
+                          {item.name}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+      </div>
     </div>
   );
 }
