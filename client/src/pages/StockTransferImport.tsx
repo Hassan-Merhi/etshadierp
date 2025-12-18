@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -508,7 +509,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
-                          {validation?.currentStock !== undefined ? validation.currentStock.toFixed(2) : "-"}
+                          {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
                         </TableCell>
                         <TableCell>
                           {validation ? (

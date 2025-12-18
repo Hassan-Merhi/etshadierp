@@ -33,6 +33,7 @@ import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, Refr
 import * as XLSX from "xlsx";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { formatNumber } from "@/lib/formatNumber";
 
 interface SalesReportItem {
   id: number;
@@ -84,14 +85,11 @@ const formatCurrency = (value: string | number): string => {
   return '$' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-// Format number with commas, remove .00 if whole
-const formatNumber = (value: string | number): string => {
+// Format number with commas, remove .00 if whole - handles string inputs
+const formatNumericValue = (value: string | number): string => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return '0';
-  if (num % 1 === 0) {
-    return num.toLocaleString('en-US');
-  }
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatNumber(num);
 };
 
 // For backwards compatibility
@@ -265,22 +263,22 @@ export default function SalesReport() {
     const exportData = groupedData.map((group) => ({
       "Date": group.displayDate,
       "Items Sold": group.itemCount,
-      "Total Sales": group.totalSales.toFixed(2),
-      "Total Cost": group.totalCost.toFixed(2),
-      "Cost Profit": group.costProfit.toFixed(2),
-      "Configured Cost": group.totalConfiguredCost.toFixed(2),
-      "Configured Profit": group.configuredProfit.toFixed(2),
+      "Total Sales": formatNumber(group.totalSales),
+      "Total Cost": formatNumber(group.totalCost),
+      "Cost Profit": formatNumber(group.costProfit),
+      "Configured Cost": formatNumber(group.totalConfiguredCost),
+      "Configured Profit": formatNumber(group.configuredProfit),
     }));
 
     // Add totals row
     exportData.push({
       "Date": "TOTAL",
       "Items Sold": salesData.length,
-      "Total Sales": totals.totalSales.toFixed(2),
-      "Total Cost": totals.totalCost.toFixed(2),
-      "Cost Profit": totals.costProfit.toFixed(2),
-      "Configured Cost": totals.totalConfiguredCost.toFixed(2),
-      "Configured Profit": totals.configuredProfit.toFixed(2),
+      "Total Sales": formatNumber(totals.totalSales),
+      "Total Cost": formatNumber(totals.totalCost),
+      "Cost Profit": formatNumber(totals.costProfit),
+      "Configured Cost": formatNumber(totals.totalConfiguredCost),
+      "Configured Profit": formatNumber(totals.configuredProfit),
     });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -684,7 +682,7 @@ export default function SalesReport() {
                           <TableCell className="font-medium">{item.stockItemName}</TableCell>
                           <TableCell>{item.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatNumber(item.quantity)}
+                            {formatNumericValue(item.quantity)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {formatCurrency(item.actualSellingPrice)}

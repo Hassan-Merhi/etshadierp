@@ -79,13 +79,13 @@ import { Book, Filter, X, Eye, Edit, Trash2, Plus, ChevronDown, Check, ChevronsU
 import { format, parseISO, isToday } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "xlsx";
 
-// Helper function to format amounts without .00 for whole numbers
+// Helper function to format amounts - wraps formatNumber to handle string inputs
 const formatAmount = (amount: number | string): string => {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  const formatted = num.toFixed(2);
-  return formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
+  return formatNumber(num);
 };
 
 // Account types
@@ -1218,7 +1218,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <div className="flex items-center gap-2">
                                 {!isPOSUser && purchaseOrderData.itemsTotal && (
                                   <div className="font-mono font-bold">
-                                    ${parseFloat(purchaseOrderData.itemsTotal || "0").toFixed(2)}
+                                    ${formatNumber(parseFloat(purchaseOrderData.itemsTotal || "0"))}
                                   </div>
                                 )}
                                 <Badge variant={purchaseOrderData.status === "Closed" ? "secondary" : "default"}>
@@ -1273,10 +1273,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                       {!isPOSUser && (
                                         <>
                                           <TableCell className="text-right font-mono">
-                                            ${rate.toFixed(2)}
+                                            ${formatNumber(rate)}
                                           </TableCell>
                                           <TableCell className="text-right font-mono">
-                                            ${totalAmount.toFixed(2)}
+                                            ${formatNumber(totalAmount)}
                                           </TableCell>
                                         </>
                                       )}
@@ -1295,7 +1295,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                       <>
                                         <TableCell></TableCell>
                                         <TableCell className="text-right font-mono font-semibold">
-                                          ${purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0).toFixed(2)}
+                                          ${formatNumber(purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0))}
                                         </TableCell>
                                       </>
                                     )}
@@ -1323,7 +1323,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         <>
                                           <TableCell></TableCell>
                                           <TableCell className="text-right font-mono">
-                                            {charge.amount < 0 ? `-$${Math.abs(charge.amount).toFixed(2)}` : `$${charge.amount.toFixed(2)}`}
+                                            {charge.amount < 0 ? `-$${formatNumber(Math.abs(charge.amount))}` : `$${formatNumber(charge.amount)}`}
                                           </TableCell>
                                         </>
                                       )}
@@ -1341,7 +1341,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     <>
                                       <TableCell></TableCell>
                                       <TableCell className="text-right font-mono">
-                                        ${(purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0) + 
+                                        ${formatNumber(purchaseItems.reduce((sum, item) => sum + (item.totalAmount != null ? parseFloat(item.totalAmount) : 0), 0) + 
                                             (purchaseOrderData ? 
                                               parseFloat(purchaseOrderData.freight || "0") +
                                               parseFloat(purchaseOrderData.fumigation || "0") +
@@ -1349,7 +1349,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                               parseFloat(purchaseOrderData.documentCharges || "0") +
                                               parseFloat(purchaseOrderData.otherCharges || "0") -
                                               parseFloat(purchaseOrderData.discount || "0")
-                                            : 0)).toFixed(2)}
+                                            : 0))}
                                       </TableCell>
                                     </>
                                   )}
@@ -1467,10 +1467,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   {!isPOSUser && (
                                     <>
                                       <TableCell className="text-right font-mono">
-                                        ${rate.toFixed(2)}
+                                        ${formatNumber(rate)}
                                       </TableCell>
                                       <TableCell className="text-right font-mono">
-                                        ${totalAmount.toFixed(2)}
+                                        ${formatNumber(totalAmount)}
                                       </TableCell>
                                     </>
                                   )}
@@ -1542,7 +1542,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 <>
                                   <TableCell></TableCell>
                                   <TableCell className="text-right font-mono">
-                                    ${viewVoucherEntries
+                                    ${formatNumber(viewVoucherEntries
                                       .reduce((sum, e) => {
                                         if (e.totalAmount != null) {
                                           return sum + Math.abs(parseFloat(e.totalAmount));
@@ -1550,8 +1550,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         const qty = Math.abs(parseFloat(e.quantity || "0"));
                                         const rate = e.rate != null ? parseFloat(e.rate) : 0;
                                         return sum + (qty * rate);
-                                      }, 0)
-                                      .toFixed(2)}
+                                      }, 0))}
                                   </TableCell>
                                 </>
                               )}

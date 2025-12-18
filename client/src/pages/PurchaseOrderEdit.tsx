@@ -12,11 +12,7 @@ import { ArrowLeft, Loader2, Plus, Trash2, Save, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-// Format number to remove unnecessary .00 and add commas
-const formatCurrency = (num: number) => {
-  return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-};
+import { formatCurrency } from "@/lib/formatNumber";
 
 interface LineItem {
   id?: number;

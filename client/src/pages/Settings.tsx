@@ -59,6 +59,7 @@
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
   import { useCompany } from "@/contexts/CompanyContext";
+  import { formatNumber } from "@/lib/formatNumber";
   
   const userFormSchema = insertUserSchema;
   const companyFormSchema = insertCompanySchema;
@@ -1398,7 +1399,7 @@
                     {initBalancesResult.results?.map((r: any) => (
                       <div key={r.companyId} className="p-3 border rounded-md space-y-2">
                         <div className="font-medium">{r.companyName}</div>
-                        <div className="text-sm">Imbalance: ${r.imbalance?.toFixed(2)}</div>
+                        <div className="text-sm">Imbalance: ${formatNumber(r.imbalance || 0)}</div>
                         <div className="text-sm">{r.message}</div>
                         
                         {r.components && (
@@ -1426,12 +1427,12 @@
                                     {r.components.assets?.map((c: any, i: number) => (
                                       <div key={i} className="flex justify-between">
                                         <span>{c.name}</span>
-                                        <span>${c.value.toFixed(2)}</span>
+                                        <span>${formatNumber(c.value)}</span>
                                       </div>
                                     ))}
                                     <div className="border-t mt-1 pt-1 font-medium flex justify-between">
                                       <span>Total Assets</span>
-                                      <span>${r.components.totalAssets?.toFixed(2)}</span>
+                                      <span>${formatNumber(r.components.totalAssets || 0)}</span>
                                     </div>
                                   </div>
                                   <div>
@@ -1439,17 +1440,17 @@
                                     {r.components.liabilities?.map((c: any, i: number) => (
                                       <div key={i} className="flex justify-between">
                                         <span>{c.name}</span>
-                                        <span>${c.value.toFixed(2)}</span>
+                                        <span>${formatNumber(c.value)}</span>
                                       </div>
                                     ))}
                                     <div className="border-t mt-1 pt-1 font-medium flex justify-between">
                                       <span>Total Liabilities</span>
-                                      <span>${r.components.totalLiabilities?.toFixed(2)}</span>
+                                      <span>${formatNumber(r.components.totalLiabilities || 0)}</span>
                                     </div>
                                   </div>
                                 </div>
                                 <div className="mt-2 p-2 bg-muted rounded text-center font-medium">
-                                  Net Imbalance = ${r.components.totalAssets?.toFixed(2)} - ${r.components.totalLiabilities?.toFixed(2)} = ${r.imbalance?.toFixed(2)}
+                                  Net Imbalance = ${formatNumber(r.components.totalAssets || 0)} - ${formatNumber(r.components.totalLiabilities || 0)} = ${formatNumber(r.imbalance || 0)}
                                 </div>
                               </>
                             )}

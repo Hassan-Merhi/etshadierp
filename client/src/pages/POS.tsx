@@ -13,6 +13,7 @@ import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Uplo
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
+import { formatNumber } from "@/lib/formatNumber";
 import {
   Select,
   SelectContent,
@@ -1186,7 +1187,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                             type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
                             value={
                               col.key === "amount"
-                                ? row.amount.toFixed(2)
+                                ? formatNumber(row.amount)
                                 : col.key === "quantity" || col.key === "rate"
                                   ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
                                   : row[col.key as keyof SaleRow]
@@ -1247,7 +1248,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </div>
               <div className="text-lg font-semibold">Grand Total:</div>
               <div className="text-2xl font-bold font-mono" data-testid="text-grand-total">
-                ${total.toFixed(2)}
+                ${formatNumber(total)}
               </div>
             </div>
           </div>
@@ -1398,7 +1399,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                       <td className="py-1 px-1">{idx + 1}</td>
                       <td className="py-1 px-1">{item.stockItemName}</td>
                       <td className="text-right py-1 px-1">{item.quantity}</td>
-                      <td className="text-right py-1 px-1">${parseFloat(item.rate).toFixed(2)}</td>
+                      <td className="text-right py-1 px-1">${formatNumber(parseFloat(item.rate))}</td>
                       <td className="text-right py-1 px-1">${item.amount}</td>
                     </tr>
                   ))}

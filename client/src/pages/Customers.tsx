@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatNumber } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Plus, Search, Building2, Pencil } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -313,7 +314,7 @@ export default function Customers() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${(customer.balance || 0).toFixed(2)}
+                    ${formatNumber(customer.balance || 0)}
                   </TableCell>
                   <TableCell>{customer.balanceSide || "Dr"}</TableCell>
                   <TableCell>

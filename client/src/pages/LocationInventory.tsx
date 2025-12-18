@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import * as XLSX from "xlsx";
+import { formatNumber } from "@/lib/formatNumber";
 
 interface Location {
   id: number;
@@ -950,8 +951,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 <tr key={index} className="border-b last:border-b-0">
                                   <td className="p-2">{item.Item_barcode}</td>
                                   <td className="p-2 text-right">{parseFloat(item.quantity).toLocaleString()}</td>
-                                  <td className="p-2 text-right">${parseFloat(item.rate).toFixed(2)}</td>
-                                  <td className="p-2 text-right">${parseFloat(item.value).toFixed(2)}</td>
+                                  <td className="p-2 text-right">${formatNumber(parseFloat(item.rate))}</td>
+                                  <td className="p-2 text-right">${formatNumber(parseFloat(item.value))}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1134,7 +1135,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             {!posUser && (
                               <>
                                 <td className="px-3 text-right font-mono" data-testid={`rate-${group.groupId}`}>
-                                  ${group.averageRate.toFixed(2)}
+                                  ${formatNumber(group.averageRate)}
                                 </td>
                                 <td className="px-3 text-right font-mono font-medium" data-testid={`value-${group.groupId}`}>
                                   ${group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1245,10 +1246,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         {!posUser && (
                           <>
                             <td className="px-3 text-right font-mono">
-                              ${parseFloat(item.averageRate).toFixed(2)}
+                              ${formatNumber(parseFloat(item.averageRate))}
                             </td>
                             <td className="px-3 text-right font-mono font-medium">
-                              ${parseFloat(item.totalValue).toFixed(2)}
+                              ${formatNumber(parseFloat(item.totalValue))}
                             </td>
                           </>
                         )}
@@ -1445,10 +1446,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                         {!posUser && (
                                           <>
                                             <td className="px-3 py-2 text-right font-mono">
-                                              ${parseFloat(item.averageRate).toFixed(2)}
+                                              ${formatNumber(parseFloat(item.averageRate))}
                                             </td>
                                             <td className="px-3 py-2 text-right font-mono font-medium">
-                                              ${parseFloat(item.totalValue).toFixed(2)}
+                                              ${formatNumber(parseFloat(item.totalValue))}
                                             </td>
                                           </>
                                         )}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatNumber";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -229,7 +230,7 @@ export function CreateMixBatchDialog({
     const blendedCostPerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
 
     form.setValue("totalPlannedWeight", totalWeight.toFixed(3));
-    form.setValue("totalCost", totalCost.toFixed(2));
+    form.setValue("totalCost", formatNumber(totalCost));
     form.setValue("costPerKg", blendedCostPerKg.toFixed(4));
   };
 
@@ -425,10 +426,10 @@ export function CreateMixBatchDialog({
                           })}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${selection.costPerKg.toFixed(2)}
+                          ${formatNumber(selection.costPerKg)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${selection.totalCost.toFixed(2)}
+                          ${formatNumber(selection.totalCost)}
                         </TableCell>
                         <TableCell>
                           <Button
@@ -458,7 +459,7 @@ export function CreateMixBatchDialog({
               <div>
                 <p className="text-sm text-muted-foreground">Total Cost</p>
                 <p className="text-2xl font-bold font-mono" data-testid="text-total-cost">
-                  ${parseFloat(form.watch("totalCost") || "0").toFixed(2)}
+                  ${formatNumber(parseFloat(form.watch("totalCost") || "0"))}
                 </p>
               </div>
               <div>

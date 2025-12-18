@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatNumber } from "@/lib/formatNumber";
 import { useState } from "react";
 import { format } from "date-fns";
 import { X, Plus } from "lucide-react";
@@ -182,7 +183,7 @@ export default function BaleTransferPage() {
                     <div className="flex-1">
                       <p className="font-semibold" data-testid={`text-selected-code-${bale.id}`}>{bale.baleCode}</p>
                       <p className="text-sm text-gray-600" data-testid={`text-bale-details-${bale.id}`}>
-                        {bale.category} ({bale.grade}) • {Number(bale.weightKg).toFixed(2)} kg
+                        {bale.category} ({bale.grade}) • {formatNumber(Number(bale.weightKg))} kg
                       </p>
                     </div>
                     <Button

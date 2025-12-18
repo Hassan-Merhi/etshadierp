@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, Percent } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
@@ -379,7 +380,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip formatter={(value: number) => value.toFixed(2)} />
+                <Tooltip formatter={(value: number) => formatNumber(value)} />
                 <Line
                   type="monotone"
                   dataKey="sales"
@@ -448,7 +449,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip formatter={(value: number) => value.toFixed(2)} />
+                <Tooltip formatter={(value: number) => formatNumber(value)} />
                 <Bar dataKey="sales" fill="hsl(var(--chart-1))" />
               </BarChart>
             </ResponsiveContainer>

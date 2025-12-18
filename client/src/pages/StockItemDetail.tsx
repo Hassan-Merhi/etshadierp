@@ -8,6 +8,7 @@ import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatNumber } from "@/lib/formatNumber";
 
 interface StockItem {
   id: number;
@@ -188,7 +189,7 @@ export default function StockItemDetail() {
                         <TableRow key={idx}>
                           <TableCell>{purchase.containerNumber || "N/A"}</TableCell>
                           <TableCell className="text-right font-mono">{formatSmartNumber(purchase.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono">${parseFloat(purchase.rate).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(purchase.rate))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -243,8 +244,8 @@ export default function StockItemDetail() {
                           <TableCell>{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
                           <TableCell>{sale.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono">${parseFloat(sale.sellingPrice).toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-mono">${parseFloat(sale.totalSales).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(sale.sellingPrice))}</TableCell>
+                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(sale.totalSales))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -261,7 +262,7 @@ export default function StockItemDetail() {
                     <div className="text-sm">
                       <span className="font-semibold">Total Value: </span>
                       <span className="font-mono">
-                        ${itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.totalSales || "0"), 0).toFixed(2)}
+                        ${formatNumber(itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.totalSales || "0"), 0))}
                       </span>
                     </div>
                   </div>
@@ -303,10 +304,10 @@ export default function StockItemDetail() {
                             {formatSmartNumber(loc.quantity)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(loc.averageRate).toFixed(2)}
+                            ${formatNumber(parseFloat(loc.averageRate))}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(loc.totalValue).toFixed(2)}
+                            ${formatNumber(parseFloat(loc.totalValue))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -324,7 +325,7 @@ export default function StockItemDetail() {
                     <div className="text-sm">
                       <span className="font-semibold">Total Value: </span>
                       <span className="font-mono">
-                        ${itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.totalValue || "0"), 0).toFixed(2)}
+                        ${formatNumber(itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.totalValue || "0"), 0))}
                       </span>
                     </div>
                   </div>

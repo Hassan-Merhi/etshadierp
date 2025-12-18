@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { formatNumber } from "@/lib/formatNumber";
 
 // Type definitions
 interface Account {
@@ -876,18 +877,18 @@ export default function Analytics() {
       ["Financial Ratios Report"],
       [""],
       ["Ratio", "Value"],
-      ["Gross Profit Margin", `${ratiosData.ratios.grossProfitMargin.toFixed(2)}%`],
-      ["Net Profit Margin", `${ratiosData.ratios.netProfitMargin.toFixed(2)}%`],
-      ["Current Ratio", ratiosData.ratios.currentRatio.toFixed(2)],
-      ["Debt to Equity", ratiosData.ratios.debtToEquity.toFixed(2)],
+      ["Gross Profit Margin", `${formatNumber(ratiosData.ratios.grossProfitMargin)}%`],
+      ["Net Profit Margin", `${formatNumber(ratiosData.ratios.netProfitMargin)}%`],
+      ["Current Ratio", formatNumber(ratiosData.ratios.currentRatio)],
+      ["Debt to Equity", formatNumber(ratiosData.ratios.debtToEquity)],
       [""],
       ["Underlying Data", "Amount"],
-      ["Total Income", ratiosData.underlying.totalIncome.toFixed(2)],
-      ["Total Expenses", ratiosData.underlying.totalExpenses.toFixed(2)],
-      ["Net Profit", ratiosData.underlying.netProfit.toFixed(2)],
-      ["Total Assets", ratiosData.underlying.totalAssets.toFixed(2)],
-      ["Total Liabilities", ratiosData.underlying.totalLiabilities.toFixed(2)],
-      ["Total Equity", ratiosData.underlying.totalEquity.toFixed(2)],
+      ["Total Income", formatNumber(ratiosData.underlying.totalIncome)],
+      ["Total Expenses", formatNumber(ratiosData.underlying.totalExpenses)],
+      ["Net Profit", formatNumber(ratiosData.underlying.netProfit)],
+      ["Total Assets", formatNumber(ratiosData.underlying.totalAssets)],
+      ["Total Liabilities", formatNumber(ratiosData.underlying.totalLiabilities)],
+      ["Total Equity", formatNumber(ratiosData.underlying.totalEquity)],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -968,25 +969,25 @@ export default function Analytics() {
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Gross Profit Margin</span>
                     <span className="text-sm font-mono font-medium">
-                      {ratiosData.ratios.grossProfitMargin.toFixed(2)}%
+                      {formatNumber(ratiosData.ratios.grossProfitMargin)}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Net Profit Margin</span>
                     <span className="text-sm font-mono font-medium">
-                      {ratiosData.ratios.netProfitMargin.toFixed(2)}%
+                      {formatNumber(ratiosData.ratios.netProfitMargin)}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Current Ratio</span>
                     <span className="text-sm font-mono font-medium">
-                      {ratiosData.ratios.currentRatio.toFixed(2)}
+                      {formatNumber(ratiosData.ratios.currentRatio)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Debt to Equity</span>
                     <span className="text-sm font-mono font-medium">
-                      {ratiosData.ratios.debtToEquity.toFixed(2)}
+                      {formatNumber(ratiosData.ratios.debtToEquity)}
                     </span>
                   </div>
                 </div>

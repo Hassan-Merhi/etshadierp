@@ -53,6 +53,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, ArrowLeft, Plus, Check, ChevronsUpDown, X, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 import { AccountAutocomplete, CombinedAccount } from "@/components/AccountAutocomplete";
 
 // Types
@@ -492,16 +493,6 @@ function AccountCombobox({
   );
 }
 
-// Helper function to format numbers: removes .00 for whole numbers, keeps decimals otherwise
-function formatNumber(value: number): string {
-  if (Number.isInteger(value)) {
-    return value.toLocaleString();
-  }
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 export default function VoucherEdit() {
   const { formatDisplayDate } = useDateFormat();
@@ -604,7 +595,7 @@ export default function VoucherEdit() {
         id: ledger.id,
         name: ledger.name,
         code: ledger.code,
-        balance: adjustedBalance.toFixed(2),
+        balance: formatNumber(adjustedBalance),
       });
     });
 
@@ -620,7 +611,7 @@ export default function VoucherEdit() {
         id: bank.id,
         name: bank.bankName,
         code: bank.accountNumber,
-        balance: adjustedBalance.toFixed(2),
+        balance: formatNumber(adjustedBalance),
       });
     });
 
@@ -636,7 +627,7 @@ export default function VoucherEdit() {
         id: supplier.id,
         name: supplier.legalName,
         code: supplier.code,
-        balance: adjustedBalance.toFixed(2),
+        balance: formatNumber(adjustedBalance),
       });
     });
 

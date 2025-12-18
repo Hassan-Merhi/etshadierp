@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatNumber } from "@/lib/formatNumber";
 
 interface Account {
   id: string;
@@ -978,7 +979,7 @@ export default function Accounts() {
                             )
                           )}
                           <span className="font-mono font-semibold" data-testid="text-account-balance">
-                            ${Math.abs(closingBalance).toFixed(2)}{" "}
+                            ${formatNumber(Math.abs(closingBalance))}{" "}
                             {selectedAccount?.type === "supplier"
                               ? (closingBalance > 0 ? "Cr" : "Dr")
                               : (closingBalance >= 0 ? "Dr" : "Cr")}
@@ -1173,16 +1174,16 @@ export default function Accounts() {
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {parseBalance(transaction.debitAmount) > 0
-                              ? `$${parseBalance(transaction.debitAmount).toFixed(2)}`
+                              ? `$${formatNumber(parseBalance(transaction.debitAmount))}`
                               : "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {parseBalance(transaction.creditAmount) > 0
-                              ? `$${parseBalance(transaction.creditAmount).toFixed(2)}`
+                              ? `$${formatNumber(parseBalance(transaction.creditAmount))}`
                               : "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
-                            ${Math.abs(transaction.runningBalance).toFixed(2)}
+                            ${formatNumber(Math.abs(transaction.runningBalance))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1190,13 +1191,13 @@ export default function Accounts() {
                         <TableCell colSpan={2}></TableCell>
                         <TableCell className="text-right">Totals</TableCell>
                         <TableCell className="text-right font-mono">
-                          ${transactionTotals.totalDebit.toFixed(2)}
+                          ${formatNumber(transactionTotals.totalDebit)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${transactionTotals.totalCredit.toFixed(2)}
+                          ${formatNumber(transactionTotals.totalCredit)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${Math.abs(closingBalance).toFixed(2)}
+                          ${formatNumber(Math.abs(closingBalance))}
                         </TableCell>
                       </TableRow>
                     </TableBody>

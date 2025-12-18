@@ -1,6 +1,7 @@
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { formatNumber } from "@/lib/formatNumber";
 import {
   ArrowLeft,
   FileText,
@@ -254,7 +255,7 @@ export default function VoucherDetail() {
                               {item.stockItemName}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {item.quantity.toFixed(2)} {item.unit}
+                              {formatNumber(item.quantity)} {item.unit}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatFullNumber(item.rate)}
@@ -272,7 +273,7 @@ export default function VoucherDetail() {
                         <TableRow className="bg-primary/10 font-bold border-t-2">
                           <TableCell></TableCell>
                           <TableCell className="text-right font-mono">
-                            {data.totals.quantity.toFixed(2)} {data.items[0]?.unit || ""}
+                            {formatNumber(data.totals.quantity)} {data.items[0]?.unit || ""}
                           </TableCell>
                           <TableCell></TableCell>
                           <TableCell></TableCell>

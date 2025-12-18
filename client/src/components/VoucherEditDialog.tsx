@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 import type { Voucher } from "@shared/schema";
 
 // Types
@@ -530,8 +531,8 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             <>
                               <td className="py-2 px-2">{itemName || "-"}</td>
                               <td className="py-2 px-2 text-right font-mono">{qty.toFixed(3)}</td>
-                              <td className="py-2 px-2 text-right font-mono">${rate.toFixed(2)}</td>
-                              <td className="py-2 px-2 text-right font-mono">${(qty * rate).toFixed(2)}</td>
+                              <td className="py-2 px-2 text-right font-mono">${formatNumber(rate)}</td>
+                              <td className="py-2 px-2 text-right font-mono">${formatNumber(qty * rate)}</td>
                             </>
                           ) : (
                             <>
@@ -698,7 +699,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             </td>
                             <td className="py-2 px-2"></td>
                             <td className="py-2 px-2 text-right font-mono">
-                              ${fields.reduce((sum, _, index) => {
+                              ${formatNumber(fields.reduce((sum, _, index) => {
                                 const narration = form.watch(`entries.${index}.narration`) || "";
                                 const match = narration.match(/of\s+([-\d.]+)\s+x\s+.+?\s+@\s+\$?([\d.]+)/);
                                 if (match) {
@@ -707,7 +708,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                   return sum + (qty * rate);
                                 }
                                 return sum;
-                              }, 0).toFixed(2)}
+                              }, 0))}
                             </td>
                           </>
                         ) : (
@@ -716,17 +717,17 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
                               <>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-amount">
-                                  ${Math.max(totalDebits, totalCredits).toFixed(2)}
+                                  ${formatNumber(Math.max(totalDebits, totalCredits))}
                                 </td>
                                 <td className="py-2 px-2"></td>
                               </>
                             ) : (
                               <>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-debits">
-                                  ${totalDebits.toFixed(2)}
+                                  ${formatNumber(totalDebits)}
                                 </td>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-credits">
-                                  ${totalCredits.toFixed(2)}
+                                  ${formatNumber(totalCredits)}
                                 </td>
                                 <td colSpan={2} className="py-2 px-2">
                                   {!isBalanced && !isOptional && (

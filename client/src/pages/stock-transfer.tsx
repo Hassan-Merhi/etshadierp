@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -542,7 +543,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                             />
                           </TableCell>
                           <TableCell className="text-right font-mono text-muted-foreground">
-                            {entry.stockItemId > 0 ? entry.availableQty.toFixed(2) : "-"}
+                            {entry.stockItemId > 0 ? formatNumber(entry.availableQty) : "-"}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -574,7 +575,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                     Add Item
                   </Button>
                   <div className="text-sm text-muted-foreground">
-                    Total Qty: <span className="font-mono font-medium">{calculateTotal().toFixed(2)}</span>
+                    Total Qty: <span className="font-mono font-medium">{formatNumber(calculateTotal())}</span>
                   </div>
                 </div>
               </div>
@@ -747,7 +748,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                     <div key={idx} className="flex justify-between text-sm py-1">
                       <span className="font-medium">{item.name}</span>
                       <span className="text-destructive font-mono">
-                        Available: {item.available.toFixed(2)} / Requested: {item.requested.toFixed(2)}
+                        Available: {formatNumber(item.available)} / Requested: {formatNumber(item.requested)}
                       </span>
                     </div>
                   ))}
@@ -806,7 +807,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                         <TableRow key={idx}>
                           <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(item.quantity || "0").toFixed(2)}
+                            {formatNumber(parseFloat(item.quantity || "0"))}
                           </TableCell>
                         </TableRow>
                       ))}

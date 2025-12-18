@@ -24,6 +24,7 @@ import { Edit, Save, X, Package, Plus, Trash2, ExternalLink, BarChart3 } from "l
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
 import type { Location as LocationType } from "@shared/schema";
+import { formatNumber } from "@/lib/formatNumber";
 
 interface StockItemDetailsDialogProps {
   open: boolean;
@@ -676,7 +677,7 @@ export function StockItemDetailsDialog({
                               {price.locationName}
                             </p>
                             <p className="text-sm text-muted-foreground" data-testid={`price-value-${price.id}`}>
-                              {parseFloat(price.sellingPrice).toFixed(2)}
+                              {formatNumber(parseFloat(price.sellingPrice))}
                             </p>
                           </div>
                           <Button

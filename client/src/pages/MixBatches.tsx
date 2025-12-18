@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
+import { formatNumber } from "@/lib/formatNumber";
 import type { MixBatch } from "@shared/schema";
 
 export default function MixBatches() {
@@ -144,7 +145,7 @@ export default function MixBatches() {
                       })}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${parseFloat(batch.costPerKg).toFixed(2)}
+                      ${formatNumber(parseFloat(batch.costPerKg))}
                     </TableCell>
                     <TableCell>
                       <Badge

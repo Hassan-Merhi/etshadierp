@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { formatNumber } from "@/lib/formatNumber";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -1338,7 +1339,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       
       // Only auto-fill if current amount is 0 and there's a positive remaining amount
       if (currentAmount === 0 && remainingToBalance > 0) {
-        journalForm.setValue(`entries.${index}.amount`, remainingToBalance.toFixed(2));
+        journalForm.setValue(`entries.${index}.amount`, formatNumber(remainingToBalance));
       }
     }
     
@@ -1534,7 +1535,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       toast({
         title: "Validation Error",
-        description: `Debits ($${totalDebit.toFixed(2)}) must equal Credits ($${totalCredit.toFixed(2)})`,
+        description: `Debits ($${formatNumber(totalDebit)}) must equal Credits ($${formatNumber(totalCredit)})`,
         variant: "destructive",
       });
       return;
@@ -2112,7 +2113,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             const sourceLocation = locations.find(l => l.id === entry.sourceLocationId);
             return {
               success: false,
-              error: `${item?.name} has only ${availableQty.toFixed(2)} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
+              error: `${item?.name} has only ${formatNumber(availableQty)} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
             };
           }
           return { success: true };
@@ -3203,7 +3204,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </Button>
                           </td>
                           <td className="p-3 text-right text-sm text-muted-foreground">
-                            DR: ${totalDebit.toFixed(2)} | CR: ${totalCredit.toFixed(2)}
+                            DR: ${formatNumber(totalDebit)} | CR: ${formatNumber(totalCredit)}
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono">
@@ -3220,7 +3221,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <td colSpan={4} className="p-3">
                               <div className="text-center text-sm text-destructive">
                                 ⚠️ Debits and Credits must be equal. Difference: $
-                                {Math.abs(totalDebit - totalCredit).toFixed(2)}
+                                {formatNumber(Math.abs(totalDebit - totalCredit))}
                               </div>
                             </td>
                           </tr>
@@ -3847,7 +3848,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   />
                                 </div>
                                 <div className="w-28 border-r h-10 bg-muted/30 flex items-center justify-end px-3 font-mono">
-                                  {(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0")).toFixed(2)}
+                                  {formatNumber(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0"))}
                                 </div>
                               </>
                             )}
@@ -3886,7 +3887,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <>
                           <div className="text-xs font-semibold">Grand Total:</div>
                           <div className="text-sm font-bold font-mono" data-testid="text-transfer-total">
-                            ${transferTotal.toFixed(2)}
+                            ${formatNumber(transferTotal)}
                           </div>
                         </>
                       )}
@@ -4642,7 +4643,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
                             <TableCell className="text-right">
-                              {validation?.currentStock !== undefined ? validation.currentStock.toFixed(2) : "-"}
+                              {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
                             </TableCell>
                             <TableCell>
                               {validation ? (

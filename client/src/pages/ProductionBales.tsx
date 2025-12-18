@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatNumber } from "@/lib/formatNumber";
 import { CreateBaleDialog } from "../components/CreateBaleDialog";
 import type { ProductionBale, BaleProduct, Location } from "@shared/schema";
 
@@ -202,10 +203,10 @@ export default function ProductionBales() {
                       })}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${parseFloat(bale.costPerKg).toFixed(2)}
+                      ${formatNumber(parseFloat(bale.costPerKg))}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      ${parseFloat(bale.totalCost).toFixed(2)}
+                      ${formatNumber(parseFloat(bale.totalCost))}
                     </TableCell>
                     <TableCell>
                       {location ? (

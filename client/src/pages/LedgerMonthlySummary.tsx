@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatNumber";
 import { format, startOfYear, endOfYear, parseISO } from "date-fns";
 import {
   ArrowLeft,
@@ -63,12 +64,12 @@ interface LedgerMonthlySummaryData {
 function formatSmartNumber(value: number): string {
   if (value === 0) return "0.00";
   if (Math.abs(value) >= 1000000) {
-    return (value / 1000000).toFixed(2) + "M";
+    return formatNumber(value / 1000000) + "M";
   }
   if (Math.abs(value) >= 1000) {
-    return (value / 1000).toFixed(2) + "K";
+    return formatNumber(value / 1000) + "K";
   }
-  return value.toFixed(2);
+  return formatNumber(value);
 }
 
 function formatFullNumber(value: number): string {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,7 +70,7 @@ export default function POSImport() {
       setValidationResult(null);
       toast({
         title: "File parsed successfully",
-        description: `Found ${data.items.length} item(s) totaling ${data.totalValue.toFixed(2)}. Click Validate to check the data.`,
+        description: `Found ${data.items.length} item(s) totaling ${formatNumber(data.totalValue)}. Click Validate to check the data.`,
       });
     },
     onError: (error: any) => {
@@ -432,7 +433,7 @@ export default function POSImport() {
           <CardHeader>
             <CardTitle>Preview ({preview.items.length} items)</CardTitle>
             <CardDescription>
-              Total Sales Value: ${preview.totalValue.toFixed(2)}
+              Total Sales Value: ${formatNumber(preview.totalValue)}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -462,9 +463,9 @@ export default function POSImport() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">${item.rate.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">${formatNumber(item.rate)}</TableCell>
                         <TableCell className="text-right font-medium">
-                          ${(item.quantity * item.rate).toFixed(2)}
+                          ${formatNumber(item.quantity * item.rate)}
                         </TableCell>
                         <TableCell>
                           {validation ? (

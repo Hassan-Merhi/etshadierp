@@ -70,6 +70,7 @@ import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon,
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 
 const depositSchema = z.object({
   amount: z.string().min(1, "Amount is required"),
@@ -487,7 +488,7 @@ export default function Payroll() {
       
       payments[worker.id] = {
         workerId: worker.id,
-        amount: netPayment.toFixed(2),
+        amount: formatNumber(netPayment),
         selected: true,
         manuallyEdited: false,
       };
@@ -1290,7 +1291,7 @@ export default function Payroll() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="flex items-center justify-between">
                     <span>
-                      <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {bulkDepositTotal.toFixed(2)}
+                      <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {formatNumber(bulkDepositTotal)}
                     </span>
                     <Button
                       size="sm"
@@ -1381,16 +1382,16 @@ export default function Payroll() {
                             {employee.firstName} {employee.lastName}
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
-                            {parseFloat(employee.monthlySalary).toFixed(2)}
+                            {formatNumber(parseFloat(employee.monthlySalary))}
                           </TableCell>
                           <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono">
-                            {balance.toFixed(2)}
+                            {formatNumber(balance)}
                           </TableCell>
                           <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalDeposits || "0").toFixed(2)}
+                            {formatNumber(parseFloat(employee.totalDeposits || "0"))}
                           </TableCell>
                           <TableCell data-testid={`cell-withdrawals-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {parseFloat(employee.totalWithdrawals || "0").toFixed(2)}
+                            {formatNumber(parseFloat(employee.totalWithdrawals || "0"))}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${employee.id}`}>
                             <Badge variant={employee.active ? "default" : "secondary"}>
@@ -1487,7 +1488,7 @@ export default function Payroll() {
                           <TableCell className="font-mono">{wp.workerCode}</TableCell>
                           <TableCell>{wp.workerName}</TableCell>
                           <TableCell className="text-right font-mono" data-testid={`text-paid-${wp.workerId}`}>
-                            {parseFloat(wp.totalPaid).toFixed(2)}
+                            {formatNumber(parseFloat(wp.totalPaid))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1497,7 +1498,7 @@ export default function Payroll() {
                 <div className="flex items-center justify-between pt-4 border-t">
                   <span className="text-lg font-semibold">Grand Total Paid:</span>
                   <span className="text-lg font-semibold font-mono" data-testid="text-grand-total">
-                    {parseFloat(workerPaymentSummary.grandTotal).toFixed(2)}
+                    {formatNumber(parseFloat(workerPaymentSummary.grandTotal))}
                   </span>
                 </div>
               </div>
@@ -1539,7 +1540,7 @@ export default function Payroll() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {totalAmount.toFixed(2)}
+                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {formatNumber(totalAmount)}
                   </AlertDescription>
                 </Alert>
               )}
@@ -1575,7 +1576,7 @@ export default function Payroll() {
                                 <div>
                                   <h3 className="font-semibold">{group.name}</h3>
                                   <p className="text-sm text-muted-foreground">
-                                    {groupMembers.length} workers - {selectedCount} selected - Total: {groupTotal.toFixed(2)}
+                                    {groupMembers.length} workers - {selectedCount} selected - Total: {formatNumber(groupTotal)}
                                   </p>
                                 </div>
                               </div>
@@ -1669,12 +1670,12 @@ export default function Payroll() {
                                           {worker.firstName} {worker.lastName}
                                         </TableCell>
                                         <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                                          {monthlySalary.toFixed(2)}
+                                          {formatNumber(monthlySalary)}
                                         </TableCell>
                                         <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
                                           {advanceInfo.total > 0 ? (
                                             <span className="text-destructive">
-                                              {advanceInfo.total.toFixed(2)}
+                                              {formatNumber(advanceInfo.total)}
                                               {advanceInfo.count > 0 && (
                                                 <span className="text-xs text-muted-foreground ml-1">
                                                   ({advanceInfo.count})
@@ -1795,12 +1796,12 @@ export default function Payroll() {
                                     {worker.firstName} {worker.lastName}
                                   </TableCell>
                                   <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                                    {monthlySalary.toFixed(2)}
+                                    {formatNumber(monthlySalary)}
                                   </TableCell>
                                   <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
                                     {advanceInfo.total > 0 ? (
                                       <span className="text-destructive">
-                                        {advanceInfo.total.toFixed(2)}
+                                        {formatNumber(advanceInfo.total)}
                                         {advanceInfo.count > 0 && (
                                           <span className="text-xs text-muted-foreground ml-1">
                                             ({advanceInfo.count})
@@ -1969,7 +1970,7 @@ export default function Payroll() {
                                 </TableCell>
                                 <TableCell>{worker.firstName} {worker.lastName}</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {parseFloat(worker.monthlySalary || "0").toFixed(2)}
+                                  {formatNumber(parseFloat(worker.monthlySalary || "0"))}
                                 </TableCell>
                               </TableRow>
                             );
@@ -2012,7 +2013,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Total Advances Given</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
-                          ${workerAdvancesStats.totalAdvances.toFixed(2)}
+                          ${formatNumber(workerAdvancesStats.totalAdvances)}
                         </p>
                       </div>
                       <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -2024,7 +2025,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Outstanding Balance</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
-                          ${workerAdvancesStats.outstandingBalance.toFixed(2)}
+                          ${formatNumber(workerAdvancesStats.outstandingBalance)}
                         </p>
                       </div>
                       <TrendingUp className="h-8 w-8 text-destructive" />
@@ -2087,17 +2088,17 @@ export default function Payroll() {
                                     {worker.firstName} {worker.lastName}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
-                                    {worker.code} • Salary: ${parseFloat(worker.monthlySalary).toFixed(2)}
+                                    {worker.code} • Salary: ${formatNumber(parseFloat(worker.monthlySalary))}
                                   </div>
                                 </div>
                                 {hasAdvances && (
                                   <Badge variant="secondary" className="text-destructive">
-                                    ${advanceInfo.total.toFixed(2)} advance
+                                    ${formatNumber(advanceInfo.total)} advance
                                   </Badge>
                                 )}
                                 {balance !== 0 && (
                                   <Badge variant="secondary">
-                                    Balance: ${balance.toFixed(2)}
+                                    Balance: ${formatNumber(balance)}
                                   </Badge>
                                 )}
                               </div>
@@ -2194,10 +2195,10 @@ export default function Payroll() {
                                   {formatDisplayDate(new Date(advance.advanceDate))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
-                                  ${parseFloat(advance.amount).toFixed(2)}
+                                  ${formatNumber(parseFloat(advance.amount))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-remaining-${advance.id}`} className="text-right font-mono">
-                                  ${parseFloat(advance.remainingBalance).toFixed(2)}
+                                  ${formatNumber(parseFloat(advance.remainingBalance))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-status-${advance.id}`}>
                                   <Badge variant={advance.fullyPaid ? "default" : "secondary"} data-testid={`badge-status-${advance.id}`}>
@@ -2550,7 +2551,7 @@ export default function Payroll() {
           <DialogHeader>
             <DialogTitle>Process Bulk Payment</DialogTitle>
             <DialogDescription>
-              Pay {selectedPayments.length} workers - Total amount: {totalAmount.toFixed(2)}
+              Pay {selectedPayments.length} workers - Total amount: {formatNumber(totalAmount)}
             </DialogDescription>
           </DialogHeader>
 
@@ -2562,13 +2563,13 @@ export default function Payroll() {
                 return (
                   <div key={payment.workerId} className="flex justify-between text-sm">
                     <span>{worker?.firstName} {worker?.lastName} ({worker?.code})</span>
-                    <span className="font-mono">{parseFloat(payment.amount).toFixed(2)}</span>
+                    <span className="font-mono">{formatNumber(parseFloat(payment.amount))}</span>
                   </div>
                 );
               })}
               <div className="pt-2 border-t mt-3 flex justify-between font-semibold">
                 <span>Total</span>
-                <span className="font-mono">{totalAmount.toFixed(2)}</span>
+                <span className="font-mono">{formatNumber(totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -2887,12 +2888,12 @@ export default function Payroll() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Original Amount:</span>
-                <span className="font-mono">${parseFloat(selectedAdvance.amount).toFixed(2)}</span>
+                <span className="font-mono">${formatNumber(parseFloat(selectedAdvance.amount))}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Remaining Balance:</span>
                 <span className="font-mono font-semibold" data-testid="text-deduction-remaining">
-                  ${parseFloat(selectedAdvance.remainingBalance).toFixed(2)}
+                  ${formatNumber(parseFloat(selectedAdvance.remainingBalance))}
                 </span>
               </div>
             </div>
@@ -2918,7 +2919,7 @@ export default function Payroll() {
                     <FormMessage />
                     {selectedAdvance && (
                       <p className="text-sm text-muted-foreground">
-                        Maximum: ${parseFloat(selectedAdvance.remainingBalance).toFixed(2)}
+                        Maximum: ${formatNumber(parseFloat(selectedAdvance.remainingBalance))}
                       </p>
                     )}
                   </FormItem>
@@ -3229,8 +3230,8 @@ export default function Payroll() {
                 <>
                   <span className="font-semibold">{deleteWorkerConflict.employee.firstName} {deleteWorkerConflict.employee.lastName}</span> has a non-zero balance:
                   <div className="mt-2 space-y-1 font-mono text-sm">
-                    <div>Employee Balance: {deleteWorkerConflict.employeeBalance.toFixed(2)}</div>
-                    <div>Ledger Balance: {deleteWorkerConflict.ledgerBalance.toFixed(2)}</div>
+                    <div>Employee Balance: {formatNumber(deleteWorkerConflict.employeeBalance)}</div>
+                    <div>Ledger Balance: {formatNumber(deleteWorkerConflict.ledgerBalance)}</div>
                   </div>
                   <p className="mt-3">
                     Deleting this worker will also delete their linked ledger account. This action cannot be undone.
@@ -3434,8 +3435,8 @@ export default function Payroll() {
                 <>
                   <span className="font-semibold">{deleteConflict.employee.firstName} {deleteConflict.employee.lastName}</span> has a non-zero balance:
                   <div className="mt-2 space-y-1 font-mono text-sm">
-                    <div>Employee Balance: {deleteConflict.employeeBalance.toFixed(2)}</div>
-                    <div>Ledger Balance: {deleteConflict.ledgerBalance.toFixed(2)}</div>
+                    <div>Employee Balance: {formatNumber(deleteConflict.employeeBalance)}</div>
+                    <div>Ledger Balance: {formatNumber(deleteConflict.ledgerBalance)}</div>
                   </div>
                   <p className="mt-3">
                     Deleting this employee will also delete their linked ledger account. This action cannot be undone.
@@ -3607,12 +3608,12 @@ export default function Payroll() {
               {validSelectedEmployees.map((emp) => (
                 <div key={emp.id} className="flex justify-between text-sm">
                   <span>{emp.firstName} {emp.lastName}</span>
-                  <span className="font-mono">{parseFloat(emp.monthlySalary).toFixed(2)}</span>
+                  <span className="font-mono">{formatNumber(parseFloat(emp.monthlySalary))}</span>
                 </div>
               ))}
               <div className="flex justify-between font-semibold pt-2 border-t mt-2">
                 <span>Total</span>
-                <span className="font-mono">{bulkDepositTotal.toFixed(2)}</span>
+                <span className="font-mono">{formatNumber(bulkDepositTotal)}</span>
               </div>
             </div>
 
@@ -3716,7 +3717,7 @@ export default function Payroll() {
                     {employeeStaff.map((emp) => (
                       <TableRow key={emp.id}>
                         <TableCell>{emp.firstName} {emp.lastName}</TableCell>
-                        <TableCell className="text-right font-mono">{parseFloat(emp.calculatedBalance || "0").toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(parseFloat(emp.calculatedBalance || "0"))}</TableCell>
                         <TableCell className="text-right">
                           <Input
                             type="number"
@@ -3743,9 +3744,8 @@ export default function Payroll() {
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Withdrawal: </span>
                 <span className="font-semibold font-mono">
-                  {Object.values(bulkWithdrawalAmounts)
-                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0)
-                    .toFixed(2)}
+                  {formatNumber(Object.values(bulkWithdrawalAmounts)
+                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
                 </span>
                 <span className="text-muted-foreground ml-2">
                   ({Object.values(bulkWithdrawalAmounts).filter(amt => parseFloat(amt) > 0).length} employees)
@@ -3843,9 +3843,8 @@ export default function Payroll() {
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Bonus: </span>
                 <span className="font-semibold font-mono">
-                  {Object.values(bulkBonusAmounts)
-                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0)
-                    .toFixed(2)}
+                  {formatNumber(Object.values(bulkBonusAmounts)
+                    .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
                 </span>
                 <span className="text-muted-foreground ml-2">
                   ({Object.values(bulkBonusAmounts).filter(amt => parseFloat(amt) > 0).length} employees)

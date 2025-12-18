@@ -43,6 +43,7 @@ import {
   insertStockItemSchema,
 } from "@shared/schema";
 import { useCompany } from "@/contexts/CompanyContext";
+import { formatNumber } from "@/lib/formatNumber";
 
 type EntityType =
   | "location"
@@ -839,7 +840,7 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
   // Auto-calculate opening value
   useEffect(() => {
     if (openingQty && openingRate) {
-      const value = (parseFloat(openingQty) * parseFloat(openingRate)).toFixed(2);
+      const value = formatNumber(parseFloat(openingQty) * parseFloat(openingRate));
       form.setValue("openingValue", value);
     }
   }, [openingQty, openingRate]);
