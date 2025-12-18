@@ -409,25 +409,15 @@ export default function PurchaseOrderEdit() {
                             setHighlightedIndex(0);
                             setShowItemSidebar(true);
                           }}
-                          onBlur={() => {
-                            const focusIdAtBlur = focusIdRef.current;
-                            setTimeout(() => {
-                              if (focusIdRef.current === focusIdAtBlur) {
-                                setActiveRow(null);
-                                setSearchTerm("");
-                                setShowItemSidebar(false);
-                              }
-                            }, 200);
-                          }}
                           onKeyDown={(e) => {
                             if (e.key === "ArrowDown") {
-                              e.preventDefault();
                               if (showItemSidebar && filteredStockItems.length > 0) {
+                                e.preventDefault();
                                 setHighlightedIndex(Math.min(filteredStockItems.length - 1, highlightedIndex + 1));
                               }
                             } else if (e.key === "ArrowUp") {
-                              e.preventDefault();
                               if (showItemSidebar && filteredStockItems.length > 0) {
+                                e.preventDefault();
                                 setHighlightedIndex(Math.max(0, highlightedIndex - 1));
                               }
                             } else if (e.key === "Enter") {
@@ -437,8 +427,15 @@ export default function PurchaseOrderEdit() {
                                 handleSelectItem(filteredStockItems[highlightedIndex]);
                               }
                             } else if (e.key === "Tab") {
-                              setShowItemSidebar(false);
-                              setSearchTerm("");
+                              // Move to next row while keeping sidebar open
+                              const nextInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
+                              if (nextInput && !e.shiftKey) {
+                                e.preventDefault();
+                                setActiveRow(index + 1);
+                                setSearchTerm(items[index + 1]?.itemName || "");
+                                setHighlightedIndex(0);
+                                nextInput.focus();
+                              }
                             }
                           }}
                           placeholder="Type to search..."
