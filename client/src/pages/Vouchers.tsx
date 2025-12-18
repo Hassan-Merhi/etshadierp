@@ -1261,6 +1261,40 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     0
   );
 
+  // Journal sidebar state for account selection (like Stock Transfer's item sidebar)
+  const [activeJournalRow, setActiveJournalRow] = useState<number | null>(null);
+  const [showAccountSidebar, setShowAccountSidebar] = useState(false);
+  const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
+  const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
+  const journalSidebarRef = useRef<HTMLDivElement>(null);
+
+  // Filter accounts for journal sidebar
+  const filteredJournalAccounts = useMemo(() => {
+    if (!journalAccountSearchTerm.trim()) return allAccounts;
+    const term = journalAccountSearchTerm.toLowerCase();
+    return allAccounts.filter((acc) =>
+      acc.name.toLowerCase().includes(term) ||
+      acc.code.toLowerCase().includes(term)
+    );
+  }, [allAccounts, journalAccountSearchTerm]);
+
+  // Handle account selection from sidebar
+  const handleJournalAccountSelect = (account: CombinedAccount) => {
+    if (activeJournalRow !== null) {
+      journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
+      journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
+      journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
+      // Focus the amount field after selection
+      setTimeout(() => {
+        const amountInput = document.querySelector(`[data-testid="input-journal-amount-${activeJournalRow}"]`) as HTMLInputElement;
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      }, 50);
+    }
+  };
+
   // Helper function to get account balance from sidebarAccounts
   const getAccountBalance = (accountType: string, accountId: number): number => {
     const account = sidebarAccounts.find(
@@ -2851,15 +2885,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {/* Journal Voucher Tab */}
         {!isPOS && (
           <TabsContent value="journal" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Journal Voucher</CardTitle>
-              </CardHeader>
-              <CardContent>
-              <Form {...journalForm}>
-                <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start justify-end gap-4">
+            <div className="flex gap-4">
+              {/* Left Panel - Form */}
+              <Card className="flex-1">
+                <CardHeader>
+                  <CardTitle>Journal Voucher</CardTitle>
+                </CardHeader>
+                <CardContent>
+                <Form {...journalForm}>
+                  <form onSubmit={journalForm.handleSubmit(onJournalSubmit)} className="space-y-6">
+                    {/* Header section */}
+                    <div className="flex items-start justify-end gap-4">
                     <FormField
                       control={journalForm.control}
                       name="voucherDate"
@@ -2994,68 +3030,71 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     <FormItem>
                                       <FormControl>
                                         <div className="space-y-1">
-                                          <AccountAutocomplete
-                                            value={
-                                              entry?.accountId > 0
-                                                ? {
-                                                    type: entry.accountType,
-                                                    id: entry.accountId,
-                                                    name: entry.accountName,
+                                          <Input
+                                            value={activeJournalRow === index ? journalAccountSearchTerm : (entry?.accountName || "")}
+                                            onChange={(e) => {
+                                              setJournalAccountSearchTerm(e.target.value);
+                                              setJournalAccountHighlightedIndex(0);
+                                            }}
+                                            onFocus={() => {
+                                              setActiveJournalRow(index);
+                                              setShowAccountSidebar(true);
+                                              setJournalAccountSearchTerm(entry?.accountName || "");
+                                            }}
+                                            onBlur={() => {
+                                              setTimeout(() => {
+                                                if (activeJournalRow === index) {
+                                                  setJournalAccountSearchTerm("");
+                                                }
+                                              }, 200);
+                                            }}
+                                            placeholder="Type to search..."
+                                            data-testid={`input-journal-account-${index}`}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Tab" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                  if (amountInput) {
+                                                    amountInput.focus();
+                                                    amountInput.select();
                                                   }
-                                                : null
-                                            }
-                                            onChange={(type, id, name) => {
-                                              journalForm.setValue(`entries.${index}.accountType`, type);
-                                              journalForm.setValue(`entries.${index}.accountId`, id);
-                                              journalForm.setValue(`entries.${index}.accountName`, name);
-                                            }}
-                                            onTabPressed={() => {
-                                              setTimeout(() => {
-                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                if (amountInput) {
-                                                  amountInput.focus();
-                                                  amountInput.select();
-                                                }
-                                              }, 50);
-                                            }}
-                                            onArrowUp={() => {
-                                              if (index > 0) {
-                                                setTimeout(() => {
-                                                  const prevAccountInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
-                                                  if (prevAccountInput) prevAccountInput.focus();
                                                 }, 50);
+                                              } else if (e.key === "ArrowUp" && index > 0) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const prevInput = document.querySelector(`[data-testid="input-journal-account-${index - 1}"]`) as HTMLInputElement;
+                                                  if (prevInput) prevInput.focus();
+                                                }, 50);
+                                              } else if (e.key === "ArrowDown" && index < journalFields.length - 1) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const nextInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
+                                                  if (nextInput) nextInput.focus();
+                                                }, 50);
+                                              } else if (e.key === "ArrowRight") {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
+                                                  if (amountInput) {
+                                                    amountInput.focus();
+                                                    amountInput.select();
+                                                  }
+                                                }, 50);
+                                              } else if (e.key === "ArrowLeft") {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLElement;
+                                                  if (typeInput) typeInput.focus();
+                                                }, 50);
+                                              } else if (e.key === "Enter" && filteredJournalAccounts.length > 0) {
+                                                e.preventDefault();
+                                                const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
+                                                if (selectedAccount) {
+                                                  handleJournalAccountSelect(selectedAccount);
+                                                }
                                               }
                                             }}
-                                            onArrowDown={() => {
-                                              if (index < journalFields.length - 1) {
-                                                setTimeout(() => {
-                                                  const nextAccountInput = document.querySelector(`[data-testid="input-journal-account-${index + 1}"]`) as HTMLInputElement;
-                                                  if (nextAccountInput) nextAccountInput.focus();
-                                                }, 50);
-                                              }
-                                            }}
-                                            onArrowRight={() => {
-                                              setTimeout(() => {
-                                                const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-                                                if (amountInput) {
-                                                  amountInput.focus();
-                                                  amountInput.select();
-                                                }
-                                              }, 50);
-                                            }}
-                                            onArrowLeft={() => {
-                                              setTimeout(() => {
-                                                const typeInput = document.querySelector(`[data-testid="input-journal-type-${index}"]`) as HTMLInputElement;
-                                                if (typeInput) {
-                                                  typeInput.focus();
-                                                }
-                                              }, 50);
-                                            }}
-                                            allAccounts={allAccounts}
-                                            rowIndex={index}
-                                            placeholder="Select account..."
-                                            testId={`input-journal-account-${index}`}
-                                            dropdownPosition="right"
                                           />
                                           {entry?.accountId > 0 && (
                                             <div className="text-xs text-muted-foreground pl-1 flex items-center gap-2">
@@ -3209,20 +3248,93 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     )}
                   />
 
-                  {/* Submit button */}
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={journalMutation.isPending || Math.abs(totalDebit - totalCredit) > 0.01}
-                      data-testid="button-save-journal-voucher"
-                    >
-                      {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
-                    </Button>
-                  </div>
+                    {/* Submit button */}
+                    <div className="flex justify-end">
+                      <Button
+                        type="submit"
+                        disabled={journalMutation.isPending || Math.abs(totalDebit - totalCredit) > 0.01}
+                        data-testid="button-save-journal-voucher"
+                      >
+                        {journalMutation.isPending ? "Saving..." : "Save Journal Voucher"}
+                      </Button>
+                    </div>
                   </form>
                 </Form>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Right Panel - Account Search Sidebar */}
+              {showAccountSidebar && (
+                <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold">Search Accounts</h3>
+                      <button 
+                        onClick={() => setShowAccountSidebar(false)} 
+                        className="text-xs text-muted-foreground hover:text-foreground" 
+                        data-testid="button-close-account-sidebar"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or code..."
+                        value={journalAccountSearchTerm}
+                        onChange={(e) => {
+                          setJournalAccountSearchTerm(e.target.value);
+                          setJournalAccountHighlightedIndex(0);
+                        }}
+                        className="pl-9"
+                        data-testid="input-journal-sidebar-search"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2" ref={journalSidebarRef}>
+                    <div className="space-y-1">
+                      {filteredJournalAccounts.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          No accounts found
+                        </div>
+                      ) : (
+                        filteredJournalAccounts.map((account, idx) => {
+                          const isHighlighted = idx === journalAccountHighlightedIndex && activeJournalRow !== null;
+                          const isSelected = journalEntries[activeJournalRow ?? 0]?.accountId === account.id &&
+                                            journalEntries[activeJournalRow ?? 0]?.accountType === account.type;
+                          const balance = getAccountBalance(account.type, account.id);
+                          
+                          return (
+                            <button
+                              key={`${account.type}-${account.id}`}
+                              type="button"
+                              onClick={() => handleJournalAccountSelect(account)}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-md text-sm hover-elevate active-elevate-2 flex items-center justify-between gap-2",
+                                isHighlighted && "bg-accent",
+                                isSelected && "bg-primary/10"
+                              )}
+                              data-testid={`journal-account-option-${idx}`}
+                            >
+                              <div className="flex-1 truncate">
+                                <div className="font-medium truncate">{account.name}</div>
+                                <div className="text-xs text-muted-foreground">{account.code}</div>
+                              </div>
+                              <div className={cn(
+                                "text-xs font-mono",
+                                balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                              )}>
+                                ${Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
           </TabsContent>
         )}
 
