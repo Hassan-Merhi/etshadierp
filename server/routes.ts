@@ -16858,7 +16858,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, null, 2));
 
       // Round to 2 decimal places to eliminate floating-point noise
-      const roundedBalance = Math.round(netImportCycleBalance * 100) / 100;
+      // If the balance is within ±$5, round to 0 to handle accumulated floating-point precision errors
+      const ROUNDING_THRESHOLD = 5;
+      let roundedBalance = Math.round(netImportCycleBalance * 100) / 100;
+      if (Math.abs(roundedBalance) <= ROUNDING_THRESHOLD) {
+        roundedBalance = 0;
+      }
       
       res.json({
         netImportCycleBalance: roundedBalance,

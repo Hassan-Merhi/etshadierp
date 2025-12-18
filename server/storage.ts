@@ -2066,40 +2066,9 @@ export class DbStorage implements IStorage {
     }
 
     // Office charges voucher entry
-    // NOTE: Office charges are treated as ASSETS (money set aside for later use), NOT expenses
-    // This keeps the import cycle balanced: DR Asset (office charges) = CR Asset (cash)
+    // NOTE: Uses the user-selected office charges account directly (should be an Asset-type account)
+    // This keeps the import cycle balanced: DR Asset (office charges account) = CR Asset (cash)
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
-      // Find or create Office Charges as an ASSET account (not under IMPORT_CHARGES)
-      const findOrCreateOfficeChargesAsset = async () => {
-        let account = await db
-          .select()
-          .from(schema.ledgerAccounts)
-          .where(
-            and(
-              eq(schema.ledgerAccounts.companyId, location.companyId),
-              eq(schema.ledgerAccounts.code, "OFFICE_CHARGES_ASSET"),
-              isNull(schema.ledgerAccounts.deletedAt)
-            )
-          )
-          .limit(1);
-
-        if (!account.length) {
-          const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-            companyId: location.companyId,
-            code: "OFFICE_CHARGES_ASSET",
-            name: "Office Charges (Prepaid)",
-            accountType: "Asset",
-            subType: "Current Asset",
-            openingBalance: "0",
-            openingBalanceSide: "Dr",
-          }).returning();
-          account = [newAccount];
-        }
-
-        return account[0].id;
-      };
-      
-      const officeAssetAccountId = await findOrCreateOfficeChargesAsset();
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
       const [voucher] = await db.insert(schema.vouchers).values({
         companyId: location.companyId,
@@ -2110,10 +2079,10 @@ export class DbStorage implements IStorage {
         totalAmount: officeCharges,
       }).returning();
 
-      // Debit: Office Charges Asset (Asset increases - money set aside)
+      // Debit: User-selected Office Charges Account (should be Asset type to keep import cycle balanced)
       await db.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: officeAssetAccountId,
+        ledgerAccountId: officeChargesAccountId,
         debitAmount: officeCharges,
         creditAmount: "0",
         narration: `Office charges for container ${container.containerNumber}`,
