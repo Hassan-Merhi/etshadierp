@@ -1339,16 +1339,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // Only auto-fill if current amount is 0 and there's a positive remaining amount
       if (currentAmount === 0 && remainingToBalance > 0) {
         journalForm.setValue(`entries.${index}.amount`, remainingToBalance.toFixed(2));
-        // Focus the amount field after setting it
-        setTimeout(() => {
-          const amountInput = document.querySelector(`[data-testid="input-journal-amount-${index}"]`) as HTMLInputElement;
-          if (amountInput) {
-            amountInput.focus();
-            amountInput.select();
-          }
-        }, 50);
       }
     }
+    
+    // Focus the account field after type change
+    setTimeout(() => {
+      const accountInput = document.querySelector(`[data-testid="input-journal-account-${index}"]`) as HTMLInputElement;
+      if (accountInput) {
+        accountInput.focus();
+      }
+    }, 50);
   };
 
   // Pre-populate journal form when editing
@@ -3076,6 +3076,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                                   }, 0);
                                                 } else if (e.key === "Enter") {
                                                   e.preventDefault();
+                                                  e.stopPropagation();
                                                   const selectedAccount = filteredJournalAccounts[journalAccountHighlightedIndex];
                                                   if (selectedAccount) {
                                                     handleJournalAccountSelect(selectedAccount);
