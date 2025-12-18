@@ -293,7 +293,7 @@ export default function Containers() {
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">Total Amount</p>
                       <p className="text-2xl font-semibold font-mono" data-testid="text-total-amount">
-                        ${containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0).toFixed(2)}
+                        ${containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </CardContent>
@@ -326,7 +326,7 @@ export default function Containers() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono">
-                            ${parseFloat(container.grandTotal || "0").toFixed(2)}
+                            ${parseFloat(container.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell className="font-mono">
                             {new Date(container.importDate).toLocaleDateString()}
@@ -406,13 +406,13 @@ export default function Containers() {
                           {new Date(sale.saleDate).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
-                          ${parseFloat(sale.containerCost).toFixed(2)}
+                          ${parseFloat(sale.containerCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${parseFloat(sale.commission || "0").toFixed(2)}
+                          ${parseFloat(sale.commission || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold">
-                          ${parseFloat(sale.totalAmount).toFixed(2)}
+                          ${parseFloat(sale.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right">
                           <Link href={`/containers/${sale.containerId}`}>

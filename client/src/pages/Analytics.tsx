@@ -1534,13 +1534,13 @@ export default function Analytics() {
                           <TableCell>{container.status}</TableCell>
                           <TableCell>{container.importDate}</TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.itemsTotal).toFixed(2)}
+                            ${parseFloat(container.itemsTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.chargesTotal).toFixed(2)}
+                            ${parseFloat(container.chargesTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.grandTotal).toFixed(2)}
+                            ${parseFloat(container.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1549,13 +1549,13 @@ export default function Analytics() {
                       <TableRow>
                         <TableCell colSpan={4}>TOTALS</TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalItemsTotal.toFixed(2)}
+                          ${containerData.summary.totalItemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalChargesTotal.toFixed(2)}
+                          ${containerData.summary.totalChargesTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalGrandTotal.toFixed(2)}
+                          ${containerData.summary.totalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                       </TableRow>
                     </TableBody>
