@@ -18,6 +18,7 @@ import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
+import { formatNumber } from "@/lib/formatNumber";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
 
 // Format number to remove unnecessary .00 and add commas
@@ -549,11 +550,11 @@ export default function ContainerDetail() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Items Total:</span>
-              <span className="font-semibold">${itemsTotal.toFixed(2)}</span>
+              <span className="font-semibold">${formatNumber(itemsTotal)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Charges Total:</span>
-              <span className="font-semibold">${chargesTotal.toFixed(2)}</span>
+              <span className="font-semibold">${formatNumber(chargesTotal)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t">
               <span className="text-lg font-bold">Grand Total:</span>

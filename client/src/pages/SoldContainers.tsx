@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { formatNumber } from "@/lib/formatNumber";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,13 +123,13 @@ export default function SoldContainers() {
                       {new Date(sale.saleDate).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
-                      ${parseFloat(sale.containerCost).toFixed(2)}
+                      ${formatNumber(parseFloat(sale.containerCost))}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-commission-${sale.saleId}`}>
-                      ${parseFloat(sale.commission).toFixed(2)}
+                      ${formatNumber(parseFloat(sale.commission))}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${sale.saleId}`}>
-                      ${parseFloat(sale.totalAmount).toFixed(2)}
+                      ${formatNumber(parseFloat(sale.totalAmount))}
                     </TableCell>
                     <TableCell className="text-right">
                       <Link href={`/containers/${sale.containerId}`}>

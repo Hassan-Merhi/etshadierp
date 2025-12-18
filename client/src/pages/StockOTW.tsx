@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatNumber } from "@/lib/formatNumber";
 import type { Container, Supplier } from "@shared/schema";
 
 interface ContainerDetailData {
@@ -346,7 +347,7 @@ export default function StockOTW() {
                             {Math.round(item.totalQuantity).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${item.totalCost.toFixed(2)}
+                            ${formatNumber(item.totalCost)}
                           </TableCell>
                           <TableCell className="text-sm">
                             {(() => {
@@ -373,7 +374,7 @@ export default function StockOTW() {
                               {Math.round(container.quantity).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              ${container.cost.toFixed(2)}
+                              ${formatNumber(container.cost)}
                             </TableCell>
                             <TableCell className="text-sm">
                               {container.supplierName}
@@ -398,7 +399,7 @@ export default function StockOTW() {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total Value:</span>
                   <span className="ml-2 font-mono font-semibold" data-testid="text-summary-value">
-                    ${totalValue.toFixed(2)}
+                    ${formatNumber(totalValue)}
                   </span>
                 </div>
               </div>

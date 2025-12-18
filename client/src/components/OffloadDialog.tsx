@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/formatNumber";
 import type { Location } from "@shared/schema";
 
 interface OffloadDialogProps {
@@ -543,31 +544,31 @@ export function OffloadDialog({
               {manualCharges > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Manual Charges:</span>
-                  <span className="font-medium">${manualCharges.toFixed(2)}</span>
+                  <span className="font-medium">${formatNumber(manualCharges)}</span>
                 </div>
               )}
               {poChargesTotal > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">PO Charges (Freight, Document Charges, etc.):</span>
-                  <span className="font-medium">${poChargesTotal.toFixed(2)}</span>
+                  <span className="font-medium">${formatNumber(poChargesTotal)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold border-t pt-2">
                 <span className="text-muted-foreground">Total Charges:</span>
                 <span data-testid="text-total-charges">
-                  ${totalCharges.toFixed(2)}
+                  ${formatNumber(totalCharges)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Bales:</span>
                 <span className="font-medium" data-testid="text-total-bales">
-                  {totalBales.toFixed(2)}
+                  {formatNumber(totalBales)}
                 </span>
               </div>
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-muted-foreground">Additional Cost per Bale:</span>
                 <span className="font-semibold" data-testid="text-cost-per-bale">
-                  ${additionalCostPerBale.toFixed(2)}
+                  ${formatNumber(additionalCostPerBale)}
                 </span>
               </div>
             </div>
