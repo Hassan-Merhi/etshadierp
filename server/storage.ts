@@ -1999,21 +1999,48 @@ export class DbStorage implements IStorage {
       return parentAccount.id;
     };
     
-    // Helper function to find or create expense accounts
+    // Helper function to find or create expense accounts under IMPORT_CHARGES parent
     const findOrCreateExpenseAccount = async (code: string, name: string, parentId: number) => {
+      // First, look for an account with the correct parent (under IMPORT_CHARGES)
       let account = await db
         .select()
         .from(schema.ledgerAccounts)
         .where(
           and(
             eq(schema.ledgerAccounts.companyId, location.companyId),
-            eq(schema.ledgerAccounts.code, code)
+            eq(schema.ledgerAccounts.code, code),
+            eq(schema.ledgerAccounts.parentId, parentId)
           )
         )
         .limit(1);
 
       if (!account.length) {
-        // Use accountType: "Direct Expense" so it's included in import cycle's directExpenseBalance
+        // Check if there's an account with this code but wrong parent - if so, update it
+        const [existingWithWrongParent] = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, location.companyId),
+              eq(schema.ledgerAccounts.code, code)
+            )
+          )
+          .limit(1);
+
+        if (existingWithWrongParent) {
+          // Update the existing account to have correct parent and type
+          await db
+            .update(schema.ledgerAccounts)
+            .set({
+              parentId,
+              accountType: "Direct Expense",
+              subType: "Direct Expense",
+            })
+            .where(eq(schema.ledgerAccounts.id, existingWithWrongParent.id));
+          return existingWithWrongParent.id;
+        }
+
+        // Create new account with correct parent
         const [newAccount] = await db.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
           code,
