@@ -3341,7 +3341,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             >
                               <div className="flex-1 truncate">
                                 <div className="font-medium truncate">{account.name}</div>
-                                <div className="text-xs text-muted-foreground">{account.code}</div>
                               </div>
                               <div className={cn(
                                 "text-xs font-mono",
@@ -3983,9 +3982,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium mb-1 truncate">{item.stockItemName}</div>
-                                  <div className="text-xs text-muted-foreground font-mono">
-                                    {item.stockItemCode}
-                                  </div>
                                 </div>
                                 <div className="flex items-center">
                                   <div className={`text-xs font-medium px-2 py-0.5 rounded ${
@@ -4086,7 +4082,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 }}
                               >
                                 <div className="text-sm font-medium">{loc.name}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{loc.code}</div>
                               </button>
                             );
                           });
