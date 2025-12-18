@@ -75,8 +75,10 @@ export default function PurchaseOrderEdit() {
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [sidebarTop, setSidebarTop] = useState(0);
   const focusIdRef = useRef(0);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: stockItems } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
@@ -322,8 +324,8 @@ export default function PurchaseOrderEdit() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-      <Card className="flex-1">
+      <div className="flex gap-4 relative" ref={containerRef}>
+      <Card className={`flex-1 transition-all ${showItemSidebar ? 'mr-[340px]' : ''}`}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>PO Details</span>
@@ -402,12 +404,30 @@ export default function PurchaseOrderEdit() {
                             setSearchTerm(e.target.value);
                             setHighlightedIndex(0);
                           }}
-                          onFocus={() => {
+                          onFocus={(e) => {
                             focusIdRef.current += 1;
                             setActiveRow(index);
                             setSearchTerm(item.itemName || "");
                             setHighlightedIndex(0);
                             setShowItemSidebar(true);
+                            // Calculate sidebar position relative to the row
+                            const row = e.currentTarget.closest('tr');
+                            const container = containerRef.current;
+                            if (row && container) {
+                              const rowRect = row.getBoundingClientRect();
+                              const containerRect = container.getBoundingClientRect();
+                              setSidebarTop(rowRect.top - containerRect.top);
+                            }
+                          }}
+                          onBlur={() => {
+                            const focusIdAtBlur = focusIdRef.current;
+                            setTimeout(() => {
+                              if (focusIdRef.current === focusIdAtBlur) {
+                                setActiveRow(null);
+                                setSearchTerm("");
+                                setShowItemSidebar(false);
+                              }
+                            }, 200);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "ArrowDown") {
@@ -426,15 +446,15 @@ export default function PurchaseOrderEdit() {
                               if (showItemSidebar && filteredStockItems.length > 0) {
                                 handleSelectItem(filteredStockItems[highlightedIndex]);
                               }
-                            } else if (e.key === "Tab") {
-                              // Move to next row while keeping sidebar open
+                            } else if (e.key === "Tab" && !e.shiftKey) {
+                              // Move to next row's item field and reposition sidebar
                               const nextInput = document.querySelector(`[data-testid="input-item-name-${index + 1}"]`) as HTMLInputElement;
-                              if (nextInput && !e.shiftKey) {
+                              if (nextInput) {
                                 e.preventDefault();
-                                setActiveRow(index + 1);
-                                setSearchTerm(items[index + 1]?.itemName || "");
-                                setHighlightedIndex(0);
                                 nextInput.focus();
+                              } else {
+                                setShowItemSidebar(false);
+                                setSearchTerm("");
                               }
                             }
                           }}
@@ -610,7 +630,11 @@ export default function PurchaseOrderEdit() {
 
       {/* Search Items Sidebar */}
       {showItemSidebar && (
-        <Card className="w-80 flex-shrink-0" ref={sidebarRef}>
+        <Card 
+          className="w-80 flex-shrink-0 absolute right-0 z-10" 
+          style={{ top: `${sidebarTop}px` }}
+          ref={sidebarRef}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Search className="h-4 w-4" />
@@ -640,7 +664,7 @@ export default function PurchaseOrderEdit() {
                           handleSelectItem(item);
                         }}
                       >
-                        <div className="text-sm font-medium truncate">
+                        <div className="text-sm font-medium">
                           {item.name}
                         </div>
                       </button>
