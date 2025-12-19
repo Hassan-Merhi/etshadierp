@@ -3507,12 +3507,16 @@ export class DbStorage implements IStorage {
             let newValue: number;
             let newRate: number;
 
-            if (adjustmentType === "Production") {
+            // For Mixed adjustments, check individual item quantity sign
+            // Positive = Production (add), Negative = Consumption (subtract)
+            const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+
+            if (isProduction) {
               // Positive adjustment - add to inventory
               // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
-              newQty = currentQty + quantity;
+              newQty = currentQty + Math.abs(quantity);
               newRate = newQty > 0 
-                ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+                ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
                 : 0;
               newValue = newQty * newRate;
             } else {
@@ -3531,13 +3535,13 @@ export class DbStorage implements IStorage {
                 lastUpdated: new Date(),
               })
               .where(eq(schema.inventory.id, currentInventory.id));
-          } else if (adjustmentType === "Production") {
-            // Create new inventory record for production
+          } else if (quantity > 0 || adjustmentType === "Production") {
+            // Create new inventory record for production (positive quantities)
             await tx.insert(schema.inventory).values({
               companyId: location.companyId,
               locationId,
               stockItemId: item.stockItemId,
-              quantity: item.quantity,
+              quantity: Math.abs(quantity).toFixed(3),
               averageRate: item.rate,
               totalValue: totalAmount.toFixed(2),
               lastUpdated: new Date(),
@@ -3951,9 +3955,12 @@ export class DbStorage implements IStorage {
           let newValue: number;
           let newRate: number;
 
-          if (oldAdjustmentType === "Production") {
+          // For Mixed adjustments, check individual item quantity sign
+          const wasProduction = oldAdjustmentType === "Production" || (oldAdjustmentType === "Mixed" && quantity > 0);
+
+          if (wasProduction) {
             // REVERSE Production: Subtract the quantity that was added
-            newQty = currentQty - quantity;
+            newQty = currentQty - Math.abs(quantity);
             newValue = newQty > 0 ? newQty * currentRate : 0;
             newRate = currentRate;
           } else {
@@ -3975,7 +3982,7 @@ export class DbStorage implements IStorage {
               lastUpdated: new Date(),
             })
             .where(eq(schema.inventory.id, currentInventory.id));
-        } else if (oldAdjustmentType === "Consumption") {
+        } else if (oldAdjustmentType === "Consumption" || (oldAdjustmentType === "Mixed" && quantity < 0)) {
           // If reversing consumption and no inventory exists, create it
           await tx.insert(schema.inventory).values({
             companyId: location.companyId,
@@ -4060,12 +4067,16 @@ export class DbStorage implements IStorage {
           let newValue: number;
           let newRate: number;
 
-          if (adjustmentType === "Production") {
+          // For Mixed adjustments, check individual item quantity sign
+          // Positive = Production (add), Negative = Consumption (subtract)
+          const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+
+          if (isProduction) {
             // Positive adjustment - add to inventory
             // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
-            newQty = currentQty + quantity;
+            newQty = currentQty + Math.abs(quantity);
             newRate = newQty > 0 
-              ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
+              ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
               : 0;
             newValue = newQty * newRate;
           } else {
@@ -4084,13 +4095,13 @@ export class DbStorage implements IStorage {
               lastUpdated: new Date(),
             })
             .where(eq(schema.inventory.id, currentInventory.id));
-        } else if (adjustmentType === "Production") {
-          // Create new inventory record for production
+        } else if (quantity > 0 || adjustmentType === "Production") {
+          // Create new inventory record for production (positive quantities)
           await tx.insert(schema.inventory).values({
             companyId: newLocation.companyId,
             locationId,
             stockItemId: item.stockItemId,
-            quantity: item.quantity,
+            quantity: Math.abs(quantity).toFixed(3),
             averageRate: item.rate,
             totalValue: totalAmount.toFixed(2),
             lastUpdated: new Date(),
