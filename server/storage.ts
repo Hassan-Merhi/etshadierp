@@ -2926,12 +2926,18 @@ export class DbStorage implements IStorage {
           .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
         for (const item of adjustmentItems) {
-          const quantity = Math.abs(parseFloat(item.quantity));
+          const rawQuantity = parseFloat(item.quantity);
+          const quantity = Math.abs(rawQuantity);
           const rate = parseFloat(item.rate);
           
           // For consumption: we subtracted, so we need to ADD back
           // For production: we added, so we need to SUBTRACT back
-          const isConsumption = adjustmentVoucher.adjustmentType === "Consumption";
+          // For Mixed adjustments, check the item's quantity sign:
+          //   - Positive quantity = was production (added), need to subtract back
+          //   - Negative quantity = was consumption (subtracted), need to add back
+          const adjustmentType = adjustmentVoucher.adjustmentType;
+          const isConsumption = adjustmentType === "Consumption" || 
+            (adjustmentType === "Mixed" && rawQuantity < 0);
           const reversedQuantity = isConsumption ? quantity : -quantity;
 
           const [currentInventory] = await db

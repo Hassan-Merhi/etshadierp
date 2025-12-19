@@ -11604,9 +11604,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
 
               for (const item of items) {
-                const quantity = parseFloat(item.quantity);
+                const rawQuantity = parseFloat(item.quantity);
+                const quantity = Math.abs(rawQuantity);
                 const rate = parseFloat(item.rate);
-                const totalAmount = Math.abs(quantity) * rate;
+                const totalAmount = quantity * rate;
+                
+                // For Mixed adjustments, check the item's quantity sign:
+                //   - Positive quantity = production (added)
+                //   - Negative quantity = consumption (subtracted)
+                const adjustmentType = adjustment.adjustmentType;
+                const isProduction = adjustmentType === "Production" || 
+                  (adjustmentType === "Mixed" && rawQuantity > 0);
 
                 const [currentInv] = await tx.select().from(inventory)
                   .where(and(
@@ -11624,7 +11632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   if (willBeOptional) {
                     // Reversing the adjustment
-                    if (adjustment.adjustmentType === "Production") {
+                    if (isProduction) {
                       // Reverse production: subtract what was added
                       newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -11632,15 +11640,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     } else {
                       // Reverse consumption: add back what was subtracted
                       // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
-                      newQty = currentQty + Math.abs(quantity);
+                      newQty = currentQty + quantity;
                       newRate = newQty > 0 
-                        ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+                        ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
                         : 0;
                       newValue = newQty * newRate;
                     }
                   } else {
                     // Applying the adjustment
-                    if (adjustment.adjustmentType === "Production") {
+                    if (isProduction) {
                       // Apply production: add to inventory
                       // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                       newQty = currentQty + quantity;
@@ -11650,7 +11658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       newValue = newQty * newRate;
                     } else {
                       // Apply consumption: subtract from inventory
-                      newQty = currentQty - Math.abs(quantity);
+                      newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
                       newRate = currentRate;
                     }
@@ -11664,7 +11672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       lastUpdated: new Date(),
                     })
                     .where(eq(inventory.id, currentInv.id));
-                } else if (!willBeOptional && adjustment.adjustmentType === "Production") {
+                } else if (!willBeOptional && isProduction) {
                   // Creating new inventory for production when making voucher active
                   const [loc] = await tx.select().from(locations)
                     .where(eq(locations.id, adjustment.locationId));
@@ -11977,9 +11985,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(stockAdjustmentItems.adjustmentId, adjustment.id));
 
               for (const item of items) {
-                const quantity = parseFloat(item.quantity);
+                const rawQuantity = parseFloat(item.quantity);
+                const quantity = Math.abs(rawQuantity);
                 const rate = parseFloat(item.rate);
-                const totalAmount = Math.abs(quantity) * rate;
+                const totalAmount = quantity * rate;
+                
+                // For Mixed adjustments, check the item's quantity sign:
+                //   - Positive quantity = production (added)
+                //   - Negative quantity = consumption (subtracted)
+                const adjustmentType = adjustment.adjustmentType;
+                const isProduction = adjustmentType === "Production" || 
+                  (adjustmentType === "Mixed" && rawQuantity > 0);
 
                 const [currentInv] = await tx.select().from(inventory)
                   .where(and(
@@ -11997,7 +12013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                   if (willBeOptional) {
                     // Reversing the adjustment
-                    if (adjustment.adjustmentType === "Production") {
+                    if (isProduction) {
                       // Reverse production: subtract what was added
                       newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -12005,15 +12021,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     } else {
                       // Reverse consumption: add back what was subtracted
                       // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
-                      newQty = currentQty + Math.abs(quantity);
+                      newQty = currentQty + quantity;
                       newRate = newQty > 0 
-                        ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+                        ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
                         : 0;
                       newValue = newQty * newRate;
                     }
                   } else {
                     // Applying the adjustment
-                    if (adjustment.adjustmentType === "Production") {
+                    if (isProduction) {
                       // Apply production: add to inventory
                       // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
                       newQty = currentQty + quantity;
@@ -12023,7 +12039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       newValue = newQty * newRate;
                     } else {
                       // Apply consumption: subtract from inventory
-                      newQty = currentQty - Math.abs(quantity);
+                      newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
                       newRate = currentRate;
                     }
@@ -12037,7 +12053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       lastUpdated: new Date(),
                     })
                     .where(eq(inventory.id, currentInv.id));
-                } else if (!willBeOptional && adjustment.adjustmentType === "Production") {
+                } else if (!willBeOptional && isProduction) {
                   // Creating new inventory for production when making voucher active
                   const [loc] = await tx.select().from(locations)
                     .where(eq(locations.id, adjustment.locationId));
