@@ -8819,17 +8819,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update line items if provided
       if (req.body.items && Array.isArray(req.body.items)) {
-        // Calculate new items total
+        // Get existing line items to preserve values when only name changes
+        const existingLineItems = await storage.getLineItemsByPO(id);
+        const existingItemsMap = new Map(existingLineItems.map(item => [item.id, item]));
+        
+        // Calculate new items total, preserving existing quantity/rate if not provided
         let itemsTotal = 0;
         const newItems = req.body.items.map((item: any) => {
-          const lineTotal = parseFloat(item.quantity || "0") * parseFloat(item.rate || "0");
+          // Find existing item by id to preserve values
+          const existingItem = item.id ? existingItemsMap.get(item.id) : null;
+          
+          // Use provided values, or fall back to existing values, or default to "0"
+          const quantity = item.quantity?.toString() ?? existingItem?.quantity ?? "0";
+          const rate = item.rate?.toString() ?? existingItem?.rate ?? "0";
+          const lineTotal = parseFloat(quantity) * parseFloat(rate);
           itemsTotal += lineTotal;
+          
           return {
             poId: id,
-            stockItemId: item.stockItemId,
-            itemName: item.itemName,
-            quantity: item.quantity?.toString() || "0",
-            rate: item.rate?.toString() || "0",
+            stockItemId: item.stockItemId ?? existingItem?.stockItemId,
+            itemName: item.itemName ?? existingItem?.itemName,
+            quantity: quantity,
+            rate: rate,
             lineTotal: lineTotal.toFixed(2),
           };
         });

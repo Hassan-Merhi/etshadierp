@@ -268,6 +268,7 @@ export default function PurchaseOrderEdit() {
       currency,
       status,
       items: items.map(item => ({
+        id: item.id,
         stockItemId: item.stockItemId,
         itemName: item.itemName,
         quantity: item.quantity,
