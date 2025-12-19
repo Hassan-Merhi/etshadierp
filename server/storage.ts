@@ -3433,7 +3433,7 @@ export class DbStorage implements IStorage {
   async createStockAdjustment(
     voucherId: number,
     locationId: number,
-    adjustmentType: "Production" | "Consumption",
+    adjustmentType: "Production" | "Consumption" | "Mixed",
     notes: string,
     items: Array<{stockItemId: number, quantity: string, rate: string}>
   ): Promise<any> {

@@ -15742,13 +15742,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (
           adjustmentType !== "Production" &&
-          adjustmentType !== "Consumption"
+          adjustmentType !== "Consumption" &&
+          adjustmentType !== "Mixed"
         ) {
           return res
             .status(400)
             .json({
               message:
-                "Adjustment type must be either 'Production' or 'Consumption'",
+                "Adjustment type must be 'Production', 'Consumption', or 'Mixed'",
             });
         }
         if (!items || !Array.isArray(items) || items.length === 0) {
