@@ -2192,6 +2192,51 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
   });
 
+  // Adjustment sidebar state
+  const [adjustmentSearchTerm, setAdjustmentSearchTerm] = useState("");
+  const [adjustmentHighlightedIndex, setAdjustmentHighlightedIndex] = useState(0);
+  const [activeAdjustmentRow, setActiveAdjustmentRow] = useState<number | null>(null);
+  const [showAdjustmentSidebar, setShowAdjustmentSidebar] = useState(false);
+  const adjustmentFocusIdRef = useRef(0);
+  const adjustmentSidebarRef = useRef<HTMLDivElement>(null);
+
+  // Create combined list of all stock items with their location quantities
+  const adjustmentItemsWithInventory = useMemo(() => {
+    if (!stockItems.length) return [];
+    
+    return stockItems.map(item => {
+      const inventoryItem = locationInventory.find((inv: any) => inv.stockItemId === item.id);
+      return {
+        stockItemId: item.id,
+        stockItemCode: item.code,
+        stockItemName: item.name,
+        quantity: inventoryItem?.quantity || "0",
+        averageRate: inventoryItem?.averageRate || "0",
+      };
+    }).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
+  }, [stockItems, locationInventory]);
+
+  // Filtered adjustment items based on search
+  const filteredAdjustmentItems = useMemo(() => {
+    if (!adjustmentSearchTerm.trim()) return adjustmentItemsWithInventory;
+    const term = adjustmentSearchTerm.toLowerCase();
+    return adjustmentItemsWithInventory.filter(item =>
+      item.stockItemName?.toLowerCase().includes(term) ||
+      item.stockItemCode?.toLowerCase().includes(term)
+    );
+  }, [adjustmentItemsWithInventory, adjustmentSearchTerm]);
+
+  // Scroll highlighted adjustment item into view
+  useEffect(() => {
+    if (showAdjustmentSidebar && adjustmentSidebarRef.current) {
+      const container = adjustmentSidebarRef.current;
+      const highlightedItem = container.querySelector(`[data-adjustment-idx="${adjustmentHighlightedIndex}"]`);
+      if (highlightedItem) {
+        highlightedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [adjustmentHighlightedIndex, showAdjustmentSidebar]);
+
   // Pre-populate stock adjustment form when editing
   useEffect(() => {
     if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && stockItems.length > 0) {
@@ -4217,189 +4262,390 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     />
                   </div>
 
-                  {/* UNIFIED PRODUCTION/CONSUMPTION TABLE */}
-                  <div className="border rounded-md overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="text-left p-3 font-medium w-[120px]">Type</th>
-                          <th className="text-left p-3 font-medium">Stock Item</th>
-                          <th className="text-left p-3 font-medium w-[100px]">Quantity</th>
-                          <th className="text-left p-3 font-medium w-[100px]">Rate</th>
-                          <th className="text-left p-3 font-medium w-[120px]">Total</th>
-                          <th className="w-[50px]"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {adjustmentFields.map((field, index) => (
-                          <tr key={field.id} className="border-t">
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.type`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <Select
-                                      value={field.value}
-                                      onValueChange={field.onChange}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger 
-                                          data-testid={`select-adjustment-type-${index}`}
-                                          onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "type")}
-                                        >
-                                          <SelectValue placeholder="Select..." />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="CONSUME">Consume</SelectItem>
-                                        <SelectItem value="PRODUCE">Produce</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.stockItemId`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <StockItemCombobox
-                                        value={
-                                          adjustmentEntries[index]?.stockItemId > 0
-                                            ? {
-                                                id: adjustmentEntries[index].stockItemId,
-                                                name: adjustmentEntries[index].stockItemName,
-                                              }
-                                            : null
-                                        }
-                                        onChange={(id, name) => {
-                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, id);
-                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, name);
-                                          
-                                          // Auto-fill rate from location inventory
-                                          const inventoryItem = locationInventory.find((inv: any) => inv.stockItemId === id);
-                                          if (inventoryItem && inventoryItem.averageRate !== undefined && inventoryItem.averageRate !== null) {
-                                            stockAdjustmentForm.setValue(`entries.${index}.rate`, inventoryItem.averageRate);
-                                          }
-                                        }}
-                                        stockItems={stockItems}
-                                        rowIndex={index}
-                                        testIdPrefix="button-adjustment-stock"
-                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "stockItem")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.quantity`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.001"
-                                        placeholder="0.000"
-                                        className="font-mono"
-                                        data-testid={`input-adjustment-quantity-${index}`}
-                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "quantity")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <FormField
-                                control={stockAdjustmentForm.control}
-                                name={`entries.${index}.rate`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        data-testid={`input-adjustment-rate-${index}`}
-                                        onKeyDown={(e) => handleAdjustmentKeyDown(e, index, "rate")}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="p-2">
-                              <div className="text-right font-mono">
-                                ${(parseFloat(adjustmentEntries[index]?.quantity || "0") * parseFloat(adjustmentEntries[index]?.rate || "0")).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}
-                              </div>
-                            </td>
-                            <td className="p-2">
-                              {adjustmentFields.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeAdjustment(index)}
-                                  data-testid={`button-remove-adjustment-${index}`}
-                                >
-                                  ×
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-muted/30 border-t-2">
-                        <tr>
-                          <td colSpan={4} className="p-3">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                appendAdjustment({
-                                  type: "CONSUME",
-                                  stockItemId: 0,
-                                  stockItemName: "",
-                                  quantity: "",
-                                  rate: "",
-                                })
-                              }
-                              data-testid="button-add-adjustment-row"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Row
-                            </Button>
-                          </td>
-                          <td className="p-3">
-                            <div className="text-right font-bold font-mono">
-                              ${(consumptionTotal + productionTotal).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                  {/* UNIFIED PRODUCTION/CONSUMPTION TABLE WITH SIDEBAR */}
+                  <div className="flex gap-4">
+                    {/* Main Spreadsheet Area */}
+                    <Card className="flex-1 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <div className="min-w-full">
+                          {/* Header */}
+                          <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+                            <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                              #
                             </div>
-                          </td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                              Type
+                            </div>
+                            <div className="flex-1 min-w-[200px] flex items-center px-3 border-r h-10 font-medium text-sm">
+                              Item Name
+                            </div>
+                            <div className="w-20 flex items-center px-3 border-r h-10 font-medium text-sm text-muted-foreground">
+                              Avail
+                            </div>
+                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                              Qty
+                            </div>
+                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                              Rate
+                            </div>
+                            <div className="w-28 flex items-center px-3 border-r h-10 font-medium text-sm bg-muted/30">
+                              Amount
+                            </div>
+                            <div className="w-12 flex items-center justify-center h-10" />
+                          </div>
+
+                          {/* Rows */}
+                          <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
+                            {adjustmentFields.map((field, index) => {
+                              const currentEntry = adjustmentEntries[index];
+                              const inventoryItem = adjustmentItemsWithInventory.find(
+                                item => item.stockItemId === currentEntry?.stockItemId
+                              );
+                              const availableQty = inventoryItem?.quantity || "0";
+                              
+                              return (
+                                <div key={field.id} className="flex border-b hover-elevate">
+                                  <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                                    {index + 1}
+                                  </div>
+                                  {/* Type column - accepts p/c keyboard shortcuts */}
+                                  <div className="w-24 border-r h-10">
+                                    <input
+                                      type="text"
+                                      value={currentEntry?.type === "PRODUCE" ? "Produce" : currentEntry?.type === "CONSUME" ? "Consume" : ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value.toLowerCase();
+                                        if (val.startsWith('p')) {
+                                          stockAdjustmentForm.setValue(`entries.${index}.type`, "PRODUCE");
+                                        } else if (val.startsWith('c')) {
+                                          stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME");
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'p' || e.key === 'P') {
+                                          e.preventDefault();
+                                          stockAdjustmentForm.setValue(`entries.${index}.type`, "PRODUCE");
+                                        } else if (e.key === 'c' || e.key === 'C') {
+                                          e.preventDefault();
+                                          stockAdjustmentForm.setValue(`entries.${index}.type`, "CONSUME");
+                                        } else if (e.key === "Tab" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          const itemInput = document.querySelector(`[data-testid="input-adjustment-item-${index}"]`) as HTMLInputElement;
+                                          if (itemInput) { itemInput.focus(); itemInput.select(); }
+                                        } else if (e.key === "ArrowDown") {
+                                          e.preventDefault();
+                                          const nextInput = document.querySelector(`[data-testid="input-adjustment-type-${index + 1}"]`) as HTMLInputElement;
+                                          if (nextInput) nextInput.focus();
+                                        } else if (e.key === "ArrowUp" && index > 0) {
+                                          e.preventDefault();
+                                          const prevInput = document.querySelector(`[data-testid="input-adjustment-type-${index - 1}"]`) as HTMLInputElement;
+                                          if (prevInput) prevInput.focus();
+                                        }
+                                      }}
+                                      placeholder="p/c"
+                                      className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 text-sm"
+                                      data-testid={`input-adjustment-type-${index}`}
+                                    />
+                                  </div>
+                                  {/* Item Name column - triggers sidebar */}
+                                  <div className="flex-1 min-w-[200px] border-r h-10">
+                                    <input
+                                      type="text"
+                                      value={activeAdjustmentRow === index ? adjustmentSearchTerm : (currentEntry?.stockItemName || "")}
+                                      onChange={(e) => {
+                                        setAdjustmentSearchTerm(e.target.value);
+                                        setAdjustmentHighlightedIndex(0);
+                                        if (!e.target.value) {
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, 0);
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, "");
+                                        }
+                                      }}
+                                      onFocus={() => {
+                                        adjustmentFocusIdRef.current += 1;
+                                        setActiveAdjustmentRow(index);
+                                        setAdjustmentSearchTerm(currentEntry?.stockItemName || "");
+                                        setAdjustmentHighlightedIndex(0);
+                                        setShowAdjustmentSidebar(true);
+                                      }}
+                                      onBlur={() => {
+                                        const focusIdAtBlur = adjustmentFocusIdRef.current;
+                                        setTimeout(() => {
+                                          if (adjustmentFocusIdRef.current === focusIdAtBlur) {
+                                            setActiveAdjustmentRow(null);
+                                            setAdjustmentSearchTerm("");
+                                            setShowAdjustmentSidebar(false);
+                                          }
+                                        }, 200);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "ArrowUp" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          if (showAdjustmentSidebar && filteredAdjustmentItems.length > 0) {
+                                            setAdjustmentHighlightedIndex(Math.max(0, adjustmentHighlightedIndex - 1));
+                                          } else if (index > 0) {
+                                            const prevInput = document.querySelector(`[data-testid="input-adjustment-item-${index - 1}"]`) as HTMLInputElement;
+                                            if (prevInput) prevInput.focus();
+                                          }
+                                        } else if (e.key === "ArrowDown" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          if (showAdjustmentSidebar && filteredAdjustmentItems.length > 0) {
+                                            setAdjustmentHighlightedIndex(Math.min(filteredAdjustmentItems.length - 1, adjustmentHighlightedIndex + 1));
+                                          } else if (index < adjustmentFields.length - 1) {
+                                            const nextInput = document.querySelector(`[data-testid="input-adjustment-item-${index + 1}"]`) as HTMLInputElement;
+                                            if (nextInput) nextInput.focus();
+                                          }
+                                        } else if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          if (showAdjustmentSidebar && filteredAdjustmentItems.length > 0) {
+                                            const item = filteredAdjustmentItems[adjustmentHighlightedIndex];
+                                            if (item) {
+                                              stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
+                                              stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, item.stockItemName);
+                                              stockAdjustmentForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
+                                              setAdjustmentSearchTerm("");
+                                              setShowAdjustmentSidebar(false);
+                                              setTimeout(() => {
+                                                const qtyInput = document.querySelector(`[data-testid="input-adjustment-qty-${index}"]`) as HTMLInputElement;
+                                                if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                              }, 50);
+                                            }
+                                          }
+                                        } else if (e.key === "Tab" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          setShowAdjustmentSidebar(false);
+                                          const qtyInput = document.querySelector(`[data-testid="input-adjustment-qty-${index}"]`) as HTMLInputElement;
+                                          if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                        }
+                                      }}
+                                      placeholder="Type to search..."
+                                      className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
+                                      data-testid={`input-adjustment-item-${index}`}
+                                    />
+                                  </div>
+                                  {/* Available Qty column */}
+                                  <div className="w-20 border-r h-10 bg-muted/20 flex items-center justify-end px-3 font-mono text-sm text-muted-foreground">
+                                    {formatNumber(parseFloat(availableQty))}
+                                  </div>
+                                  {/* Quantity column */}
+                                  <div className="w-24 border-r h-10">
+                                    <input
+                                      type="number"
+                                      step="0.001"
+                                      value={currentEntry?.quantity || ""}
+                                      onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Tab" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          const rateInput = document.querySelector(`[data-testid="input-adjustment-rate-${index}"]`) as HTMLInputElement;
+                                          if (rateInput) { rateInput.focus(); rateInput.select(); }
+                                        } else if (e.key === "ArrowDown") {
+                                          e.preventDefault();
+                                          const nextInput = document.querySelector(`[data-testid="input-adjustment-qty-${index + 1}"]`) as HTMLInputElement;
+                                          if (nextInput) nextInput.focus();
+                                        } else if (e.key === "ArrowUp" && index > 0) {
+                                          e.preventDefault();
+                                          const prevInput = document.querySelector(`[data-testid="input-adjustment-qty-${index - 1}"]`) as HTMLInputElement;
+                                          if (prevInput) prevInput.focus();
+                                        }
+                                      }}
+                                      placeholder="0"
+                                      className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
+                                      data-testid={`input-adjustment-qty-${index}`}
+                                    />
+                                  </div>
+                                  {/* Rate column - Enter creates new row */}
+                                  <div className="w-24 border-r h-10">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={currentEntry?.rate || ""}
+                                      onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.rate`, e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          if (index === adjustmentFields.length - 1) {
+                                            appendAdjustment({
+                                              type: "CONSUME",
+                                              stockItemId: 0,
+                                              stockItemName: "",
+                                              quantity: "",
+                                              rate: "",
+                                            });
+                                            setTimeout(() => {
+                                              const newInput = document.querySelector(`[data-testid="input-adjustment-type-${index + 1}"]`) as HTMLInputElement;
+                                              if (newInput) newInput.focus();
+                                            }, 100);
+                                          }
+                                        } else if (e.key === "ArrowDown") {
+                                          e.preventDefault();
+                                          const nextInput = document.querySelector(`[data-testid="input-adjustment-rate-${index + 1}"]`) as HTMLInputElement;
+                                          if (nextInput) nextInput.focus();
+                                        } else if (e.key === "ArrowUp" && index > 0) {
+                                          e.preventDefault();
+                                          const prevInput = document.querySelector(`[data-testid="input-adjustment-rate-${index - 1}"]`) as HTMLInputElement;
+                                          if (prevInput) prevInput.focus();
+                                        }
+                                      }}
+                                      placeholder="0"
+                                      className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 font-mono text-right"
+                                      data-testid={`input-adjustment-rate-${index}`}
+                                    />
+                                  </div>
+                                  {/* Amount column */}
+                                  <div className="w-28 border-r h-10 bg-muted/30 flex items-center justify-end px-3 font-mono">
+                                    {formatNumber(parseFloat(currentEntry?.quantity || "0") * parseFloat(currentEntry?.rate || "0"))}
+                                  </div>
+                                  {/* Delete button */}
+                                  <div className="w-12 flex items-center justify-center h-10">
+                                    {adjustmentFields.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeAdjustment(index)}
+                                        className="h-8 w-8"
+                                        data-testid={`button-remove-adjustment-${index}`}
+                                      >
+                                        <X className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Total Section */}
+                      <div className="border-t bg-muted/20 p-4">
+                        <div className="flex justify-between items-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              appendAdjustment({
+                                type: "CONSUME",
+                                stockItemId: 0,
+                                stockItemName: "",
+                                quantity: "",
+                                rate: "",
+                              })
+                            }
+                            data-testid="button-add-adjustment-row"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Row
+                          </Button>
+                          <div className="flex items-center gap-8">
+                            <div className="text-xs text-muted-foreground">Consume:</div>
+                            <div className="text-xs font-mono font-medium text-destructive">
+                              ${formatNumber(consumptionTotal)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Produce:</div>
+                            <div className="text-xs font-mono font-medium text-green-600">
+                              ${formatNumber(productionTotal)}
+                            </div>
+                            <div className="text-sm font-semibold">Total:</div>
+                            <div className="text-sm font-bold font-mono" data-testid="text-adjustment-total">
+                              ${formatNumber(consumptionTotal + productionTotal)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Right Panel - Item Search Sidebar */}
+                    {showAdjustmentSidebar && (
+                      <Card className="w-80 flex flex-col sticky top-4 max-h-[calc(100vh-12rem)] self-start">
+                        <div className="p-4 border-b">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-semibold">Search Items</h3>
+                            <button 
+                              onClick={() => setShowAdjustmentSidebar(false)} 
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                              data-testid="button-close-adjustment-sidebar"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          {adjustmentLocationId > 0 && (
+                            <p className="text-xs text-muted-foreground mb-3">
+                              {locations.find(l => l.id === adjustmentLocationId)?.name}
+                            </p>
+                          )}
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search by name or code..."
+                              value={adjustmentSearchTerm}
+                              onChange={(e) => {
+                                setAdjustmentSearchTerm(e.target.value);
+                                setAdjustmentHighlightedIndex(0);
+                              }}
+                              className="pl-9"
+                              data-testid="input-adjustment-sidebar-search"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2" ref={adjustmentSidebarRef}>
+                          <div className="space-y-1">
+                            {filteredAdjustmentItems.length === 0 ? (
+                              <div className="text-center py-8 text-sm text-muted-foreground">
+                                {adjustmentLocationId > 0 ? "No items found" : "Select a location first"}
+                              </div>
+                            ) : (
+                              filteredAdjustmentItems.map((item, idx) => {
+                                const stock = parseFloat(item.quantity || "0");
+                                const isHighlighted = idx === adjustmentHighlightedIndex && activeAdjustmentRow !== null;
+                                
+                                return (
+                                  <button
+                                    key={item.stockItemId}
+                                    type="button"
+                                    data-adjustment-idx={idx}
+                                    className={`w-full text-left px-3 py-3 rounded-md hover-elevate active-elevate-2 ${
+                                      stock === 0 ? "opacity-60" : ""
+                                    } ${isHighlighted ? "bg-accent" : ""}`}
+                                    data-testid={`button-adjustment-suggest-item-${item.stockItemId}`}
+                                    onClick={() => {
+                                      if (activeAdjustmentRow !== null) {
+                                        stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.stockItemId`, item.stockItemId);
+                                        stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.stockItemName`, item.stockItemName);
+                                        stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.rate`, item.averageRate || "0");
+                                        setAdjustmentSearchTerm("");
+                                        setShowAdjustmentSidebar(false);
+                                        
+                                        setTimeout(() => {
+                                          const qtyInput = document.querySelector(`[data-testid="input-adjustment-qty-${activeAdjustmentRow}"]`) as HTMLInputElement;
+                                          if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+                                        }, 50);
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-sm truncate">{item.stockItemName}</div>
+                                        <div className="text-xs text-muted-foreground">{item.stockItemCode}</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className={`text-sm font-mono ${stock > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                          {formatNumber(stock)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          @{formatNumber(parseFloat(item.averageRate || "0"))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
                   </div>
 
                   {/* Notes field */}
