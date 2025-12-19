@@ -8827,7 +8827,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let itemsTotal = 0;
         const newItems = req.body.items.map((item: any) => {
           // Find existing item by id to preserve values
-          const existingItem = item.id ? existingItemsMap.get(item.id) : null;
+          // Convert item.id to number for consistent Map lookup (request may send string or number)
+          const itemIdNum = item.id ? Number(item.id) : null;
+          const existingItem = itemIdNum ? existingItemsMap.get(itemIdNum) : null;
           
           // Use provided values, or fall back to existing values, or default to "0"
           const quantity = item.quantity?.toString() ?? existingItem?.quantity ?? "0";
