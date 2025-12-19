@@ -2156,7 +2156,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     defaultValues: {
       voucherDate: new Date(),
       locationId: 0,
-      entries: [],
+      entries: [
+        {
+          type: "CONSUME",
+          stockItemId: 0,
+          stockItemName: "",
+          quantity: "",
+          rate: "",
+        }
+      ],
       notes: "",
       optional: false,
     },
@@ -4426,7 +4434,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   <div className="w-20 border-r h-10 bg-muted/20 flex items-center justify-end px-3 font-mono text-sm text-muted-foreground">
                                     {formatNumber(parseFloat(availableQty))}
                                   </div>
-                                  {/* Quantity column */}
+                                  {/* Quantity column - Enter goes to Rate */}
                                   <div className="w-24 border-r h-10">
                                     <input
                                       type="number"
@@ -4434,7 +4442,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       value={currentEntry?.quantity || ""}
                                       onChange={(e) => stockAdjustmentForm.setValue(`entries.${index}.quantity`, e.target.value)}
                                       onKeyDown={(e) => {
-                                        if (e.key === "Tab" && !e.shiftKey) {
+                                        if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
                                           e.preventDefault();
                                           const rateInput = document.querySelector(`[data-testid="input-adjustment-rate-${index}"]`) as HTMLInputElement;
                                           if (rateInput) { rateInput.focus(); rateInput.select(); }
@@ -4453,7 +4461,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       data-testid={`input-adjustment-qty-${index}`}
                                     />
                                   </div>
-                                  {/* Rate column - Enter creates new row */}
+                                  {/* Rate column - Enter creates new row or goes to next row */}
                                   <div className="w-24 border-r h-10">
                                     <input
                                       type="number"
@@ -4475,6 +4483,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                               const newInput = document.querySelector(`[data-testid="input-adjustment-type-${index + 1}"]`) as HTMLInputElement;
                                               if (newInput) newInput.focus();
                                             }, 100);
+                                          } else {
+                                            const nextTypeInput = document.querySelector(`[data-testid="input-adjustment-type-${index + 1}"]`) as HTMLInputElement;
+                                            if (nextTypeInput) nextTypeInput.focus();
                                           }
                                         } else if (e.key === "ArrowDown") {
                                           e.preventDefault();
@@ -4538,7 +4549,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             <Plus className="h-4 w-4 mr-2" />
                             Add Row
                           </Button>
-                          <div className="flex items-center gap-8">
+                          <div className="flex items-center gap-6">
+                            <div className="text-xs text-muted-foreground">Total Qty:</div>
+                            <div className="text-xs font-mono font-medium">
+                              {formatNumber(adjustmentEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0))}
+                            </div>
                             <div className="text-xs text-muted-foreground">Consume:</div>
                             <div className="text-xs font-mono font-medium text-destructive">
                               ${formatNumber(consumptionTotal)}

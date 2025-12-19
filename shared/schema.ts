@@ -836,7 +836,7 @@ export const updateStockAdjustmentItemSchema = z.object({
 
 export const updateStockAdjustmentSchema = z.object({
   locationId: z.coerce.number().int().positive("Location must be a positive integer"),
-  adjustmentType: z.enum(["Production", "Consumption"]),
+  adjustmentType: z.enum(["Production", "Consumption", "Mixed"]),
   notes: z.string().optional(),
   items: z.array(updateStockAdjustmentItemSchema).min(1, "At least one item is required"),
 });
