@@ -2912,8 +2912,8 @@ export class DbStorage implements IStorage {
       }
     }
 
-    if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Stock Adjustment") {
-      // Reverse stock adjustments (Production/Consumption/Stock Adjustment)
+    if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed" || voucher.voucherType === "Stock Adjustment") {
+      // Reverse stock adjustments (Production/Consumption/Mixed/Stock Adjustment)
       const [adjustmentVoucher] = await db
         .select()
         .from(schema.stockAdjustmentVouchers)
