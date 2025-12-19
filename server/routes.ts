@@ -8823,6 +8823,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingLineItems = await storage.getLineItemsByPO(id);
         const existingItemsMap = new Map(existingLineItems.map(item => [item.id, item]));
         
+        console.log('[PO PATCH] Existing line items:', existingLineItems.map(i => ({ id: i.id, qty: i.quantity, rate: i.rate })));
+        console.log('[PO PATCH] Request items:', req.body.items.map((i: any) => ({ id: i.id, qty: i.quantity, rate: i.rate })));
+        
         // Calculate new items total, preserving existing quantity/rate if not provided
         let itemsTotal = 0;
         const newItems = req.body.items.map((item: any) => {
@@ -8831,9 +8834,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const itemIdNum = item.id ? Number(item.id) : null;
           const existingItem = itemIdNum ? existingItemsMap.get(itemIdNum) : null;
           
+          console.log(`[PO PATCH] Item id=${item.id}, itemIdNum=${itemIdNum}, foundExisting=${!!existingItem}`);
+          
           // Use provided values, or fall back to existing values, or default to "0"
-          const quantity = item.quantity?.toString() ?? existingItem?.quantity ?? "0";
-          const rate = item.rate?.toString() ?? existingItem?.rate ?? "0";
+          // Also handle empty string as missing value
+          const hasQuantity = item.quantity !== undefined && item.quantity !== null && item.quantity !== "";
+          const hasRate = item.rate !== undefined && item.rate !== null && item.rate !== "";
+          const quantity = hasQuantity ? item.quantity.toString() : (existingItem?.quantity ?? "0");
+          const rate = hasRate ? item.rate.toString() : (existingItem?.rate ?? "0");
+          
+          console.log(`[PO PATCH] Item result: qty=${quantity}, rate=${rate}`);
           const lineTotal = parseFloat(quantity) * parseFloat(rate);
           itemsTotal += lineTotal;
           
