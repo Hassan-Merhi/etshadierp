@@ -42,6 +42,7 @@ interface Location {
   city: string | null;
   state: string | null;
   country: string | null;
+  createdAt?: string;
 }
 
 interface InventoryItem {
@@ -201,8 +202,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   });
 
-  // Sort locations alphabetically (A-Z) by name
-  const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
+  // Sort locations chronologically (by creation order - ID)
+  const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
 
   // Filter locations by search term
   const filteredLocations = sortedLocations.filter((location) =>
@@ -222,11 +223,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
-  // Filter stock items by search term
-  const filteredStockItems = selectedGroup?.items.filter((item) =>
-    (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-    (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
-  ) || [];
+  // Filter and sort stock items chronologically (by creation order - ID)
+  const filteredStockItems = (selectedGroup?.items || [])
+    .sort((a, b) => a.stockItemId - b.stockItemId)
+    .filter((item) =>
+      (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+      (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
+    );
 
   // Handle location selection
   const handleLocationClick = (location: Location) => {
