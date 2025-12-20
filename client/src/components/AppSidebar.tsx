@@ -50,7 +50,7 @@ const menuItems = [
   },
   {
     title: "Point of Sale",
-    url: "/po-import",
+    url: "/pos",
     icon: ShoppingCart,
   },
   {

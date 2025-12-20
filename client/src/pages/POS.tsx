@@ -543,10 +543,48 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   });
 
   // Conditional renders after all hooks are called
-  // Redirect to Location Inventory if no location is available (only for non-POS users)
-  // Skip redirect if in edit mode, as we can load and edit without location selection
+  // Show location selector if no location is available (only for non-POS users)
+  // Skip if in edit mode, as we can load and edit without location selection
   if (!activeLocation && !posUser && !editVoucherId) {
-    return <Redirect to="/location-inventory" />;
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Point of Sale</h1>
+          <p className="text-muted-foreground">Select a location to begin</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl">
+          {allLocations.map((location) => (
+            <Card 
+              key={location.id} 
+              className="cursor-pointer hover-elevate"
+              onClick={() => setSelectedLocation(location)}
+              data-testid={`card-location-${location.id}`}
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">{location.name}</h3>
+                    <p className="text-sm text-muted-foreground">{location.code}</p>
+                  </div>
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                </div>
+                {location.city && <p className="text-sm text-muted-foreground mb-2">{location.city}</p>}
+                <Button 
+                  className="w-full gap-2 mt-4"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedLocation(location);
+                  }}
+                  data-testid={`button-use-location-${location.id}`}
+                >
+                  Use Location
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   // Show loading state while fetching POS user's location
