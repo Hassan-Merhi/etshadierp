@@ -11690,11 +11690,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const stockItem = await storage.getStockItemById(
                 item.stockItemId,
               );
+              
+              // Get configured price from stockItemLocationPrices
+              let configuredPrice = "0";
+              if (voucher.locationId) {
+                const [locationPrice] = await db
+                  .select()
+                  .from(stockItemLocationPrices)
+                  .where(
+                    and(
+                      eq(stockItemLocationPrices.stockItemId, item.stockItemId),
+                      eq(stockItemLocationPrices.locationId, voucher.locationId)
+                    )
+                  )
+                  .limit(1);
+                if (locationPrice) {
+                  configuredPrice = locationPrice.sellingPrice || "0";
+                }
+              }
+              
+              const qty = parseFloat(item.quantity || "0");
+              const configuredPriceNum = parseFloat(configuredPrice);
+              const actualPrice = parseFloat(item.sellingPrice || "0");
+              const costPrice = parseFloat(item.costPrice || "0");
+              
+              // Hassan's Profit = (Actual Selling Price - Configured Price) * Qty
+              const hassansProfit = (actualPrice - configuredPriceNum) * qty;
+              // Hassan's Total = Configured Price * Qty
+              const hassansTotal = configuredPriceNum * qty;
+              // Hassan's % = (Hassan's Profit / Hassan's Total) * 100
+              const hassansPercentage = hassansTotal > 0 ? (hassansProfit / hassansTotal) * 100 : 0;
+              
               return {
                 ...item,
                 stockItemCode: stockItem?.code || "",
                 stockItemName: stockItem?.name || "",
                 stockItemUom: stockItem?.uom || "",
+                configuredPrice,
+                hassansProfit: hassansProfit.toFixed(2),
+                hassansTotal: hassansTotal.toFixed(2),
+                hassansPercentage: hassansPercentage.toFixed(1),
               };
             }),
           );
