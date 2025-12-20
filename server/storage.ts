@@ -553,8 +553,12 @@ export class DbStorage implements IStorage {
     // Delete container sales
     await db.delete(schema.containerSales).where(eq(schema.containerSales.companyId, id));
     
-    // Delete inter-company transfers
-    await db.delete(schema.interCompanyTransfers).where(or(eq(schema.interCompanyTransfers.fromCompanyId, id), eq(schema.interCompanyTransfers.toCompanyId, id)));
+    // Delete inter-company transfers (ignore if table doesn't exist)
+    try {
+      await db.delete(schema.interCompanyTransfers).where(or(eq(schema.interCompanyTransfers.fromCompanyId, id), eq(schema.interCompanyTransfers.toCompanyId, id)));
+    } catch (e: any) {
+      if (!e.message?.includes('does not exist')) throw e;
+    }
     
     // Delete bank accounts
     await db.delete(schema.bankAccounts).where(eq(schema.bankAccounts.companyId, id));
