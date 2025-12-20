@@ -3832,11 +3832,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
 
-          // If no ledger account, just return opening balance
+          // If no ledger account, check customer_balances table for balance from credit sales
+          const customerBalance = await storage.getCustomerBalance(customer.id, req.session.currentCompanyId!);
+          const openingBalance = parseFloat(customer.openingBalance || "0");
+          const openingSide = customer.openingBalanceSide || "Dr";
+          
+          // Combine opening balance with transactions from customer_balances table
+          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBalance;
+          
           return {
             ...customer,
-            balance: parseFloat(customer.openingBalance || "0"),
-            balanceSide: customer.openingBalanceSide || "Dr",
+            balance: Math.abs(totalBalance),
+            balanceSide: totalBalance >= 0 ? "Dr" : "Cr",
           };
         })
       );
