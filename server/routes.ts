@@ -16761,6 +16761,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + parseFloat(item.totalAmount || "0");
       }, 0);
 
+      // 12d. Mixed Voucher Balance - NET value of mixed production/consumption
+      // Mixed vouchers add inventory but don't have accounting entries to balance them
+      // We need to subtract their NET value from assets to keep import cycle balanced
+      const mixedVoucherData = await db
+        .select({
+          totalAmount: stockAdjustmentItems.totalAmount,
+          quantity: stockAdjustmentItems.quantity,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            // Only Mixed vouchers
+            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed'`
+          )
+        );
+
+      const mixedVoucherBalance = mixedVoucherData.reduce((sum, item) => {
+        const qty = parseFloat(item.quantity || "0");
+        const totalAmount = parseFloat(item.totalAmount || "0");
+        // For mixed: positive qty = production (positive), negative qty = consumption (negative)
+        // Use quantity sign to determine direction
+        const signedAmount = qty >= 0 ? totalAmount : -totalAmount;
+        return sum + signedAmount;
+      }, 0);
+
       // 13. Payroll Expenses - get from Expense accounts related to salaries
       // Uses a single optimized query with aggregation instead of N+1 pattern
       const payrollExpenseAccounts = await db
@@ -16893,7 +16923,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         indirectExpenseBalance +    // Expense (debit) - operating expenses
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
-        salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
+        salaryAdvancesBalance -     // Salary Advances (asset) - recoverable from employees
+        mixedVoucherBalance) -      // Mixed Voucher Adjustment - nets out the value added by mixed vouchers
         (supplierBalance +          // Liability (what we owe to suppliers)
         dutyAgentBalance +          // Liability (what we owe to duty agents)
         transporterAgentBalance +   // Liability (what we owe to transporters)
@@ -16920,6 +16951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cogsBalance,
           consumptionBalance,
           productionBalance,
+          mixedVoucherBalance,
         },
         liabilities: {
           supplierBalance,
@@ -16964,6 +16996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cogsBalance,
           consumptionBalance,
           productionBalance,
+          mixedVoucherBalance,
           payrollExpenseBalance,
           salaryAdvancesBalance,
           payrollLiabilitiesBalance,
