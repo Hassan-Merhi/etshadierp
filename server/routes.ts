@@ -14132,8 +14132,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption) vouchers
-          if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption") && !voucher.optional) {
+          // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption/Mixed) vouchers
+          if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") && !voucher.optional) {
             // Get the stock adjustment record
             const [adjustmentVoucher] = await tx
               .select()
@@ -14151,10 +14151,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Reverse each item's inventory movement
               // Production forward logic: adds qty with weighted average
               // Consumption forward logic: subtracts qty, keeps rate
+              // Mixed: depends on the individual item qty sign
               for (const item of adjustmentItemsList) {
                 const qty = parseFloat(item.quantity);
                 const adjustmentRate = parseFloat(item.rate);
-                const adjustmentValue = qty * adjustmentRate;
+                const absoluteQty = Math.abs(qty);
+                const adjustmentValue = absoluteQty * adjustmentRate;
+
+                // Determine if this item was production or consumption
+                // For pure Production: all items are positive
+                // For pure Consumption: all items are negative or absolutely valued
+                // For Mixed: check the individual qty sign
+                const isProduction = adjustmentVoucher.adjustmentType === "Production" || 
+                                     (adjustmentVoucher.adjustmentType === "Mixed" && qty > 0);
 
                 const [inv] = await tx
                   .select()
@@ -14167,12 +14176,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   )
                   .limit(1);
 
-                if (adjustmentVoucher.adjustmentType === "Production") {
+                if (isProduction) {
                   // Production added inventory with weighted average, so reverse it
                   if (inv) {
                     const existingQty = parseFloat(inv.quantity);
                     const existingValue = parseFloat(inv.totalValue || "0");
-                    const newQty = existingQty - qty;
+                    const newQty = existingQty - absoluteQty;
 
                     if (newQty <= 0) {
                       await tx.delete(inventory).where(eq(inventory.id, inv.id));
@@ -14197,7 +14206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   if (inv) {
                     const existingQty = parseFloat(inv.quantity);
                     const existingRate = parseFloat(inv.averageRate || "0");
-                    const newQty = existingQty + Math.abs(qty);
+                    const newQty = existingQty + absoluteQty;
                     // Keep the same rate - consumption didn't change it
                     const newValue = newQty * existingRate;
 
@@ -14214,9 +14223,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       companyId: req.session.currentCompanyId!,
                       locationId: adjustmentVoucher.locationId,
                       stockItemId: item.stockItemId,
-                      quantity: qty.toString(),
+                      quantity: absoluteQty.toString(),
                       averageRate: adjustmentRate.toString(),
-                      totalValue: (qty * adjustmentRate).toString(),
+                      totalValue: (absoluteQty * adjustmentRate).toString(),
                     });
                   }
                 }
