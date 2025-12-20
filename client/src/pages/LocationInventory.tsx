@@ -202,19 +202,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   });
 
-  // Sort locations chronologically (by creation order - ID)
-  const sortedLocations = [...locations].sort((a, b) => a.id - b.id);
+  // Sort locations alphabetically (A-Z) by name
+  const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
 
   // Filter locations by search term
   const filteredLocations = sortedLocations.filter((location) =>
     (location.name ?? "").toLowerCase().includes(locationSearchTerm.toLowerCase())
   );
 
-  // Sort stock groups chronologically (by id, nulls last)
+  // Sort stock groups alphabetically (A-Z) by name, nulls/Uncategorized last
   const sortedStockGroups = [...stockGroups].sort((a, b) => {
     if (a.groupId === null) return 1;
     if (b.groupId === null) return -1;
-    return a.groupId - b.groupId;
+    return a.groupName.localeCompare(b.groupName);
   });
 
   // Filter stock groups by search term
@@ -223,9 +223,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     (group.groupCode ?? "").toLowerCase().includes(groupSearchTerm.toLowerCase())
   );
 
-  // Filter and sort stock items chronologically (by creation order - ID)
+  // Filter and sort stock items alphabetically (A-Z) by name
   const filteredStockItems = (selectedGroup?.items || [])
-    .sort((a, b) => a.stockItemId - b.stockItemId)
+    .sort((a, b) => (a.stockItemName ?? "").localeCompare(b.stockItemName ?? ""))
     .filter((item) =>
       (item.stockItemName ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
       (item.stockItemCode ?? "").toLowerCase().includes(itemSearchTerm.toLowerCase())
