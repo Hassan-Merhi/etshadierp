@@ -16667,6 +16667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 11. Stock Value on Floor (inventory in locations)
       // Only include inventory at valid, non-deleted locations (excludes orphaned inventory)
       // Calculate from quantity * averageRate to ensure accuracy (totalValue can get out of sync)
+      // NOTE: Exclude the value impact of Mixed vouchers since their production/consumption net to 0
       const inventoryItems = await db
         .select({
           quantity: inventory.quantity,
@@ -16686,6 +16687,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const rate = parseFloat(item.averageRate || "0");
         return sum + (qty * rate);
       }, 0);
+
+      // Calculate net value of mixed vouchers to subtract from stock on floor
+      // Mixed vouchers have both production and consumption that should net to 0 in import cycle
+      const mixedVoucherData = await db
+        .select({
+          totalAmount: stockAdjustmentItems.totalAmount,
+          quantity: stockAdjustmentItems.quantity,
+          adjustmentType: stockAdjustmentVouchers.adjustmentType,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false),
+            // Only Mixed vouchers
+            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed'`
+          )
+        );
+
+      const mixedVoucherValue = mixedVoucherData.reduce((sum, item) => {
+        const qty = parseFloat(item.quantity || "0");
+        // For mixed: positive = production (adds to value), negative = consumption (subtracts from value)
+        // Net them out: the absolute net value is what should be excluded
+        const totalAmount = parseFloat(item.totalAmount || "0");
+        return sum + totalAmount;
+      }, 0);
+
+      // Adjust stock on floor to exclude mixed vouchers' net impact
+      const adjustedStockOnFloorValue = stockOnFloorValue - mixedVoucherValue;
 
       // 12. Cost of Goods Sold (calculated from salesItems for non-optional, non-deleted sales vouchers)
       // This represents inventory that was sold and is now an expense
@@ -16886,7 +16919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
         bankBalance +               // Asset (debit) - bank balances
-        stockOnFloorValue +         // Asset - inventory at cost (includes production/consumption effects)
+        adjustedStockOnFloorValue + // Asset - inventory at cost (excludes mixed voucher net effects)
         assetBalance +              // Asset accounts (properties, guarantees, receivables)
         directExpenseBalance +      // Expense (debit) - not capitalized into inventory
         indirectExpenseBalance +    // Expense (debit) - operating expenses
@@ -16959,7 +16992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           incomeBalance,
           liabilityBalance,
           profitBalance,
-          stockOnFloorValue,
+          stockOnFloorValue: adjustedStockOnFloorValue,
           cogsBalance,
           consumptionBalance,
           productionBalance,
