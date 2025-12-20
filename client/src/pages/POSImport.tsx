@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,11 @@ interface LedgerAccount {
   accountType: string;
 }
 
+interface Customer {
+  id: number;
+  legalName: string;
+}
+
 export default function POSImport() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
@@ -42,6 +48,8 @@ export default function POSImport() {
   const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [isCreditSale, setIsCreditSale] = useState(false);
   const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
 
@@ -51,6 +59,11 @@ export default function POSImport() {
 
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts"],
+  });
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers"],
+    enabled: isCreditSale,
   });
 
   const parseMutation = useMutation({
@@ -135,6 +148,30 @@ export default function POSImport() {
     },
   });
 
+  const creditImportMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/credit-sales-import/import", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Credit Sale Import successful",
+        description: `${data.itemsCount} items imported. Total: $${data.totalSales} to ${data.customerName}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      navigate("/vouchers");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Credit Import error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -169,10 +206,19 @@ export default function POSImport() {
       return;
     }
 
-    if (!selectedCashAccount) {
+    if (!isCreditSale && !selectedCashAccount) {
       toast({
         title: "Cash account required",
         description: "Please select a cash account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isCreditSale && !selectedCustomer) {
+      toast({
+        title: "Customer required",
+        description: "Please select a customer for credit sale",
         variant: "destructive",
       });
       return;
@@ -195,12 +241,21 @@ export default function POSImport() {
   };
 
   const doImport = () => {
-    importMutation.mutate({
-      locationId: parseInt(selectedLocation),
-      cashAccountId: parseInt(selectedCashAccount),
-      saleDate,
-      items: validationResult.validatedItems,
-    });
+    if (isCreditSale) {
+      creditImportMutation.mutate({
+        locationId: parseInt(selectedLocation),
+        customerId: parseInt(selectedCustomer),
+        saleDate,
+        items: validationResult.validatedItems,
+      });
+    } else {
+      importMutation.mutate({
+        locationId: parseInt(selectedLocation),
+        cashAccountId: parseInt(selectedCashAccount),
+        saleDate,
+        items: validationResult.validatedItems,
+      });
+    }
   };
 
   const handleImport = () => {
@@ -213,10 +268,19 @@ export default function POSImport() {
       return;
     }
 
-    if (!selectedCashAccount) {
+    if (!isCreditSale && !selectedCashAccount) {
       toast({
         title: "Cash account required",
         description: "Please select a cash account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isCreditSale && !selectedCustomer) {
+      toast({
+        title: "Customer required",
+        description: "Please select a customer for credit sale",
         variant: "destructive",
       });
       return;
@@ -287,11 +351,11 @@ export default function POSImport() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <ShoppingCart className="h-8 w-8" />
-            POS Import
+            {isCreditSale ? <CreditCard className="h-8 w-8" /> : <ShoppingCart className="h-8 w-8" />}
+            {isCreditSale ? "Credit Sales Import" : "POS Import"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Import sales transactions from Excel (Barcode, Quantity, Selling Rate)
+            Import {isCreditSale ? "credit" : "cash"} sales transactions from Excel (Barcode, Quantity, Selling Rate)
           </p>
         </div>
         <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
@@ -308,6 +372,31 @@ export default function POSImport() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="creditSale"
+                checked={isCreditSale}
+                onCheckedChange={(checked) => {
+                  setIsCreditSale(checked);
+                  setSelectedCashAccount("");
+                  setSelectedCustomer("");
+                  setValidationResult(null);
+                }}
+                data-testid="switch-credit-sale"
+              />
+              <Label htmlFor="creditSale" className="cursor-pointer">
+                Credit Sale
+              </Label>
+            </div>
+            {isCreditSale && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <CreditCard className="h-4 w-4" />
+                Sale will be recorded as receivable from customer
+              </span>
+            )}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="file">Excel File</Label>
@@ -354,23 +443,41 @@ export default function POSImport() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cashAccount">Cash Account</Label>
-              <Select value={selectedCashAccount} onValueChange={setSelectedCashAccount}>
-                <SelectTrigger id="cashAccount" data-testid="select-cash-account">
-                  <SelectValue placeholder="Select cash account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts
-                    .filter((account) => account.accountType === "Cash")
-                    .map((account) => (
-                      <SelectItem key={account.id} value={account.id.toString()}>
-                        {account.name}
+            {isCreditSale ? (
+              <div className="space-y-2">
+                <Label htmlFor="customer">Customer</Label>
+                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <SelectTrigger id="customer" data-testid="select-customer">
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
+                        {customer.legalName}
                       </SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="cashAccount">Cash Account</Label>
+                <Select value={selectedCashAccount} onValueChange={setSelectedCashAccount}>
+                  <SelectTrigger id="cashAccount" data-testid="select-cash-account">
+                    <SelectValue placeholder="Select cash account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ledgerAccounts
+                      .filter((account) => account.accountType === "Cash")
+                      .map((account) => (
+                        <SelectItem key={account.id} value={account.id.toString()}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2">
@@ -385,7 +492,7 @@ export default function POSImport() {
 
             <Button
               onClick={handleValidate}
-              disabled={!preview || !selectedLocation || !selectedCashAccount || validateMutation.isPending}
+              disabled={!preview || !selectedLocation || (!isCreditSale && !selectedCashAccount) || (isCreditSale && !selectedCustomer) || validateMutation.isPending}
               variant="outline"
               data-testid="button-validate"
             >
@@ -401,11 +508,11 @@ export default function POSImport() {
 
             <Button
               onClick={handleImport}
-              disabled={!isValidated || hasValidationErrors || importMutation.isPending}
+              disabled={!isValidated || hasValidationErrors || importMutation.isPending || creditImportMutation.isPending}
               data-testid="button-import"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {importMutation.isPending ? "Importing..." : "Import"}
+              {importMutation.isPending || creditImportMutation.isPending ? "Importing..." : "Import"}
             </Button>
           </div>
         </CardContent>

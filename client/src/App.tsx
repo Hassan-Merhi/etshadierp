@@ -66,7 +66,6 @@ import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
 import TestDataImport from "@/pages/TestDataImport";
-import CreditSalesImport from "@/pages/CreditSalesImport";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -107,7 +106,6 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-otw" component={StockOTW} />
       <Route path="/po-import" component={POImport} />
       <Route path="/pos-import" component={POSImport} />
-      <Route path="/credit-sales-import" component={CreditSalesImport} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/suppliers" component={Suppliers} />

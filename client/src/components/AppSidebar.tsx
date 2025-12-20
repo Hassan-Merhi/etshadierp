@@ -25,7 +25,6 @@ import {
   Factory,
   Grid3X3,
   FlaskConical,
-  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -139,11 +138,6 @@ const menuItems = [
     title: "Sales Report",
     url: "/sales-report",
     icon: PieChart,
-  },
-  {
-    title: "Credit Sales Import",
-    url: "/credit-sales-import",
-    icon: CreditCard,
   },
   {
     title: "Settings",
