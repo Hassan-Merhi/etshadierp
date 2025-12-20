@@ -75,6 +75,7 @@ import {
   stockItemCodeAliases,
   users,
   chatMessages,
+  customerBalances,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
@@ -7078,6 +7079,437 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader(
         "Content-Disposition",
         "attachment; filename=POS_Import_Template.xlsx",
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Template generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============= Credit Sales Import Endpoints =============
+
+  // Credit Sales Import - Parse and Preview Excel (same as POS but for credit sales)
+  app.post(
+    "/api/credit-sales-import/parse",
+    requireAuth,
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.session.currentCompanyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (rawData.length === 0) {
+          return res.status(400).json({ message: "Excel file is empty" });
+        }
+
+        const rows = rawData as any[];
+        const items: any[] = [];
+        let totalValue = 0;
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+
+          const barcode = row.Barcode || row.barcode || row.Code || row.code;
+          const quantity = parseFloat(
+            row.Quantity || row.quantity || row.Qty || row.qty || "0",
+          );
+          const rate = parseFloat(
+            row.Rate || row.rate || row.Price || row.price || "0",
+          );
+
+          if (!barcode) {
+            continue;
+          }
+
+          if (quantity <= 0 || rate <= 0) {
+            continue;
+          }
+
+          const itemValue = quantity * rate;
+          totalValue += itemValue;
+
+          items.push({
+            rowNum,
+            barcode: barcode.toString().trim(),
+            quantity,
+            rate,
+            value: itemValue,
+          });
+        }
+
+        res.json({
+          items,
+          totalValue,
+          fileName: req.file.originalname,
+        });
+      } catch (error: any) {
+        console.error("Credit Sales Import parse error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
+  // Credit Sales Import - Validate data before import
+  app.post("/api/credit-sales-import/validate", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { locationId, items } = req.body;
+
+      if (!locationId || !items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      const validatedItems: any[] = [];
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        errors.push("Selected location not found");
+        return res.json({ errors, warnings, validatedItems });
+      }
+
+      for (const item of items) {
+        const validatedItem: any = { ...item };
+
+        let stockItem = await storage.getStockItemByCodeOrAlias(
+          item.barcode,
+          req.session.currentCompanyId!,
+        );
+
+        if (!stockItem) {
+          validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
+          errors.push(
+            `Row ${item.rowNum}: Barcode '${item.barcode}' not found`,
+          );
+        } else {
+          validatedItem.stockItemId = stockItem.id;
+          validatedItem.stockItemName = stockItem.name;
+          validatedItem.stockItemUom = stockItem.uom;
+
+          const inventoryItem = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, locationId),
+              ),
+            )
+            .limit(1);
+
+          if (inventoryItem.length > 0) {
+            validatedItem.costPrice = parseFloat(
+              inventoryItem[0].averageRate || "0",
+            );
+            const currentQty = parseFloat(inventoryItem[0].quantity || "0");
+            const saleQty = parseFloat(item.quantity);
+            const remainingQty = currentQty - saleQty;
+            
+            validatedItem.currentStock = currentQty;
+            validatedItem.remainingStock = remainingQty;
+
+            if (remainingQty < 0) {
+              validatedItem.warning = `Stock will go negative (${remainingQty.toFixed(2)} ${stockItem.uom})`;
+              warnings.push(
+                `${stockItem.name}: Stock will go negative (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)}, Remaining: ${remainingQty.toFixed(2)} ${stockItem.uom})`
+              );
+            } else if (remainingQty === 0) {
+              validatedItem.warning = `Stock will reach zero`;
+              warnings.push(
+                `${stockItem.name}: Stock will reach zero (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)} ${stockItem.uom})`
+              );
+            }
+          } else {
+            validatedItem.currentStock = 0;
+            validatedItem.remainingStock = -parseFloat(item.quantity);
+            validatedItem.warning = `No stock at this location, will go negative`;
+            warnings.push(
+              `${stockItem.name}: No stock at this location (Selling: ${item.quantity} ${stockItem.uom})`
+            );
+          }
+        }
+
+        validatedItems.push(validatedItem);
+      }
+
+      res.json({
+        errors,
+        warnings,
+        validatedItems,
+      });
+    } catch (error: any) {
+      console.error("Credit Sales Import validation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Credit Sales Import - Import credit sales transactions
+  app.post("/api/credit-sales-import/import", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { locationId, saleDate, items, customerId } = req.body;
+
+      if (!locationId || !saleDate || !items || !Array.isArray(items) || !customerId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(400).json({ message: "Location not found" });
+      }
+
+      const customer = await storage.getCustomerById(customerId);
+      if (!customer || customer.companyId !== req.session.currentCompanyId) {
+        return res.status(400).json({ message: "Invalid customer" });
+      }
+
+      let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
+      if (!salesRevenueAccount) {
+        salesRevenueAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "SALES_REV",
+          name: "Sales Revenue",
+          accountType: "Income",
+          subType: "Direct Income",
+          openingBalance: "0",
+          openingBalanceSide: "Cr",
+          active: true,
+        });
+      }
+
+      let accountsReceivable = await storage.getLedgerAccountByCode("ACCTS_RECV", req.session.currentCompanyId!);
+      if (!accountsReceivable) {
+        accountsReceivable = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: "ACCTS_RECV",
+          name: "Accounts Receivable",
+          accountType: "Asset",
+          subType: "Current Asset",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+          active: true,
+        });
+      }
+
+      let totalSales = 0;
+
+      await db.transaction(async (tx) => {
+        const voucherNumber = `CREDIT-SALES-${Date.now()}`;
+
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId!,
+            locationId,
+            locationName: location.name,
+            voucherNumber,
+            voucherType: "Sales",
+            voucherDate: saleDate,
+            description: `Credit Sale Import - ${items.length} items - Customer: ${customer.legalName}`,
+            totalAmount: "0",
+            optional: false,
+          })
+          .returning();
+
+        for (const item of items) {
+          const stockItem = await storage.getStockItemByCodeOrAlias(
+            item.barcode,
+            req.session.currentCompanyId!,
+          );
+          if (!stockItem) {
+            throw new Error(
+              `Stock item not found for barcode: ${item.barcode}`,
+            );
+          }
+
+          const [inventoryRecord] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, stockItem.id),
+                eq(inventory.locationId, locationId),
+              ),
+            )
+            .limit(1);
+
+          let costPrice = 0;
+          let currentQty = 0;
+          
+          if (inventoryRecord) {
+            costPrice = parseFloat(inventoryRecord.averageRate || "0");
+            currentQty = parseFloat(inventoryRecord.quantity);
+          }
+
+          const itemSales = item.quantity * item.rate;
+          const itemCost = item.quantity * costPrice;
+          const profit = itemSales - itemCost;
+
+          totalSales += itemSales;
+
+          await tx.insert(salesItems).values({
+            voucherId: voucher.id,
+            stockItemId: stockItem.id,
+            quantity: item.quantity.toString(),
+            sellingPrice: item.rate.toString(),
+            costPrice: costPrice.toString(),
+            totalSales: itemSales.toString(),
+            totalCost: itemCost.toString(),
+            profit: profit.toString(),
+          });
+
+          if (inventoryRecord) {
+            const newQty = currentQty - item.quantity;
+            const rate = parseFloat(inventoryRecord.averageRate || "0");
+            const newTotalValue = (newQty * rate).toFixed(2);
+            await tx
+              .update(inventory)
+              .set({
+                quantity: newQty.toString(),
+                totalValue: newTotalValue,
+              })
+              .where(
+                and(
+                  eq(inventory.stockItemId, stockItem.id),
+                  eq(inventory.locationId, locationId),
+                ),
+              );
+          } else {
+            await tx.insert(inventory).values({
+              companyId: req.session.currentCompanyId!,
+              locationId,
+              stockItemId: stockItem.id,
+              quantity: (-item.quantity).toString(),
+              averageRate: "0",
+              totalValue: "0",
+            });
+          }
+        }
+
+        // Create voucher entries for credit sale
+        // Entry 1: Debit Accounts Receivable (Customer owes money)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: accountsReceivable.id,
+          debitAmount: totalSales.toString(),
+          creditAmount: "0",
+          narration: `Credit Sale to ${customer.legalName} - ${items.length} items`,
+        });
+
+        // Entry 2: Credit Sales Revenue (Income increases with credit)
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: salesRevenueAccount.id,
+          debitAmount: "0",
+          creditAmount: totalSales.toString(),
+          narration: `Credit Sale Revenue - ${items.length} items`,
+        });
+
+        // Update voucher with total amount
+        await tx
+          .update(vouchers)
+          .set({
+            totalAmount: totalSales.toString(),
+          })
+          .where(eq(vouchers.id, voucher.id));
+
+        // Add customer balance transaction (credit sale = debit to customer = they owe us)
+        // Get current running balance for this customer
+        const [lastBalance] = await tx
+          .select()
+          .from(customerBalances)
+          .where(
+            and(
+              eq(customerBalances.customerId, customerId),
+              eq(customerBalances.companyId, req.session.currentCompanyId!),
+            ),
+          )
+          .orderBy(desc(customerBalances.id))
+          .limit(1);
+
+        const previousBalance = lastBalance ? parseFloat(lastBalance.balance || "0") : 0;
+        const newBalance = previousBalance + totalSales;
+
+        await tx.insert(customerBalances).values({
+          customerId,
+          companyId: req.session.currentCompanyId!,
+          transactionDate: saleDate,
+          transactionType: "Credit Sale",
+          referenceId: voucher.id,
+          referenceType: "voucher",
+          debitAmount: totalSales.toString(),
+          creditAmount: "0",
+          balance: newBalance.toString(),
+          currency: "USD",
+          description: `Credit Sale Import - ${items.length} items`,
+        });
+      });
+
+      res.json({
+        success: true,
+        itemsCount: items.length,
+        totalSales: totalSales.toFixed(2),
+        customerName: customer.legalName,
+      });
+    } catch (error: any) {
+      console.error("Credit Sales Import error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Download sample Credit Sales import template
+  app.get("/api/credit-sales-import/template", (_req, res) => {
+    try {
+      const sampleData = [
+        {
+          Barcode: "BC001",
+          Quantity: 5,
+          Rate: 25.0,
+        },
+        {
+          Barcode: "BC002",
+          Quantity: 3,
+          Rate: 35.5,
+        },
+        {
+          Barcode: "BC003",
+          Quantity: 10,
+          Rate: 15.75,
+        },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(sampleData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Credit Sales Import");
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=Credit_Sales_Import_Template.xlsx",
       );
       res.setHeader(
         "Content-Type",
