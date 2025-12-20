@@ -28,7 +28,7 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
 -   **Voucher System**: Comprehensive support for creating, editing, and managing all voucher types (Payment, Receipt, Journal, Stock Transfer, Production, Consumption). An "optional" voucher system allows for drafts/templates that are excluded from all inventory movements and financial calculations, with a toggle mechanism that atomically applies or reverses inventory changes.
 -   **Soft Delete System**: Implemented across key tables (locations, ledger accounts, stock items, suppliers, employees, customers, bank accounts) with a `deletedAt` timestamp. Includes admin-only UI for viewing, restoring, and permanently deleting items.
 -   **AI Chatbot**: Integrated Google Gemini for ERP context-aware responses. Features multi-language support, real-time chat with history, and admin controls for user access and chat history viewing.
--   **Purchase Order Enhancements**: POs now include editable freight and other charges, which are correctly factored into container offload inventory costs and supplier account balances.
+-   **Purchase Order Enhancements**: POs now include editable freight and other charges, which are correctly factored into container offload inventory costs and supplier account balances. **Critical Fix (Dec 2025)**: PO import voucher entries now correctly use company-specific Purchases ledger accounts. Previously, entries were incorrectly posting to a single Purchases account regardless of company, causing inflated balances. Existing data was corrected via SQL migration.
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 
 ### System Design Choices
