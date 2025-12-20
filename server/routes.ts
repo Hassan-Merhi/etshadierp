@@ -1885,11 +1885,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { name: "Payroll Liabilities", value: payrollLiabilitiesBalance },
           ].filter(c => Math.abs(c.value) >= 0.01);
 
-          // NOTE: Production and Consumption are EXCLUDED from the balance calculation
-          // Their effects are already reflected in stockOnFloorValue (inventory movements)
+          // Production and Consumption ARE included in the balance calculation to offset inventory changes:
+          // - Production adds inventory without accounting entry → SUBTRACT to offset
+          // - Consumption removes inventory without expense entry → ADD as expense
           const totalAssets = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
             directExpenseBalance + indirectExpenseBalance + governmentTaxesBalance +
-            cogsBalance + salaryAdvancesBalance;
+            cogsBalance + salaryAdvancesBalance + consumptionBalance - productionBalance;
           
           // Calculate liabilities WITHOUT profit (to avoid circular dependency)
           const totalLiabilitiesWithoutProfit = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance +
@@ -16889,11 +16890,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //       When containers are offloaded, Purchases expense is debited AND Stock on Floor increases
       //       The inventory value already captures the cost of goods, so we don't add Purchases again
       // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
-      // NOTE: Production and Consumption are EXCLUDED from the balance formula because:
-      //       - Their effects are already reflected in stockOnFloorValue (inventory movements)
-      //       - Production adds to inventory, Consumption removes from inventory
-      //       - These movements are internal transfers that should net to 0 in the import cycle
-      //       - We track them for reporting purposes but don't include in the balance calculation
+      // NOTE: Production and Consumption ARE included in the balance calculation to offset inventory changes:
+      //       - Production adds inventory without accounting entry → SUBTRACT to offset the increase
+      //       - Consumption removes inventory without expense entry → ADD as expense to offset the decrease
       const netImportCycleBalance = 
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
@@ -16904,7 +16903,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         indirectExpenseBalance +    // Expense (debit) - operating expenses
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
-        salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
+        salaryAdvancesBalance +     // Salary Advances (asset) - recoverable from employees
+        consumptionBalance -        // Consumption expense - offsets inventory decrease
+        productionBalance) -        // Production offset - offsets inventory increase
         (supplierBalance +          // Liability (what we owe to suppliers)
         dutyAgentBalance +          // Liability (what we owe to duty agents)
         transporterAgentBalance +   // Liability (what we owe to transporters)
