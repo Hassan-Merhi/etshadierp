@@ -7288,7 +7288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Location not found" });
       }
 
-      const customer = await storage.getCustomerById(customerId);
+      let customer = await storage.getCustomerById(customerId);
       if (!customer || customer.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Invalid customer" });
       }
@@ -7307,18 +7307,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      let accountsReceivable = await storage.getLedgerAccountByCode("ACCTS_RECV", req.session.currentCompanyId!);
-      if (!accountsReceivable) {
-        accountsReceivable = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId!,
-          code: "ACCTS_RECV",
-          name: "Accounts Receivable",
-          accountType: "Asset",
-          subType: "Current Asset",
-          openingBalance: "0",
-          openingBalanceSide: "Dr",
-          active: true,
-        });
+      // Get or create the customer's linked ledger account for receivables
+      let customerLedgerAccountId = customer.ledgerAccountId;
+      if (!customerLedgerAccountId) {
+        // Create a ledger account for this customer
+        const customerLedgerCode = `CUST_${customer.code}`;
+        let customerLedgerAccount = await storage.getLedgerAccountByCode(customerLedgerCode, req.session.currentCompanyId!);
+        if (!customerLedgerAccount) {
+          customerLedgerAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId!,
+            code: customerLedgerCode,
+            name: `${customer.legalName} - Receivable`,
+            accountType: "Asset",
+            subType: "Sundry Debtors",
+            openingBalance: "0",
+            openingBalanceSide: "Dr",
+            active: true,
+          });
+        }
+        // Update customer with the linked ledger account
+        customer = await storage.updateCustomer(customer.id, { ledgerAccountId: customerLedgerAccount.id });
+        customerLedgerAccountId = customerLedgerAccount.id;
       }
 
       let totalSales = 0;
@@ -7417,10 +7426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Create voucher entries for credit sale
-        // Entry 1: Debit Accounts Receivable (Customer owes money)
+        // Entry 1: Debit Customer's Ledger Account (Customer owes money)
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: accountsReceivable.id,
+          ledgerAccountId: customerLedgerAccountId!,
           debitAmount: totalSales.toString(),
           creditAmount: "0",
           narration: `Credit Sale to ${customer.legalName} - ${items.length} items`,
