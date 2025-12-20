@@ -65,6 +65,7 @@ import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
 import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
+import TestDataImport from "@/pages/TestDataImport";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -144,6 +145,7 @@ function Router({ user }: { user: any }) {
       {user?.role === "Admin" && <Route path="/orphaned-records" component={OrphanedRecords} />}
       {user?.role === "Admin" && <Route path="/deleted-items" component={DeletedItems} />}
       {user?.role === "Admin" && <Route path="/chatbot-settings" component={ChatbotSettings} />}
+      {user?.role === "Admin" && <Route path="/test-data-import" component={TestDataImport} />}
       <Route component={NotFound} />
     </Switch>
   );

@@ -24,6 +24,7 @@ import {
   ArrowLeftRight,
   Factory,
   Grid3X3,
+  FlaskConical,
 } from "lucide-react";
 import {
   Sidebar,
@@ -143,6 +144,11 @@ const menuItems = [
     url: "/settings",
     icon: Settings,
   },
+  {
+    title: "Test Data Import",
+    url: "/test-data-import",
+    icon: FlaskConical,
+  },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
@@ -189,8 +195,8 @@ export function AppSidebar({ user }: { user?: any }) {
     }
     
     // For non-POS users:
-    // Settings is Admin only (already handled above)
-    if (item.url === "/settings") {
+    // Settings and Test Data Import are Admin only (already handled above)
+    if (item.url === "/settings" || item.url === "/test-data-import") {
       return false;
     }
     

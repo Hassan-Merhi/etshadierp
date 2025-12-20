@@ -24372,6 +24372,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // ==========================================
+  // Test Data Import API (for testing Net Profit)
+  // ==========================================
+  
+  // Create a test data voucher (Journal entry marked as optional with TEST- prefix)
+  app.post(
+    "/api/test-data/vouchers",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
+        }
+
+        const { date, debitAccountId, creditAccountId, amount, description } = req.body;
+
+        // Validate required fields
+        if (!date || !debitAccountId || !creditAccountId || !amount) {
+          return res.status(400).json({ message: "Missing required fields: date, debitAccountId, creditAccountId, amount" });
+        }
+
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          return res.status(400).json({ message: "Amount must be a positive number" });
+        }
+
+        // Verify debit account exists and belongs to current company
+        const debitAccount = await storage.getLedgerAccountById(debitAccountId);
+        if (!debitAccount || debitAccount.companyId !== companyId) {
+          return res.status(404).json({ message: "Debit account not found or doesn't belong to current company" });
+        }
+
+        // Verify credit account exists and belongs to current company
+        const creditAccount = await storage.getLedgerAccountById(creditAccountId);
+        if (!creditAccount || creditAccount.companyId !== companyId) {
+          return res.status(404).json({ message: "Credit account not found or doesn't belong to current company" });
+        }
+
+        // Generate a unique voucher number with TEST- prefix
+        const voucherNumber = `TEST-${Date.now()}`;
+
+        // Create the voucher as optional (excluded from calculations by default)
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description: description || `Test data entry`,
+            totalAmount: parsedAmount.toFixed(2),
+            optional: true, // Start as draft/optional
+          })
+          .returning();
+
+        // Create debit entry
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: debitAccountId,
+          debitAmount: parsedAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Test data - ${description || debitAccount.name}`,
+        });
+
+        // Create credit entry
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: creditAccountId,
+          debitAmount: "0",
+          creditAmount: parsedAmount.toFixed(2),
+          narration: `Test data - ${description || creditAccount.name}`,
+        });
+
+        res.status(201).json({
+          voucher,
+          message: "Test entry created as optional (draft). Toggle to apply to calculations.",
+        });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   const httpServer = createServer(app);
 
   return httpServer;
