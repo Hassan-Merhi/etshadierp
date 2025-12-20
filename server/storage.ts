@@ -3474,6 +3474,65 @@ export class DbStorage implements IStorage {
         throw new Error(`Location ${locationId} not found`);
       }
 
+      // Helper to find or create stock adjustment ledger accounts
+      const findOrCreateAdjustmentAccount = async (
+        code: string, 
+        name: string, 
+        accountType: string, 
+        openingBalanceSide: "Dr" | "Cr"
+      ): Promise<number> => {
+        let [account] = await tx
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, location.companyId),
+              eq(schema.ledgerAccounts.code, code),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+
+        if (!account) {
+          [account] = await tx.insert(schema.ledgerAccounts).values({
+            companyId: location.companyId,
+            code,
+            name,
+            accountType,
+            subType: accountType,
+            openingBalance: "0",
+            openingBalanceSide,
+          }).returning();
+        }
+        return account.id;
+      };
+
+      // Get or create the adjustment accounts (only if not optional)
+      let productionAccountId: number | null = null;
+      let consumptionAccountId: number | null = null;
+      
+      if (!isOptional) {
+        // PRODUCTION_ADJUSTMENT: Liability account - credits offset inventory increases
+        productionAccountId = await findOrCreateAdjustmentAccount(
+          "PRODUCTION_ADJUSTMENT",
+          "Production Adjustment (Inventory Offset)",
+          "Liability",
+          "Cr"
+        );
+        
+        // CONSUMPTION_EXPENSE: Indirect Expense account - debits record consumption expenses
+        consumptionAccountId = await findOrCreateAdjustmentAccount(
+          "CONSUMPTION_EXPENSE", 
+          "Consumption Expense (Stock Adjustment)",
+          "Indirect Expense",
+          "Dr"
+        );
+      }
+
+      // Track totals for voucher entries - use ACTUAL inventory value changes
+      let totalProductionValue = 0;
+      let totalConsumptionValue = 0;
+
       // Process each item
       const adjustmentItems: StockAdjustmentItem[] = [];
       for (const item of items) {
@@ -3491,6 +3550,9 @@ export class DbStorage implements IStorage {
         }).returning();
 
         adjustmentItems.push(adjustmentItem);
+
+        // Determine if this is a production or consumption item
+        const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
@@ -3512,10 +3574,7 @@ export class DbStorage implements IStorage {
             let newQty: number;
             let newValue: number;
             let newRate: number;
-
-            // For Mixed adjustments, check individual item quantity sign
-            // Positive = Production (add), Negative = Consumption (subtract)
-            const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+            let actualValueChange: number;
 
             if (isProduction) {
               // Positive adjustment - add to inventory
@@ -3525,11 +3584,17 @@ export class DbStorage implements IStorage {
                 ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
                 : 0;
               newValue = newQty * newRate;
+              // Track actual value added (using input rate for production)
+              actualValueChange = Math.abs(quantity) * rate;
+              totalProductionValue += actualValueChange;
             } else {
               // Consumption - subtract from inventory (use absolute value to ensure reduction)
               newQty = currentQty - Math.abs(quantity);
               newValue = newQty > 0 ? newQty * currentRate : 0;
               newRate = currentRate;
+              // Track actual value removed (using current average rate, not input rate)
+              actualValueChange = Math.abs(quantity) * currentRate;
+              totalConsumptionValue += actualValueChange;
             }
             
             await tx
@@ -3552,7 +3617,38 @@ export class DbStorage implements IStorage {
               totalValue: totalAmount.toFixed(2),
               lastUpdated: new Date(),
             });
+            // Track value for new inventory
+            if (isProduction) {
+              totalProductionValue += totalAmount;
+            }
           }
+        }
+      }
+
+      // Create balancing voucher entries (only if not optional and there are amounts to record)
+      if (!isOptional) {
+        // Production: Credit the PRODUCTION_ADJUSTMENT account to offset inventory increase
+        // This keeps import cycle balanced: DR Inventory (implicit) = CR Production Adjustment
+        if (totalProductionValue > 0 && productionAccountId) {
+          await tx.insert(schema.voucherEntries).values({
+            voucherId,
+            ledgerAccountId: productionAccountId,
+            debitAmount: "0",
+            creditAmount: totalProductionValue.toFixed(2),
+            narration: `Production adjustment - ${adjustmentType} voucher`,
+          });
+        }
+        
+        // Consumption: Debit the CONSUMPTION_EXPENSE account to record expense
+        // This keeps import cycle balanced: DR Consumption Expense = CR Inventory (implicit)
+        if (totalConsumptionValue > 0 && consumptionAccountId) {
+          await tx.insert(schema.voucherEntries).values({
+            voucherId,
+            ledgerAccountId: consumptionAccountId,
+            debitAmount: totalConsumptionValue.toFixed(2),
+            creditAmount: "0",
+            narration: `Consumption expense - ${adjustmentType} voucher`,
+          });
         }
       }
 
@@ -4010,6 +4106,51 @@ export class DbStorage implements IStorage {
 
       console.log('[storage.updateStockAdjustment] Deleted old items');
 
+      // Step 3b: Delete old voucher entries for production/consumption accounts (only if not optional)
+      if (!isOptional) {
+        // Find the production and consumption account IDs
+        const productionAccount = await tx
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, location.companyId),
+              eq(schema.ledgerAccounts.code, "PRODUCTION_ADJUSTMENT"),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        const consumptionAccount = await tx
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, location.companyId),
+              eq(schema.ledgerAccounts.code, "CONSUMPTION_EXPENSE"),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        // Delete old entries for these accounts on this voucher
+        const accountIdsToDelete: number[] = [];
+        if (productionAccount.length > 0) accountIdsToDelete.push(productionAccount[0].id);
+        if (consumptionAccount.length > 0) accountIdsToDelete.push(consumptionAccount[0].id);
+        
+        if (accountIdsToDelete.length > 0) {
+          await tx
+            .delete(schema.voucherEntries)
+            .where(
+              and(
+                eq(schema.voucherEntries.voucherId, existingAdjustment.voucherId),
+                inArray(schema.voucherEntries.ledgerAccountId, accountIdsToDelete)
+              )
+            );
+          console.log('[storage.updateStockAdjustment] Deleted old voucher entries for production/consumption accounts');
+        }
+      }
+
       // Step 4: Update the stock adjustment record
       const [updatedAdjustment] = await tx
         .update(schema.stockAdjustmentVouchers)
@@ -4033,6 +4174,63 @@ export class DbStorage implements IStorage {
         throw new Error(`Location ${locationId} not found`);
       }
 
+      // Helper to find or create stock adjustment ledger accounts
+      const findOrCreateAdjustmentAccount = async (
+        code: string, 
+        name: string, 
+        accountType: string, 
+        openingBalanceSide: "Dr" | "Cr"
+      ): Promise<number> => {
+        let [account] = await tx
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, newLocation.companyId),
+              eq(schema.ledgerAccounts.code, code),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+
+        if (!account) {
+          [account] = await tx.insert(schema.ledgerAccounts).values({
+            companyId: newLocation.companyId,
+            code,
+            name,
+            accountType,
+            subType: accountType,
+            openingBalance: "0",
+            openingBalanceSide,
+          }).returning();
+        }
+        return account.id;
+      };
+
+      // Get or create the adjustment accounts (only if not optional)
+      let productionAccountId: number | null = null;
+      let consumptionAccountId: number | null = null;
+      
+      if (!isOptional) {
+        productionAccountId = await findOrCreateAdjustmentAccount(
+          "PRODUCTION_ADJUSTMENT",
+          "Production Adjustment (Inventory Offset)",
+          "Liability",
+          "Cr"
+        );
+        
+        consumptionAccountId = await findOrCreateAdjustmentAccount(
+          "CONSUMPTION_EXPENSE", 
+          "Consumption Expense (Stock Adjustment)",
+          "Indirect Expense",
+          "Dr"
+        );
+      }
+
+      // Track totals for voucher entries - use ACTUAL inventory value changes
+      let totalProductionValue = 0;
+      let totalConsumptionValue = 0;
+
       // Step 5: Create NEW items and apply inventory changes (same logic as createStockAdjustment)
       const adjustmentItems: StockAdjustmentItem[] = [];
       for (const item of items) {
@@ -4053,6 +4251,9 @@ export class DbStorage implements IStorage {
 
         adjustmentItems.push(adjustmentItem);
 
+        // Determine if this is a production or consumption item
+        const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
           // Get current inventory at location
@@ -4072,10 +4273,7 @@ export class DbStorage implements IStorage {
           let newQty: number;
           let newValue: number;
           let newRate: number;
-
-          // For Mixed adjustments, check individual item quantity sign
-          // Positive = Production (add), Negative = Consumption (subtract)
-          const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+          let actualValueChange: number;
 
           if (isProduction) {
             // Positive adjustment - add to inventory
@@ -4085,11 +4283,17 @@ export class DbStorage implements IStorage {
               ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
               : 0;
             newValue = newQty * newRate;
+            // Track actual value added (using input rate for production)
+            actualValueChange = Math.abs(quantity) * rate;
+            totalProductionValue += actualValueChange;
           } else {
             // Consumption - subtract from inventory (use absolute value to ensure reduction)
             newQty = currentQty - Math.abs(quantity);
             newValue = newQty > 0 ? newQty * currentRate : 0;
             newRate = currentRate;
+            // Track actual value removed (using current average rate, not input rate)
+            actualValueChange = Math.abs(quantity) * currentRate;
+            totalConsumptionValue += actualValueChange;
           }
           
           await tx
@@ -4112,9 +4316,36 @@ export class DbStorage implements IStorage {
             totalValue: totalAmount.toFixed(2),
             lastUpdated: new Date(),
           });
+          // Track value for new inventory
+          if (isProduction) {
+            totalProductionValue += totalAmount;
+          }
         } else {
           throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}`);
         }
+        }
+      }
+
+      // Create balancing voucher entries (only if not optional and there are amounts to record)
+      if (!isOptional) {
+        if (totalProductionValue > 0 && productionAccountId) {
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: existingAdjustment.voucherId,
+            ledgerAccountId: productionAccountId,
+            debitAmount: "0",
+            creditAmount: totalProductionValue.toFixed(2),
+            narration: `Production adjustment - ${adjustmentType} voucher`,
+          });
+        }
+        
+        if (totalConsumptionValue > 0 && consumptionAccountId) {
+          await tx.insert(schema.voucherEntries).values({
+            voucherId: existingAdjustment.voucherId,
+            ledgerAccountId: consumptionAccountId,
+            debitAmount: totalConsumptionValue.toFixed(2),
+            creditAmount: "0",
+            narration: `Consumption expense - ${adjustmentType} voucher`,
+          });
         }
       }
 
