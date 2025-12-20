@@ -1741,11 +1741,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return sum + parseFloat(item.totalCost || "0");
           }, 0);
 
-          // 12b. Consumption expense (from stock adjustment items where adjustmentType = 'consumption' ONLY)
-          // NOTE: Mixed vouchers are EXCLUDED because their net effect is already in stockOnFloorValue
+          // 12b. Consumption expense (from stock adjustment items)
+          // Includes: pure Consumption vouchers AND Mixed voucher items with negative quantity
           const consumptionData = await db
             .select({
               totalAmount: stockAdjustmentItems.totalAmount,
+              quantity: stockAdjustmentItems.quantity,
+              adjustmentType: stockAdjustmentVouchers.adjustmentType,
             })
             .from(stockAdjustmentItems)
             .innerJoin(
@@ -1761,19 +1763,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(vouchers.companyId, companyId),
                 isNull(vouchers.deletedAt),
                 eq(vouchers.optional, false),
-                sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption'`
+                sql`(LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption' OR LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed')`
               )
             );
 
           const consumptionBalance = consumptionData.reduce((sum, item) => {
-            return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+            const qty = parseFloat(item.quantity || "0");
+            const adjustmentType = (item.adjustmentType || "").toLowerCase();
+            // Pure Consumption: always count (totalAmount is positive, represents consumed value)
+            // Mixed: only count items with negative quantity (consumption items)
+            if (adjustmentType === "consumption" || (adjustmentType === "mixed" && qty < 0)) {
+              return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+            }
+            return sum;
           }, 0);
 
-          // 12c. Production balance (from stock adjustment items where adjustmentType = 'production' ONLY)
-          // NOTE: Mixed vouchers are EXCLUDED because their net effect is already in stockOnFloorValue
+          // 12c. Production balance (from stock adjustment items)
+          // Includes: pure Production vouchers AND Mixed voucher items with positive quantity
           const productionData = await db
             .select({
               totalAmount: stockAdjustmentItems.totalAmount,
+              quantity: stockAdjustmentItems.quantity,
+              adjustmentType: stockAdjustmentVouchers.adjustmentType,
             })
             .from(stockAdjustmentItems)
             .innerJoin(
@@ -1789,12 +1800,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(vouchers.companyId, companyId),
                 isNull(vouchers.deletedAt),
                 eq(vouchers.optional, false),
-                sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production'`
+                sql`(LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production' OR LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed')`
               )
             );
 
           const productionBalance = productionData.reduce((sum, item) => {
-            return sum + parseFloat(item.totalAmount || "0");
+            const qty = parseFloat(item.quantity || "0");
+            const adjustmentType = (item.adjustmentType || "").toLowerCase();
+            // Pure Production: always count (totalAmount is positive, represents produced value)
+            // Mixed: only count items with positive quantity (production items)
+            if (adjustmentType === "production" || (adjustmentType === "mixed" && qty > 0)) {
+              return sum + parseFloat(item.totalAmount || "0");
+            }
+            return sum;
           }, 0);
 
           // 14. Salary Advances
@@ -16690,13 +16708,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + parseFloat(item.totalCost || "0");
       }, 0);
 
-      // 12b. Consumption expense (from stock adjustment items where adjustmentType = 'consumption' ONLY)
+      // 12b. Consumption expense (from stock adjustment items)
+      // Includes: pure Consumption vouchers AND Mixed voucher items with negative quantity
       // This represents inventory that was consumed (not sold) and is now an expense
-      // Consumption reduces inventory but the value should be tracked as an expense to balance
-      // NOTE: Mixed vouchers are excluded because their net effect is already in stock on floor value
       const consumptionData = await db
         .select({
           totalAmount: stockAdjustmentItems.totalAmount,
+          quantity: stockAdjustmentItems.quantity,
           adjustmentType: stockAdjustmentVouchers.adjustmentType,
         })
         .from(stockAdjustmentItems)
@@ -16707,23 +16725,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(vouchers.companyId, companyId),
             isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
-            // Only pure Consumption vouchers - Mixed vouchers don't show separately in import cycle
-            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption'`
+            sql`(LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'consumption' OR LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed')`
           )
         );
 
       const consumptionBalance = consumptionData.reduce((sum, item) => {
-        return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+        const qty = parseFloat(item.quantity || "0");
+        const adjustmentType = (item.adjustmentType || "").toLowerCase();
+        // Pure Consumption: always count (totalAmount is positive, represents consumed value)
+        // Mixed: only count items with negative quantity (consumption items)
+        if (adjustmentType === "consumption" || (adjustmentType === "mixed" && qty < 0)) {
+          return sum + Math.abs(parseFloat(item.totalAmount || "0"));
+        }
+        return sum;
       }, 0);
 
-      // 12c. Production balance (from stock adjustment items where adjustmentType = 'production' ONLY)
+      // 12c. Production balance (from stock adjustment items)
+      // Includes: pure Production vouchers AND Mixed voucher items with positive quantity
       // Production INCREASES inventory (stockOnFloorValue goes up)
-      // To balance: we need to track the production value and SUBTRACT from assets
-      // This ensures that when production adds inventory, the import cycle stays balanced
-      // NOTE: Mixed vouchers are excluded because their net effect is already in stock on floor value
       const productionData = await db
         .select({
           totalAmount: stockAdjustmentItems.totalAmount,
+          quantity: stockAdjustmentItems.quantity,
           adjustmentType: stockAdjustmentVouchers.adjustmentType,
         })
         .from(stockAdjustmentItems)
@@ -16734,13 +16757,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             eq(vouchers.companyId, companyId),
             isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
-            // Only pure Production vouchers - Mixed vouchers don't show separately in import cycle
-            sql`LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production'`
+            sql`(LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'production' OR LOWER(${stockAdjustmentVouchers.adjustmentType}) = 'mixed')`
           )
         );
 
       const productionBalance = productionData.reduce((sum, item) => {
-        return sum + parseFloat(item.totalAmount || "0");
+        const qty = parseFloat(item.quantity || "0");
+        const adjustmentType = (item.adjustmentType || "").toLowerCase();
+        // Pure Production: always count (totalAmount is positive, represents produced value)
+        // Mixed: only count items with positive quantity (production items)
+        if (adjustmentType === "production" || (adjustmentType === "mixed" && qty > 0)) {
+          return sum + parseFloat(item.totalAmount || "0");
+        }
+        return sum;
       }, 0);
 
       // 13. Payroll Expenses - get from Expense accounts related to salaries
