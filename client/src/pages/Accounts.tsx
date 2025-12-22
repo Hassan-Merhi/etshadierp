@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,18 +91,46 @@ export default function Accounts() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
+  
+  // Parse URL search params for filter persistence
+  const urlParams = new URLSearchParams(searchString);
+  const urlAccountId = urlParams.get("accountId");
+  const urlAccountType = urlParams.get("accountType");
+  const urlStartDate = urlParams.get("startDate") || "";
+  const urlEndDate = urlParams.get("endDate") || "";
+  const urlMonth = urlParams.get("month") || "";
+  const urlYear = urlParams.get("year") || "";
+  
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   // Force refresh of account data when component mounts
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
   }, []);
+  
+  // Initialize state from URL params
   const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
+  const [startDate, setStartDate] = useState(urlStartDate);
+  const [endDate, setEndDate] = useState(urlEndDate);
+  const [selectedMonth, setSelectedMonth] = useState(urlMonth);
+  const [selectedYear, setSelectedYear] = useState(urlYear);
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(null);
+  
+  // Helper to update URL params without full page reload
+  // Reads current params from window.location.search to avoid stale state
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    const newSearch = params.toString();
+    window.history.replaceState(null, "", newSearch ? `?${newSearch}` : window.location.pathname);
+  }, []);
   const [editSearchTerm, setEditSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
@@ -185,10 +213,31 @@ export default function Accounts() {
     enabled: !!selectedAccount,
   });
 
+  // Restore account from URL params when accounts load
+  useEffect(() => {
+    if (accounts.length > 0 && urlAccountId && urlAccountType && !selectedAccount) {
+      const account = accounts.find(
+        (a) => a.accountId === parseInt(urlAccountId) && a.type.toLowerCase() === urlAccountType.toLowerCase()
+      );
+      if (account) {
+        setSelectedAccount(account);
+      }
+    }
+  }, [accounts, urlAccountId, urlAccountType, selectedAccount]);
+
   const handleAccountChange = (accountId: string) => {
     const account = accounts.find((a) => a.id === accountId);
     setSelectedAccount(account || null);
     setSearchTerm("");
+    // Save to URL
+    if (account) {
+      updateUrlParams({
+        accountId: account.accountId.toString(),
+        accountType: account.type.toLowerCase(),
+      });
+    } else {
+      updateUrlParams({ accountId: null, accountType: null });
+    }
   };
 
   const handleMonthChange = (month: string) => {
@@ -198,11 +247,15 @@ export default function Accounts() {
       const year = parseInt(selectedYear);
       const start = startOfMonth(new Date(year, monthIndex, 1));
       const end = endOfMonth(new Date(year, monthIndex, 1));
-      setStartDate(format(start, "yyyy-MM-dd"));
-      setEndDate(format(end, "yyyy-MM-dd"));
+      const startStr = format(start, "yyyy-MM-dd");
+      const endStr = format(end, "yyyy-MM-dd");
+      setStartDate(startStr);
+      setEndDate(endStr);
+      updateUrlParams({ month, startDate: startStr, endDate: endStr });
     } else {
       setStartDate("");
       setEndDate("");
+      updateUrlParams({ month, startDate: null, endDate: null });
     }
   };
 
@@ -213,11 +266,15 @@ export default function Accounts() {
       const yearNum = parseInt(year);
       const start = startOfMonth(new Date(yearNum, monthIndex, 1));
       const end = endOfMonth(new Date(yearNum, monthIndex, 1));
-      setStartDate(format(start, "yyyy-MM-dd"));
-      setEndDate(format(end, "yyyy-MM-dd"));
+      const startStr = format(start, "yyyy-MM-dd");
+      const endStr = format(end, "yyyy-MM-dd");
+      setStartDate(startStr);
+      setEndDate(endStr);
+      updateUrlParams({ year, startDate: startStr, endDate: endStr });
     } else {
       setStartDate("");
       setEndDate("");
+      updateUrlParams({ year, startDate: null, endDate: null });
     }
   };
 
@@ -226,6 +283,7 @@ export default function Accounts() {
     setEndDate("");
     setSelectedMonth("");
     setSelectedYear("");
+    updateUrlParams({ startDate: null, endDate: null, month: null, year: null });
   };
 
   const currentYear = new Date().getFullYear();

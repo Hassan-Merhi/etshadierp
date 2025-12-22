@@ -502,6 +502,11 @@ export default function VoucherEdit() {
   const { selectedCompany } = useCompany();
   const [formInitialized, setFormInitialized] = useState(false);
 
+  // Reset form initialization when voucher ID changes
+  useEffect(() => {
+    setFormInitialized(false);
+  }, [id]);
+
   // Fetch voucher data
   const { data: voucher, isLoading: voucherLoading, error: voucherError } = useQuery<VoucherData>({
     queryKey: [`/api/vouchers/${id}`],
@@ -933,30 +938,31 @@ export default function VoucherEdit() {
     }
   }, [voucher, voucherType, ledgerAccounts, bankAccounts, suppliers, formInitialized, isPaymentOrReceipt, isJournal, isSales, isPurchase, isConsumption, isStockTransfer, paymentForm, journalForm, salesForm, purchaseForm, adjustmentForm, transferForm]);
 
-  // Update mutation
+  // Update mutation - uses bulk update endpoint that replaces all entries
   const updateMutation = useMutation({
-    mutationFn: async (data: { voucherUpdates: any; entriesUpdates: any[] }) => {
-      // Update voucher header
-      await apiRequest("PATCH", `/api/vouchers/${id}`, data.voucherUpdates);
-
-      // Update each entry
-      for (const entry of data.entriesUpdates) {
-        if (entry.id) {
-          await apiRequest("PATCH", `/api/voucher-entries/${entry.id}`, entry.updates);
-        }
-      }
-
-      return { success: true };
+    mutationFn: async (data: { voucherUpdates: any; entries: any[] }) => {
+      // Use bulk update endpoint that replaces all entries atomically
+      return await apiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
+        voucher: data.voucherUpdates,
+        entries: data.entries,
+      });
     },
     onSuccess: () => {
+      // Invalidate all relevant caches for immediate balance updates
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      // Invalidate ledger transaction queries so balances refresh in Accounts page
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/accounts/');
+      }});
       toast({
         title: "Success",
         description: "Voucher updated successfully",
       });
-      navigate("/daybook");
+      // Navigate back to accounts page - balances will refresh automatically
+      window.history.back();
     },
     onError: (error: any) => {
       toast({
@@ -1138,18 +1144,26 @@ export default function VoucherEdit() {
       description: data.notes,
     };
 
-    const entriesUpdates = data.entries.map((entry, index) => ({
-      id: entry.id,
-      updates: {
-        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
-        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
-        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-        debitAmount: voucherType === "Receipt" ? entry.amount : "0",
-        creditAmount: voucherType === "Payment" ? entry.amount : "0",
-      },
+    // Build the payment account entry (first entry)
+    const paymentEntry = {
+      ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
+      bankAccountId: data.paymentAccountType === "bank" ? data.paymentAccountId : null,
+      supplierId: data.paymentAccountType === "supplier" ? data.paymentAccountId : null,
+      debitAmount: voucherType === "Payment" ? data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2) : "0",
+      creditAmount: voucherType === "Receipt" ? data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2) : "0",
+    };
+
+    // Build the contra entries
+    const contraEntries = data.entries.map((entry) => ({
+      ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+      bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+      supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+      debitAmount: voucherType === "Receipt" ? entry.amount : "0",
+      creditAmount: voucherType === "Payment" ? entry.amount : "0",
     }));
 
-    updateMutation.mutate({ voucherUpdates, entriesUpdates });
+    const entries = [paymentEntry, ...contraEntries];
+    updateMutation.mutate({ voucherUpdates, entries });
   };
 
   const onSubmitJournal = (data: JournalFormData) => {
@@ -1159,18 +1173,15 @@ export default function VoucherEdit() {
       description: data.notes,
     };
 
-    const entriesUpdates = data.entries.map((entry) => ({
-      id: entry.id,
-      updates: {
-        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
-        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
-        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-        debitAmount: entry.type === "DR" ? entry.amount : "0",
-        creditAmount: entry.type === "CR" ? entry.amount : "0",
-      },
+    const entries = data.entries.map((entry) => ({
+      ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+      bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+      supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+      debitAmount: entry.type === "DR" ? entry.amount : "0",
+      creditAmount: entry.type === "CR" ? entry.amount : "0",
     }));
 
-    updateMutation.mutate({ voucherUpdates, entriesUpdates });
+    updateMutation.mutate({ voucherUpdates, entries });
   };
 
   const onSubmitSales = (data: SalesFormData) => {
@@ -1189,9 +1200,9 @@ export default function VoucherEdit() {
     updateTransferMutation.mutate(data);
   };
 
-  // Handle cancel
+  // Handle cancel - go back to previous page
   const handleCancel = () => {
-    navigate("/daybook");
+    window.history.back();
   };
 
   // Loading state
