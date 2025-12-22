@@ -74,6 +74,18 @@ interface Transaction {
   voucherDescription: string;
 }
 
+interface GroupedVoucher {
+  voucherId: number;
+  voucherNumber: string;
+  voucherType: string;
+  voucherDate: string;
+  voucherDescription: string;
+  narration: string;
+  totalDebit: number;
+  totalCredit: number;
+  runningBalance?: number;
+}
+
 export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -302,56 +314,93 @@ export default function Accounts() {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const calculateRunningBalance = () => {
-    // Start from OPENING balance, not current balance (which already includes all transactions)
-    // For non-suppliers: sign the opening balance based on openingBalanceSide (Cr = negative, Dr = positive)
-    // For suppliers: opening balance is already in the correct form (positive = we owe them)
-    let rawOpeningBalance = parseBalance(selectedAccount?.openingBalance ?? 0);
-    let runningBalance: number;
+  // Group transactions by voucherId for Tally-style one-row-per-voucher display
+  const groupTransactionsByVoucher = (): GroupedVoucher[] => {
+    const voucherMap = new Map<number, GroupedVoucher>();
     
+    transactions.forEach((txn) => {
+      const existing = voucherMap.get(txn.voucherId);
+      const debit = parseBalance(txn.debitAmount);
+      const credit = parseBalance(txn.creditAmount);
+      
+      if (existing) {
+        existing.totalDebit += debit;
+        existing.totalCredit += credit;
+        // Keep the first narration or description we find
+        if (!existing.narration && txn.narration) {
+          existing.narration = txn.narration;
+        }
+      } else {
+        voucherMap.set(txn.voucherId, {
+          voucherId: txn.voucherId,
+          voucherNumber: txn.voucherNumber,
+          voucherType: txn.voucherType,
+          voucherDate: txn.voucherDate,
+          voucherDescription: txn.voucherDescription,
+          narration: txn.narration || txn.voucherDescription || "",
+          totalDebit: debit,
+          totalCredit: credit,
+        });
+      }
+    });
+    
+    // Sort by date, then by voucher number
+    return Array.from(voucherMap.values()).sort((a, b) => {
+      const dateCompare = new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      return a.voucherNumber.localeCompare(b.voucherNumber);
+    });
+  };
+
+  const groupedVouchers = groupTransactionsByVoucher();
+
+  // Calculate opening balance
+  const getOpeningBalance = (): number => {
+    const rawOpeningBalance = parseBalance(selectedAccount?.openingBalance ?? 0);
     if (selectedAccount?.type === "supplier") {
-      // Supplier opening balance is already positive (what we owe them)
-      runningBalance = rawOpeningBalance;
+      return rawOpeningBalance;
     } else {
-      // For non-suppliers: Cr opening balance should be negative, Dr should be positive
-      runningBalance = selectedAccount?.openingBalanceSide === "Cr" 
+      return selectedAccount?.openingBalanceSide === "Cr" 
         ? -rawOpeningBalance 
         : rawOpeningBalance;
     }
+  };
+
+  const openingBalance = getOpeningBalance();
+
+  // Calculate running balance for grouped vouchers
+  const calculateGroupedRunningBalance = (): GroupedVoucher[] => {
+    let runningBalance = openingBalance;
     
-    return transactions.map((transaction) => {
-      const debit = parseBalance(transaction.debitAmount);
-      const credit = parseBalance(transaction.creditAmount);
-      // For suppliers, credits increase balance (we owe more), debits decrease it (we pay)
-      // For other accounts, debits increase and credits decrease
+    return groupedVouchers.map((voucher) => {
       if (selectedAccount?.type === "supplier") {
-        runningBalance += credit - debit;
+        runningBalance += voucher.totalCredit - voucher.totalDebit;
       } else {
-        runningBalance += debit - credit;
+        runningBalance += voucher.totalDebit - voucher.totalCredit;
       }
       return {
-        ...transaction,
+        ...voucher,
         runningBalance,
       };
     });
   };
 
-  const transactionsWithBalance = calculateRunningBalance();
+  const vouchersWithBalance = calculateGroupedRunningBalance();
 
-  const transactionTotals = transactionsWithBalance.reduce(
-    (acc, txn) => ({
-      totalDebit: acc.totalDebit + parseBalance(txn.debitAmount),
-      totalCredit: acc.totalCredit + parseBalance(txn.creditAmount),
+  const transactionTotals = vouchersWithBalance.reduce(
+    (acc, v) => ({
+      totalDebit: acc.totalDebit + v.totalDebit,
+      totalCredit: acc.totalCredit + v.totalCredit,
     }),
     { totalDebit: 0, totalCredit: 0 }
   );
 
-  const closingBalance = transactionsWithBalance.length > 0
-    ? transactionsWithBalance[transactionsWithBalance.length - 1].runningBalance
-    : parseBalance(selectedAccount?.balance);
+  const closingBalance = vouchersWithBalance.length > 0
+    ? vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ?? openingBalance
+    : openingBalance;
 
-  const handleTransactionClick = (transaction: Transaction & { runningBalance: number }) => {
-    navigate(`/vouchers/${transaction.voucherId}/edit`);
+  const handleVoucherClick = (voucher: GroupedVoucher) => {
+    navigate(`/vouchers/${voucher.voucherId}/edit`);
   };
 
   const form = useForm<InsertLedgerAccount>({
@@ -993,7 +1042,7 @@ export default function Accounts() {
                       variant="outline"
                       size="sm"
                       onClick={() => handlePrint()}
-                      disabled={transactionsLoading || transactionsWithBalance.length === 0}
+                      disabled={transactionsLoading || vouchersWithBalance.length === 0}
                       data-testid="button-print-statement"
                     >
                       <Printer className="w-4 h-4 mr-2" />
@@ -1101,30 +1150,22 @@ export default function Accounts() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Transaction History</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Ledger: {selectedAccount?.name}</CardTitle>
             </CardHeader>
             <CardContent>
               {transactionsLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-10 w-full" />
                   ))}
-                </div>
-              ) : transactionsWithBalance.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No transactions found for this account</p>
-                  {(startDate || endDate) && (
-                    <p className="text-sm mt-1">Try adjusting the date range</p>
-                  )}
                 </div>
               ) : (
                 <div ref={printRef} className="print-container">
                   {/* Print header - only visible when printing */}
                   <div className="hidden print:block mb-6 pb-4 border-b">
                     <h1 className="text-2xl font-bold mb-2">{selectedCompany?.name}</h1>
-                    <h2 className="text-xl font-semibold mb-1">Account Statement: {selectedAccount?.name}</h2>
+                    <h2 className="text-xl font-semibold mb-1">Ledger: {selectedAccount?.name}</h2>
                     {(startDate || endDate) && (
                       <p className="text-sm text-muted-foreground">
                         Period: {startDate ? formatDisplayDate(new Date(startDate)) : "Beginning"} to {endDate ? formatDisplayDate(new Date(endDate)) : "Present"}
@@ -1135,73 +1176,155 @@ export default function Accounts() {
                     </p>
                   </div>
                   <div className="rounded-md border overflow-x-auto print:border-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Debit</TableHead>
-                        <TableHead className="text-right">Credit</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transactionsWithBalance.map((transaction, index) => (
-                        <TableRow
-                          key={transaction.entryId}
-                          data-testid={`row-transaction-${transaction.entryId}`}
-                        >
-                          <TableCell className="font-mono text-sm">
-                            {transaction.voucherDate
-                              ? formatDisplayDate(new Date(transaction.voucherDate))
-                              : "-"}
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="w-[100px] py-2">Date</TableHead>
+                          <TableHead className="w-[100px] py-2">Type</TableHead>
+                          <TableHead className="py-2">Particulars</TableHead>
+                          <TableHead className="w-[100px] py-2">Vch No.</TableHead>
+                          <TableHead className="text-right w-[120px] py-2">Debit</TableHead>
+                          <TableHead className="text-right w-[120px] py-2">Credit</TableHead>
+                          <TableHead className="text-right w-[130px] py-2">Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Opening Balance Row */}
+                        <TableRow className="bg-accent/30 border-b-2" data-testid="row-opening-balance">
+                          <TableCell className="font-mono text-sm py-2" colSpan={4}>
+                            <span className="font-semibold">Opening Balance</span>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{transaction.voucherType}</Badge>
+                          <TableCell className="text-right font-mono py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (openingBalance < 0 ? `$${formatNumber(Math.abs(openingBalance))}` : "-")
+                              : (openingBalance > 0 ? `$${formatNumber(openingBalance)}` : "-")}
                           </TableCell>
-                          <TableCell>
-                            <button
-                              onClick={() => handleTransactionClick(transaction)}
-                              className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                              data-testid={`link-transaction-${transaction.entryId}`}
-                            >
-                              <span className="truncate max-w-xs">
-                                {transaction.narration || transaction.voucherDescription || "-"}
-                              </span>
-                              <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                            </button>
+                          <TableCell className="text-right font-mono py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (openingBalance > 0 ? `$${formatNumber(openingBalance)}` : "-")
+                              : (openingBalance < 0 ? `$${formatNumber(Math.abs(openingBalance))}` : "-")}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseBalance(transaction.debitAmount) > 0
-                              ? `$${formatNumber(parseBalance(transaction.debitAmount))}`
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseBalance(transaction.creditAmount) > 0
-                              ? `$${formatNumber(parseBalance(transaction.creditAmount))}`
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-semibold">
-                            ${formatNumber(Math.abs(transaction.runningBalance))}
+                          <TableCell className="text-right font-mono font-semibold py-2">
+                            ${formatNumber(Math.abs(openingBalance))}{" "}
+                            {selectedAccount?.type === "supplier"
+                              ? (openingBalance > 0 ? "Cr" : "Dr")
+                              : (openingBalance >= 0 ? "Dr" : "Cr")}
                           </TableCell>
                         </TableRow>
-                      ))}
-                      <TableRow className="bg-muted/50 font-semibold">
-                        <TableCell colSpan={2}></TableCell>
-                        <TableCell className="text-right">Totals</TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${formatNumber(transactionTotals.totalDebit)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${formatNumber(transactionTotals.totalCredit)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          ${formatNumber(Math.abs(closingBalance))}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+
+                        {/* Voucher Rows */}
+                        {vouchersWithBalance.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                              <p>No transactions found for this account</p>
+                              {(startDate || endDate) && (
+                                <p className="text-sm mt-1">Try adjusting the date range</p>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          vouchersWithBalance.map((voucher) => (
+                            <TableRow
+                              key={voucher.voucherId}
+                              className="hover-elevate"
+                              data-testid={`row-voucher-${voucher.voucherId}`}
+                            >
+                              <TableCell className="font-mono text-sm py-2">
+                                {voucher.voucherDate
+                                  ? formatDisplayDate(new Date(voucher.voucherDate))
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                <Badge variant="outline" className="text-xs">{voucher.voucherType}</Badge>
+                              </TableCell>
+                              <TableCell className="py-2">
+                                <button
+                                  onClick={() => handleVoucherClick(voucher)}
+                                  className="flex items-center gap-1 text-primary hover:underline cursor-pointer text-sm text-left"
+                                  data-testid={`link-voucher-${voucher.voucherId}`}
+                                >
+                                  <span className="truncate max-w-[280px]">
+                                    {voucher.narration || voucher.voucherDescription || voucher.voucherNumber}
+                                  </span>
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </button>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm py-2">
+                                {voucher.voucherNumber}
+                              </TableCell>
+                              <TableCell className="text-right font-mono py-2">
+                                {voucher.totalDebit > 0
+                                  ? `$${formatNumber(voucher.totalDebit)}`
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono py-2">
+                                {voucher.totalCredit > 0
+                                  ? `$${formatNumber(voucher.totalCredit)}`
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium py-2">
+                                ${formatNumber(Math.abs(voucher.runningBalance ?? 0))}{" "}
+                                {selectedAccount?.type === "supplier"
+                                  ? ((voucher.runningBalance ?? 0) > 0 ? "Cr" : "Dr")
+                                  : ((voucher.runningBalance ?? 0) >= 0 ? "Dr" : "Cr")}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Tally-style Footer Summary */}
+                  <div className="mt-4 border rounded-md overflow-hidden">
+                    <Table>
+                      <TableBody>
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={4} className="text-right font-medium py-2">Opening Balance:</TableCell>
+                          <TableCell className="text-right font-mono w-[120px] py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (openingBalance < 0 ? `$${formatNumber(Math.abs(openingBalance))}` : "-")
+                              : (openingBalance > 0 ? `$${formatNumber(openingBalance)}` : "-")}
+                          </TableCell>
+                          <TableCell className="text-right font-mono w-[120px] py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (openingBalance > 0 ? `$${formatNumber(openingBalance)}` : "-")
+                              : (openingBalance < 0 ? `$${formatNumber(Math.abs(openingBalance))}` : "-")}
+                          </TableCell>
+                          <TableCell className="w-[130px] py-2"></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-right font-medium py-2">Current Total:</TableCell>
+                          <TableCell className="text-right font-mono font-semibold w-[120px] py-2">
+                            ${formatNumber(transactionTotals.totalDebit)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold w-[120px] py-2">
+                            ${formatNumber(transactionTotals.totalCredit)}
+                          </TableCell>
+                          <TableCell className="w-[130px] py-2"></TableCell>
+                        </TableRow>
+                        <TableRow className="bg-accent/50 border-t-2">
+                          <TableCell colSpan={4} className="text-right font-bold py-2">Closing Balance:</TableCell>
+                          <TableCell className="text-right font-mono font-bold w-[120px] py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (closingBalance < 0 ? `$${formatNumber(Math.abs(closingBalance))}` : "-")
+                              : (closingBalance > 0 ? `$${formatNumber(closingBalance)}` : "-")}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold w-[120px] py-2">
+                            {selectedAccount?.type === "supplier"
+                              ? (closingBalance > 0 ? `$${formatNumber(closingBalance)}` : "-")
+                              : (closingBalance < 0 ? `$${formatNumber(Math.abs(closingBalance))}` : "-")}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold w-[130px] py-2">
+                            ${formatNumber(Math.abs(closingBalance))}{" "}
+                            {selectedAccount?.type === "supplier"
+                              ? (closingBalance > 0 ? "Cr" : "Dr")
+                              : (closingBalance >= 0 ? "Dr" : "Cr")}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               )}
