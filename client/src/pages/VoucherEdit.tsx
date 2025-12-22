@@ -810,15 +810,25 @@ export default function VoucherEdit() {
     if (ledgerAccounts.length === 0 && bankAccounts.length === 0 && suppliers.length === 0) return;
 
     if (isPaymentOrReceipt && voucher.entries.length >= 1) {
-      // First entry is the payment account (debit for Payment, credit for Receipt)
-      const paymentEntry = voucher.entries[0];
-      const paymentAccount = findAccountDetails(paymentEntry);
+      // For Payment: source account is CREDITED (money leaving), destinations are DEBITED
+      // For Receipt: source account is DEBITED (money coming in), destinations are CREDITED
+      // Find the source account by looking for the entry with the correct direction
+      const paymentEntry = voucherType === "Payment"
+        ? voucher.entries.find(e => parseFloat(e.creditAmount || "0") > 0)
+        : voucher.entries.find(e => parseFloat(e.debitAmount || "0") > 0);
       
-      // Remaining entries are the voucher entries - filter out zero amount entries
-      const voucherEntries = voucher.entries.slice(1).filter(entry => {
+      // Fallback to first entry if not found (shouldn't happen for valid vouchers)
+      const sourceEntry = paymentEntry || voucher.entries[0];
+      const paymentAccount = findAccountDetails(sourceEntry);
+      
+      // Destination entries are all other entries with the opposite direction
+      // For Payment: entries with debit amounts (money going TO these accounts)
+      // For Receipt: entries with credit amounts (money coming FROM these accounts)
+      const voucherEntries = voucher.entries.filter(entry => {
+        if (entry.id === sourceEntry.id) return false; // Exclude source entry
         const amount = voucherType === "Payment" 
-          ? parseFloat(entry.creditAmount || "0") 
-          : parseFloat(entry.debitAmount || "0");
+          ? parseFloat(entry.debitAmount || "0") 
+          : parseFloat(entry.creditAmount || "0");
         return amount > 0;
       });
 
@@ -830,9 +840,11 @@ export default function VoucherEdit() {
           voucherDate: parseISO(voucher.voucherDate),
           entries: voucherEntries.map(entry => {
             const account = findAccountDetails(entry);
+            // For Payment: destinations have debit amounts
+            // For Receipt: destinations have credit amounts
             const amount = voucherType === "Payment" 
-              ? entry.creditAmount 
-              : entry.debitAmount;
+              ? entry.debitAmount 
+              : entry.creditAmount;
             
             return account ? {
               id: entry.id,
@@ -1144,22 +1156,27 @@ export default function VoucherEdit() {
       description: data.notes,
     };
 
-    // Build the payment account entry (first entry)
+    // Build the payment account entry (source account)
+    // For Payment: source is CREDITED (money leaves this account)
+    // For Receipt: source is DEBITED (money comes into this account)
+    const total = data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2);
     const paymentEntry = {
       ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
       bankAccountId: data.paymentAccountType === "bank" ? data.paymentAccountId : null,
       supplierId: data.paymentAccountType === "supplier" ? data.paymentAccountId : null,
-      debitAmount: voucherType === "Payment" ? data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2) : "0",
-      creditAmount: voucherType === "Receipt" ? data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2) : "0",
+      debitAmount: voucherType === "Receipt" ? total : "0",
+      creditAmount: voucherType === "Payment" ? total : "0",
     };
 
-    // Build the contra entries
+    // Build the contra entries (destination accounts)
+    // For Payment: destinations are DEBITED (money goes TO these accounts)
+    // For Receipt: destinations are CREDITED (money comes FROM these accounts)
     const contraEntries = data.entries.map((entry) => ({
       ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
       bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
       supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-      debitAmount: voucherType === "Receipt" ? entry.amount : "0",
-      creditAmount: voucherType === "Payment" ? entry.amount : "0",
+      debitAmount: voucherType === "Payment" ? entry.amount : "0",
+      creditAmount: voucherType === "Receipt" ? entry.amount : "0",
     }));
 
     const entries = [paymentEntry, ...contraEntries];
