@@ -319,7 +319,10 @@ export default function Accounts() {
     const voucherMap = new Map<number, GroupedVoucher>();
     
     transactions.forEach((txn) => {
-      const existing = voucherMap.get(txn.voucherId);
+      // voucherId should always be a number from the API, but ensure it's numeric
+      const voucherId = Number(txn.voucherId);
+      
+      const existing = voucherMap.get(voucherId);
       const debit = parseBalance(txn.debitAmount);
       const credit = parseBalance(txn.creditAmount);
       
@@ -331,8 +334,8 @@ export default function Accounts() {
           existing.narration = txn.narration;
         }
       } else {
-        voucherMap.set(txn.voucherId, {
-          voucherId: txn.voucherId,
+        voucherMap.set(voucherId, {
+          voucherId: voucherId,
           voucherNumber: txn.voucherNumber,
           voucherType: txn.voucherType,
           voucherDate: txn.voucherDate,
@@ -1182,7 +1185,6 @@ export default function Accounts() {
                           <TableHead className="w-[100px] py-2">Date</TableHead>
                           <TableHead className="w-[100px] py-2">Type</TableHead>
                           <TableHead className="py-2">Particulars</TableHead>
-                          <TableHead className="w-[100px] py-2">Vch No.</TableHead>
                           <TableHead className="text-right w-[120px] py-2">Debit</TableHead>
                           <TableHead className="text-right w-[120px] py-2">Credit</TableHead>
                           <TableHead className="text-right w-[130px] py-2">Balance</TableHead>
@@ -1191,7 +1193,7 @@ export default function Accounts() {
                       <TableBody>
                         {/* Opening Balance Row */}
                         <TableRow className="bg-accent/30 border-b-2" data-testid="row-opening-balance">
-                          <TableCell className="font-mono text-sm py-2" colSpan={4}>
+                          <TableCell className="font-mono text-sm py-2" colSpan={3}>
                             <span className="font-semibold">Opening Balance</span>
                           </TableCell>
                           <TableCell className="text-right font-mono py-2">
@@ -1215,7 +1217,7 @@ export default function Accounts() {
                         {/* Voucher Rows */}
                         {vouchersWithBalance.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                               <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
                               <p>No transactions found for this account</p>
                               {(startDate || endDate) && (
@@ -1250,9 +1252,6 @@ export default function Accounts() {
                                   <ExternalLink className="h-3 w-3 flex-shrink-0" />
                                 </button>
                               </TableCell>
-                              <TableCell className="font-mono text-sm py-2">
-                                {voucher.voucherNumber}
-                              </TableCell>
                               <TableCell className="text-right font-mono py-2">
                                 {voucher.totalDebit > 0
                                   ? `$${formatNumber(voucher.totalDebit)}`
@@ -1281,7 +1280,7 @@ export default function Accounts() {
                     <Table>
                       <TableBody>
                         <TableRow className="bg-muted/30">
-                          <TableCell colSpan={4} className="text-right font-medium py-2">Opening Balance:</TableCell>
+                          <TableCell colSpan={3} className="text-right font-medium py-2">Opening Balance:</TableCell>
                           <TableCell className="text-right font-mono w-[120px] py-2">
                             {selectedAccount?.type === "supplier"
                               ? (openingBalance < 0 ? `$${formatNumber(Math.abs(openingBalance))}` : "-")
@@ -1295,7 +1294,7 @@ export default function Accounts() {
                           <TableCell className="w-[130px] py-2"></TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell colSpan={4} className="text-right font-medium py-2">Current Total:</TableCell>
+                          <TableCell colSpan={3} className="text-right font-medium py-2">Current Total:</TableCell>
                           <TableCell className="text-right font-mono font-semibold w-[120px] py-2">
                             ${formatNumber(transactionTotals.totalDebit)}
                           </TableCell>
@@ -1305,7 +1304,7 @@ export default function Accounts() {
                           <TableCell className="w-[130px] py-2"></TableCell>
                         </TableRow>
                         <TableRow className="bg-accent/50 border-t-2">
-                          <TableCell colSpan={4} className="text-right font-bold py-2">Closing Balance:</TableCell>
+                          <TableCell colSpan={3} className="text-right font-bold py-2">Closing Balance:</TableCell>
                           <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                             {selectedAccount?.type === "supplier"
                               ? (closingBalance < 0 ? `$${formatNumber(Math.abs(closingBalance))}` : "-")
