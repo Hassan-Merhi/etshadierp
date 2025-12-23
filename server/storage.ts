@@ -5516,6 +5516,8 @@ export class DbStorage implements IStorage {
     const location = await this.getLocationById(locationId);
     
     let stockGroupName = "Uncategorized";
+    let uncategorizedGroupId: number | null = null;
+    
     if (stockGroupId !== null) {
       const stockGroup = await db
         .select()
@@ -5527,23 +5529,65 @@ export class DbStorage implements IStorage {
         throw new Error("Stock group not found");
       }
       stockGroupName = stockGroup[0].name;
+    } else {
+      // When stockGroupId is null, find the "Uncategorized" stock group for this company
+      // Items may be assigned to this group OR have null stockGroupId
+      const uncategorizedGroup = await db
+        .select()
+        .from(schema.stockGroups)
+        .where(and(
+          eq(schema.stockGroups.companyId, companyId),
+          sql`UPPER(${schema.stockGroups.code}) = 'UNCATEGORIZED'`
+        ))
+        .limit(1);
+      
+      if (uncategorizedGroup.length > 0) {
+        uncategorizedGroupId = uncategorizedGroup[0].id;
+      }
     }
     
     if (!location) {
       throw new Error("Location not found");
     }
 
-    // Get all stock items in this stock group (or uncategorized if stockGroupId is null)
-    const stockItems = await db
-      .select()
-      .from(schema.stockItems)
-      .where(and(
-        eq(schema.stockItems.companyId, companyId),
-        stockGroupId !== null 
-          ? eq(schema.stockItems.stockGroupId, stockGroupId)
-          : isNull(schema.stockItems.stockGroupId),
-        isNull(schema.stockItems.deletedAt)
-      ));
+    // Get all stock items in this stock group
+    // For uncategorized: get items with null stockGroupId OR items in the "Uncategorized" group
+    let stockItems;
+    if (stockGroupId !== null) {
+      stockItems = await db
+        .select()
+        .from(schema.stockItems)
+        .where(and(
+          eq(schema.stockItems.companyId, companyId),
+          eq(schema.stockItems.stockGroupId, stockGroupId),
+          isNull(schema.stockItems.deletedAt)
+        ));
+    } else {
+      // For uncategorized items: find items with null stockGroupId OR in the Uncategorized group
+      if (uncategorizedGroupId !== null) {
+        stockItems = await db
+          .select()
+          .from(schema.stockItems)
+          .where(and(
+            eq(schema.stockItems.companyId, companyId),
+            or(
+              isNull(schema.stockItems.stockGroupId),
+              eq(schema.stockItems.stockGroupId, uncategorizedGroupId)
+            ),
+            isNull(schema.stockItems.deletedAt)
+          ));
+      } else {
+        // No Uncategorized group exists, just look for null stockGroupId
+        stockItems = await db
+          .select()
+          .from(schema.stockItems)
+          .where(and(
+            eq(schema.stockItems.companyId, companyId),
+            isNull(schema.stockItems.stockGroupId),
+            isNull(schema.stockItems.deletedAt)
+          ));
+      }
+    }
 
     if (stockItems.length === 0) {
       throw new Error("No stock items found in this stock group");
