@@ -321,6 +321,12 @@ export function OffloadDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
+      // Invalidate stock item queries so stock query page updates automatically
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && key.startsWith('/api/stock-items/');
+      }});
       toast({
         title: "Container offloaded successfully",
         description: `Container ${containerNumber} has been offloaded to the selected location.`,

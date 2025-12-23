@@ -4410,6 +4410,8 @@ export class DbStorage implements IStorage {
   }
 
   async getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]> {
+    // Only show purchases from containers that are NOT yet offloaded
+    // (once offloaded, the stock is in inventory, so the purchase is "complete")
     const results = await db
       .select({
         poNumber: schema.purchaseOrders.poNumber,
@@ -4426,7 +4428,13 @@ export class DbStorage implements IStorage {
       .leftJoin(schema.containers, eq(schema.purchaseOrders.containerId, schema.containers.id))
       .where(and(
         eq(schema.poLineItems.stockItemId, stockItemId),
-        eq(schema.purchaseOrders.companyId, companyId)
+        eq(schema.purchaseOrders.companyId, companyId),
+        // Exclude purchases from offloaded containers
+        // Either no container (containerId is null) or container is not offloaded
+        or(
+          isNull(schema.purchaseOrders.containerId),
+          sql`${schema.containers.status} NOT IN ('OFFLOADED', 'SOLD')`
+        )
       ))
       .orderBy(sql`${schema.purchaseOrders.createdAt} DESC`);
 
@@ -4458,25 +4466,30 @@ export class DbStorage implements IStorage {
   }
 
   async getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]> {
-    const results = await db
-      .select({
-        locationId: schema.inventory.locationId,
-        locationName: schema.locations.name,
-        locationCode: schema.locations.code,
-        quantity: schema.inventory.quantity,
-        averageRate: schema.inventory.averageRate,
-        totalValue: schema.inventory.totalValue,
-      })
-      .from(schema.inventory)
-      .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
-      .where(and(
-        eq(schema.inventory.stockItemId, stockItemId),
-        eq(schema.locations.companyId, companyId),
-        sql`${schema.inventory.quantity}::numeric > 0` // Only show locations with positive inventory
-      ))
-      .orderBy(schema.locations.name);
+    // Use raw SQL with DISTINCT ON to get the most recent inventory record per location
+    // This ensures we get the freshest data if duplicates exist
+    const results = await db.execute(sql`
+      SELECT DISTINCT ON (i.location_id)
+        i.location_id as "locationId",
+        l.name as "locationName",
+        l.code as "locationCode",
+        i.quantity,
+        i.average_rate as "averageRate",
+        i.total_value as "totalValue"
+      FROM inventory i
+      INNER JOIN locations l ON i.location_id = l.id
+      WHERE i.stock_item_id = ${stockItemId}
+        AND l.company_id = ${companyId}
+        AND i.quantity::numeric > 0
+      ORDER BY i.location_id, i.last_updated DESC
+    `);
 
-    return results;
+    // Sort by location name for display
+    const sorted = (results.rows as any[]).sort((a, b) => 
+      (a.locationName || '').localeCompare(b.locationName || '')
+    );
+
+    return sorted;
   }
 
   async getVoucherHistoryForItem(stockItemId: number, companyId: number): Promise<any[]> {
