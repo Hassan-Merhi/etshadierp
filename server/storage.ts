@@ -3542,21 +3542,14 @@ export class DbStorage implements IStorage {
       for (const item of items) {
         const quantity = parseFloat(item.quantity);
         const rate = parseFloat(item.rate);
-        const totalAmount = Math.abs(quantity) * rate;
-
-        // Insert adjustment item
-        const [adjustmentItem] = await tx.insert(schema.stockAdjustmentItems).values({
-          adjustmentId: adjustment.id,
-          stockItemId: item.stockItemId,
-          quantity: item.quantity,
-          rate: item.rate,
-          totalAmount: totalAmount.toFixed(2),
-        }).returning();
-
-        adjustmentItems.push(adjustmentItem);
 
         // Determine if this is a production or consumption item
         const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+
+        // For consumption items, we need to get the current inventory rate FIRST
+        // to store the actual value that will be removed from inventory
+        let actualRate = rate;
+        let actualTotalAmount = Math.abs(quantity) * rate;
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
@@ -3597,7 +3590,10 @@ export class DbStorage implements IStorage {
               newValue = newQty > 0 ? newQty * currentRate : 0;
               newRate = currentRate;
               // Track actual value removed (using current average rate, not input rate)
-              actualValueChange = Math.abs(quantity) * currentRate;
+              // CRITICAL: Update actualRate and actualTotalAmount to match what's actually being consumed
+              actualRate = currentRate;
+              actualTotalAmount = Math.abs(quantity) * currentRate;
+              actualValueChange = actualTotalAmount;
               totalConsumptionValue += actualValueChange;
             }
             
@@ -3610,7 +3606,7 @@ export class DbStorage implements IStorage {
                 lastUpdated: new Date(),
               })
               .where(eq(schema.inventory.id, currentInventory.id));
-          } else if (quantity > 0 || adjustmentType === "Production") {
+          } else if (isProduction) {
             // Create new inventory record for production (positive quantities)
             await tx.insert(schema.inventory).values({
               companyId: location.companyId,
@@ -3618,15 +3614,30 @@ export class DbStorage implements IStorage {
               stockItemId: item.stockItemId,
               quantity: Math.abs(quantity).toFixed(3),
               averageRate: item.rate,
-              totalValue: totalAmount.toFixed(2),
+              totalValue: actualTotalAmount.toFixed(2),
               lastUpdated: new Date(),
             });
             // Track value for new inventory
-            if (isProduction) {
-              totalProductionValue += totalAmount;
-            }
+            totalProductionValue += actualTotalAmount;
+          } else {
+            // Consumption requires existing inventory - cannot consume what doesn't exist
+            // This guard ensures we never store user-input rates for consumption items
+            throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}. Cannot consume items that don't exist in inventory.`);
           }
         }
+
+        // Insert adjustment item with the ACTUAL rate and total used
+        // For consumption: uses current inventory average rate
+        // For production: uses user-input rate
+        const [adjustmentItem] = await tx.insert(schema.stockAdjustmentItems).values({
+          adjustmentId: adjustment.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: actualRate.toFixed(2),
+          totalAmount: actualTotalAmount.toFixed(2),
+        }).returning();
+
+        adjustmentItems.push(adjustmentItem);
       }
 
       // Create balancing voucher entries (only if not optional and there are amounts to record)
@@ -4240,23 +4251,16 @@ export class DbStorage implements IStorage {
       for (const item of items) {
         const quantity = parseFloat(item.quantity);
         const rate = parseFloat(item.rate);
-        const totalAmount = Math.abs(quantity) * rate;
 
         console.log('[storage.updateStockAdjustment] Creating new item:', item.stockItemId, 'qty:', quantity);
 
-        // Insert adjustment item
-        const [adjustmentItem] = await tx.insert(schema.stockAdjustmentItems).values({
-          adjustmentId: updatedAdjustment.id,
-          stockItemId: item.stockItemId,
-          quantity: item.quantity,
-          rate: item.rate,
-          totalAmount: totalAmount.toFixed(2),
-        }).returning();
-
-        adjustmentItems.push(adjustmentItem);
-
         // Determine if this is a production or consumption item
         const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+
+        // For consumption items, we need to get the current inventory rate FIRST
+        // to store the actual value that will be removed from inventory
+        let actualRate = rate;
+        let actualTotalAmount = Math.abs(quantity) * rate;
 
         // Only update inventory if voucher is NOT optional
         if (!isOptional) {
@@ -4270,64 +4274,80 @@ export class DbStorage implements IStorage {
             ));
 
           if (currentInventory) {
-          // Adjust quantity at location
-          const currentQty = parseFloat(currentInventory.quantity);
-          const currentRate = parseFloat(currentInventory.averageRate || "0");
-          
-          let newQty: number;
-          let newValue: number;
-          let newRate: number;
-          let actualValueChange: number;
+            // Adjust quantity at location
+            const currentQty = parseFloat(currentInventory.quantity);
+            const currentRate = parseFloat(currentInventory.averageRate || "0");
+            
+            let newQty: number;
+            let newValue: number;
+            let newRate: number;
+            let actualValueChange: number;
 
-          if (isProduction) {
-            // Positive adjustment - add to inventory
-            // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
-            newQty = currentQty + Math.abs(quantity);
-            newRate = newQty > 0 
-              ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
-              : 0;
-            newValue = newQty * newRate;
-            // Track actual value added (using input rate for production)
-            actualValueChange = Math.abs(quantity) * rate;
-            totalProductionValue += actualValueChange;
-          } else {
-            // Consumption - subtract from inventory (use absolute value to ensure reduction)
-            newQty = currentQty - Math.abs(quantity);
-            newValue = newQty > 0 ? newQty * currentRate : 0;
-            newRate = currentRate;
-            // Track actual value removed (using current average rate, not input rate)
-            actualValueChange = Math.abs(quantity) * currentRate;
-            totalConsumptionValue += actualValueChange;
-          }
-          
-          await tx
-            .update(schema.inventory)
-            .set({
-              quantity: newQty.toFixed(3),
-              averageRate: newRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
+            if (isProduction) {
+              // Positive adjustment - add to inventory
+              // Use weighted average: (existing qty * existing rate + new qty * new rate) / total qty
+              newQty = currentQty + Math.abs(quantity);
+              newRate = newQty > 0 
+                ? ((currentQty * currentRate) + (Math.abs(quantity) * rate)) / newQty 
+                : 0;
+              newValue = newQty * newRate;
+              // Track actual value added (using input rate for production)
+              actualValueChange = Math.abs(quantity) * rate;
+              totalProductionValue += actualValueChange;
+            } else {
+              // Consumption - subtract from inventory (use absolute value to ensure reduction)
+              newQty = currentQty - Math.abs(quantity);
+              newValue = newQty > 0 ? newQty * currentRate : 0;
+              newRate = currentRate;
+              // Track actual value removed (using current average rate, not input rate)
+              // CRITICAL: Update actualRate and actualTotalAmount to match what's actually being consumed
+              actualRate = currentRate;
+              actualTotalAmount = Math.abs(quantity) * currentRate;
+              actualValueChange = actualTotalAmount;
+              totalConsumptionValue += actualValueChange;
+            }
+            
+            await tx
+              .update(schema.inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: newRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(schema.inventory.id, currentInventory.id));
+          } else if (isProduction) {
+            // Create new inventory record for production (positive quantities)
+            await tx.insert(schema.inventory).values({
+              companyId: newLocation.companyId,
+              locationId,
+              stockItemId: item.stockItemId,
+              quantity: Math.abs(quantity).toFixed(3),
+              averageRate: item.rate,
+              totalValue: actualTotalAmount.toFixed(2),
               lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, currentInventory.id));
-        } else if (quantity > 0 || adjustmentType === "Production") {
-          // Create new inventory record for production (positive quantities)
-          await tx.insert(schema.inventory).values({
-            companyId: newLocation.companyId,
-            locationId,
-            stockItemId: item.stockItemId,
-            quantity: Math.abs(quantity).toFixed(3),
-            averageRate: item.rate,
-            totalValue: totalAmount.toFixed(2),
-            lastUpdated: new Date(),
-          });
-          // Track value for new inventory
-          if (isProduction) {
-            totalProductionValue += totalAmount;
+            });
+            // Track value for new inventory
+            totalProductionValue += actualTotalAmount;
+          } else {
+            // Consumption requires existing inventory - cannot consume what doesn't exist
+            // This guard ensures we never store user-input rates for consumption items
+            throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}. Cannot consume items that don't exist in inventory.`);
           }
-        } else {
-          throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}`);
         }
-        }
+
+        // Insert adjustment item with the ACTUAL rate and total used
+        // For consumption: uses current inventory average rate
+        // For production: uses user-input rate
+        const [adjustmentItem] = await tx.insert(schema.stockAdjustmentItems).values({
+          adjustmentId: updatedAdjustment.id,
+          stockItemId: item.stockItemId,
+          quantity: item.quantity,
+          rate: actualRate.toFixed(2),
+          totalAmount: actualTotalAmount.toFixed(2),
+        }).returning();
+
+        adjustmentItems.push(adjustmentItem);
       }
 
       // Create balancing voucher entries (only if not optional and there are amounts to record)

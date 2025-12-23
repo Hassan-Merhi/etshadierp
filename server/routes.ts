@@ -9380,6 +9380,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ message: "Only Admin and Owner can edit purchase orders" });
       }
 
+      // Check if container is offloaded - if so, prevent stock item changes that would cause import cycle imbalance
+      const container = await storage.getContainerById(existingPO.containerId);
+      if (container?.status === "OFFLOADED" && req.body.items && Array.isArray(req.body.items)) {
+        const existingLineItems = await storage.getLineItemsByPO(id);
+        const existingStockItemIds = new Set(existingLineItems.map(item => item.stockItemId));
+        
+        // Check if any stock item is being changed (swapped)
+        // Normalize stockItemId to number to avoid type mismatch if client sends strings
+        for (const item of req.body.items) {
+          const stockItemId = item.stockItemId ? Number(item.stockItemId) : null;
+          if (stockItemId && !existingStockItemIds.has(stockItemId)) {
+            return res.status(400).json({
+              message: "Cannot change stock items on an offloaded container. The inventory has already been added with the original items. Changing stock items would cause an import cycle imbalance. To fix this, first reverse the container offload, then edit the PO, then re-offload."
+            });
+          }
+        }
+      }
+
       // Update line items if provided
       if (req.body.items && Array.isArray(req.body.items)) {
         // Get existing line items to preserve values when only name changes
