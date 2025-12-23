@@ -4,7 +4,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive } from "lucide-react";
 import { LocationCreateDialog } from "@/components/LocationCreateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -116,6 +116,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Archive stock group dialog state
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   // Create location dialog state
   const [createLocationDialogOpen, setCreateLocationDialogOpen] = useState(false);
@@ -577,6 +581,39 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleArchiveStockGroup = async () => {
+    if (!selectedLocationLocal || !selectedGroup || !selectedGroup.groupId) return;
+
+    setIsArchiving(true);
+    try {
+      await apiRequest("POST", "/api/stock-group-archives", {
+        locationId: selectedLocationLocal.id,
+        stockGroupId: selectedGroup.groupId,
+        notes: `Archived from Location Inventory page`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
+
+      toast({
+        title: "Stock Group Archived",
+        description: `${selectedGroup.groupName} has been archived from ${selectedLocationLocal.name}. You can restore it from Orphaned Records.`,
+      });
+
+      setSelectedGroup(null);
+      setArchiveDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Archive Failed",
+        description: error.message || "Failed to archive stock group",
+        variant: "destructive",
+      });
+    } finally {
+      setIsArchiving(false);
     }
   };
 
@@ -1182,9 +1219,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       {/* Stock Items Table View (Single Group) */}
       {selectedLocationLocal && selectedGroup && (
         <div>
-          <h1 className="text-3xl font-bold mb-6">
-            {selectedGroup.groupName} - Stock Items
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">
+              {selectedGroup.groupName} - Stock Items
+            </h1>
+            {!posUser && selectedGroup.groupId && (
+              <Button
+                variant="outline"
+                onClick={() => setArchiveDialogOpen(true)}
+                data-testid="button-archive-stock-group"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                Archive Stock Group
+              </Button>
+            )}
+          </div>
 
           <Card className="p-4">
             <div className="relative mb-4">
@@ -1503,6 +1552,31 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </div>
         </div>
       )}
+
+      {/* Archive Stock Group Confirmation Dialog - placed at root level */}
+      <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Stock Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{selectedGroup?.groupName}" from "{selectedLocationLocal?.name}"? 
+              This will clear all inventory for this stock group at this location. 
+              A backup will be saved and you can restore it from Orphaned Records if needed.
+              Your POS sales history and monthly reports will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-archive">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveStockGroup}
+              disabled={isArchiving}
+              data-testid="button-confirm-archive"
+            >
+              {isArchiving ? "Archiving..." : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

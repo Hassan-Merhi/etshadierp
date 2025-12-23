@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { AlertCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { AlertCircle, RefreshCw, AlertTriangle, Archive, RotateCcw, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -49,6 +49,23 @@ interface OrphanedRecordsResponse {
   unbalancedVouchers: UnbalancedVoucher[];
 }
 
+interface StockGroupArchive {
+  id: number;
+  companyId: number;
+  locationId: number;
+  stockGroupId: number;
+  locationName: string;
+  stockGroupName: string;
+  totalQuantity: string;
+  totalValue: string;
+  itemCount: number;
+  archivedBy: string;
+  archivedAt: string;
+  restoredAt: string | null;
+  deletedAt: string | null;
+  notes: string | null;
+}
+
 export default function OrphanedRecordsPage() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -65,6 +82,38 @@ export default function OrphanedRecordsPage() {
 
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations"],
+  });
+
+  const { data: stockGroupArchives = [], isLoading: archivesLoading } = useQuery<StockGroupArchive[]>({
+    queryKey: ["/api/stock-group-archives"],
+  });
+
+  const restoreArchiveMutation = useMutation({
+    mutationFn: async (archiveId: number) => {
+      return apiRequest("POST", `/api/stock-group-archives/${archiveId}/restore`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Stock group inventory restored successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteArchiveMutation = useMutation({
+    mutationFn: async ({ archiveId, permanent }: { archiveId: number; permanent: boolean }) => {
+      return apiRequest("DELETE", `/api/stock-group-archives/${archiveId}?permanent=${permanent}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Archive deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const reassignMutation = useMutation({
@@ -299,11 +348,95 @@ export default function OrphanedRecordsPage() {
         )}
       </Card>
 
+      {/* Archived Stock Groups Section */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Archive className="h-6 w-6 text-blue-500" />
+          <div>
+            <h2 className="text-xl font-semibold" data-testid="heading-archived-stock-groups">Archived Stock Groups</h2>
+            <p className="text-sm text-muted-foreground">Stock groups that have been cleared from locations (can be restored or permanently deleted)</p>
+          </div>
+        </div>
+
+        {archivesLoading ? (
+          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        ) : stockGroupArchives.length === 0 ? (
+          <div className="text-center py-8">
+            <Archive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-lg font-medium">No archived stock groups</p>
+            <p className="text-muted-foreground">Archive stock groups from Location Inventory to clear and backup inventory data</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Stock Group</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead className="text-right">Items</TableHead>
+                <TableHead className="text-right">Total Qty</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
+                <TableHead>Archived Date</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stockGroupArchives.map((archive) => (
+                <TableRow key={archive.id} data-testid={`row-archive-${archive.id}`}>
+                  <TableCell className="font-medium" data-testid={`text-archive-group-${archive.id}`}>
+                    {archive.stockGroupName}
+                  </TableCell>
+                  <TableCell data-testid={`text-archive-location-${archive.id}`}>
+                    {archive.locationName}
+                  </TableCell>
+                  <TableCell className="text-right" data-testid={`text-archive-items-${archive.id}`}>
+                    {archive.itemCount}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid={`text-archive-qty-${archive.id}`}>
+                    {parseFloat(archive.totalQuantity).toFixed(3)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid={`text-archive-value-${archive.id}`}>
+                    {formatCurrency(archive.totalValue)}
+                  </TableCell>
+                  <TableCell data-testid={`text-archive-date-${archive.id}`}>
+                    {formatDisplayDate(archive.archivedAt)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => restoreArchiveMutation.mutate(archive.id)}
+                        disabled={restoreArchiveMutation.isPending}
+                        data-testid={`button-restore-archive-${archive.id}`}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restore
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })}
+                        disabled={deleteArchiveMutation.isPending}
+                        data-testid={`button-delete-archive-${archive.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
       <Card className="p-4 bg-muted/50">
         <h3 className="font-semibold mb-2">How this works:</h3>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
           <li><strong>Unbalanced Vouchers:</strong> These have accounting errors where debits don't equal credits. Review and fix manually in the voucher editor.</li>
           <li><strong>Deleted Location Vouchers:</strong> These reference locations that have been deleted. Select records and reassign to a valid location.</li>
+          <li><strong>Archived Stock Groups:</strong> Stock groups that have been cleared from a location. Restore to recover the inventory, or permanently delete after re-importing.</li>
           <li>The location name is saved on vouchers to preserve history if the location is deleted in the future.</li>
         </ul>
       </Card>
