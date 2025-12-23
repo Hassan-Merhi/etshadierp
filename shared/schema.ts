@@ -1579,11 +1579,12 @@ export type InsertRoleFeaturePermission = z.infer<typeof insertRoleFeaturePermis
 export type RoleFeaturePermission = typeof roleFeaturePermissions.$inferSelect;
 
 // Stock Group Location Archives - for archiving/restoring inventory by stock group at a location
+// stockGroupId is nullable to support archiving "Uncategorized" items (items with no stock group)
 export const stockGroupLocationArchives = pgTable("stock_group_location_archives", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
   locationId: integer("location_id").notNull(),
-  stockGroupId: integer("stock_group_id").notNull(),
+  stockGroupId: integer("stock_group_id"),
   locationName: text("location_name").notNull(),
   stockGroupName: text("stock_group_name").notNull(),
   totalQuantity: decimal("total_quantity", { precision: 15, scale: 3 }).notNull().default("0"),

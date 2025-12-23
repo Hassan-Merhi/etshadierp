@@ -5508,32 +5508,40 @@ export class DbStorage implements IStorage {
   async archiveStockGroupAtLocation(
     companyId: number,
     locationId: number,
-    stockGroupId: number,
+    stockGroupId: number | null,
     archivedBy: string,
     notes?: string
   ): Promise<schema.StockGroupLocationArchive> {
     // Get location and stock group names for the archive record
     const location = await this.getLocationById(locationId);
-    const stockGroup = await db
-      .select()
-      .from(schema.stockGroups)
-      .where(eq(schema.stockGroups.id, stockGroupId))
-      .limit(1);
+    
+    let stockGroupName = "Uncategorized";
+    if (stockGroupId !== null) {
+      const stockGroup = await db
+        .select()
+        .from(schema.stockGroups)
+        .where(eq(schema.stockGroups.id, stockGroupId))
+        .limit(1);
+      
+      if (!stockGroup.length) {
+        throw new Error("Stock group not found");
+      }
+      stockGroupName = stockGroup[0].name;
+    }
     
     if (!location) {
       throw new Error("Location not found");
     }
-    if (!stockGroup.length) {
-      throw new Error("Stock group not found");
-    }
 
-    // Get all stock items in this stock group
+    // Get all stock items in this stock group (or uncategorized if stockGroupId is null)
     const stockItems = await db
       .select()
       .from(schema.stockItems)
       .where(and(
         eq(schema.stockItems.companyId, companyId),
-        eq(schema.stockItems.stockGroupId, stockGroupId),
+        stockGroupId !== null 
+          ? eq(schema.stockItems.stockGroupId, stockGroupId)
+          : isNull(schema.stockItems.stockGroupId),
         isNull(schema.stockItems.deletedAt)
       ));
 
@@ -5579,7 +5587,7 @@ export class DbStorage implements IStorage {
         locationId,
         stockGroupId,
         locationName: location.name,
-        stockGroupName: stockGroup[0].name,
+        stockGroupName,
         totalQuantity: totalQuantity.toString(),
         totalValue: totalValue.toString(),
         itemCount: inventoryRecords.length,

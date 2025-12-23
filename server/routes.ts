@@ -5722,13 +5722,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
       const { locationId, stockGroupId, notes } = req.body;
-      if (!locationId || !stockGroupId) {
-        return res.status(400).json({ message: "Location ID and Stock Group ID are required" });
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
       }
       const archive = await storage.archiveStockGroupAtLocation(
         req.session.currentCompanyId,
         parseInt(locationId),
-        parseInt(stockGroupId),
+        stockGroupId !== null && stockGroupId !== undefined ? parseInt(stockGroupId) : null,
         req.user!.id,
         notes
       );

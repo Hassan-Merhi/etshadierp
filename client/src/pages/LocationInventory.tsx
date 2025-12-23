@@ -585,7 +585,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   };
 
   const handleArchiveStockGroup = async () => {
-    if (!selectedLocationLocal || !selectedGroup || !selectedGroup.groupId) return;
+    if (!selectedLocationLocal || !selectedGroup) return;
 
     setIsArchiving(true);
     try {
