@@ -1223,7 +1223,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <h1 className="text-3xl font-bold">
               {selectedGroup.groupName} - Stock Items
             </h1>
-            {!posUser && selectedGroup.groupId && (
+            {!posUser && (
               <Button
                 variant="outline"
                 onClick={() => setArchiveDialogOpen(true)}
