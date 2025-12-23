@@ -5684,6 +5684,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stock Group Location Archives - Archive/Restore stock groups at specific locations
+  app.get("/api/stock-group-archives", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const archives = await storage.getStockGroupLocationArchives(req.session.currentCompanyId);
+      res.json(archives);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/stock-group-archives/:id", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const archive = await storage.getStockGroupLocationArchiveById(
+        parseInt(req.params.id),
+        req.session.currentCompanyId
+      );
+      if (!archive) {
+        return res.status(404).json({ message: "Archive not found" });
+      }
+      const items = await storage.getStockGroupLocationArchiveItems(archive.id);
+      res.json({ archive, items });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/stock-group-archives", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const { locationId, stockGroupId, notes } = req.body;
+      if (!locationId || !stockGroupId) {
+        return res.status(400).json({ message: "Location ID and Stock Group ID are required" });
+      }
+      const archive = await storage.archiveStockGroupAtLocation(
+        req.session.currentCompanyId,
+        parseInt(locationId),
+        parseInt(stockGroupId),
+        req.user!.id,
+        notes
+      );
+      res.json(archive);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/stock-group-archives/:id/restore", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const archive = await storage.restoreStockGroupLocationArchive(
+        parseInt(req.params.id),
+        req.session.currentCompanyId
+      );
+      res.json(archive);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/stock-group-archives/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const permanent = req.query.permanent === 'true';
+      if (permanent) {
+        await storage.permanentlyDeleteStockGroupLocationArchive(
+          parseInt(req.params.id),
+          req.session.currentCompanyId
+        );
+      } else {
+        await storage.deleteStockGroupLocationArchive(
+          parseInt(req.params.id),
+          req.session.currentCompanyId
+        );
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Bank Accounts
   app.get("/api/bank-accounts", requireAuth, async (req, res) => {
     try {

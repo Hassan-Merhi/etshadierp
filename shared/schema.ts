@@ -1578,6 +1578,51 @@ export const insertRoleFeaturePermissionSchema = createInsertSchema(roleFeatureP
 export type InsertRoleFeaturePermission = z.infer<typeof insertRoleFeaturePermissionSchema>;
 export type RoleFeaturePermission = typeof roleFeaturePermissions.$inferSelect;
 
+// Stock Group Location Archives - for archiving/restoring inventory by stock group at a location
+export const stockGroupLocationArchives = pgTable("stock_group_location_archives", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  stockGroupId: integer("stock_group_id").notNull(),
+  locationName: text("location_name").notNull(),
+  stockGroupName: text("stock_group_name").notNull(),
+  totalQuantity: decimal("total_quantity", { precision: 15, scale: 3 }).notNull().default("0"),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
+  itemCount: integer("item_count").notNull().default(0),
+  archivedBy: varchar("archived_by").notNull(),
+  archivedAt: timestamp("archived_at").notNull().defaultNow(),
+  restoredAt: timestamp("restored_at"),
+  deletedAt: timestamp("deleted_at"),
+  notes: text("notes"),
+});
+
+export const insertStockGroupLocationArchiveSchema = createInsertSchema(stockGroupLocationArchives).omit({
+  id: true,
+  archivedAt: true,
+});
+
+export type InsertStockGroupLocationArchive = z.infer<typeof insertStockGroupLocationArchiveSchema>;
+export type StockGroupLocationArchive = typeof stockGroupLocationArchives.$inferSelect;
+
+// Archive Items - individual inventory records within an archive
+export const stockGroupLocationArchiveItems = pgTable("stock_group_location_archive_items", {
+  id: serial("id").primaryKey(),
+  archiveId: integer("archive_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  stockItemCode: varchar("stock_item_code", { length: 50 }).notNull(),
+  stockItemName: text("stock_item_name").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull(),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
+});
+
+export const insertStockGroupLocationArchiveItemSchema = createInsertSchema(stockGroupLocationArchiveItems).omit({
+  id: true,
+});
+
+export type InsertStockGroupLocationArchiveItem = z.infer<typeof insertStockGroupLocationArchiveItemSchema>;
+export type StockGroupLocationArchiveItem = typeof stockGroupLocationArchiveItems.$inferSelect;
+
 // List of all available features for permission control
 export const FEATURE_KEYS = [
   "dashboard",
