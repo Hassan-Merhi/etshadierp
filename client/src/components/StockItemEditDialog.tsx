@@ -268,7 +268,7 @@ export function StockItemEditDialog({
                     <SelectItem value="none">Uncategorized</SelectItem>
                     {stockGroups.map((group) => (
                       <SelectItem key={group.id} value={group.id.toString()}>
-                        {group.code} - {group.name}
+                        {group.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

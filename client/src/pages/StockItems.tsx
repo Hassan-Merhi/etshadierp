@@ -165,7 +165,7 @@ export default function StockItems() {
   const getStockGroupName = (stockGroupId: number | null) => {
     if (!stockGroupId) return "Uncategorized";
     const group = stockGroups.find(g => g.id === stockGroupId);
-    return group ? `${group.code} - ${group.name}` : "Unknown";
+    return group ? group.name : "Unknown";
   };
 
   const allFilteredSelected = filteredStockItems.length > 0 && 
@@ -270,7 +270,7 @@ export default function StockItems() {
             <option value="all">All Groups</option>
             <option value="uncategorized">Uncategorized</option>
             {stockGroups.map(group => (
-              <option key={group.id} value={group.id}>{group.code} - {group.name}</option>
+              <option key={group.id} value={group.id}>{group.name}</option>
             ))}
           </select>
         </div>
