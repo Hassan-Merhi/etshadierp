@@ -1,4 +1,4 @@
-import { eq, and, or, sql, inArray, desc, ne, isNull } from "drizzle-orm";
+import { eq, and, or, sql, inArray, desc, ne, isNull, asc } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -363,7 +363,7 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(schema.users);
+    return await db.select().from(schema.users).orderBy(asc(schema.users.username));
   }
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
@@ -393,7 +393,7 @@ export class DbStorage implements IStorage {
 
   // Companies
   async getAllCompanies(): Promise<Company[]> {
-    return await db.select().from(schema.companies);
+    return await db.select().from(schema.companies).orderBy(asc(schema.companies.name));
   }
 
   async getCompanyById(id: number): Promise<Company | undefined> {
@@ -625,7 +625,7 @@ export class DbStorage implements IStorage {
         eq(schema.locations.companyId, companyId),
         isNull(schema.locations.deletedAt)
       )
-    );
+    ).orderBy(asc(schema.locations.name));
     console.log('[storage.getAllLocations] Query returned:', locations.length, 'locations');
     return locations;
   }
@@ -661,7 +661,7 @@ export class DbStorage implements IStorage {
         eq(schema.ledgerAccounts.companyId, companyId),
         isNull(schema.ledgerAccounts.deletedAt)
       )
-    );
+    ).orderBy(asc(schema.ledgerAccounts.code));
   }
 
   async getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined> {
@@ -712,7 +712,7 @@ export class DbStorage implements IStorage {
         eq(schema.employees.companyId, companyId),
         isNull(schema.employees.deletedAt)
       )
-    );
+    ).orderBy(asc(schema.employees.firstName), asc(schema.employees.lastName));
     // Ensure camelCase mapping works correctly
     return employees.map(emp => ({
       ...emp,
@@ -859,7 +859,8 @@ export class DbStorage implements IStorage {
     const results = await db
       .select()
       .from(schema.employeeGroups)
-      .where(eq(schema.employeeGroups.companyId, companyId));
+      .where(eq(schema.employeeGroups.companyId, companyId))
+      .orderBy(asc(schema.employeeGroups.name));
     // Explicitly map groupType for API compatibility
     return results.map(g => ({
       ...g,
@@ -943,7 +944,7 @@ export class DbStorage implements IStorage {
 
   // Suppliers
   async getAllSuppliers(): Promise<Supplier[]> {
-    return await db.select().from(schema.suppliers);
+    return await db.select().from(schema.suppliers).orderBy(asc(schema.suppliers.legalName));
   }
 
   async getSupplierByCode(code: string): Promise<Supplier | undefined> {
@@ -972,7 +973,7 @@ export class DbStorage implements IStorage {
 
   // Stock Groups
   async getAllStockGroups(companyId: number): Promise<StockGroup[]> {
-    return await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.companyId, companyId));
+    return await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.companyId, companyId)).orderBy(asc(schema.stockGroups.name));
   }
 
   async getStockGroupByCode(code: string, companyId: number): Promise<StockGroup | undefined> {
@@ -1007,7 +1008,7 @@ export class DbStorage implements IStorage {
         eq(schema.stockItems.companyId, companyId),
         isNull(schema.stockItems.deletedAt)
       )
-    );
+    ).orderBy(asc(schema.stockItems.code));
   }
 
   async getStockItemByCode(code: string, companyId: number): Promise<StockItem | undefined> {
@@ -1120,7 +1121,8 @@ export class DbStorage implements IStorage {
     return await db
       .select()
       .from(schema.stockItemCodeAliases)
-      .where(eq(schema.stockItemCodeAliases.companyId, companyId));
+      .where(eq(schema.stockItemCodeAliases.companyId, companyId))
+      .orderBy(asc(schema.stockItemCodeAliases.aliasCode));
   }
 
   async getStockItemCodeAliasById(id: number): Promise<schema.StockItemCodeAlias | undefined> {
@@ -1153,7 +1155,7 @@ export class DbStorage implements IStorage {
         eq(schema.bankAccounts.companyId, companyId),
         isNull(schema.bankAccounts.deletedAt)
       )
-    );
+    ).orderBy(asc(schema.bankAccounts.code));
   }
 
   async getBankAccountByCode(code: string): Promise<BankAccount | undefined> {
@@ -1250,7 +1252,7 @@ export class DbStorage implements IStorage {
 
   // Fixed Assets
   async getAllFixedAssets(companyId: number): Promise<FixedAsset[]> {
-    return await db.select().from(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, companyId));
+    return await db.select().from(schema.fixedAssets).where(eq(schema.fixedAssets.companyId, companyId)).orderBy(asc(schema.fixedAssets.code));
   }
 
   async getFixedAssetByCode(code: string): Promise<FixedAsset | undefined> {
@@ -1265,7 +1267,7 @@ export class DbStorage implements IStorage {
 
   // Containers
   async getAllContainers(companyId: number): Promise<Container[]> {
-    return await db.select().from(schema.containers).where(eq(schema.containers.companyId, companyId));
+    return await db.select().from(schema.containers).where(eq(schema.containers.companyId, companyId)).orderBy(asc(schema.containers.containerNumber));
   }
 
   async getActiveContainers(companyId: number): Promise<Container[]> {
@@ -1275,7 +1277,7 @@ export class DbStorage implements IStorage {
           eq(schema.containers.companyId, companyId),
           ne(schema.containers.status, 'SOLD')
         )
-      );
+      ).orderBy(asc(schema.containers.containerNumber));
   }
 
   async getSoldContainers(companyId: number): Promise<any[]> {
@@ -1338,7 +1340,7 @@ export class DbStorage implements IStorage {
 
   // Purchase Orders
   async getAllPurchaseOrders(companyId: number): Promise<PurchaseOrder[]> {
-    return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, companyId));
+    return await db.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.companyId, companyId)).orderBy(asc(schema.purchaseOrders.poNumber));
   }
 
   async getPurchaseOrderById(id: number): Promise<PurchaseOrder | undefined> {
@@ -2317,7 +2319,7 @@ export class DbStorage implements IStorage {
 
   // Vouchers and Journal Entries
   async getAllVouchers(companyId: number): Promise<Voucher[]> {
-    return await db.select().from(schema.vouchers).where(eq(schema.vouchers.companyId, companyId));
+    return await db.select().from(schema.vouchers).where(eq(schema.vouchers.companyId, companyId)).orderBy(asc(schema.vouchers.voucherNumber));
   }
 
   async getVoucherById(id: number): Promise<Voucher | undefined> {
