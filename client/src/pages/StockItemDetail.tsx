@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
-import { format, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
@@ -80,7 +79,6 @@ export default function StockItemDetail() {
 
   const handleSaleClick = (saleDate: string, voucherId?: number) => {
     if (!voucherId) return;
-    // Normalize date to YYYY-MM-DD format (remove time if present)
     const normalizedDate = saleDate.split(' ')[0];
     navigate(`/pos-daybook?date=${normalizedDate}&voucherId=${voucherId}`);
   };
@@ -121,9 +119,7 @@ export default function StockItemDetail() {
       </div>
 
       <div>
-        <h1 className="text-3xl font-bold">
-          {selectedItem?.name || "Loading..."} ({selectedItem?.code || ""})
-        </h1>
+        <h1 className="text-3xl font-bold">{selectedItem?.name || "Loading..."}</h1>
         <p className="text-muted-foreground">
           Purchase history, sales history, and current inventory locations
         </p>
@@ -148,22 +144,22 @@ export default function StockItemDetail() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Purchases Section */}
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Purchases
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-hidden">
               {itemDetails.purchases.length > 0 ? (
-                <>
+                <div className="h-64 overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
-                        <TableHead>Container #</TableHead>
+                        <TableHead>Supplier</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
                         <TableHead className="text-right">Rate</TableHead>
                       </TableRow>
@@ -171,49 +167,40 @@ export default function StockItemDetail() {
                     <TableBody>
                       {itemDetails.purchases.map((purchase, idx) => (
                         <TableRow key={idx}>
-                          <TableCell>{purchase.containerNumber || "N/A"}</TableCell>
-                          <TableCell className="text-right font-mono">{formatSmartNumber(purchase.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(purchase.rate))}</TableCell>
+                          <TableCell className="text-sm">{purchase.supplierName || "-"}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${formatNumber(parseFloat(purchase.rate))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="mt-3 pt-3 border-t flex justify-end">
-                    <div className="text-sm">
-                      <span className="font-semibold">Total Quantity: </span>
-                      <span className="font-mono">
-                        {formatSmartNumber(
-                          itemDetails.purchases.reduce((sum, p) => sum + parseFloat(p.quantity || "0"), 0)
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No purchase history</p>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No purchase history
+                </div>
               )}
             </CardContent>
           </Card>
 
           {/* Sales Section */}
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Sales
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-hidden">
               {itemDetails.sales.length > 0 ? (
-                <>
+                <div className="h-64 overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Selling Price</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -224,51 +211,36 @@ export default function StockItemDetail() {
                           className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
                           data-testid={`row-sale-${idx}`}
                         >
-                          <TableCell>{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
-                          <TableCell>{sale.locationName || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">{formatSmartNumber(sale.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(sale.sellingPrice))}</TableCell>
-                          <TableCell className="text-right font-mono">${formatNumber(parseFloat(sale.totalSales))}</TableCell>
+                          <TableCell className="text-sm">{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
+                          <TableCell className="text-sm">{sale.locationName || "-"}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatSmartNumber(sale.quantity)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">${formatNumber(parseFloat(sale.sellingPrice))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="mt-3 pt-3 border-t flex justify-end gap-6">
-                    <div className="text-sm">
-                      <span className="font-semibold">Total Quantity: </span>
-                      <span className="font-mono">
-                        {formatSmartNumber(
-                          itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.quantity || "0"), 0)
-                        )}
-                      </span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold">Total Value: </span>
-                      <span className="font-mono">
-                        ${formatNumber(itemDetails.sales.reduce((sum, s) => sum + parseFloat(s.totalSales || "0"), 0))}
-                      </span>
-                    </div>
-                  </div>
-                </>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No sales history</p>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No sales history
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Inventory Locations Section */}
-          <Card>
+          {/* Inventory Locations Section - Full Width */}
+          <Card className="lg:col-span-2 flex flex-col">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
                 Current Inventory Locations
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-hidden">
               {itemDetails.inventoryLocations.length > 0 ? (
-                <>
+                <div className="h-64 overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
                         <TableHead>Location</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
@@ -279,41 +251,25 @@ export default function StockItemDetail() {
                     <TableBody>
                       {itemDetails.inventoryLocations.map((loc) => (
                         <TableRow key={loc.locationId}>
-                          <TableCell>
-                            {loc.locationName} ({loc.locationCode})
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-sm">{loc.locationName}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
                             {formatSmartNumber(loc.quantity)}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right font-mono text-sm">
                             ${formatNumber(parseFloat(loc.averageRate))}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right font-mono text-sm">
                             ${formatNumber(parseFloat(loc.totalValue))}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  <div className="mt-3 pt-3 border-t flex justify-end gap-6">
-                    <div className="text-sm">
-                      <span className="font-semibold">Total Quantity: </span>
-                      <span className="font-mono">
-                        {formatSmartNumber(
-                          itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.quantity || "0"), 0)
-                        )}
-                      </span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold">Total Value: </span>
-                      <span className="font-mono">
-                        ${formatNumber(itemDetails.inventoryLocations.reduce((sum, loc) => sum + parseFloat(loc.totalValue || "0"), 0))}
-                      </span>
-                    </div>
-                  </div>
-                </>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No inventory at any location</p>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  No inventory at any location
+                </div>
               )}
             </CardContent>
           </Card>
