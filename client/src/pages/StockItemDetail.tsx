@@ -3,7 +3,6 @@ import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -149,24 +148,9 @@ export default function StockItemDetail() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="purchases" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="purchases" data-testid="tab-purchases">
-              <Package className="h-4 w-4 mr-2" />
-              Purchases
-            </TabsTrigger>
-            <TabsTrigger value="sales" data-testid="tab-sales">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Sales
-            </TabsTrigger>
-            <TabsTrigger value="inventory" data-testid="tab-inventory">
-              <MapPin className="h-4 w-4 mr-2" />
-              Inventory Locations
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="purchases" className="space-y-4">
-            <Card>
+        <div className="space-y-6">
+          {/* Purchases Section */}
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Package className="h-4 w-4" />
@@ -210,10 +194,9 @@ export default function StockItemDetail() {
               )}
             </CardContent>
           </Card>
-          </TabsContent>
 
-          <TabsContent value="sales" className="space-y-4">
-            <Card>
+          {/* Sales Section */}
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
@@ -272,10 +255,9 @@ export default function StockItemDetail() {
               )}
             </CardContent>
           </Card>
-          </TabsContent>
 
-          <TabsContent value="inventory" className="space-y-4">
-            <Card>
+          {/* Inventory Locations Section */}
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
@@ -335,8 +317,7 @@ export default function StockItemDetail() {
               )}
             </CardContent>
           </Card>
-          </TabsContent>
-        </Tabs>
+        </div>
       )}
     </div>
   );

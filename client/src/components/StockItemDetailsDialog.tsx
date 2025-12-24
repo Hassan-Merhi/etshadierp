@@ -22,6 +22,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Edit, Save, X, Package, Plus, Trash2, ExternalLink, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Location as LocationType } from "@shared/schema";
 import { formatNumber } from "@/lib/formatNumber";
 
@@ -427,9 +429,25 @@ export function StockItemDetailsDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Item Details Section */}
-          <div className="border-b pb-6">
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="details" data-testid="tab-details">
+              Item Details
+            </TabsTrigger>
+            <TabsTrigger value="prices" data-testid="tab-location-prices">
+              Location Prices
+            </TabsTrigger>
+            <TabsTrigger value="aliases" data-testid="tab-aliases">
+              Code Aliases
+            </TabsTrigger>
+            <TabsTrigger value="transactions" data-testid="tab-transactions">
+              Voucher History
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Item Details Tab */}
+          <TabsContent value="details" className="space-y-4 mt-4">
+            <div className="border-b pb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Item Details</h3>
               {!isEditingDetails ? (
@@ -581,10 +599,11 @@ export function StockItemDetailsDialog({
                 </div>
               </div>
             ) : null}
-          </div>
+            </div>
+          </TabsContent>
 
-          {/* Location Prices Section */}
-          <div className="border-b pb-6">
+          {/* Location Prices Tab */}
+          <TabsContent value="prices" className="space-y-4 mt-4">
             <h3 className="text-lg font-semibold mb-4" data-testid="tab-location-prices">Location Prices</h3>
             <div className="space-y-4">
               <Card className="p-4">
@@ -733,10 +752,10 @@ export function StockItemDetailsDialog({
                 </div>
               )}
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Code Aliases Section */}
-          <div className="border-b pb-6">
+          {/* Code Aliases Tab */}
+          <TabsContent value="aliases" className="space-y-4 mt-4">
             <h3 className="text-lg font-semibold mb-4" data-testid="tab-aliases">Code Aliases</h3>
             <div className="space-y-4">
               <Card className="p-4">
@@ -804,10 +823,10 @@ export function StockItemDetailsDialog({
                 </div>
               )}
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Voucher History Section */}
-          <div>
+          {/* Voucher History Tab */}
+          <TabsContent value="transactions" className="space-y-4 mt-4">
             <h3 className="text-lg font-semibold mb-4" data-testid="tab-transactions">Voucher History</h3>
             {loadingTransactions ? (
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
@@ -915,8 +934,8 @@ export function StockItemDetailsDialog({
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
