@@ -16577,24 +16577,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 4. Direct Expenses - accounts with accountType="Direct Expense"
-      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
-      // and should only hit P&L through COGS when goods are sold
-      const importChargesParent = companyAccounts.find(
-        (acc) => acc.code === "IMPORT_CHARGES"
-      );
-      const importChargesAccountIds = new Set<number>();
-      if (importChargesParent) {
-        importChargesAccountIds.add(importChargesParent.id);
-        // Also add all children of IMPORT_CHARGES
-        companyAccounts.forEach(acc => {
-          if (acc.parentId === importChargesParent.id) {
-            importChargesAccountIds.add(acc.id);
-          }
-        });
-      }
-      
+      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
+      // These are real expenses that should reduce profit per Tally accounting
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
+        (acc) => acc.accountType === "Direct Expense"
       );
       let directExpensesTotal = 0;
       for (const acc of directExpenseAccounts) {
@@ -16684,14 +16670,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalIncome += balance.credit - balance.debit; // Income is credits
       }
 
-      // Exclude IMPORT_CHARGES from totalExpenses as well (reuse the Set from above)
+      // Include ALL expense accounts in totalExpenses calculation
       const expenseAccounts = companyAccounts.filter(
         (acc) => (acc.accountType === "Expense" || 
                  acc.accountType === "Direct Expense" || 
                  acc.accountType === "Indirect Expense" ||
                  acc.code === "PURCHASES" || 
-                 acc.code?.startsWith("PURCHASES-")) &&
-                 !importChargesAccountIds.has(acc.id)
+                 acc.code?.startsWith("PURCHASES-"))
       );
       let totalExpenses = 0;
       for (const acc of expenseAccounts) {

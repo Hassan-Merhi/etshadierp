@@ -1,0 +1,56 @@
+ErpMultiPos Project Analysis
+1. Tech Stack & Folder Structure
+Layer	Technologies
+Frontend	React 18 + Vite, TanStack Query, shadcn/ui, wouter (routing), Tailwind CSS
+Backend	Express.js, TypeScript, Node.js
+Database	PostgreSQL with Drizzle ORM
+Auth	Passport.js with express-session (connect-pg-simple for session store)
+Folder Structure:
+
+client/src/ - React SPA (pages, components, hooks, contexts)
+server/ - Express backend (routes.ts ~25K lines, storage.ts data layer, index.ts entry)
+shared/ - Shared types and schema (schema.ts with Drizzle models)
+migrations/ - Drizzle SQL migration files
+scripts/ - Utility/seed scripts
+2. Main App Entry Points
+Entry Point	File	Description
+Backend	server/index.ts	Bootstraps Express, sessions, calls registerRoutes()
+Routes	server/routes.ts	All API endpoints (very large - ~25K lines)
+Frontend	client/src/main.tsx → App.tsx	React root with wouter routing
+Pages	client/src/pages/*	Dashboard, POS, Accounting, Inventory, Analytics, Reports, etc.
+3. Database & Config
+Connection: server/db.ts uses Drizzle with DATABASE_URL env var
+Schema: shared/schema.ts defines all tables via Drizzle
+Migrations: SQL files in migrations/ with metadata in migrations/meta/
+Seeding: Manual scripts in scripts/init-db-manual.ts
+Sessions: Stored in Postgres via connect-pg-simple when DATABASE_URL present
+4. Security Risks ⚠️
+Risk	Severity	Details
+Default session secret	🔴 Critical	Falls back to "your-secret-key-change-in-production" if env var missing (server/index.ts)
+No rate limiting	🟠 Medium	Auth endpoints lack brute-force protection
+File uploads	🟡 Low	Limited to 10MB, stored in memory, no malware scan
+Input validation	🟢 Good	Uses Zod schemas from drizzle-zod
+5. Performance Bottlenecks
+/api/stats/net-profit - Fetches ALL voucher entries and iterates entire ledger set per request
+storage.getAllLedgerAccounts - Pulls full tables with no pagination
+Excel imports - Entire file read into memory (multer memoryStorage + XLSX.read)
+routes.ts size - 25K+ lines in single file hurts code navigation and hot reload
+6. Critical Bug Found - Net Profit Calculation
+Root cause of your $60K discrepancy:
+
+The offloadContainer function in storage.ts debits charges (duties, transport, additional charges) to accounts under IMPORT_CHARGES. However, /api/stats/net-profit in routes.ts explicitly excludes IMPORT_CHARGES accounts from direct expenses calculation (lines 16582-16597).
+
+Result: These expenses are being debited but not counted in profit calculation, causing profit to appear higher than it should be.
+
+7. Top 10 Prioritized Recommendations
+Priority	Recommendation
+1	Fix net profit calculation - Include IMPORT_CHARGES in expense totals OR reroute offload debits to standard expense accounts
+2	Add regression tests for offload + net profit to prevent sign errors
+3	Enforce SESSION_SECRET - Fail startup if not set
+4	Split routes.ts into domain routers (inventory, finance, payroll, chat)
+5	Add pagination to ledger/voucher-heavy endpoints
+6	Stream Excel imports or reduce file size limits
+7	Cache financial aggregations (company-level balance snapshots)
+8	Extract financial logic into service layer with typed DTOs
+9	Centralize account type constants to avoid magic string drift
+10	Document deployment requirements and automate seeding
