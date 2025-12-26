@@ -16576,11 +16576,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         directIncomesTotal += balance.credit - balance.debit; // Income is credits
       }
 
-      // 4. Direct Expenses - accounts with accountType="Direct Expense"
-      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
-      // These are real expenses that should reduce profit per Tally accounting
+      // 4. Direct Expenses - include accounts that are Direct Expenses in any form:
+      // - accountType === "Direct Expense"
+      // - accountType === "Expense" AND subType === "Direct Expense"
+      // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" || 
+                 (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                 importChargesAccountIds.has(acc.id)
       );
       let directExpensesTotal = 0;
       for (const acc of directExpenseAccounts) {
@@ -19106,10 +19122,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // 4. Direct Expenses - accounts with accountType="Direct Expense"
-      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
+      // 4. Direct Expenses - include accounts that are Direct Expenses in any form:
+      // - accountType === "Direct Expense"
+      // - accountType === "Expense" AND subType === "Direct Expense"  
+      // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" || 
+                 (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                 importChargesAccountIds.has(acc.id)
       );
       let directExpensesTotal = 0;
       const directExpensesDetails = directExpenseAccounts.map((acc) => {
@@ -19687,9 +19720,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       
-      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
+      // Direct Expenses - include accounts that are Direct Expenses in any form:
+      // - accountType === "Direct Expense"
+      // - accountType === "Expense" AND subType === "Direct Expense"
+      // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
+      const importChargesParent = companyAccounts.find(
+        (acc) => acc.code === "IMPORT_CHARGES"
+      );
+      const importChargesAccountIds = new Set<number>();
+      if (importChargesParent) {
+        importChargesAccountIds.add(importChargesParent.id);
+        companyAccounts.forEach(acc => {
+          if (acc.parentId === importChargesParent.id) {
+            importChargesAccountIds.add(acc.id);
+          }
+        });
+      }
+      
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense"
+        (acc) => acc.accountType === "Direct Expense" || 
+                 (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+                 importChargesAccountIds.has(acc.id)
       );
 
       const companyVouchers = await db
