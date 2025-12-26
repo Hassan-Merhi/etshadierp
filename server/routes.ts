@@ -19107,22 +19107,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 4. Direct Expenses - accounts with accountType="Direct Expense"
-      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
-      const importChargesParent = companyAccounts.find(
-        (acc) => acc.code === "IMPORT_CHARGES"
-      );
-      const importChargesAccountIds = new Set<number>();
-      if (importChargesParent) {
-        importChargesAccountIds.add(importChargesParent.id);
-        companyAccounts.forEach(acc => {
-          if (acc.parentId === importChargesParent.id) {
-            importChargesAccountIds.add(acc.id);
-          }
-        });
-      }
-      
+      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
+        (acc) => acc.accountType === "Direct Expense"
       );
       let directExpensesTotal = 0;
       const directExpensesDetails = directExpenseAccounts.map((acc) => {
@@ -19700,22 +19687,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       
-      // EXCLUDE IMPORT_CHARGES accounts - those costs are capitalized into inventory
-      const importChargesParent = companyAccounts.find(
-        (acc) => acc.code === "IMPORT_CHARGES"
-      );
-      const importChargesAccountIds = new Set<number>();
-      if (importChargesParent) {
-        importChargesAccountIds.add(importChargesParent.id);
-        companyAccounts.forEach(acc => {
-          if (acc.parentId === importChargesParent.id) {
-            importChargesAccountIds.add(acc.id);
-          }
-        });
-      }
-      
+      // Include ALL Direct Expense accounts (Duties, Transport, Import Charges, etc.)
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Direct Expense" && !importChargesAccountIds.has(acc.id)
+        (acc) => acc.accountType === "Direct Expense"
       );
 
       const companyVouchers = await db
