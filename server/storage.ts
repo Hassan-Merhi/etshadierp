@@ -2039,6 +2039,89 @@ export class DbStorage implements IStorage {
     // Get or create parent IMPORT_CHARGES account
     const importChargesParentId = await findOrCreateImportChargesParent();
     
+    // ============================================================
+    // PURCHASE VOUCHER - Record FOB + PO charges as Purchases expense
+    // This follows Tally Prime convention: Purchases recorded when goods are RECEIVED
+    // ============================================================
+    
+    // Calculate total purchases amount (items total + PO charges like freight, surcharge, etc.)
+    // This does NOT include duties/transport which are Direct Expenses
+    const itemsTotal = parseFloat(container.itemsTotal || "0");
+    const purchasesAmount = itemsTotal + poCharges; // FOB + freight/other PO charges
+    
+    if (purchasesAmount > 0 && pos.length > 0) {
+      // Get supplier from first PO
+      const firstPO = pos[0];
+      const supplierId = firstPO.supplierId;
+      
+      // Get or create PURCHASES ledger account
+      let purchasesAccount = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, location.companyId),
+            eq(schema.ledgerAccounts.code, "PURCHASES")
+          )
+        )
+        .limit(1);
+      
+      if (!purchasesAccount.length) {
+        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: location.companyId,
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+        }).returning();
+        purchasesAccount = [newAccount];
+      }
+      
+      // Create Purchase voucher for the goods received
+      const purchaseVoucherNumber = `PURCH-${container.containerNumber}-${Date.now()}`;
+      const [purchaseVoucher] = await db.insert(schema.vouchers).values({
+        companyId: location.companyId,
+        voucherNumber: purchaseVoucherNumber,
+        voucherType: "Purchase",
+        voucherDate,
+        description: `Purchases for container ${container.containerNumber}`,
+        totalAmount: purchasesAmount.toFixed(2),
+        optional: false, // This affects accounting - recorded when goods are received
+      }).returning();
+      
+      // Debit: Purchases account (Expense increases)
+      await db.insert(schema.voucherEntries).values({
+        voucherId: purchaseVoucher.id,
+        ledgerAccountId: purchasesAccount[0].id,
+        debitAmount: purchasesAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Purchases for container ${container.containerNumber}`,
+      });
+      
+      // Credit: Supplier account (Accounts Payable increases)
+      if (supplierId) {
+        await db.insert(schema.voucherEntries).values({
+          voucherId: purchaseVoucher.id,
+          supplierId: supplierId,
+          debitAmount: "0",
+          creditAmount: purchasesAmount.toFixed(2),
+          narration: `Purchases for container ${container.containerNumber}`,
+        });
+      }
+      
+      // Update the PO vouchers to mark them as processed (change from optional to reflect offload)
+      for (const po of pos) {
+        if (po.voucherId) {
+          await db.update(schema.vouchers)
+            .set({ 
+              description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Offloaded)` 
+            })
+            .where(eq(schema.vouchers.id, po.voucherId));
+        }
+      }
+    }
+    
     // Duties voucher entry
     if (dutiesAccountId && parseFloat(duties) > 0) {
       const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", importChargesParentId);

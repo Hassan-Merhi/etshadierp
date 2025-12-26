@@ -6522,35 +6522,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const poChargesTotal = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
         const poGrandTotal = poItemsTotal + poChargesTotal;
 
-        // Create voucher for this PO (Purchase voucher with double-entry) - includes ALL charges
+        // Create voucher for this PO - OPTIONAL (does not affect accounting)
+        // Real accounting entries are created at container offload time per Tally conventions
+        // This voucher is for tracking/reference purposes only
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: importDate,
-          description: `Purchase Order ${poNumber} - Container ${containerNumber}`,
+          description: `Purchase Order ${poNumber} - Container ${containerNumber} (Pending Offload)`,
           totalAmount: poGrandTotal.toString(),
-          optional: false,
+          optional: true, // Does not affect accounting - real entries created at offload
         });
 
-        // Create voucher entries for double-entry bookkeeping
-        // Debit: Purchases account (Expense increases) - full grand total
-        await storage.createVoucherEntry({
-          voucherId: voucher.id,
-          ledgerAccountId: purchasesAccount.id,
-          debitAmount: poGrandTotal.toString(),
-          creditAmount: "0",
-          narration: `PO ${poNumber} - Container ${containerNumber}`,
-        });
-
-        // Credit: Supplier account (Accounts Payable increases) - full grand total
-        await storage.createVoucherEntry({
-          voucherId: voucher.id,
-          supplierId: supplierId,
-          debitAmount: "0",
-          creditAmount: poGrandTotal.toString(),
-          narration: `PO ${poNumber} - Container ${containerNumber}`,
-        });
+        // No voucher entries created here - entries will be created at container offload
+        // This follows Tally Prime convention: Purchases recorded when goods are RECEIVED, not ordered
 
         const po = await storage.createPurchaseOrder({
           companyId: req.session.currentCompanyId!,
