@@ -25302,14 +25302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Check if credit entry already exists for this PO
-            // For NEW POs: createPurchaseOrder uses PURCH-* in subsidiary and INTERCO-* in Lubumbashi
             // For OLD fixed POs: fix endpoint uses INTERCO-* in subsidiary and INTERCO-LUB-* in Lubumbashi
-            // Check both patterns to prevent duplicates
-            
-            // Check if PO already has a voucherId (means it was created after the update)
-            if (po.voucherId) {
-              continue; // Skip - PO was created with new logic, vouchers already exist
-            }
+            // Check voucher patterns to prevent duplicates
+            // NOTE: po.voucherId is for the import voucher (DR Purchases, CR Supplier), NOT inter-company vouchers
             
             // Check for existing INTERCO vouchers in subsidiary
             const existingSubsidiaryVoucher = await db
