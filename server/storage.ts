@@ -1379,6 +1379,232 @@ export class DbStorage implements IStorage {
 
   async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
     const [created] = await db.insert(schema.purchaseOrders).values(po).returning();
+    
+    // ============================================================
+    // INTER-COMPANY CREDIT ACCOUNTING
+    // Create purchase vouchers when PO is imported, not when offloaded
+    // For non-Lubumbashi: DR Purchases CR Lubumbashi Credit (subsidiary) + DR [Subsidiary] Credit CR Supplier (Lubumbashi)
+    // For Lubumbashi: DR Purchases CR Supplier
+    // ============================================================
+    
+    // Calculate PO total: items + freight + other charges
+    const poItemsTotal = parseFloat(po.itemsTotal || "0");
+    const poFreight = parseFloat(po.freight || "0");
+    const poSurcharge = parseFloat(po.surcharge || "0");
+    const poFumigation = parseFloat(po.fumigation || "0");
+    const poDocumentCharges = parseFloat(po.documentCharges || "0");
+    const poDiscount = parseFloat(po.discount || "0");
+    const poOtherCharges = parseFloat(po.otherCharges || "0");
+    const poChargesAmount = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+    const poTotal = poItemsTotal + poChargesAmount;
+    
+    if (poTotal > 0 && po.companyId) {
+      // Find Lubumbashi company
+      const allCompanies = await db.select().from(schema.companies);
+      const lubumbashiCompany = allCompanies.find(c => c.name.toLowerCase().includes("lubumbashi"));
+      const currentCompany = allCompanies.find(c => c.id === po.companyId);
+      
+      // Get or create PURCHASES ledger account for this company
+      let purchasesAccount = await db
+        .select()
+        .from(schema.ledgerAccounts)
+        .where(
+          and(
+            eq(schema.ledgerAccounts.companyId, po.companyId),
+            eq(schema.ledgerAccounts.code, "PURCHASES"),
+            isNull(schema.ledgerAccounts.deletedAt)
+          )
+        )
+        .limit(1);
+      
+      if (!purchasesAccount.length) {
+        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          companyId: po.companyId,
+          code: "PURCHASES",
+          name: "Purchases",
+          accountType: "Expense",
+          openingBalance: "0",
+          openingBalanceSide: "Dr",
+        }).returning();
+        purchasesAccount = [newAccount];
+      }
+      
+      const voucherDate = new Date().toISOString().split('T')[0];
+      
+      if (lubumbashiCompany && po.companyId !== lubumbashiCompany.id) {
+        // ============================================================
+        // NON-LUBUMBASHI COMPANY - Create TWO vouchers
+        // 1. In subsidiary: DR Purchases, CR Lubumbashi Credit
+        // 2. In Lubumbashi: DR [Subsidiary] Credit, CR Supplier
+        // ============================================================
+        
+        // --- SUBSIDIARY VOUCHER ---
+        // Get or create "Lubumbashi Credit" liability account in subsidiary
+        let lubumbashiCreditAccount = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, po.companyId),
+              eq(schema.ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        if (!lubumbashiCreditAccount.length) {
+          const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+            companyId: po.companyId,
+            code: "LUBUMBASHI_CREDIT",
+            name: "Lubumbashi Credit",
+            accountType: "Liability",
+            subType: "Current Liability",
+            openingBalance: "0",
+            openingBalanceSide: "Cr",
+          }).returning();
+          lubumbashiCreditAccount = [newAccount];
+        }
+        
+        // Create Purchase voucher in subsidiary
+        const subsidiaryVoucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
+        const [subsidiaryVoucher] = await db.insert(schema.vouchers).values({
+          companyId: po.companyId,
+          voucherNumber: subsidiaryVoucherNumber,
+          voucherType: "Purchase",
+          voucherDate,
+          description: `Purchase for PO ${created.poNumber} (Lubumbashi paid supplier)`,
+          totalAmount: poTotal.toFixed(2),
+          optional: false,
+        }).returning();
+        
+        // DR Purchases
+        await db.insert(schema.voucherEntries).values({
+          voucherId: subsidiaryVoucher.id,
+          ledgerAccountId: purchasesAccount[0].id,
+          debitAmount: poTotal.toFixed(2),
+          creditAmount: "0",
+          narration: `PO ${created.poNumber} - Purchases`,
+        });
+        
+        // CR Lubumbashi Credit (we owe Lubumbashi)
+        await db.insert(schema.voucherEntries).values({
+          voucherId: subsidiaryVoucher.id,
+          ledgerAccountId: lubumbashiCreditAccount[0].id,
+          debitAmount: "0",
+          creditAmount: poTotal.toFixed(2),
+          narration: `PO ${created.poNumber} - Lubumbashi paid supplier`,
+        });
+        
+        // Update PO with voucher reference
+        await db.update(schema.purchaseOrders)
+          .set({ voucherId: subsidiaryVoucher.id })
+          .where(eq(schema.purchaseOrders.id, created.id));
+        
+        // --- LUBUMBASHI VOUCHER ---
+        // Get or create "[Subsidiary] Credit" receivable account in Lubumbashi
+        const subsidiaryCode = currentCompany?.name?.toUpperCase().replace(/\s+/g, '_') + "_CREDIT" || "SUBSIDIARY_CREDIT";
+        const subsidiaryName = (currentCompany?.name || "Subsidiary") + " Credit";
+        
+        let subsidiaryReceivableAccount = await db
+          .select()
+          .from(schema.ledgerAccounts)
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, lubumbashiCompany.id),
+              eq(schema.ledgerAccounts.code, subsidiaryCode),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        if (!subsidiaryReceivableAccount.length) {
+          const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+            companyId: lubumbashiCompany.id,
+            code: subsidiaryCode,
+            name: subsidiaryName,
+            accountType: "Asset",
+            subType: "Current Asset",
+            openingBalance: "0",
+            openingBalanceSide: "Dr",
+          }).returning();
+          subsidiaryReceivableAccount = [newAccount];
+        }
+        
+        // Create Journal voucher in Lubumbashi
+        const lubumbashiVoucherNumber = `INTERCO-${created.poNumber}-${Date.now()}`;
+        const [lubumbashiVoucher] = await db.insert(schema.vouchers).values({
+          companyId: lubumbashiCompany.id,
+          voucherNumber: lubumbashiVoucherNumber,
+          voucherType: "Journal",
+          voucherDate,
+          description: `Inter-company credit for PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'}`,
+          totalAmount: poTotal.toFixed(2),
+          optional: false,
+        }).returning();
+        
+        // DR [Subsidiary] Credit (they owe us)
+        await db.insert(schema.voucherEntries).values({
+          voucherId: lubumbashiVoucher.id,
+          ledgerAccountId: subsidiaryReceivableAccount[0].id,
+          debitAmount: poTotal.toFixed(2),
+          creditAmount: "0",
+          narration: `PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'} owes us`,
+        });
+        
+        // CR Supplier (we owe supplier)
+        if (po.supplierId) {
+          await db.insert(schema.voucherEntries).values({
+            voucherId: lubumbashiVoucher.id,
+            supplierId: po.supplierId,
+            debitAmount: "0",
+            creditAmount: poTotal.toFixed(2),
+            narration: `PO ${created.poNumber} - Supplier payment`,
+          });
+        }
+        
+      } else {
+        // ============================================================
+        // LUBUMBASHI COMPANY - Standard purchase voucher
+        // DR Purchases, CR Supplier
+        // ============================================================
+        const voucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
+        const [purchaseVoucher] = await db.insert(schema.vouchers).values({
+          companyId: po.companyId,
+          voucherNumber,
+          voucherType: "Purchase",
+          voucherDate,
+          description: `Purchase for PO ${created.poNumber}`,
+          totalAmount: poTotal.toFixed(2),
+          optional: false,
+        }).returning();
+        
+        // DR Purchases
+        await db.insert(schema.voucherEntries).values({
+          voucherId: purchaseVoucher.id,
+          ledgerAccountId: purchasesAccount[0].id,
+          debitAmount: poTotal.toFixed(2),
+          creditAmount: "0",
+          narration: `PO ${created.poNumber} - Purchases`,
+        });
+        
+        // CR Supplier
+        if (po.supplierId) {
+          await db.insert(schema.voucherEntries).values({
+            voucherId: purchaseVoucher.id,
+            supplierId: po.supplierId,
+            debitAmount: "0",
+            creditAmount: poTotal.toFixed(2),
+            narration: `PO ${created.poNumber} - Supplier`,
+          });
+        }
+        
+        // Update PO with voucher reference
+        await db.update(schema.purchaseOrders)
+          .set({ voucherId: purchaseVoucher.id })
+          .where(eq(schema.purchaseOrders.id, created.id));
+      }
+    }
+    
     return created;
   }
 
@@ -2040,129 +2266,10 @@ export class DbStorage implements IStorage {
     const importChargesParentId = await findOrCreateImportChargesParent();
     
     // ============================================================
-    // PURCHASE VOUCHERS - Record FOB + PO charges as Purchases expense
-    // This follows Tally Prime convention: Purchases recorded when goods are RECEIVED
-    // Create one Purchase voucher per PO to correctly credit each supplier
+    // PURCHASE VOUCHERS - Already created at PO import time
+    // Just update the voucher description to mark it as offloaded
     // ============================================================
-    
-    // Get or create PURCHASES ledger account
-    let purchasesAccount = await db
-      .select()
-      .from(schema.ledgerAccounts)
-      .where(
-        and(
-          eq(schema.ledgerAccounts.companyId, location.companyId),
-          eq(schema.ledgerAccounts.code, "PURCHASES")
-        )
-      )
-      .limit(1);
-    
-    if (!purchasesAccount.length) {
-      const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-        companyId: location.companyId,
-        code: "PURCHASES",
-        name: "Purchases",
-        accountType: "Expense",
-        openingBalance: "0",
-        openingBalanceSide: "Dr",
-      }).returning();
-      purchasesAccount = [newAccount];
-    }
-    
-    // Create separate Purchase voucher for each PO (to correctly credit each supplier)
     for (const po of pos) {
-      // Calculate this PO's purchase amount: items total + PO charges (freight, surcharge, etc.)
-      const poItemsTotal = parseFloat(po.itemsTotal || "0");
-      const poFreight = parseFloat(po.freight || "0");
-      const poSurcharge = parseFloat(po.surcharge || "0");
-      const poFumigation = parseFloat(po.fumigation || "0");
-      const poDocumentCharges = parseFloat(po.documentCharges || "0");
-      const poDiscount = parseFloat(po.discount || "0");
-      const poOtherCharges = parseFloat(po.otherCharges || "0");
-      const poChargesAmount = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
-      const poPurchasesAmount = poItemsTotal + poChargesAmount;
-      
-      if (poPurchasesAmount > 0) {
-        // Create Purchase voucher for this PO's goods received
-        const purchaseVoucherNumber = `PURCH-${po.poNumber}-${Date.now()}`;
-        const [purchaseVoucher] = await db.insert(schema.vouchers).values({
-          companyId: location.companyId,
-          voucherNumber: purchaseVoucherNumber,
-          voucherType: "Purchase",
-          voucherDate,
-          description: `Purchases for PO ${po.poNumber} - Container ${container.containerNumber}`,
-          totalAmount: poPurchasesAmount.toFixed(2),
-          optional: false, // This affects accounting - recorded when goods are received
-        }).returning();
-        
-        // Debit: Purchases account (Expense increases)
-        await db.insert(schema.voucherEntries).values({
-          voucherId: purchaseVoucher.id,
-          ledgerAccountId: purchasesAccount[0].id,
-          debitAmount: poPurchasesAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `PO ${po.poNumber} - Container ${container.containerNumber}`,
-        });
-        
-        // ============================================================
-        // CREDIT ENTRY - Either Supplier or Lubumbashi Credit
-        // For Lubumbashi company: Credit Supplier (they owe the supplier directly)
-        // For other companies: Credit Lubumbashi Credit (Lubumbashi pays suppliers, so we owe Lubumbashi)
-        // ============================================================
-        const allCompanies = await db.select().from(schema.companies);
-        const lubumbashiCompany = allCompanies.find(c => c.name.toLowerCase().includes("lubumbashi"));
-        
-        if (lubumbashiCompany && location.companyId !== lubumbashiCompany.id) {
-          // Non-Lubumbashi company: Lubumbashi pays suppliers, so credit Lubumbashi Credit
-          // Get or create "Lubumbashi Credit" account for this company
-          let creditAccount = await db
-            .select()
-            .from(schema.ledgerAccounts)
-            .where(
-              and(
-                eq(schema.ledgerAccounts.companyId, location.companyId),
-                eq(schema.ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
-                isNull(schema.ledgerAccounts.deletedAt)
-              )
-            )
-            .limit(1);
-          
-          if (!creditAccount.length) {
-            const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-              companyId: location.companyId,
-              code: "LUBUMBASHI_CREDIT",
-              name: "Lubumbashi Credit",
-              accountType: "Liability",
-              subType: "Current Liability",
-              openingBalance: "0",
-              openingBalanceSide: "Cr",
-            }).returning();
-            creditAccount = [newAccount];
-          }
-          
-          // Credit: Lubumbashi Credit account (we owe Lubumbashi, who paid the supplier)
-          await db.insert(schema.voucherEntries).values({
-            voucherId: purchaseVoucher.id,
-            ledgerAccountId: creditAccount[0].id,
-            debitAmount: "0",
-            creditAmount: poPurchasesAmount.toFixed(2),
-            narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Lubumbashi paid)`,
-          });
-        } else {
-          // Lubumbashi company or no Lubumbashi found: Credit Supplier directly
-          if (po.supplierId) {
-            await db.insert(schema.voucherEntries).values({
-              voucherId: purchaseVoucher.id,
-              supplierId: po.supplierId,
-              debitAmount: "0",
-              creditAmount: poPurchasesAmount.toFixed(2),
-              narration: `PO ${po.poNumber} - Container ${container.containerNumber}`,
-            });
-          }
-        }
-      }
-      
-      // Update the PO voucher to mark it as processed
       if (po.voucherId) {
         await db.update(schema.vouchers)
           .set({ 

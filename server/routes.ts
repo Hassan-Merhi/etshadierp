@@ -25287,7 +25287,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Check if credit entry already exists for this PO
-            const existingVoucher = await db
+            // For NEW POs: createPurchaseOrder uses PURCH-* in subsidiary and INTERCO-* in Lubumbashi
+            // For OLD fixed POs: fix endpoint uses INTERCO-* in subsidiary and INTERCO-LUB-* in Lubumbashi
+            // Check both patterns to prevent duplicates
+            
+            // Check if PO already has a voucherId (means it was created after the update)
+            if (po.voucherId) {
+              continue; // Skip - PO was created with new logic, vouchers already exist
+            }
+            
+            // Check for existing INTERCO vouchers in subsidiary
+            const existingSubsidiaryVoucher = await db
               .select()
               .from(vouchers)
               .where(
@@ -25298,8 +25308,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               )
               .limit(1);
             
-            if (existingVoucher.length > 0) {
-              continue; // Skip - already has credit entry
+            if (existingSubsidiaryVoucher.length > 0) {
+              continue; // Skip - already has credit entry in subsidiary
+            }
+            
+            // Check for existing INTERCO-LUB vouchers in Lubumbashi
+            const existingLubumbashiVoucher = await db
+              .select()
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, lubumbashiCompany.id),
+                  like(vouchers.voucherNumber, `INTERCO-LUB-${po.poNumber}%`)
+                )
+              )
+              .limit(1);
+            
+            if (existingLubumbashiVoucher.length > 0) {
+              continue; // Skip - already has credit entry in Lubumbashi
             }
             
             // Calculate PO total: items + freight + charges
@@ -25327,9 +25353,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? new Date(offloadRecord.offloadedAt).toISOString().split('T')[0]
               : new Date().toISOString().split('T')[0];
             
-            // Create inter-company credit transfer voucher
-            // This transfers the liability from Supplier to Lubumbashi Credit
-            // (Old purchase voucher credited Supplier, now we move that to Lubumbashi Credit)
+            // ============================================================
+            // SUBSIDIARY VOUCHER - Transfer liability from Supplier to Lubumbashi Credit
+            // ============================================================
             const voucherNumber = `INTERCO-${po.poNumber}-${Date.now()}`;
             const [voucher] = await db.insert(vouchers).values({
               companyId: company.id,
@@ -25360,6 +25386,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
               creditAmount: poTotal.toFixed(2),
               narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Lubumbashi paid)`,
             });
+            
+            // ============================================================
+            // LUBUMBASHI VOUCHER - Record receivable from subsidiary + supplier payable
+            // ============================================================
+            // Get or create "[Subsidiary] Credit" receivable account in Lubumbashi
+            const subsidiaryCode = company.name.toUpperCase().replace(/\s+/g, '_') + "_CREDIT";
+            const subsidiaryName = company.name + " Credit";
+            
+            let subsidiaryReceivableAccount = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, lubumbashiCompany.id),
+                  eq(ledgerAccounts.code, subsidiaryCode),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              )
+              .limit(1);
+            
+            if (!subsidiaryReceivableAccount.length) {
+              const [newAccount] = await db.insert(ledgerAccounts).values({
+                companyId: lubumbashiCompany.id,
+                code: subsidiaryCode,
+                name: subsidiaryName,
+                accountType: "Asset",
+                subType: "Current Asset",
+                openingBalance: "0",
+                openingBalanceSide: "Dr",
+              }).returning();
+              subsidiaryReceivableAccount = [newAccount];
+            }
+            
+            // Create Journal voucher in Lubumbashi
+            const lubumbashiVoucherNumber = `INTERCO-LUB-${po.poNumber}-${Date.now()}`;
+            const [lubumbashiVoucher] = await db.insert(vouchers).values({
+              companyId: lubumbashiCompany.id,
+              voucherNumber: lubumbashiVoucherNumber,
+              voucherType: "Journal",
+              voucherDate,
+              description: `Inter-company credit for PO ${po.poNumber} - ${company.name}`,
+              totalAmount: poTotal.toFixed(2),
+              optional: false,
+            }).returning();
+            
+            // DR [Subsidiary] Credit (they owe us)
+            await db.insert(voucherEntries).values({
+              voucherId: lubumbashiVoucher.id,
+              ledgerAccountId: subsidiaryReceivableAccount[0].id,
+              debitAmount: poTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `PO ${po.poNumber} - ${company.name} owes us`,
+            });
+            
+            // CR Supplier (we owe supplier)
+            if (po.supplierId) {
+              await db.insert(voucherEntries).values({
+                voucherId: lubumbashiVoucher.id,
+                supplierId: po.supplierId,
+                debitAmount: "0",
+                creditAmount: poTotal.toFixed(2),
+                narration: `PO ${po.poNumber} - Supplier payment`,
+              });
+            }
             
             totalFixed++;
             totalAmount += poTotal;
