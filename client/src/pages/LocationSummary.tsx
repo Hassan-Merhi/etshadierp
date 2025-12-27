@@ -202,10 +202,18 @@ export default function LocationSummary() {
     const rows: Array<{ key: string; groupId: number; itemId?: number; groupIndex: number; itemIndex?: number }> = [];
     
     summaryData.stockGroups.forEach((group, groupIndex) => {
-      rows.push({ key: buildRowKey(group.id), groupId: group.id, groupIndex });
+      const groupKey = buildRowKey(group.id);
+      // Skip hidden rows from navigation
+      if (!hiddenRows.has(groupKey)) {
+        rows.push({ key: groupKey, groupId: group.id, groupIndex });
+      }
       if (expandedGroups.has(group.id)) {
         group.items.forEach((item, itemIndex) => {
-          rows.push({ key: buildRowKey(group.id, item.id), groupId: group.id, itemId: item.id, groupIndex, itemIndex });
+          const itemKey = buildRowKey(group.id, item.id);
+          // Skip hidden rows from navigation
+          if (!hiddenRows.has(itemKey)) {
+            rows.push({ key: itemKey, groupId: group.id, itemId: item.id, groupIndex, itemIndex });
+          }
         });
       }
     });
@@ -303,7 +311,7 @@ export default function LocationSummary() {
   }, [selectedLocationIndex]);
 
   // Scroll to selected row when it changes (vertical)
-  // Manual calculation to avoid scrollIntoView conflicts with sticky header
+  // Uses absolute positioning (offsetTop) to prevent animation stacking issues
   useEffect(() => {
     if (!selectedRowKey || !tableScrollContainer.current) return;
     
@@ -311,35 +319,38 @@ export default function LocationSummary() {
     const rowElement = container.querySelector(`[data-row-key="${selectedRowKey}"]`) as HTMLElement | null;
     if (!rowElement) return;
     
-    // Get the sticky header height (approximately 2 rows: location names + column headers)
-    const thead = container.querySelector('thead');
+    // Get the sticky header height
+    const thead = container.querySelector('thead') as HTMLElement | null;
     const headerHeight = thead ? thead.offsetHeight : 60;
-    const scrollMargin = 8; // Extra padding for visual comfort
+    const scrollMargin = 8;
     
-    const containerRect = container.getBoundingClientRect();
-    const rowRect = rowElement.getBoundingClientRect();
+    // Use absolute positions (offsetTop) instead of relative getBoundingClientRect
+    // This prevents stacking issues when multiple scroll animations overlap
+    const rowTop = rowElement.offsetTop;
+    const rowBottom = rowTop + rowElement.offsetHeight;
     
-    // Calculate the row's position relative to the container's visible area
-    const rowTopRelative = rowRect.top - containerRect.top;
-    const rowBottomRelative = rowRect.bottom - containerRect.top;
-    const visibleTop = headerHeight + scrollMargin;
-    const visibleBottom = container.clientHeight - scrollMargin;
+    // Calculate visible viewport bounds
+    const viewportTop = container.scrollTop + headerHeight + scrollMargin;
+    const viewportBottom = container.scrollTop + container.clientHeight - scrollMargin;
     
-    // Only scroll if row is outside the visible area
-    if (rowTopRelative < visibleTop) {
-      // Row is above visible area - scroll up
-      container.scrollTo({
-        top: container.scrollTop + (rowTopRelative - visibleTop),
-        behavior: 'smooth'
-      });
-    } else if (rowBottomRelative > visibleBottom) {
-      // Row is below visible area - scroll down
-      container.scrollTo({
-        top: container.scrollTop + (rowBottomRelative - visibleBottom),
-        behavior: 'smooth'
-      });
+    // Calculate target scroll position if row is outside viewport
+    let targetScrollTop: number | null = null;
+    
+    if (rowTop < viewportTop) {
+      // Row is above visible area - scroll up to show it just below header
+      targetScrollTop = rowTop - headerHeight - scrollMargin;
+    } else if (rowBottom > viewportBottom) {
+      // Row is below visible area - scroll down to show it at bottom
+      targetScrollTop = rowBottom - container.clientHeight + scrollMargin;
     }
-  }, [selectedRowKey]);
+    
+    // Only scroll if needed, clamp to valid range
+    if (targetScrollTop !== null) {
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const clampedTarget = Math.max(0, Math.min(targetScrollTop, maxScroll));
+      container.scrollTop = clampedTarget;
+    }
+  }, [selectedRowKey, expandedGroups, hiddenRows]);
 
   return (
     <div className="w-full h-screen flex flex-col overflow-hidden" data-testid="location-summary-container">
