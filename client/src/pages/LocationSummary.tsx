@@ -287,12 +287,41 @@ export default function LocationSummary() {
   }, [selectedLocationIndex]);
 
   // Scroll to selected row when it changes (vertical)
+  // Manual calculation to avoid scrollIntoView conflicts with sticky header
   useEffect(() => {
     if (!selectedRowKey || !tableScrollContainer.current) return;
     
-    const rowElement = tableScrollContainer.current.querySelector(`[data-row-key="${selectedRowKey}"]`);
-    if (rowElement) {
-      rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const container = tableScrollContainer.current;
+    const rowElement = container.querySelector(`[data-row-key="${selectedRowKey}"]`) as HTMLElement | null;
+    if (!rowElement) return;
+    
+    // Get the sticky header height (approximately 2 rows: location names + column headers)
+    const thead = container.querySelector('thead');
+    const headerHeight = thead ? thead.offsetHeight : 60;
+    const scrollMargin = 8; // Extra padding for visual comfort
+    
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = rowElement.getBoundingClientRect();
+    
+    // Calculate the row's position relative to the container's visible area
+    const rowTopRelative = rowRect.top - containerRect.top;
+    const rowBottomRelative = rowRect.bottom - containerRect.top;
+    const visibleTop = headerHeight + scrollMargin;
+    const visibleBottom = container.clientHeight - scrollMargin;
+    
+    // Only scroll if row is outside the visible area
+    if (rowTopRelative < visibleTop) {
+      // Row is above visible area - scroll up
+      container.scrollTo({
+        top: container.scrollTop + (rowTopRelative - visibleTop),
+        behavior: 'smooth'
+      });
+    } else if (rowBottomRelative > visibleBottom) {
+      // Row is below visible area - scroll down
+      container.scrollTo({
+        top: container.scrollTop + (rowBottomRelative - visibleBottom),
+        behavior: 'smooth'
+      });
     }
   }, [selectedRowKey]);
 
