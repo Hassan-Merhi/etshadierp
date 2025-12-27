@@ -102,6 +102,7 @@
     const [expandedBreakdownId, setExpandedBreakdownId] = useState<number | null>(null);
     const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
     const [fixPOCreditsResult, setFixPOCreditsResult] = useState<any>(null);
+    const [selectedCompanyForFix, setSelectedCompanyForFix] = useState<string>("");
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -492,8 +493,8 @@
     });
 
     const fixPOCreditsMutation = useMutation({
-      mutationFn: async () => {
-        const res = await apiRequest("POST", "/api/fix-old-po-credits", {});
+      mutationFn: async (companyId: number) => {
+        const res = await apiRequest("POST", "/api/fix-old-po-credits", { companyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -1558,17 +1559,44 @@
         </AlertDialog>
 
         {/* Fix Old PO Credits Dialog */}
-        <AlertDialog open={isFixPOCreditsDialogOpen} onOpenChange={setIsFixPOCreditsDialogOpen}>
+        <AlertDialog open={isFixPOCreditsDialogOpen} onOpenChange={(open) => {
+          setIsFixPOCreditsDialogOpen(open);
+          if (!open) {
+            setSelectedCompanyForFix("");
+          }
+        }}>
           <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <AlertDialogHeader>
               <AlertDialogTitle>Fix Old PO Inter-Company Credits</AlertDialogTitle>
               <AlertDialogDescription asChild>
                 {!fixPOCreditsResult ? (
-                  <p>
-                    This will create "Lubumbashi Credit" liability accounts for each non-Lubumbashi company 
-                    and add credit entries for all old offloaded POs. The credit amount equals the PO total 
-                    (items + freight + charges). This cannot be easily undone.
-                  </p>
+                  <div className="space-y-4">
+                    <p>
+                      This will create "HADI L'shi Credit" liability account for the selected company 
+                      and add credit entries for all old offloaded POs. The credit amount equals the PO total 
+                      (items + freight + charges). This cannot be easily undone.
+                    </p>
+                    <div className="pt-2">
+                      <label className="text-sm font-medium text-foreground">Select Company to Fix</label>
+                      <Select
+                        value={selectedCompanyForFix}
+                        onValueChange={setSelectedCompanyForFix}
+                      >
+                        <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
+                          <SelectValue placeholder="Choose a company..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies
+                            .filter((c: any) => !c.name.toLowerCase().includes("lubumbashi") && !c.name.toLowerCase().includes("hadi l'shi"))
+                            .map((company: any) => (
+                              <SelectItem key={company.id} value={company.id.toString()}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-4 mt-4">
                     <div className="text-foreground font-medium">{fixPOCreditsResult.message}</div>
@@ -1615,10 +1643,10 @@
               <AlertDialogCancel>Close</AlertDialogCancel>
               {!fixPOCreditsResult && (
                 <AlertDialogAction
-                  onClick={() => fixPOCreditsMutation.mutate()}
-                  disabled={fixPOCreditsMutation.isPending}
+                  onClick={() => fixPOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
+                  disabled={fixPOCreditsMutation.isPending || !selectedCompanyForFix}
                 >
-                  {fixPOCreditsMutation.isPending ? "Processing..." : "Fix All PO Credits"}
+                  {fixPOCreditsMutation.isPending ? "Processing..." : "Fix PO Credits"}
                 </AlertDialogAction>
               )}
             </AlertDialogFooter>

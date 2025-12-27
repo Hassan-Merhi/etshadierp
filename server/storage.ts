@@ -1401,7 +1401,9 @@ export class DbStorage implements IStorage {
     if (poTotal > 0 && po.companyId) {
       // Find Lubumbashi company
       const allCompanies = await db.select().from(schema.companies);
-      const lubumbashiCompany = allCompanies.find(c => c.name.toLowerCase().includes("lubumbashi"));
+      const lubumbashiCompany = allCompanies.find(c => 
+        c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
+      );
       const currentCompany = allCompanies.find(c => c.id === po.companyId);
       
       // Get or create PURCHASES ledger account for this company

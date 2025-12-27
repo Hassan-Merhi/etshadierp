@@ -25215,26 +25215,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole("Admin"),
     async (req, res) => {
       try {
+        const { companyId } = req.body;
+        
+        if (!companyId) {
+          return res.status(400).json({ 
+            message: "Please select a company to process." 
+          });
+        }
+        
         // Find the Lubumbashi company (parent company that paid for all POs)
         const allCompanies = await storage.getAllCompanies();
         const lubumbashiCompany = allCompanies.find(c => 
-          c.name.toLowerCase().includes("lubumbashi")
+          c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
         );
         
         if (!lubumbashiCompany) {
           return res.status(400).json({ 
-            message: "Could not find a company with 'Lubumbashi' in the name. Please ensure the parent company is named correctly." 
+            message: "Could not find a company with 'Lubumbashi' or 'HADI L'shi' in the name. Please ensure the parent company is named correctly." 
           });
         }
         
-        // Get all non-Lubumbashi companies
-        const otherCompanies = allCompanies.filter(c => c.id !== lubumbashiCompany.id);
+        // Find the selected company
+        const company = allCompanies.find(c => c.id === companyId);
         
-        if (otherCompanies.length === 0) {
-          return res.json({ 
-            message: "No other companies found besides Lubumbashi.",
-            fixed: 0,
-            totalAmount: 0
+        if (!company) {
+          return res.status(400).json({ 
+            message: "Selected company not found." 
+          });
+        }
+        
+        if (company.id === lubumbashiCompany.id) {
+          return res.status(400).json({ 
+            message: "Cannot process the parent company (HADI L'shi). Please select a subsidiary company." 
           });
         }
         
@@ -25242,7 +25254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let totalAmount = 0;
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
-        for (const company of otherCompanies) {
+        // Process only the selected company
+        {
           // Get or create "Lubumbashi Credit" account for this company
           let creditAccount = await db
             .select()
