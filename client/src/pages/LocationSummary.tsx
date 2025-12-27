@@ -88,15 +88,20 @@ export default function LocationSummary() {
     new Set(savedState?.hiddenRows || [])
   );
   const tableScrollContainer = useRef<HTMLDivElement>(null);
-  const isKeyboardNavigating = useRef(false);
-  const keyboardNavTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track interaction mode: 'keyboard' blocks hover selection until pointer moves
+  const interactionMode = useRef<'keyboard' | 'pointer'>('pointer');
   const { toast } = useToast();
   
-  // Helper to handle mouse enter - only select if not keyboard navigating
+  // Helper to handle mouse enter - only select if in pointer mode
   const handleMouseEnterRow = (rowKey: string) => {
-    if (!isKeyboardNavigating.current) {
+    if (interactionMode.current === 'pointer') {
       setSelectedRowKey(rowKey);
     }
+  };
+  
+  // Switch back to pointer mode when mouse actually moves
+  const handlePointerMove = () => {
+    interactionMode.current = 'pointer';
   };
   
   // Save state to sessionStorage whenever it changes
@@ -216,27 +221,15 @@ export default function LocationSummary() {
     
     const currentIndex = selectedRowKey ? allRows.findIndex(r => r.key === selectedRowKey) : -1;
     
-    // Helper to set keyboard navigation mode temporarily
-    const setKeyboardNavMode = () => {
-      isKeyboardNavigating.current = true;
-      if (keyboardNavTimeoutRef.current) {
-        clearTimeout(keyboardNavTimeoutRef.current);
-      }
-      // Reset after scroll animation completes
-      keyboardNavTimeoutRef.current = setTimeout(() => {
-        isKeyboardNavigating.current = false;
-      }, 500);
-    };
-    
     if (e.key === "ArrowUp") {
       e.preventDefault();
       if (currentIndex > 0) {
-        setKeyboardNavMode();
+        interactionMode.current = 'keyboard';
         setSelectedRowKey(allRows[currentIndex - 1].key);
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      setKeyboardNavMode();
+      interactionMode.current = 'keyboard';
       if (currentIndex === -1) {
         setSelectedRowKey(allRows[0].key);
       } else if (currentIndex < allRows.length - 1) {
@@ -446,7 +439,7 @@ export default function LocationSummary() {
         </Card>
       ) : (
         <Card className="overflow-hidden flex flex-col flex-1 w-full m-4 mt-0" style={{ minHeight: 0 }}>
-          <div className="overflow-auto flex-1" ref={tableScrollContainer}>
+          <div className="overflow-auto flex-1" ref={tableScrollContainer} onPointerMove={handlePointerMove}>
             <table className="w-full border-collapse" style={{ fontSize: '12px' }}>
               <thead className="sticky top-0 z-20 bg-muted">
                 <tr className="bg-muted">
