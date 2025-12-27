@@ -33,6 +33,12 @@ type ProfitData = {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
+  forUsTotal: number;
+  forUsBreakdown: { name: string; value: number }[];
+  onUsTotal: number;
+  onUsBreakdown: { name: string; value: number }[];
+  ownersCapital: number;
+  netWorth: number;
 };
 
 type ImportCycleBalanceData = {
@@ -456,6 +462,90 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      {/* Net Worth Breakdown: FOR US vs ON US */}
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Net Worth Breakdown</h3>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[200px]">
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* FOR US (Assets) */}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium text-green-600 mb-3 flex items-center gap-2">
+                <ArrowDownLeft className="h-4 w-4" />
+                FOR US (Assets)
+              </h4>
+              <div className="space-y-2 text-sm">
+                {profitData?.forUsBreakdown?.map((item, idx) => (
+                  <div key={idx} className="flex justify-between">
+                    <span className="text-muted-foreground">{item.name}:</span>
+                    <span className="font-mono">{formatCurrency(item.value)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+                  <span>Total FOR US:</span>
+                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* ON US (Liabilities) */}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-medium text-red-600 mb-3 flex items-center gap-2">
+                <ArrowUpRight className="h-4 w-4" />
+                ON US (Liabilities)
+              </h4>
+              <div className="space-y-2 text-sm">
+                {profitData?.onUsBreakdown?.map((item, idx) => (
+                  <div key={idx} className="flex justify-between">
+                    <span className="text-muted-foreground">{item.name}:</span>
+                    <span className="font-mono">{formatCurrency(item.value)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+                  <span>Total ON US:</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Net Worth Summary */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <h4 className="font-medium mb-3">Net Worth Calculation</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">FOR US:</span>
+                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">- ON US:</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
+                </div>
+                <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+                  <span>Net Worth:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netWorth ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">- Owner's Capital:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.ownersCapital ?? 0)}</span>
+                </div>
+                <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
+                  <span>Net Profit:</span>
+                  <span className={cn(
+                    "font-mono",
+                    (profitData?.netProfit ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                  )}>
+                    {formatCurrency(profitData?.netProfit ?? 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Bottom Row: Profit Margin, Available Cash, Cash to Pay */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
