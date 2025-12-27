@@ -16553,8 +16553,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
+      // EXCLUDE sales-related accounts because Sales is already counted from salesItems table
       const directIncomeAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+        (acc) => acc.accountType === "Income" && 
+                 acc.subType === "Direct Income" &&
+                 !acc.code?.includes("SALES") && // Exclude SALES_REV, SALES, etc.
+                 !acc.name?.toLowerCase().includes("sales") // Exclude any sales-named accounts
       );
       let directIncomesTotal = 0;
       for (const acc of directIncomeAccounts) {
@@ -19090,8 +19094,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
+      // EXCLUDE sales-related accounts because Sales is already counted from salesItems table
       const directIncomeAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
+        (acc) => acc.accountType === "Income" && 
+                 acc.subType === "Direct Income" &&
+                 !acc.code?.includes("SALES") && // Exclude SALES_REV, SALES, etc.
+                 !acc.name?.toLowerCase().includes("sales") // Exclude any sales-named accounts
       );
       let directIncomesTotal = 0;
       const directIncomesDetails = directIncomeAccounts.map((acc) => {
