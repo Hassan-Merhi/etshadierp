@@ -223,6 +223,28 @@ export default function LocationSummary() {
     return rows;
   };
 
+  // Immediate scroll function - called directly from keydown handler for faster response
+  const scrollToRowImmediate = (rowKey: string) => {
+    if (!tableScrollContainer.current) return;
+    const container = tableScrollContainer.current;
+    const rowElement = container.querySelector(`[data-row-key="${rowKey}"]`) as HTMLElement | null;
+    if (!rowElement) return;
+    
+    const thead = container.querySelector('thead') as HTMLElement | null;
+    const headerHeight = thead ? thead.offsetHeight : 60;
+    const scrollMargin = 8;
+    const rowTop = rowElement.offsetTop;
+    const rowBottom = rowTop + rowElement.offsetHeight;
+    const viewportTop = container.scrollTop + headerHeight + scrollMargin;
+    const viewportBottom = container.scrollTop + container.clientHeight - scrollMargin;
+    
+    if (rowTop < viewportTop) {
+      container.scrollTop = rowTop - headerHeight - scrollMargin;
+    } else if (rowBottom > viewportBottom) {
+      container.scrollTop = rowBottom - container.clientHeight + scrollMargin;
+    }
+  };
+
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (locationDialogOpen || !summaryData?.stockGroups?.length) return;
     
@@ -235,15 +257,21 @@ export default function LocationSummary() {
       e.preventDefault();
       if (currentIndex > 0) {
         interactionMode.current = 'keyboard';
-        setSelectedRowKey(allRows[currentIndex - 1].key);
+        const newKey = allRows[currentIndex - 1].key;
+        scrollToRowImmediate(newKey);
+        setSelectedRowKey(newKey);
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       interactionMode.current = 'keyboard';
       if (currentIndex === -1) {
-        setSelectedRowKey(allRows[0].key);
+        const newKey = allRows[0].key;
+        scrollToRowImmediate(newKey);
+        setSelectedRowKey(newKey);
       } else if (currentIndex < allRows.length - 1) {
-        setSelectedRowKey(allRows[currentIndex + 1].key);
+        const newKey = allRows[currentIndex + 1].key;
+        scrollToRowImmediate(newKey);
+        setSelectedRowKey(newKey);
       }
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
