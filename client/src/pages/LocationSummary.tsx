@@ -88,7 +88,16 @@ export default function LocationSummary() {
     new Set(savedState?.hiddenRows || [])
   );
   const tableScrollContainer = useRef<HTMLDivElement>(null);
+  const isKeyboardNavigating = useRef(false);
+  const keyboardNavTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  
+  // Helper to handle mouse enter - only select if not keyboard navigating
+  const handleMouseEnterRow = (rowKey: string) => {
+    if (!isKeyboardNavigating.current) {
+      setSelectedRowKey(rowKey);
+    }
+  };
   
   // Save state to sessionStorage whenever it changes
   useEffect(() => {
@@ -207,13 +216,27 @@ export default function LocationSummary() {
     
     const currentIndex = selectedRowKey ? allRows.findIndex(r => r.key === selectedRowKey) : -1;
     
+    // Helper to set keyboard navigation mode temporarily
+    const setKeyboardNavMode = () => {
+      isKeyboardNavigating.current = true;
+      if (keyboardNavTimeoutRef.current) {
+        clearTimeout(keyboardNavTimeoutRef.current);
+      }
+      // Reset after scroll animation completes
+      keyboardNavTimeoutRef.current = setTimeout(() => {
+        isKeyboardNavigating.current = false;
+      }, 500);
+    };
+    
     if (e.key === "ArrowUp") {
       e.preventDefault();
       if (currentIndex > 0) {
+        setKeyboardNavMode();
         setSelectedRowKey(allRows[currentIndex - 1].key);
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      setKeyboardNavMode();
       if (currentIndex === -1) {
         setSelectedRowKey(allRows[0].key);
       } else if (currentIndex < allRows.length - 1) {
@@ -485,7 +508,7 @@ export default function LocationSummary() {
                             toggleGroup(group.id);
                             setSelectedRowKey(buildRowKey(group.id));
                           }}
-                          onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id))}
+                          onMouseEnter={() => handleMouseEnterRow(buildRowKey(group.id))}
                           data-testid={`row-group-${group.id}`}
                           data-row-key={buildRowKey(group.id)}
                         >
@@ -541,7 +564,7 @@ export default function LocationSummary() {
                               hiddenRows.has(buildRowKey(group.id, item.id)) && "hidden"
                             )}
                             onClick={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
-                            onMouseEnter={() => setSelectedRowKey(buildRowKey(group.id, item.id))}
+                            onMouseEnter={() => handleMouseEnterRow(buildRowKey(group.id, item.id))}
                             data-testid={`row-item-${item.id}`}
                             data-row-key={buildRowKey(group.id, item.id)}
                           >
