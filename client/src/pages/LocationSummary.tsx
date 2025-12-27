@@ -208,7 +208,9 @@ export default function LocationSummary() {
         rows.push({ key: groupKey, groupId: group.id, groupIndex });
       }
       if (expandedGroups.has(group.id)) {
-        group.items.forEach((item, itemIndex) => {
+        // Sort items alphabetically to match the visual table order
+        const sortedItems = [...group.items].sort((a, b) => a.name.localeCompare(b.name));
+        sortedItems.forEach((item, itemIndex) => {
           const itemKey = buildRowKey(group.id, item.id);
           // Skip hidden rows from navigation
           if (!hiddenRows.has(itemKey)) {
