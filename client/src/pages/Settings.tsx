@@ -1599,29 +1599,47 @@
               <AlertDialogDescription asChild>
                 {!fixPOCreditsResult && !reversePOCreditsResult ? (
                   <div className="space-y-4">
-                    <p>
-                      <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
-                      <br />
-                      <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers for the selected company.
-                    </p>
-                    <div className="pt-2">
-                      <label className="text-sm font-medium text-foreground">Select Company</label>
-                      <Select
-                        value={selectedCompanyForFix}
-                        onValueChange={setSelectedCompanyForFix}
-                      >
-                        <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
-                          <SelectValue placeholder="Choose a company..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {companies.map((company: any) => (
-                            <SelectItem key={company.id} value={company.id.toString()}>
-                              {company.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {(() => {
+                      const selectedCo = companies.find((c: any) => c.id.toString() === selectedCompanyForFix);
+                      const isParentSelected = selectedCo && (
+                        selectedCo.name.toLowerCase().includes("lubumbashi") || 
+                        selectedCo.name.toLowerCase().includes("hadi l'shi")
+                      );
+                      return (
+                        <>
+                          <p>
+                            <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
+                            <br />
+                            <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers.
+                          </p>
+                          <div className="pt-2">
+                            <label className="text-sm font-medium text-foreground">Select Company</label>
+                            <Select
+                              value={selectedCompanyForFix}
+                              onValueChange={setSelectedCompanyForFix}
+                            >
+                              <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
+                                <SelectValue placeholder="Choose a company..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {companies.map((company: any) => (
+                                  <SelectItem key={company.id} value={company.id.toString()}>
+                                    {company.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {isParentSelected && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                              <p className="text-sm text-blue-800 dark:text-blue-200">
+                                <strong>Parent company selected:</strong> This will process ALL subsidiary companies at once.
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : fixPOCreditsResult ? (
                   <div className="space-y-4 mt-4">
@@ -1676,6 +1694,7 @@
                           <Table>
                             <TableHeader>
                               <TableRow>
+                                <TableHead>Company</TableHead>
                                 <TableHead>Voucher Number</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                               </TableRow>
@@ -1683,6 +1702,7 @@
                             <TableBody>
                               {reversePOCreditsResult.details.map((d: any, i: number) => (
                                 <TableRow key={i}>
+                                  <TableCell>{d.company}</TableCell>
                                   <TableCell>{d.voucherNumber}</TableCell>
                                   <TableCell className="text-right">${formatNumber(parseFloat(d.amount))}</TableCell>
                                 </TableRow>

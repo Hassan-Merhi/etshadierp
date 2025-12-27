@@ -25236,23 +25236,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Find the selected company
-        const company = allCompanies.find(c => c.id === companyId);
+        const selectedCompany = allCompanies.find(c => c.id === companyId);
         
-        if (!company) {
+        if (!selectedCompany) {
           return res.status(400).json({ 
             message: "Selected company not found." 
           });
         }
         
-        // Allow processing any company including parent
-        const isParentCompany = company.id === lubumbashiCompany.id;
+        // Check if parent company is selected - if so, process ALL subsidiaries
+        const isParentCompany = selectedCompany.id === lubumbashiCompany.id;
+        
+        // Determine which companies to process
+        const companiesToProcess = isParentCompany
+          ? allCompanies.filter(c => c.id !== lubumbashiCompany.id) // All subsidiaries
+          : [selectedCompany]; // Just the selected one
         
         let totalFixed = 0;
         let totalAmount = 0;
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
-        // Process only the selected company
-        {
+        // Process each company
+        for (const company of companiesToProcess) {
           // Get or create "Lubumbashi Credit" account for this company
           let creditAccount = await db
             .select()
@@ -25471,11 +25476,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        const processedCompanyNames = companiesToProcess.map(c => c.name).join(", ");
+        const message = isParentCompany
+          ? `Fixed ${totalFixed} POs across ${companiesToProcess.length} subsidiaries: ${processedCompanyNames}`
+          : `Fixed ${totalFixed} POs for ${selectedCompany.name}`;
+        
         res.json({
-          message: `Fixed ${totalFixed} POs with inter-company credit entries`,
+          message,
           fixed: totalFixed,
           totalAmount: totalAmount.toFixed(2),
-          details
+          details,
+          processedCompanies: companiesToProcess.length
         });
       } catch (error: any) {
         console.error("Fix old PO credits error:", error);
@@ -25513,54 +25524,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Company not found." });
         }
         
-        let totalReversed = 0;
-        const details: Array<{ voucherNumber: string; amount: string }> = [];
-        
-        // Delete INTERCO vouchers in the selected company
-        const companyIntercoVouchers = await db
-          .select()
-          .from(vouchers)
-          .where(
-            and(
-              eq(vouchers.companyId, company.id),
-              like(vouchers.voucherNumber, "INTERCO-%")
-            )
-          );
-        
-        for (const v of companyIntercoVouchers) {
-          // Delete voucher entries first
-          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-          // Delete voucher
-          await db.delete(vouchers).where(eq(vouchers.id, v.id));
-          totalReversed++;
-          details.push({ voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+        if (!lubumbashiCompany) {
+          return res.status(400).json({ 
+            message: "Could not find a company with 'Lubumbashi' or 'HADI L'shi' in the name. Please ensure the parent company is named correctly." 
+          });
         }
         
-        // If not the parent company, also delete corresponding INTERCO-LUB vouchers in Lubumbashi
-        if (lubumbashiCompany && company.id !== lubumbashiCompany.id) {
-          const lubumbashiIntercoVouchers = await db
+        // Check if parent company is selected - if so, process ALL subsidiaries
+        const isParentCompany = company.id === lubumbashiCompany.id;
+        
+        // Determine which companies to process
+        const companiesToProcess = isParentCompany
+          ? allCompanies.filter(c => c.id !== lubumbashiCompany.id) // All subsidiaries
+          : [company]; // Just the selected one
+        
+        let totalReversed = 0;
+        const details: Array<{ company: string; voucherNumber: string; amount: string }> = [];
+        
+        for (const targetCompany of companiesToProcess) {
+          // Delete INTERCO vouchers in this company
+          const companyIntercoVouchers = await db
             .select()
             .from(vouchers)
             .where(
               and(
-                eq(vouchers.companyId, lubumbashiCompany.id),
-                like(vouchers.voucherNumber, "INTERCO-LUB-%"),
-                like(vouchers.description, `%${company.name}%`)
+                eq(vouchers.companyId, targetCompany.id),
+                like(vouchers.voucherNumber, "INTERCO-%")
               )
             );
           
-          for (const v of lubumbashiIntercoVouchers) {
+          for (const v of companyIntercoVouchers) {
+            // Delete voucher entries first
             await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+            // Delete voucher
             await db.delete(vouchers).where(eq(vouchers.id, v.id));
             totalReversed++;
-            details.push({ voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+            details.push({ company: targetCompany.name, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+          }
+          
+          // Also delete corresponding INTERCO-LUB vouchers in Lubumbashi for this subsidiary
+          if (lubumbashiCompany) {
+            const lubumbashiIntercoVouchers = await db
+              .select()
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, lubumbashiCompany.id),
+                  like(vouchers.voucherNumber, "INTERCO-LUB-%"),
+                  like(vouchers.description, `%${targetCompany.name}%`)
+                )
+              );
+            
+            for (const v of lubumbashiIntercoVouchers) {
+              await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+              await db.delete(vouchers).where(eq(vouchers.id, v.id));
+              totalReversed++;
+              details.push({ company: `${lubumbashiCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+            }
           }
         }
         
+        const message = isParentCompany
+          ? `Reversed ${totalReversed} inter-company vouchers across ${companiesToProcess.length} subsidiaries`
+          : `Reversed ${totalReversed} inter-company vouchers for ${company.name}`;
+        
         res.json({
-          message: `Reversed ${totalReversed} inter-company vouchers for ${company.name}`,
+          message,
           reversed: totalReversed,
-          details
+          details,
+          processedCompanies: companiesToProcess.length
         });
       } catch (error: any) {
         console.error("Reverse PO credits error:", error);
