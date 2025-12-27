@@ -25205,6 +25205,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // ==========================================
+  // Fix Old PO Inter-Company Credits
+  // ==========================================
+  
+  app.post(
+    "/api/fix-old-po-credits",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        // Find the Lubumbashi company (parent company that paid for all POs)
+        const allCompanies = await storage.getAllCompanies();
+        const lubumbashiCompany = allCompanies.find(c => 
+          c.name.toLowerCase().includes("lubumbashi")
+        );
+        
+        if (!lubumbashiCompany) {
+          return res.status(400).json({ 
+            message: "Could not find a company with 'Lubumbashi' in the name. Please ensure the parent company is named correctly." 
+          });
+        }
+        
+        // Get all non-Lubumbashi companies
+        const otherCompanies = allCompanies.filter(c => c.id !== lubumbashiCompany.id);
+        
+        if (otherCompanies.length === 0) {
+          return res.json({ 
+            message: "No other companies found besides Lubumbashi.",
+            fixed: 0,
+            totalAmount: 0
+          });
+        }
+        
+        let totalFixed = 0;
+        let totalAmount = 0;
+        const details: Array<{ company: string; poNumber: string; amount: number }> = [];
+        
+        for (const company of otherCompanies) {
+          // Get or create "Lubumbashi Credit" account for this company
+          let creditAccount = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, company.id),
+                eq(ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
+                isNull(ledgerAccounts.deletedAt)
+              )
+            )
+            .limit(1);
+          
+          if (!creditAccount.length) {
+            const [newAccount] = await db.insert(ledgerAccounts).values({
+              companyId: company.id,
+              code: "LUBUMBASHI_CREDIT",
+              name: "Lubumbashi Credit",
+              accountType: "Liability",
+              subType: "Current Liability",
+              openingBalance: "0",
+              openingBalanceSide: "Cr",
+            }).returning();
+            creditAccount = [newAccount];
+          }
+          
+          // Get all purchase orders for this company
+          const companyPOs = await db
+            .select()
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.companyId, company.id));
+          
+          for (const po of companyPOs) {
+            // Check if this PO is for an offloaded container
+            const [container] = await db
+              .select()
+              .from(containers)
+              .where(eq(containers.id, po.containerId));
+            
+            if (!container || container.status !== "OFFLOADED") {
+              continue; // Skip non-offloaded containers
+            }
+            
+            // Check if credit entry already exists for this PO
+            const existingVoucher = await db
+              .select()
+              .from(vouchers)
+              .where(
+                and(
+                  eq(vouchers.companyId, company.id),
+                  like(vouchers.voucherNumber, `INTERCO-${po.poNumber}%`)
+                )
+              )
+              .limit(1);
+            
+            if (existingVoucher.length > 0) {
+              continue; // Skip - already has credit entry
+            }
+            
+            // Calculate PO total: items + freight + charges
+            const poItemsTotal = parseFloat(po.itemsTotal || "0");
+            const poFreight = parseFloat(po.freight || "0");
+            const poSurcharge = parseFloat(po.surcharge || "0");
+            const poFumigation = parseFloat(po.fumigation || "0");
+            const poDocumentCharges = parseFloat(po.documentCharges || "0");
+            const poDiscount = parseFloat(po.discount || "0");
+            const poOtherCharges = parseFloat(po.otherCharges || "0");
+            const poTotal = poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
+            
+            if (poTotal <= 0) {
+              continue; // Skip zero or negative amounts
+            }
+            
+            // Get offload date from container offload record
+            const [offloadRecord] = await db
+              .select()
+              .from(containerOffloads)
+              .where(eq(containerOffloads.containerId, container.id))
+              .limit(1);
+            
+            const voucherDate = offloadRecord?.offloadedAt 
+              ? new Date(offloadRecord.offloadedAt).toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0];
+            
+            // Create inter-company credit transfer voucher
+            // This transfers the liability from Supplier to Lubumbashi Credit
+            // (Old purchase voucher credited Supplier, now we move that to Lubumbashi Credit)
+            const voucherNumber = `INTERCO-${po.poNumber}-${Date.now()}`;
+            const [voucher] = await db.insert(vouchers).values({
+              companyId: company.id,
+              voucherNumber,
+              voucherType: "Journal",
+              voucherDate,
+              description: `Transfer supplier liability to Lubumbashi Credit - PO ${po.poNumber} - Container ${container.containerNumber}`,
+              totalAmount: poTotal.toFixed(2),
+              optional: false,
+            }).returning();
+            
+            // Debit: Supplier account (reduce payable - they got paid by Lubumbashi)
+            if (po.supplierId) {
+              await db.insert(voucherEntries).values({
+                voucherId: voucher.id,
+                supplierId: po.supplierId,
+                debitAmount: poTotal.toFixed(2),
+                creditAmount: "0",
+                narration: `Transfer to Lubumbashi Credit - PO ${po.poNumber}`,
+              });
+            }
+            
+            // Credit: Lubumbashi Credit account (we owe Lubumbashi, who paid the supplier)
+            await db.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: creditAccount[0].id,
+              debitAmount: "0",
+              creditAmount: poTotal.toFixed(2),
+              narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Lubumbashi paid)`,
+            });
+            
+            totalFixed++;
+            totalAmount += poTotal;
+            details.push({
+              company: company.name,
+              poNumber: po.poNumber,
+              amount: poTotal
+            });
+          }
+        }
+        
+        res.json({
+          message: `Fixed ${totalFixed} POs with inter-company credit entries`,
+          fixed: totalFixed,
+          totalAmount: totalAmount.toFixed(2),
+          details
+        });
+      } catch (error: any) {
+        console.error("Fix old PO credits error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
   const httpServer = createServer(app);
 
   return httpServer;

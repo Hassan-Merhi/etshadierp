@@ -100,6 +100,8 @@
     const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
     const [initBalancesResult, setInitBalancesResult] = useState<any>(null);
     const [expandedBreakdownId, setExpandedBreakdownId] = useState<number | null>(null);
+    const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
+    const [fixPOCreditsResult, setFixPOCreditsResult] = useState<any>(null);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -486,6 +488,31 @@
         });
         // Reset the result so button shows again for retry
         setInitBalancesResult(null);
+      },
+    });
+
+    const fixPOCreditsMutation = useMutation({
+      mutationFn: async () => {
+        const res = await apiRequest("POST", "/api/fix-old-po-credits", {});
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        setFixPOCreditsResult(data);
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      },
+      onError: (error: any) => {
+        console.error("Fix PO credits error:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fix PO credits",
+          variant: "destructive",
+        });
+        setFixPOCreditsResult(null);
       },
     });
   
@@ -1311,6 +1338,36 @@
                     </Button>
                   </div>
                 </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-po-credits-title">Fix Old PO Inter-Company Credits</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Create "Lubumbashi Credit" entries for old POs that were imported before this feature existed
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setFixPOCreditsResult(null);
+                        setIsFixPOCreditsDialogOpen(true);
+                      }}
+                      disabled={fixPOCreditsMutation.isPending}
+                      data-testid="button-fix-po-credits"
+                    >
+                      {fixPOCreditsMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Fix Credits"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
               </div>
             </div>
           </TabsContent>
@@ -1494,6 +1551,74 @@
                   disabled={initializeBalancesMutation.isPending}
                 >
                   {initializeBalancesMutation.isPending ? "Processing..." : "Initialize All Companies"}
+                </AlertDialogAction>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Fix Old PO Credits Dialog */}
+        <AlertDialog open={isFixPOCreditsDialogOpen} onOpenChange={setIsFixPOCreditsDialogOpen}>
+          <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Fix Old PO Inter-Company Credits</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!fixPOCreditsResult ? (
+                  <p>
+                    This will create "Lubumbashi Credit" liability accounts for each non-Lubumbashi company 
+                    and add credit entries for all old offloaded POs. The credit amount equals the PO total 
+                    (items + freight + charges). This cannot be easily undone.
+                  </p>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{fixPOCreditsResult.message}</div>
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded">
+                      <div>
+                        <div className="text-sm text-muted-foreground">POs Fixed</div>
+                        <div className="text-lg font-semibold">{fixPOCreditsResult.fixed}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Total Amount</div>
+                        <div className="text-lg font-semibold">${formatNumber(parseFloat(fixPOCreditsResult.totalAmount || 0))}</div>
+                      </div>
+                    </div>
+                    {fixPOCreditsResult.details?.length > 0 && (
+                      <div className="mt-4">
+                        <div className="font-medium mb-2">Details:</div>
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Company</TableHead>
+                                <TableHead>PO Number</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {fixPOCreditsResult.details.map((d: any, i: number) => (
+                                <TableRow key={i}>
+                                  <TableCell>{d.company}</TableCell>
+                                  <TableCell>{d.poNumber}</TableCell>
+                                  <TableCell className="text-right">${formatNumber(d.amount)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+              {!fixPOCreditsResult && (
+                <AlertDialogAction
+                  onClick={() => fixPOCreditsMutation.mutate()}
+                  disabled={fixPOCreditsMutation.isPending}
+                >
+                  {fixPOCreditsMutation.isPending ? "Processing..." : "Fix All PO Credits"}
                 </AlertDialogAction>
               )}
             </AlertDialogFooter>

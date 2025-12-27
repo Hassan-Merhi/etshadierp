@@ -2104,15 +2104,61 @@ export class DbStorage implements IStorage {
           narration: `PO ${po.poNumber} - Container ${container.containerNumber}`,
         });
         
-        // Credit: Supplier account (Accounts Payable increases)
-        if (po.supplierId) {
+        // ============================================================
+        // CREDIT ENTRY - Either Supplier or Lubumbashi Credit
+        // For Lubumbashi company: Credit Supplier (they owe the supplier directly)
+        // For other companies: Credit Lubumbashi Credit (Lubumbashi pays suppliers, so we owe Lubumbashi)
+        // ============================================================
+        const allCompanies = await db.select().from(schema.companies);
+        const lubumbashiCompany = allCompanies.find(c => c.name.toLowerCase().includes("lubumbashi"));
+        
+        if (lubumbashiCompany && location.companyId !== lubumbashiCompany.id) {
+          // Non-Lubumbashi company: Lubumbashi pays suppliers, so credit Lubumbashi Credit
+          // Get or create "Lubumbashi Credit" account for this company
+          let creditAccount = await db
+            .select()
+            .from(schema.ledgerAccounts)
+            .where(
+              and(
+                eq(schema.ledgerAccounts.companyId, location.companyId),
+                eq(schema.ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
+                isNull(schema.ledgerAccounts.deletedAt)
+              )
+            )
+            .limit(1);
+          
+          if (!creditAccount.length) {
+            const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+              companyId: location.companyId,
+              code: "LUBUMBASHI_CREDIT",
+              name: "Lubumbashi Credit",
+              accountType: "Liability",
+              subType: "Current Liability",
+              openingBalance: "0",
+              openingBalanceSide: "Cr",
+            }).returning();
+            creditAccount = [newAccount];
+          }
+          
+          // Credit: Lubumbashi Credit account (we owe Lubumbashi, who paid the supplier)
           await db.insert(schema.voucherEntries).values({
             voucherId: purchaseVoucher.id,
-            supplierId: po.supplierId,
+            ledgerAccountId: creditAccount[0].id,
             debitAmount: "0",
             creditAmount: poPurchasesAmount.toFixed(2),
-            narration: `PO ${po.poNumber} - Container ${container.containerNumber}`,
+            narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Lubumbashi paid)`,
           });
+        } else {
+          // Lubumbashi company or no Lubumbashi found: Credit Supplier directly
+          if (po.supplierId) {
+            await db.insert(schema.voucherEntries).values({
+              voucherId: purchaseVoucher.id,
+              supplierId: po.supplierId,
+              debitAmount: "0",
+              creditAmount: poPurchasesAmount.toFixed(2),
+              narration: `PO ${po.poNumber} - Container ${container.containerNumber}`,
+            });
+          }
         }
       }
       
