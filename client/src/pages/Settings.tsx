@@ -103,6 +103,7 @@
     const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
     const [fixPOCreditsResult, setFixPOCreditsResult] = useState<any>(null);
     const [selectedCompanyForFix, setSelectedCompanyForFix] = useState<string>("");
+    const [reversePOCreditsResult, setReversePOCreditsResult] = useState<any>(null);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -514,6 +515,31 @@
           variant: "destructive",
         });
         setFixPOCreditsResult(null);
+      },
+    });
+
+    const reversePOCreditsMutation = useMutation({
+      mutationFn: async (companyId: number) => {
+        const res = await apiRequest("POST", "/api/reverse-po-credits", { companyId });
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        setReversePOCreditsResult(data);
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      },
+      onError: (error: any) => {
+        console.error("Reverse PO credits error:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to reverse PO credits",
+          variant: "destructive",
+        });
+        setReversePOCreditsResult(null);
       },
     });
   
@@ -1563,21 +1589,23 @@
           setIsFixPOCreditsDialogOpen(open);
           if (!open) {
             setSelectedCompanyForFix("");
+            setFixPOCreditsResult(null);
+            setReversePOCreditsResult(null);
           }
         }}>
           <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <AlertDialogHeader>
-              <AlertDialogTitle>Fix Old PO Inter-Company Credits</AlertDialogTitle>
+              <AlertDialogTitle>Inter-Company Credit Management</AlertDialogTitle>
               <AlertDialogDescription asChild>
-                {!fixPOCreditsResult ? (
+                {!fixPOCreditsResult && !reversePOCreditsResult ? (
                   <div className="space-y-4">
                     <p>
-                      This will create "HADI L'shi Credit" liability account for the selected company 
-                      and add credit entries for all old offloaded POs. The credit amount equals the PO total 
-                      (items + freight + charges). This cannot be easily undone.
+                      <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
+                      <br />
+                      <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers for the selected company.
                     </p>
                     <div className="pt-2">
-                      <label className="text-sm font-medium text-foreground">Select Company to Fix</label>
+                      <label className="text-sm font-medium text-foreground">Select Company</label>
                       <Select
                         value={selectedCompanyForFix}
                         onValueChange={setSelectedCompanyForFix}
@@ -1586,18 +1614,16 @@
                           <SelectValue placeholder="Choose a company..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {companies
-                            .filter((c: any) => !c.name.toLowerCase().includes("lubumbashi") && !c.name.toLowerCase().includes("hadi l'shi"))
-                            .map((company: any) => (
-                              <SelectItem key={company.id} value={company.id.toString()}>
-                                {company.name}
-                              </SelectItem>
-                            ))}
+                          {companies.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id.toString()}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
-                ) : (
+                ) : fixPOCreditsResult ? (
                   <div className="space-y-4 mt-4">
                     <div className="text-foreground font-medium">{fixPOCreditsResult.message}</div>
                     <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded">
@@ -1636,18 +1662,59 @@
                       </div>
                     )}
                   </div>
-                )}
+                ) : reversePOCreditsResult ? (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{reversePOCreditsResult.message}</div>
+                    <div className="p-3 bg-muted/50 rounded">
+                      <div className="text-sm text-muted-foreground">Vouchers Reversed</div>
+                      <div className="text-lg font-semibold">{reversePOCreditsResult.reversed}</div>
+                    </div>
+                    {reversePOCreditsResult.details?.length > 0 && (
+                      <div className="mt-4">
+                        <div className="font-medium mb-2">Deleted Vouchers:</div>
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Voucher Number</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reversePOCreditsResult.details.map((d: any, i: number) => (
+                                <TableRow key={i}>
+                                  <TableCell>{d.voucherNumber}</TableCell>
+                                  <TableCell className="text-right">${formatNumber(parseFloat(d.amount))}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="gap-2">
               <AlertDialogCancel>Close</AlertDialogCancel>
-              {!fixPOCreditsResult && (
-                <AlertDialogAction
-                  onClick={() => fixPOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
-                  disabled={fixPOCreditsMutation.isPending || !selectedCompanyForFix}
-                >
-                  {fixPOCreditsMutation.isPending ? "Processing..." : "Fix PO Credits"}
-                </AlertDialogAction>
+              {!fixPOCreditsResult && !reversePOCreditsResult && (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => reversePOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
+                    disabled={reversePOCreditsMutation.isPending || fixPOCreditsMutation.isPending || !selectedCompanyForFix}
+                    data-testid="button-reverse-po-credits"
+                  >
+                    {reversePOCreditsMutation.isPending ? "Reversing..." : "Reverse Credits"}
+                  </Button>
+                  <AlertDialogAction
+                    onClick={() => fixPOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
+                    disabled={fixPOCreditsMutation.isPending || reversePOCreditsMutation.isPending || !selectedCompanyForFix}
+                  >
+                    {fixPOCreditsMutation.isPending ? "Processing..." : "Fix Credits"}
+                  </AlertDialogAction>
+                </>
               )}
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -25244,11 +25244,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        if (company.id === lubumbashiCompany.id) {
-          return res.status(400).json({ 
-            message: "Cannot process the parent company (HADI L'shi). Please select a subsidiary company." 
-          });
-        }
+        // Allow processing any company including parent
+        const isParentCompany = company.id === lubumbashiCompany.id;
         
         let totalFixed = 0;
         let totalAmount = 0;
@@ -25482,6 +25479,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Fix old PO credits error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ==========================================
+  // Reverse Fix Old PO Inter-Company Credits
+  // ==========================================
+  
+  app.post(
+    "/api/reverse-po-credits",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { companyId } = req.body;
+        
+        if (!companyId) {
+          return res.status(400).json({ 
+            message: "Please select a company to reverse." 
+          });
+        }
+        
+        // Find all INTERCO vouchers for this company and delete them
+        const allCompanies = await storage.getAllCompanies();
+        const company = allCompanies.find(c => c.id === companyId);
+        const lubumbashiCompany = allCompanies.find(c => 
+          c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
+        );
+        
+        if (!company) {
+          return res.status(400).json({ message: "Company not found." });
+        }
+        
+        let totalReversed = 0;
+        const details: Array<{ voucherNumber: string; amount: string }> = [];
+        
+        // Delete INTERCO vouchers in the selected company
+        const companyIntercoVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, company.id),
+              like(vouchers.voucherNumber, "INTERCO-%")
+            )
+          );
+        
+        for (const v of companyIntercoVouchers) {
+          // Delete voucher entries first
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          // Delete voucher
+          await db.delete(vouchers).where(eq(vouchers.id, v.id));
+          totalReversed++;
+          details.push({ voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+        }
+        
+        // If not the parent company, also delete corresponding INTERCO-LUB vouchers in Lubumbashi
+        if (lubumbashiCompany && company.id !== lubumbashiCompany.id) {
+          const lubumbashiIntercoVouchers = await db
+            .select()
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, lubumbashiCompany.id),
+                like(vouchers.voucherNumber, "INTERCO-LUB-%"),
+                like(vouchers.description, `%${company.name}%`)
+              )
+            );
+          
+          for (const v of lubumbashiIntercoVouchers) {
+            await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+            await db.delete(vouchers).where(eq(vouchers.id, v.id));
+            totalReversed++;
+            details.push({ voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+          }
+        }
+        
+        res.json({
+          message: `Reversed ${totalReversed} inter-company vouchers for ${company.name}`,
+          reversed: totalReversed,
+          details
+        });
+      } catch (error: any) {
+        console.error("Reverse PO credits error:", error);
         res.status(500).json({ message: error.message });
       }
     }
