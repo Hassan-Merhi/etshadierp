@@ -16600,9 +16600,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - Income: P&L account, not balance sheet
       // - Profit: Equity/Capital, not operating liability
       // - Equity: Owner's capital
-      const excludedFromNetPosition = ["Income", "Profit", "Equity"];
-      const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) =>
-        excludedFromNetPosition.includes(acc.accountType || "");
+      // - Fixed Asset: Not liquid assets for operating position
+      const excludedAccountTypes = ["Income", "Profit", "Equity", "Fixed Asset"];
+      
+      // Asset types that might contain fixed assets by name pattern
+      const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
+      
+      // Fixed asset name patterns - only apply to asset-type accounts
+      const fixedAssetNamePatterns = [
+        "rover", "toyota", "mercedes", "vehicle", "car", "truck",
+        "land", "property", "building", "house",
+        "rolex", "watch", "luxury", "jewelry",
+        "guarantee", "deposit", "caution"
+      ];
+      
+      const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) => {
+        // First check excluded account types
+        if (excludedAccountTypes.includes(acc.accountType || "")) return true;
+        
+        // Only apply name pattern filter to asset-type accounts (not liabilities)
+        // This prevents accidentally excluding liability accounts that happen to contain these words
+        if (assetAccountTypes.includes(acc.accountType || "")) {
+          const nameLower = (acc.name || "").toLowerCase();
+          if (fixedAssetNamePatterns.some(pattern => nameLower.includes(pattern))) {
+            return true;
+          }
+        }
+        
+        return false;
+      };
 
       // Track totals
       let forUsTotal = 0;
@@ -16669,20 +16695,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryTotals["asset_Stock In Hand"] = stockOnFloor;
       }
 
-      // Add Stock OTW (containers pending offload) - always positive asset
-      const pendingContainers = await db
-        .select({ id: containers.id, grandTotal: containers.grandTotal })
-        .from(containers)
-        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
-        .execute();
-      let stockOTW = 0;
-      for (const c of pendingContainers) {
-        stockOTW += parseFloat(c.grandTotal || "0");
-      }
-      if (stockOTW > 0) {
-        forUsTotal += stockOTW;
-        categoryTotals["asset_Stock OTW"] = stockOTW;
-      }
+      // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
+      // Containers in transit are not yet assets - they become assets only when offloaded
+      // At that point, they increase inventory (asset) and create supplier/agent liabilities
 
       // Add Workers/Payroll - employee balances (what we owe them)
       const companyEmployees = await db
