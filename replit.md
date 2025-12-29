@@ -33,12 +33,13 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **In subsidiary books**: DR Purchases, CR Lubumbashi Credit (liability - we owe Lubumbashi)
     - **In Lubumbashi books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
     This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers (DR Supplier, CR Lubumbashi Credit in subsidiary + DR [Subsidiary] Credit, CR Supplier in Lubumbashi).
--   **Net Position with Parent Company Setting (Dec 2025)**: Net Position = All Assets - All Liabilities. A global `system_settings` table stores the designated parent company ID. When set:
-    - Only the parent company shows supplier liabilities in Net Position (since Lubumbashi pays all suppliers)
-    - Subsidiary companies show "Lubumbashi Credit" as their liability instead
-    - If no parent is set, all companies show their own supplier balances (original behavior)
-    - Admin-only setting in Settings > System Tools
-    - Dashboard displays full asset/liability breakdown (forUsBreakdown/onUsBreakdown)
+-   **Net Position with Parent Company Setting (Dec 2025)**: Simplified sign-based Net Position calculation:
+    - **Formula**: Net Position = Assets - Liabilities - Expenses
+    - **Sign-based logic**: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
+    - **Expenses**: All expense accounts (Direct/Indirect Expense) are subtracted from Net Position, EXCEPT IMPORT_CHARGES (already in inventory cost)
+    - **Suppliers**: Only included for designated parent company (Lubumbashi pays all suppliers). Subsidiaries use "Lubumbashi Credit" liability instead
+    - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools
+    - **Dashboard**: Shows 4-column breakdown: Assets, Liabilities, Expenses, Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
