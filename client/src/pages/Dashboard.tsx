@@ -566,10 +566,6 @@ export default function Dashboard() {
                   <span className="text-muted-foreground">- Liabilities:</span>
                   <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">- Expenses:</span>
-                  <span className="font-mono text-orange-600">{formatCurrency(profitData?.expensesTotal ?? 0)}</span>
-                </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
                   <span>=</span>
                   <span className={cn(

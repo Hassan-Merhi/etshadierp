@@ -16743,8 +16743,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       expensesBreakdown.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      // Net Position = Assets - Liabilities - Expenses
-      const netPosition = forUsTotal - onUsTotal - expensesTotal;
+      // Net Position = Assets - Liabilities
+      // NOTE: Expenses are NOT subtracted because they are capitalized into inventory cost
+      // When you record a DUTIES expense, it increases the inventory value (asset)
+      // and creates a liability to the duty agent - so it's already captured in both sides
+      const netPosition = forUsTotal - onUsTotal;
       const netPositionLabel = netPosition >= 0 
         ? "We have more than we owe" 
         : "We owe more than we have";
