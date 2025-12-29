@@ -16671,28 +16671,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const acc of companyAccounts) {
         const netBalance = getAccountNetBalance(acc);
         
-        if (isExpenseAccount(acc)) {
-          // Expenses: Only count POSITIVE balances (actual spending)
-          // Negative expense balances (reversals/adjustments) are ignored
-          if (netBalance > 0) {
+        // Check if this is ANY expense-type account (regardless of excludedFromExpenses)
+        const isAnyExpenseType = expenseTypes.includes(acc.accountType || "");
+        
+        if (isAnyExpenseType) {
+          // Expense-type accounts: either track in expensesTotal or skip entirely
+          // Accounts in excludedFromExpenses (PURCHASES, IMPORT_CHARGES) are skipped
+          // Other expense accounts are tracked in expensesTotal
+          if (!excludedFromExpenses.has(acc.id) && netBalance > 0) {
             expensesTotal += netBalance;
             const category = acc.accountType || "Expense";
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
           }
-          // If expense balance is negative, it could mean a refund/reversal - ignore for now
+          // Skip all expense-type accounts from asset/liability calculation
+          continue;
         } else if (isExcludedFromNetPosition(acc)) {
           // Skip Income/Profit/Equity accounts - they're not part of Net Position
           continue;
         } else {
-          // All other accounts: positive = asset, negative = liability
-          if (netBalance > 0) {
-            forUsTotal += netBalance;
-            const category = acc.accountType || "Other";
-            categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
-          } else if (netBalance < 0) {
-            onUsTotal += Math.abs(netBalance);
-            const category = acc.accountType || "Other";
-            categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+          // Determine if account is naturally a liability type (should be treated as liability regardless of balance sign)
+          const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
+          const isLiabilityType = liabilityAccountTypes.includes(acc.accountType || "");
+          
+          if (isLiabilityType) {
+            // Liability-type accounts: positive = we've overpaid/prepaid (still track), negative = we owe
+            // For net position, we treat the absolute value as liability
+            // A positive balance means a deposit/guarantee we hold FOR someone (we owe them back)
+            if (netBalance !== 0) {
+              onUsTotal += Math.abs(netBalance);
+              const category = acc.accountType || "Liability";
+              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+            }
+          } else {
+            // Asset-type accounts: positive = asset, negative = liability (overdraft)
+            if (netBalance > 0) {
+              forUsTotal += netBalance;
+              const category = acc.accountType || "Other";
+              categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
+            } else if (netBalance < 0) {
+              onUsTotal += Math.abs(netBalance);
+              const category = acc.accountType || "Other";
+              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+            }
           }
         }
       }
@@ -16795,11 +16815,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       expensesBreakdown.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      // Net Position = Assets - Liabilities
-      // NOTE: Expenses are NOT subtracted because they are capitalized into inventory cost
-      // When you record a DUTIES expense, it increases the inventory value (asset)
-      // and creates a liability to the duty agent - so it's already captured in both sides
-      const netPosition = forUsTotal - onUsTotal;
+      // Net Position = Assets - Liabilities - Expenses
+      // Expenses are subtracted because they represent operational costs that reduce net worth
+      const netPosition = forUsTotal - onUsTotal - expensesTotal;
+      
+      // Debug logging for Net Position calculation
+      console.log("Net Position Debug:", {
+        companyId,
+        shouldIncludeSuppliers,
+        forUsTotal,
+        onUsTotal,
+        expensesTotal,
+        netPosition,
+        stockOnFloor,
+        categoryTotals
+      });
       const netPositionLabel = netPosition >= 0 
         ? "We have more than we owe" 
         : "We owe more than we have";
