@@ -16660,9 +16660,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let forUsTotal = 0;
       let onUsTotal = 0;
       let expensesTotal = 0;
+      let incomeTotal = 0;
       const forUsBreakdown: { name: string; value: number }[] = [];
       const onUsBreakdown: { name: string; value: number }[] = [];
       const expensesBreakdown: { name: string; value: number }[] = [];
+      const incomeBreakdown: { name: string; value: number }[] = [];
 
       // Group accounts by category for cleaner breakdown
       const categoryTotals: Record<string, number> = {};
@@ -16674,7 +16676,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if this is ANY expense-type account (regardless of excludedFromExpenses)
         const isAnyExpenseType = expenseTypes.includes(acc.accountType || "");
         
-        if (isAnyExpenseType) {
+        // Check if this is an Income account
+        const isIncomeAccount = acc.accountType === "Income";
+        
+        if (isIncomeAccount) {
+          // Income accounts: track in incomeTotal (typically have credit balances = negative netBalance)
+          // Income credits show as negative netBalance, so we take absolute value
+          if (netBalance < 0) {
+            incomeTotal += Math.abs(netBalance);
+            categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
+          } else if (netBalance > 0) {
+            // Rare: debit balance on income = refund/return, reduce income
+            incomeTotal -= netBalance;
+            // Also reduce categoryTotals so breakdown matches total
+            categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
+          }
+          continue;
+        } else if (isAnyExpenseType) {
           // Expense-type accounts: either track in expensesTotal or skip entirely
           // Accounts in excludedFromExpenses (PURCHASES, IMPORT_CHARGES) are skipped
           // Other expense accounts are tracked in expensesTotal
@@ -16686,7 +16704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Skip all expense-type accounts from asset/liability calculation
           continue;
         } else if (isExcludedFromNetPosition(acc)) {
-          // Skip Income/Profit/Equity accounts - they're not part of Net Position
+          // Skip Profit/Equity accounts - they're not part of Net Position (Income now handled separately)
           continue;
         } else {
           // Determine if account is naturally a liability type (should be treated as liability regardless of balance sign)
@@ -16813,6 +16831,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           onUsBreakdown.push({ name: key.replace("liability_", ""), value });
         } else if (key.startsWith("exp_")) {
           expensesBreakdown.push({ name: key.replace("exp_", ""), value });
+        } else if (key.startsWith("income_")) {
+          incomeBreakdown.push({ name: key.replace("income_", ""), value });
         }
       }
 
@@ -16820,16 +16840,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       forUsBreakdown.sort((a, b) => b.value - a.value);
       onUsBreakdown.sort((a, b) => b.value - a.value);
       expensesBreakdown.sort((a, b) => b.value - a.value);
+      incomeBreakdown.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      // Net Position calculation differs by company type:
-      // - Parent company (shouldIncludeSuppliers=true): Assets - Liabilities only
-      //   (expenses are already reflected in supplier/consolidated liabilities, avoid double-counting)
-      // - Subsidiaries (shouldIncludeSuppliers=false): Assets - Liabilities - Expenses
-      //   (local expenses need to be subtracted as they're not captured elsewhere)
-      const netPosition = shouldIncludeSuppliers 
-        ? forUsTotal - onUsTotal  // Parent company: don't subtract expenses
-        : forUsTotal - onUsTotal - expensesTotal;  // Subsidiaries: subtract expenses
+      // Net Position = Assets - Liabilities + Income - Expenses (full equity position including P&L)
+      // This formula applies to ALL companies consistently
+      const netPosition = forUsTotal - onUsTotal + incomeTotal - expensesTotal;
       
       // Debug logging for Net Position calculation
       console.log("Net Position Debug:", {
@@ -16837,6 +16853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shouldIncludeSuppliers,
         forUsTotal,
         onUsTotal,
+        incomeTotal,
         expensesTotal,
         netPosition,
         stockOnFloor,
@@ -16869,6 +16886,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: onUsTotal,
           breakdown: onUsBreakdown,
         },
+        income: {
+          total: incomeTotal,
+          breakdown: incomeBreakdown,
+        },
         expenses: {
           total: expensesTotal,
           breakdown: expensesBreakdown,
@@ -16876,18 +16897,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netPosition,
       };
 
-      // For backward compatibility with dashboard
-      const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
-      let totalIncome = 0;
-      for (const acc of incomeAccounts) {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        totalIncome += balance.credit - balance.debit;
-      }
-
       res.json({
-        totalIncome,
+        totalIncome: incomeTotal,
         totalExpenses: expensesTotal,
-        netProfit,
+        netProfit: incomeTotal - expensesTotal,
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
@@ -16895,6 +16908,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onUs: {
           total: onUsTotal,
           breakdown: onUsBreakdown,
+        },
+        income: {
+          total: incomeTotal,
+          breakdown: incomeBreakdown,
         },
         expenses: {
           total: expensesTotal,
@@ -16907,6 +16924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netPositionBreakdown,
         forUsTotal,
         onUsTotal,
+        incomeTotal,
         expensesTotal,
       });
     } catch (error: any) {
@@ -25648,7 +25666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/system/parent-company",
     requireAuth,
-    async (req: AuthenticatedRequest, res: Response) => {
+    async (req, res) => {
       try {
         const parentCompanyId = await storage.getParentCompanyId();
         res.json({ parentCompanyId });
@@ -25662,7 +25680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/system/parent-company",
     requireAuth,
-    async (req: AuthenticatedRequest, res: Response) => {
+    async (req, res) => {
       try {
         // Only Admin can change parent company setting
         const userRole = req.session.currentRole;
