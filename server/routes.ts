@@ -16822,9 +16822,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       expensesBreakdown.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      // Net Position = Assets - Liabilities - Expenses
-      // Expenses are subtracted because they represent operational costs that reduce net worth
-      const netPosition = forUsTotal - onUsTotal - expensesTotal;
+      // Net Position calculation differs by company type:
+      // - Parent company (shouldIncludeSuppliers=true): Assets - Liabilities only
+      //   (expenses are already reflected in supplier/consolidated liabilities, avoid double-counting)
+      // - Subsidiaries (shouldIncludeSuppliers=false): Assets - Liabilities - Expenses
+      //   (local expenses need to be subtracted as they're not captured elsewhere)
+      const netPosition = shouldIncludeSuppliers 
+        ? forUsTotal - onUsTotal  // Parent company: don't subtract expenses
+        : forUsTotal - onUsTotal - expensesTotal;  // Subsidiaries: subtract expenses
       
       // Debug logging for Net Position calculation
       console.log("Net Position Debug:", {
