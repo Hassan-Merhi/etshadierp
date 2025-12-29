@@ -16614,14 +16614,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "guarantee", "deposit", "caution"
       ];
       
+      // Stock/Inventory account patterns - exclude from ledger assets because we add computed stockOnFloor separately
+      // This prevents double-counting inventory (once from ledger accounts, once from inventory table)
+      const stockInventoryPatterns = [
+        "closing stock", "opening stock", "stock in hand", "stock on hand",
+        "inventory", "stock account", "goods in stock", "merchandise"
+      ];
+      const stockInventoryCodes = [
+        "CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"
+      ];
+      
       const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) => {
         // First check excluded account types
         if (excludedAccountTypes.includes(acc.accountType || "")) return true;
         
-        // Only apply name pattern filter to asset-type accounts (not liabilities)
+        const nameLower = (acc.name || "").toLowerCase();
+        const codeLower = (acc.code || "").toLowerCase();
+        
+        // Only apply pattern-based filters to asset-type accounts (not liabilities)
         // This prevents accidentally excluding liability accounts that happen to contain these words
         if (assetAccountTypes.includes(acc.accountType || "")) {
-          const nameLower = (acc.name || "").toLowerCase();
+          // Exclude stock/inventory ledger accounts - we add computed stockOnFloor separately
+          // This prevents double-counting inventory
+          if (stockInventoryPatterns.some(pattern => nameLower.includes(pattern))) {
+            return true;
+          }
+          if (stockInventoryCodes.some(code => codeLower === code.toLowerCase() || codeLower.startsWith(code.toLowerCase() + "_"))) {
+            return true;
+          }
+          
+          // Exclude fixed assets by name pattern
           if (fixedAssetNamePatterns.some(pattern => nameLower.includes(pattern))) {
             return true;
           }
