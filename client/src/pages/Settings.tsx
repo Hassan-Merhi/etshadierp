@@ -180,6 +180,32 @@
     // Roles that can be configured (exclude Admin since they always have full access)
     const configurableRoles = ["Owner", "Manager", "POS1", "POS2", "POS3", "POS4", "POS5", "POS6"];
 
+    // Parent Company setting query and mutation
+    const { data: parentCompanyData } = useQuery<{ parentCompanyId: number | null }>({
+      queryKey: ["/api/system/parent-company"],
+    });
+
+    const setParentCompanyMutation = useMutation({
+      mutationFn: async (companyId: number | null) => {
+        const res = await apiRequest("POST", "/api/system/parent-company", { parentCompanyId: companyId });
+        return await res.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/system/parent-company"] });
+        toast({
+          title: "Success",
+          description: "Parent company setting has been updated.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to update parent company setting",
+          variant: "destructive",
+        });
+      },
+    });
+
     // Feature key to readable name
     const featureLabels: Record<FeatureKey, string> = {
       dashboard: "Dashboard",
@@ -1393,6 +1419,47 @@
                         "Fix Credits"
                       )}
                     </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6 md:col-span-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-500/10 rounded-lg">
+                        <Building2 className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-parent-company-title">Parent Company for Net Position</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Set which company is the parent for supplier balance reporting. Suppliers are only counted in the parent company's Net Position.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={parentCompanyData?.parentCompanyId?.toString() || "none"}
+                        onValueChange={(value) => {
+                          const companyId = value === "none" ? null : parseInt(value, 10);
+                          setParentCompanyMutation.mutate(companyId);
+                        }}
+                        disabled={setParentCompanyMutation.isPending || currentUser?.role !== "Admin"}
+                      >
+                        <SelectTrigger className="w-[200px]" data-testid="select-parent-company">
+                          <SelectValue placeholder="Select parent company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Not Set</SelectItem>
+                          {companies.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id.toString()}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {currentUser?.role !== "Admin" && (
+                        <span className="text-xs text-muted-foreground">(Admin only)</span>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </div>

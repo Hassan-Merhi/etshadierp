@@ -33,6 +33,12 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **In subsidiary books**: DR Purchases, CR Lubumbashi Credit (liability - we owe Lubumbashi)
     - **In Lubumbashi books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
     This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers (DR Supplier, CR Lubumbashi Credit in subsidiary + DR [Subsidiary] Credit, CR Supplier in Lubumbashi).
+-   **Net Position with Parent Company Setting (Dec 2025)**: Net Position = All Assets - All Liabilities. A global `system_settings` table stores the designated parent company ID. When set:
+    - Only the parent company shows supplier liabilities in Net Position (since Lubumbashi pays all suppliers)
+    - Subsidiary companies show "Lubumbashi Credit" as their liability instead
+    - If no parent is set, all companies show their own supplier balances (original behavior)
+    - Admin-only setting in Settings > System Tools
+    - Dashboard displays full asset/liability breakdown (forUsBreakdown/onUsBreakdown)
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.

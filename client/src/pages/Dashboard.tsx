@@ -488,44 +488,34 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* What We Have (Assets) */}
+            {/* What We Have (Assets) - Full Breakdown */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-green-600 mb-3 flex items-center gap-2">
                 <ArrowDownLeft className="h-4 w-4" />
                 What We Have
               </h4>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.cash ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Bank Balances:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.bank ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stock OTW:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOTW ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Stock On Hand:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOnHand ?? 0)}</span>
-                </div>
+                {(profitData?.forUsBreakdown ?? []).map((item, idx) => (
+                  <div key={idx} className="flex justify-between">
+                    <span className="text-muted-foreground">{item.name}:</span>
+                    <span className="font-mono">{formatCurrency(item.value)}</span>
+                  </div>
+                ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Assets:</span>
-                  <span className="font-mono text-green-600">{formatCurrency(profitData?.netPositionBreakdown?.assets?.total ?? 0)}</span>
+                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
                 </div>
               </div>
             </div>
             
-            {/* What We Owe (Liabilities) */}
+            {/* What We Owe (Liabilities) - Full Breakdown */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-red-600 mb-3 flex items-center gap-2">
                 <ArrowUpRight className="h-4 w-4" />
                 What We Owe
               </h4>
               <div className="space-y-2 text-sm">
-                {profitData?.netPositionBreakdown?.liabilities?.breakdown?.map((item, idx) => (
+                {(profitData?.onUsBreakdown ?? []).map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
                     <span className="font-mono text-red-600">{formatCurrency(item.value)}</span>
@@ -533,7 +523,7 @@ export default function Dashboard() {
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Liabilities:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.netPositionBreakdown?.liabilities?.total ?? 0)}</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
                 </div>
               </div>
             </div>
@@ -543,24 +533,12 @@ export default function Dashboard() {
               <h4 className="font-medium mb-3">Net Position Calculation</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cash:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.cash ?? 0)}</span>
+                  <span className="text-muted-foreground">Total Assets:</span>
+                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Bank:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.bank ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Stock OTW:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOTW ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Stock On Hand:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOnHand ?? 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">+ Liabilities:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.netPositionBreakdown?.liabilities?.total ?? 0)}</span>
+                  <span className="text-muted-foreground">- Total Liabilities:</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
                 </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
                   <span>Net Position:</span>

@@ -16720,29 +16720,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const onUsBreakdown: { name: string; value: number }[] = [];
 
       // 1. Suppliers (what we owe them)
-      // Only include suppliers that have transactions with this company
-      // Opening balances are global, so only include if supplier has company transactions
-      const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+      // If a parent company is designated, only the parent company shows supplier balances
+      // Non-parent companies use "Lubumbashi Credit" liability instead of direct supplier balances
+      // If NO parent company is set, ALL companies show supplier balances (original behavior)
+      const parentCompanyId = await storage.getParentCompanyId();
+      // Include suppliers if: no parent is set (null) OR this company IS the parent
+      const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+      
       let supplierLiabilities = 0;
       let supplierAssets = 0; // For suppliers we overpaid
-      for (const sup of allSuppliers) {
-        const balance = supplierBalances.get(sup.id);
-        // Only include this supplier if they have transactions with this company
-        if (balance) {
-          const opening = parseFloat(sup.openingBalance || "0");
-          const netBalance = opening + balance.credit - balance.debit; // Credit = we owe them
-          if (netBalance > 0) {
-            supplierLiabilities += netBalance;
-          } else if (netBalance < 0) {
-            supplierAssets += Math.abs(netBalance); // Negative = we overpaid
+      
+      if (shouldIncludeSuppliers) {
+        // Include suppliers in this company's Net Position
+        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
+        for (const sup of allSuppliers) {
+          const balance = supplierBalances.get(sup.id);
+          // Only include this supplier if they have transactions with this company
+          if (balance) {
+            const opening = parseFloat(sup.openingBalance || "0");
+            const netBalance = opening + balance.credit - balance.debit; // Credit = we owe them
+            if (netBalance > 0) {
+              supplierLiabilities += netBalance;
+            } else if (netBalance < 0) {
+              supplierAssets += Math.abs(netBalance); // Negative = we overpaid
+            }
           }
         }
       }
+      // When parent company IS set, non-parent companies: Suppliers are excluded from Net Position
+      // Their liability to Lubumbashi is tracked via "Lubumbashi Credit" liability account instead
+      
       if (supplierLiabilities !== 0) {
         onUsBreakdown.push({ name: "Suppliers", value: supplierLiabilities });
         onUsTotal += supplierLiabilities;
       }
-      // Add supplier overpayments to FOR US
+      // Add supplier overpayments to FOR US (only for parent company)
       if (supplierAssets !== 0) {
         forUsBreakdown.push({ name: "Supplier Overpayment", value: supplierAssets });
         forUsTotal += supplierAssets;
@@ -25620,6 +25632,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Reverse PO credits error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // System Settings - Parent Company (Admin only)
+  app.get(
+    "/api/system/parent-company",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const parentCompanyId = await storage.getParentCompanyId();
+        res.json({ parentCompanyId });
+      } catch (error: any) {
+        console.error("Get parent company error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.post(
+    "/api/system/parent-company",
+    requireAuth,
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        // Only Admin can change parent company setting
+        const userRole = req.session.currentRole;
+        if (userRole !== "Admin") {
+          return res.status(403).json({ message: "Only Admin users can change the parent company setting" });
+        }
+
+        const { parentCompanyId } = req.body;
+        
+        // Validate parentCompanyId is null or a valid number
+        if (parentCompanyId !== null && parentCompanyId !== undefined) {
+          const numericId = typeof parentCompanyId === 'string' ? parseInt(parentCompanyId, 10) : parentCompanyId;
+          if (typeof numericId !== 'number' || isNaN(numericId)) {
+            return res.status(400).json({ message: "Invalid parent company ID: must be a number or null" });
+          }
+          
+          // Validate the company exists
+          const company = await storage.getCompanyById(numericId);
+          if (!company) {
+            return res.status(400).json({ message: "Company not found" });
+          }
+          
+          await storage.setParentCompanyId(numericId);
+          res.json({ success: true, parentCompanyId: numericId });
+        } else {
+          // Setting to null (clear the parent company)
+          await storage.setParentCompanyId(null);
+          res.json({ success: true, parentCompanyId: null });
+        }
+      } catch (error: any) {
+        console.error("Set parent company error:", error);
         res.status(500).json({ message: error.message });
       }
     }
