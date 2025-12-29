@@ -67,6 +67,7 @@ import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
+import NetProfitDetails from "@/pages/NetProfitDetails";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -148,6 +149,7 @@ function Router({ user }: { user: any }) {
       {user?.role === "Admin" && <Route path="/chatbot-settings" component={ChatbotSettings} />}
       {user?.role === "Admin" && <Route path="/test-data-import" component={TestDataImport} />}
       {user?.role === "Admin" && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
+      {user?.role === "Admin" && <Route path="/net-profit-details" component={NetProfitDetails} />}
       <Route component={NotFound} />
     </Switch>
   );

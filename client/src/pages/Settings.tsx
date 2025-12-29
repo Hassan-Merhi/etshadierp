@@ -53,7 +53,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -1373,6 +1373,25 @@
                           <h3 className="font-semibold" data-testid="link-import-diagnostics">Import Cycle Diagnostics</h3>
                           <p className="text-sm text-muted-foreground">
                             Detect and diagnose issues causing import cycle imbalance
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href="/net-profit-details">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-purple-500/10 rounded-lg">
+                          <PieChart className="h-6 w-6 text-purple-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-net-profit-details">Net Profit Details</h3>
+                          <p className="text-sm text-muted-foreground">
+                            View detailed breakdown of income, expenses, and net position
                           </p>
                         </div>
                       </div>
