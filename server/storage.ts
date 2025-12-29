@@ -343,6 +343,12 @@ export interface IStorage {
   getRoleFeaturePermission(companyId: number, role: string, featureKey: string): Promise<schema.RoleFeaturePermission | undefined>;
   upsertRoleFeaturePermission(permission: schema.InsertRoleFeaturePermission): Promise<schema.RoleFeaturePermission>;
   bulkUpsertRoleFeaturePermissions(permissions: schema.InsertRoleFeaturePermission[]): Promise<schema.RoleFeaturePermission[]>;
+
+  // System Settings (global app-wide settings)
+  getSystemSetting(key: string): Promise<schema.SystemSetting | undefined>;
+  setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting>;
+  getParentCompanyId(): Promise<number | null>;
+  setParentCompanyId(companyId: number | null): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -6068,6 +6074,46 @@ export class DbStorage implements IStorage {
     await db
       .delete(schema.stockGroupLocationArchives)
       .where(eq(schema.stockGroupLocationArchives.id, archiveId));
+  }
+
+  // System Settings implementation
+  async getSystemSetting(key: string): Promise<schema.SystemSetting | undefined> {
+    const [setting] = await db
+      .select()
+      .from(schema.systemSettings)
+      .where(eq(schema.systemSettings.key, key));
+    return setting;
+  }
+
+  async setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting> {
+    const existing = await this.getSystemSetting(key);
+    if (existing) {
+      const [updated] = await db
+        .update(schema.systemSettings)
+        .set({ value, updatedAt: sql`now()` })
+        .where(eq(schema.systemSettings.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(schema.systemSettings)
+        .values({ key, value })
+        .returning();
+      return created;
+    }
+  }
+
+  async getParentCompanyId(): Promise<number | null> {
+    const setting = await this.getSystemSetting("parentCompanyId");
+    if (setting?.value) {
+      const id = parseInt(setting.value, 10);
+      return isNaN(id) ? null : id;
+    }
+    return null;
+  }
+
+  async setParentCompanyId(companyId: number | null): Promise<void> {
+    await this.setSystemSetting("parentCompanyId", companyId?.toString() ?? null);
   }
 }
 

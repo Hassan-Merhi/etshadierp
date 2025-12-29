@@ -1624,6 +1624,25 @@ export const insertStockGroupLocationArchiveItemSchema = createInsertSchema(stoc
 export type InsertStockGroupLocationArchiveItem = z.infer<typeof insertStockGroupLocationArchiveItemSchema>;
 export type StockGroupLocationArchiveItem = typeof stockGroupLocationArchiveItems.$inferSelect;
 
+// System Settings - global application-wide settings
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  updatedAt: true,
+}).extend({
+  key: z.string().min(1, "Key is required"),
+  value: z.string().optional(),
+});
+
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;
+
 // List of all available features for permission control
 export const FEATURE_KEYS = [
   "dashboard",
