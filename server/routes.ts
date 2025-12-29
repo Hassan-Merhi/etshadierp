@@ -16628,6 +16628,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // First check excluded account types
         if (excludedAccountTypes.includes(acc.accountType || "")) return true;
         
+        // Exclude Supplier-type ledger accounts for subsidiary companies
+        // Suppliers are only tracked for the parent company (Lubumbashi)
+        if (acc.accountType === "Supplier" && !shouldIncludeSuppliers) return true;
+        
         const nameLower = (acc.name || "").toLowerCase();
         const codeLower = (acc.code || "").toLowerCase();
         
