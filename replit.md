@@ -41,6 +41,7 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools
     - **Dashboard**: Shows 4-column breakdown: Assets, Liabilities, Expenses, Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
+-   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).

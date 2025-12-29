@@ -19237,6 +19237,409 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Cycle Diagnostics - Debug endpoint to find why import cycle balance isn't zero
+  app.get("/api/debug/import-cycle", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Define issue types
+      interface DiagnosticIssue {
+        id: string;
+        type: string;
+        severity: "critical" | "warning" | "info";
+        description: string;
+        impact: number;
+        details: any;
+        fixGuidance?: string;
+      }
+
+      const issues: DiagnosticIssue[] = [];
+      let issueCounter = 0;
+      const generateIssueId = () => `issue-${++issueCounter}`;
+
+      // ============ 1. Detect Negative Inventory ============
+      const negativeInventory = await db
+        .select({
+          id: inventory.id,
+          stockItemId: inventory.stockItemId,
+          stockItemCode: stockItems.code,
+          stockItemName: stockItems.name,
+          locationId: inventory.locationId,
+          locationName: locations.name,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .leftJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            sql`CAST(${inventory.quantity} AS DECIMAL) < 0`
+          )
+        );
+
+      for (const item of negativeInventory) {
+        const qty = parseFloat(item.quantity || "0");
+        const rate = parseFloat(item.averageRate || "0");
+        const impact = Math.abs(qty * rate); // Use absolute value for display
+        issues.push({
+          id: generateIssueId(),
+          type: "negative_inventory",
+          severity: "critical",
+          description: `Negative inventory: ${item.stockItemCode} at ${item.locationName || `Location ${item.locationId}`}`,
+          impact,
+          details: {
+            stockItemId: item.stockItemId,
+            stockItemCode: item.stockItemCode,
+            stockItemName: item.stockItemName,
+            locationId: item.locationId,
+            locationName: item.locationName,
+            quantity: qty,
+            averageRate: rate,
+          },
+          fixGuidance: "Create a Production voucher to add missing inventory, or review sales/consumption vouchers for errors.",
+        });
+      }
+
+      // ============ 2. Detect Orphaned Inventory (at deleted locations) ============
+      const orphanedInventory = await db
+        .select({
+          id: inventory.id,
+          stockItemId: inventory.stockItemId,
+          stockItemCode: stockItems.code,
+          stockItemName: stockItems.name,
+          locationId: inventory.locationId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .leftJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            or(
+              isNull(locations.id),
+              isNotNull(locations.deletedAt)
+            )
+          )
+        );
+
+      for (const item of orphanedInventory) {
+        const qty = parseFloat(item.quantity || "0");
+        const rate = parseFloat(item.averageRate || "0");
+        const rawImpact = qty * rate;
+        const impact = Math.abs(rawImpact); // Use absolute value for display
+        if (impact > 0.01) {
+          issues.push({
+            id: generateIssueId(),
+            type: "orphaned_inventory",
+            severity: "warning",
+            description: `Orphaned inventory: ${item.stockItemCode} at deleted/missing location ${item.locationId}`,
+            impact,
+            details: {
+              inventoryId: item.id,
+              stockItemId: item.stockItemId,
+              stockItemCode: item.stockItemCode,
+              stockItemName: item.stockItemName,
+              locationId: item.locationId,
+              quantity: qty,
+              averageRate: rate,
+            },
+            fixGuidance: "Restore the location or transfer inventory to an active location before deleting.",
+          });
+        }
+      }
+
+      // ============ 3. Detect Unbalanced Vouchers (debits ≠ credits) ============
+      const voucherBalances = await db
+        .select({
+          voucherId: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          totalDebit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0)`,
+          totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
+        })
+        .from(vouchers)
+        .leftJoin(voucherEntries, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        )
+        .groupBy(vouchers.id, vouchers.voucherNumber, vouchers.voucherType, vouchers.voucherDate);
+
+      for (const v of voucherBalances) {
+        const debit = parseFloat(v.totalDebit || "0");
+        const credit = parseFloat(v.totalCredit || "0");
+        const diff = Math.abs(debit - credit);
+        if (diff > 0.01) {
+          issues.push({
+            id: generateIssueId(),
+            type: "unbalanced_voucher",
+            severity: "critical",
+            description: `Unbalanced voucher: ${v.voucherNumber} (${v.voucherType}) - Debits: $${debit.toFixed(2)}, Credits: $${credit.toFixed(2)}`,
+            impact: diff, // Use absolute difference for display
+            details: {
+              voucherId: v.voucherId,
+              voucherNumber: v.voucherNumber,
+              voucherType: v.voucherType,
+              voucherDate: v.voucherDate,
+              totalDebit: debit,
+              totalCredit: credit,
+              difference: diff,
+            },
+            fixGuidance: "Edit the voucher to ensure debits equal credits, or delete and recreate it.",
+          });
+        }
+      }
+
+      // ============ 4. Detect Stale OTW Containers (older than 90 days) ============
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+      const staleContainers = await db
+        .select({
+          id: containers.id,
+          containerNumber: containers.containerNumber,
+          supplierName: suppliers.legalName,
+          grandTotal: containers.grandTotal,
+          createdAt: containers.createdAt,
+        })
+        .from(containers)
+        .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW"),
+            sql`${containers.createdAt} < ${ninetyDaysAgo.toISOString()}`
+          )
+        );
+
+      for (const c of staleContainers) {
+        const value = parseFloat(c.grandTotal || "0");
+        const daysSinceCreated = Math.floor((Date.now() - new Date(c.createdAt || 0).getTime()) / (1000 * 60 * 60 * 24));
+        issues.push({
+          id: generateIssueId(),
+          type: "stale_otw_container",
+          severity: "warning",
+          description: `Stale OTW container: ${c.containerNumber} (${daysSinceCreated} days old) from ${c.supplierName || 'Unknown Supplier'}`,
+          impact: value,
+          details: {
+            containerId: c.id,
+            containerNumber: c.containerNumber,
+            supplierName: c.supplierName,
+            grandTotal: value,
+            daysSinceCreated,
+            createdAt: c.createdAt,
+          },
+          fixGuidance: "Offload this container if goods have arrived, or cancel if the shipment was lost/cancelled.",
+        });
+      }
+
+      // ============ 5. Detect Duplicate Inventory Records ============
+      const duplicateInventory = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          locationId: inventory.locationId,
+          count: sql<number>`COUNT(*)`,
+        })
+        .from(inventory)
+        .where(eq(inventory.companyId, companyId))
+        .groupBy(inventory.stockItemId, inventory.locationId)
+        .having(sql`COUNT(*) > 1`);
+
+      for (const dup of duplicateInventory) {
+        issues.push({
+          id: generateIssueId(),
+          type: "duplicate_inventory",
+          severity: "critical",
+          description: `Duplicate inventory records: ${dup.count} records for same stock item at same location`,
+          impact: 0, // Impact calculated separately
+          details: {
+            stockItemId: dup.stockItemId,
+            locationId: dup.locationId,
+            duplicateCount: dup.count,
+          },
+          fixGuidance: "Merge duplicate records by summing quantities and recalculating average rate.",
+        });
+      }
+
+      // ============ 6. Get Balance Totals (same as import-cycle-balance) ============
+      // Reuse the calculation logic from import-cycle-balance
+      const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
+        const accounts = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.accountType, accountType),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
+
+        let totalBalance = 0;
+        for (const account of accounts) {
+          const entries = await db
+            .select({
+              creditAmount: voucherEntries.creditAmount,
+              debitAmount: voucherEntries.debitAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(
+              and(
+                eq(voucherEntries.ledgerAccountId, account.id),
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false)
+              )
+            );
+
+          const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+          const openingSide = account.openingBalanceSide || "Dr";
+          let signedOpening: number;
+          if (isLiability) {
+            signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
+          } else {
+            signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
+          }
+          
+          const balance = entries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            if (isLiability) {
+              return sum + credit - debit;
+            } else {
+              return sum + debit - credit;
+            }
+          }, signedOpening);
+          
+          totalBalance += balance;
+        }
+        return totalBalance;
+      };
+
+      // Calculate all components
+      const supplierEntries = await db
+        .select({
+          creditAmount: voucherEntries.creditAmount,
+          debitAmount: voucherEntries.debitAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            isNotNull(voucherEntries.supplierId),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
+      
+      const supplierBalance = supplierEntries.reduce((sum, entry) => {
+        return sum + parseFloat(entry.creditAmount || "0") - parseFloat(entry.debitAmount || "0");
+      }, 0);
+
+      const otwContainers = await db.select().from(containers).where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
+      const stockOtwValue = otwContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
+
+      const cashBalance = await getAccountTypeBalance("Cash", false);
+      const bankBalance = await getAccountTypeBalance("Bank", false);
+      const assetBalance = await getAccountTypeBalance("Asset", false);
+      const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
+      const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
+      const loansBalance = await getAccountTypeBalance("Loans", true);
+      const liabilityBalance = await getAccountTypeBalance("Liability", true);
+      const profitBalance = await getAccountTypeBalance("Profit", true);
+      const incomeBalance = await getAccountTypeBalance("Income", true);
+      const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
+      const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
+
+      // Stock on floor (excluding orphaned)
+      const inventoryItems = await db
+        .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(and(eq(inventory.companyId, companyId), isNull(locations.deletedAt)));
+      
+      const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
+        return sum + parseFloat(item.quantity || "0") * parseFloat(item.averageRate || "0");
+      }, 0);
+
+      // COGS
+      const cogsData = await db
+        .select({ totalCost: salesItems.totalCost })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+      const cogsBalance = cogsData.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0);
+
+      // Employee liabilities
+      const employeesData = await db.select({ currentBalance: employees.currentBalance }).from(employees).where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
+      const payrollLiabilitiesBalance = employeesData.reduce((sum, emp) => {
+        const bal = parseFloat(emp.currentBalance || "0");
+        return sum + (bal > 0 ? bal : 0);
+      }, 0);
+
+      // Calculate net balance
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+      
+      const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance);
+      const totalExpenses = round2(indirectExpenseBalance + governmentTaxesBalance + cogsBalance);
+      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance);
+      const netImportCycleBalance = round2((totalAssets + totalExpenses) - totalLiabilities);
+
+      // Sum up issue impacts
+      const totalIssueImpact = round2(issues.reduce((sum, issue) => sum + issue.impact, 0));
+
+      res.json({
+        totals: {
+          assets: totalAssets,
+          expenses: totalExpenses,
+          liabilities: totalLiabilities,
+          netBalance: netImportCycleBalance,
+        },
+        components: {
+          stockOtwValue: round2(stockOtwValue),
+          cashBalance: round2(cashBalance),
+          bankBalance: round2(bankBalance),
+          stockOnFloorValue: round2(stockOnFloorValue),
+          assetBalance: round2(assetBalance),
+          indirectExpenseBalance: round2(indirectExpenseBalance),
+          governmentTaxesBalance: round2(governmentTaxesBalance),
+          cogsBalance: round2(cogsBalance),
+          supplierBalance: round2(supplierBalance),
+          dutyAgentBalance: round2(dutyAgentBalance),
+          transporterAgentBalance: round2(transporterAgentBalance),
+          loansBalance: round2(loansBalance),
+          liabilityBalance: round2(liabilityBalance),
+          profitBalance: round2(profitBalance),
+          incomeBalance: round2(incomeBalance),
+          payrollLiabilitiesBalance: round2(payrollLiabilitiesBalance),
+        },
+        issues,
+        summary: {
+          totalIssues: issues.length,
+          criticalIssues: issues.filter(i => i.severity === "critical").length,
+          warningIssues: issues.filter(i => i.severity === "warning").length,
+          totalIssueImpact,
+        },
+      });
+    } catch (error: any) {
+      console.error("Import cycle diagnostics error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Net Profit (P&L) Report - Tally Prime style
   app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
     try {
