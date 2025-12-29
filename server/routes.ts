@@ -16694,10 +16694,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const isLiabilityType = liabilityAccountTypes.includes(acc.accountType || "");
           
           if (isLiabilityType) {
-            // Liability-type accounts: positive = we've overpaid/prepaid (still track), negative = we owe
-            // For net position, we treat the absolute value as liability
-            // A positive balance means a deposit/guarantee we hold FOR someone (we owe them back)
-            if (netBalance !== 0) {
+            // Liability-type accounts with SIGN-based classification:
+            // - POSITIVE balance (debit side) = we paid a deposit/advance = ASSET (we'll get it back)
+            // - NEGATIVE balance (credit side) = we owe them = LIABILITY
+            // Examples: Guarantee deposits PAID by us have positive balances = assets
+            if (netBalance > 0) {
+              // Positive = we paid/deposited, it's an asset (refundable deposit)
+              forUsTotal += netBalance;
+              const category = acc.accountType || "Liability";
+              categoryTotals[`asset_${category} Deposits`] = (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
+            } else if (netBalance < 0) {
+              // Negative = we owe them, it's a liability
               onUsTotal += Math.abs(netBalance);
               const category = acc.accountType || "Liability";
               categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
