@@ -16595,6 +16595,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
       const isExpenseAccount = (acc: typeof companyAccounts[0]) => 
         expenseTypes.includes(acc.accountType || "") && !excludedFromExpenses.has(acc.id);
+      
+      // Exclude these account types from Net Position calculation:
+      // - Income: P&L account, not balance sheet
+      // - Profit: Equity/Capital, not operating liability
+      // - Equity: Owner's capital
+      const excludedFromNetPosition = ["Income", "Profit", "Equity"];
+      const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) =>
+        excludedFromNetPosition.includes(acc.accountType || "");
 
       // Track totals
       let forUsTotal = 0;
@@ -16620,6 +16628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
           }
           // If expense balance is negative, it could mean a refund/reversal - ignore for now
+        } else if (isExcludedFromNetPosition(acc)) {
+          // Skip Income/Profit/Equity accounts - they're not part of Net Position
+          continue;
         } else {
           // All other accounts: positive = asset, negative = liability
           if (netBalance > 0) {
