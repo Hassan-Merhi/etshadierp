@@ -16602,12 +16602,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const netBalance = getAccountNetBalance(acc);
         
         if (isExpenseAccount(acc)) {
-          // Expenses are always positive (money spent) - subtract from Net Position
-          if (netBalance !== 0) {
+          // Expenses: Only count POSITIVE balances (actual spending)
+          // Negative expense balances (reversals/adjustments) are ignored
+          if (netBalance > 0) {
             expensesTotal += netBalance;
             const category = acc.accountType || "Expense";
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
           }
+          // If expense balance is negative, it could mean a refund/reversal - ignore for now
         } else {
           // All other accounts: positive = asset, negative = liability
           if (netBalance > 0) {
