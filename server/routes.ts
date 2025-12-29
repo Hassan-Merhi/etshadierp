@@ -16693,13 +16693,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           continue;
         } else if (isAnyExpenseType) {
-          // Expense-type accounts: either track in expensesTotal or skip entirely
-          // Accounts in excludedFromExpenses (PURCHASES, IMPORT_CHARGES) are skipped
-          // Other expense accounts are tracked in expensesTotal
-          if (!excludedFromExpenses.has(acc.id) && netBalance > 0) {
-            expensesTotal += netBalance;
+          // Skip PURCHASES / IMPORT_CHARGES (handled elsewhere)
+          if (!excludedFromExpenses.has(acc.id)) {
             const category = acc.accountType || "Expense";
-            categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
+            if (netBalance > 0) {
+              // Normal expense (debit)
+              expensesTotal += netBalance;
+              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
+            } else if (netBalance < 0) {
+              // Contra-expense / refund (credit) - reduces expenses
+              const credit = Math.abs(netBalance);
+              expensesTotal -= credit;
+              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
+            }
           }
           // Skip all expense-type accounts from asset/liability calculation
           continue;
@@ -16843,9 +16849,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       incomeBreakdown.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
+      // Helper to round currency values to 2 decimal places (prevents floating point noise)
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+      
+      // Round all totals to prevent floating point noise
+      forUsTotal = round2(forUsTotal);
+      onUsTotal = round2(onUsTotal);
+      incomeTotal = round2(incomeTotal);
+      expensesTotal = round2(expensesTotal);
+      
       // Net Position = Assets - Liabilities + Income - Expenses (full equity position including P&L)
       // This formula applies to ALL companies consistently
-      const netPosition = forUsTotal - onUsTotal + incomeTotal - expensesTotal;
+      const netPosition = round2(forUsTotal - onUsTotal + incomeTotal - expensesTotal);
       
       // Debug logging for Net Position calculation
       console.log("Net Position Debug:", {
@@ -16873,8 +16888,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Net Worth and Profit for backward compatibility
-      const netWorth = forUsTotal - onUsTotal;
-      const netProfit = netWorth - ownersCapital;
+      const netWorth = round2(forUsTotal - onUsTotal);
+      const netProfit = round2(incomeTotal - expensesTotal);
 
       // Breakdown for display
       const netPositionBreakdown = {
