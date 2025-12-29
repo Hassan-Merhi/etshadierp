@@ -16568,23 +16568,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parentCompanyId = await storage.getParentCompanyId();
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
-      // Find IMPORT_CHARGES parent account to exclude its children from expenses
+      // Find accounts to EXCLUDE from expenses:
+      // 1. IMPORT_CHARGES parent and children (import costs capitalized into inventory)
+      // 2. PURCHASES accounts (inventory cost, not expense until sold)
       const importChargesParent = companyAccounts.find(acc => acc.code === "IMPORT_CHARGES");
-      const importChargesAccountIds = new Set<number>();
+      const excludedFromExpenses = new Set<number>();
+      
       if (importChargesParent) {
-        importChargesAccountIds.add(importChargesParent.id);
+        excludedFromExpenses.add(importChargesParent.id);
         // Also find all children of IMPORT_CHARGES
         for (const acc of companyAccounts) {
           if (acc.parentId === importChargesParent.id) {
-            importChargesAccountIds.add(acc.id);
+            excludedFromExpenses.add(acc.id);
           }
+        }
+      }
+      
+      // Exclude PURCHASES accounts - these are inventory costs, not expenses
+      for (const acc of companyAccounts) {
+        if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
+          excludedFromExpenses.add(acc.id);
         }
       }
 
       // Categorize accounts
       const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
       const isExpenseAccount = (acc: typeof companyAccounts[0]) => 
-        expenseTypes.includes(acc.accountType || "") && !importChargesAccountIds.has(acc.id);
+        expenseTypes.includes(acc.accountType || "") && !excludedFromExpenses.has(acc.id);
 
       // Track totals
       let forUsTotal = 0;
