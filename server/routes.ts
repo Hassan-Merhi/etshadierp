@@ -16829,6 +16829,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const netWorth = forUsTotal - onUsTotal;
       const netProfit = netWorth - ownersCapital;
 
+      // ============ NET POSITION = What We Have - What We Owe ============
+      // Net Position = (Cash + Bank + Stock OTW + Stock On Hand) + Liabilities (as negative)
+      const netPosition = forUsTotal - onUsTotal;
+      const netPositionLabel = netPosition >= 0 
+        ? "We have more than we owe" 
+        : "We owe more than we have";
+      
+      // Build simplified breakdown for Net Position matching user's formula
+      const netPositionBreakdown = {
+        assets: {
+          cash: cashTotal,
+          bank: bankTotal,
+          stockOTW: stockOTW,
+          stockOnHand: stockOnFloor,
+          total: cashTotal + bankTotal + stockOTW + stockOnFloor,
+        },
+        liabilities: {
+          total: -onUsTotal, // Negative because these are what we owe
+          breakdown: onUsBreakdown.map(item => ({ name: item.name, value: -item.value })),
+        },
+        netPosition,
+      };
+
       // For backward compatibility with dashboard
       const incomeAccounts = companyAccounts.filter((acc) => acc.accountType === "Income");
       let totalIncome = 0;
@@ -16860,6 +16883,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         ownersCapital,
         netWorth,
+        // New Net Position data
+        netPosition,
+        netPositionLabel,
+        netPositionBreakdown,
+        forUsTotal,
+        onUsTotal,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

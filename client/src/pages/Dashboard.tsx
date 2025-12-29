@@ -39,6 +39,22 @@ type ProfitData = {
   onUsBreakdown: { name: string; value: number }[];
   ownersCapital: number;
   netWorth: number;
+  netPosition: number;
+  netPositionLabel: string;
+  netPositionBreakdown: {
+    assets: {
+      cash: number;
+      bank: number;
+      stockOTW: number;
+      stockOnHand: number;
+      total: number;
+    };
+    liabilities: {
+      total: number;
+      breakdown: { name: string; value: number }[];
+    };
+    netPosition: number;
+  };
 };
 
 type ImportCycleBalanceData = {
@@ -351,12 +367,12 @@ export default function Dashboard() {
           data-testid="kpi-total-income"
         />
         <KPICard
-          title="Net Profit"
-          value={isLoading ? "Loading..." : formatCurrency(profitData?.netProfit || 0)}
-          change="Income minus operating expenses"
-          changeType={(profitData?.netProfit ?? 0) >= 0 ? "positive" : "negative"}
+          title="Net Position"
+          value={isLoading ? "Loading..." : formatCurrency(profitData?.netPosition || 0)}
+          change={profitData?.netPositionLabel || "What we have minus what we owe"}
+          changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
-          data-testid="kpi-net-profit"
+          data-testid="kpi-net-position"
         />
         <KPICard
           title="Import Cycle Balance"
@@ -463,82 +479,104 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Net Worth Breakdown: FOR US vs ON US */}
+      {/* Net Position Breakdown: What We Have vs What We Owe */}
       <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4">Net Worth Breakdown</h3>
+        <h3 className="text-lg font-medium mb-4">Net Position Breakdown</h3>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
             <p className="text-muted-foreground">Loading...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* FOR US (Assets) */}
+            {/* What We Have (Assets) */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-green-600 mb-3 flex items-center gap-2">
                 <ArrowDownLeft className="h-4 w-4" />
-                FOR US (Assets)
+                What We Have
               </h4>
               <div className="space-y-2 text-sm">
-                {profitData?.forUsBreakdown?.map((item, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="text-muted-foreground">{item.name}:</span>
-                    <span className="font-mono">{formatCurrency(item.value)}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cash:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.cash ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Bank Balances:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.bank ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stock OTW:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOTW ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stock On Hand:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOnHand ?? 0)}</span>
+                </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total FOR US:</span>
-                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                  <span>Total Assets:</span>
+                  <span className="font-mono text-green-600">{formatCurrency(profitData?.netPositionBreakdown?.assets?.total ?? 0)}</span>
                 </div>
               </div>
             </div>
             
-            {/* ON US (Liabilities) */}
+            {/* What We Owe (Liabilities) */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-red-600 mb-3 flex items-center gap-2">
                 <ArrowUpRight className="h-4 w-4" />
-                ON US (Liabilities)
+                What We Owe
               </h4>
               <div className="space-y-2 text-sm">
-                {profitData?.onUsBreakdown?.map((item, idx) => (
+                {profitData?.netPositionBreakdown?.liabilities?.breakdown?.map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
-                    <span className="font-mono">{formatCurrency(item.value)}</span>
+                    <span className="font-mono text-red-600">{formatCurrency(item.value)}</span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total ON US:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
+                  <span>Total Liabilities:</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.netPositionBreakdown?.liabilities?.total ?? 0)}</span>
                 </div>
               </div>
             </div>
             
-            {/* Net Worth Summary */}
+            {/* Net Position Calculation */}
             <div className="border rounded-lg p-4 bg-muted/30">
-              <h4 className="font-medium mb-3">Net Worth Calculation</h4>
+              <h4 className="font-medium mb-3">Net Position Calculation</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">FOR US:</span>
-                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                  <span className="text-muted-foreground">Cash:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.cash ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">- ON US:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
-                </div>
-                <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Net Worth:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.netWorth ?? 0)}</span>
+                  <span className="text-muted-foreground">+ Bank:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.bank ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">- Owner's Capital:</span>
-                  <span className="font-mono">{formatCurrency(profitData?.ownersCapital ?? 0)}</span>
+                  <span className="text-muted-foreground">+ Stock OTW:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOTW ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">+ Stock On Hand:</span>
+                  <span className="font-mono">{formatCurrency(profitData?.netPositionBreakdown?.assets?.stockOnHand ?? 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">+ Liabilities:</span>
+                  <span className="font-mono text-red-600">{formatCurrency(profitData?.netPositionBreakdown?.liabilities?.total ?? 0)}</span>
                 </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
-                  <span>Net Profit:</span>
+                  <span>Net Position:</span>
                   <span className={cn(
                     "font-mono",
-                    (profitData?.netProfit ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                    (profitData?.netPosition ?? 0) >= 0 ? "text-green-600" : "text-red-600"
                   )}>
-                    {formatCurrency(profitData?.netProfit ?? 0)}
+                    {formatCurrency(profitData?.netPosition ?? 0)}
+                  </span>
+                </div>
+                <div className="text-center mt-2">
+                  <span className={cn(
+                    "text-xs font-medium px-2 py-1 rounded-full",
+                    (profitData?.netPosition ?? 0) >= 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  )}>
+                    {profitData?.netPositionLabel ?? ""}
                   </span>
                 </div>
               </div>
