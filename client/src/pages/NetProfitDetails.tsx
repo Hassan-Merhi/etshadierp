@@ -1,17 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { 
+import {
   ArrowLeft,
   TrendingUp,
   TrendingDown,
@@ -19,10 +25,17 @@ import {
   Plus,
   Minus,
   Equal,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
+
+interface AccountItem {
+  name: string;
+  code: string;
+  value: number;
+  category: string;
+}
 
 interface BreakdownItem {
   name: string;
@@ -33,10 +46,18 @@ interface NetProfitData {
   totalIncome: number;
   totalExpenses: number;
   netProfit: number;
-  forUs: { total: number; breakdown: BreakdownItem[] };
-  onUs: { total: number; breakdown: BreakdownItem[] };
-  income: { total: number; breakdown: BreakdownItem[] };
-  expenses: { total: number; breakdown: BreakdownItem[] };
+  forUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
+  onUs: { total: number; breakdown: BreakdownItem[]; accounts: AccountItem[] };
+  income: {
+    total: number;
+    breakdown: BreakdownItem[];
+    accounts: AccountItem[];
+  };
+  expenses: {
+    total: number;
+    breakdown: BreakdownItem[];
+    accounts: AccountItem[];
+  };
   netPosition: number;
   netPositionLabel: string;
   forUsTotal: number;
@@ -87,19 +108,31 @@ export default function NetProfitDetails() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link href="/settings">
-            <Button variant="ghost" size="icon" data-testid="button-back-settings">
+            <Button
+              variant="ghost"
+              size="icon"
+              data-testid="button-back-settings"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Net Profit Details</h1>
-            <p className="text-muted-foreground">Detailed breakdown of income and expenses</p>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Net Profit Details
+            </h1>
+            <p className="text-muted-foreground">
+              Detailed breakdown of all accounts
+            </p>
           </div>
         </div>
-        <Button onClick={() => refetch()} variant="outline" data-testid="button-refresh">
+        <Button
+          onClick={() => refetch()}
+          variant="outline"
+          data-testid="button-refresh"
+        >
           Refresh
         </Button>
       </div>
@@ -116,7 +149,9 @@ export default function NetProfitDetails() {
             <div className="text-2xl font-bold text-green-600">
               ${formatNumber(data?.incomeTotal || 0)}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Added to profit</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Added to profit
+            </p>
           </CardContent>
         </Card>
 
@@ -131,7 +166,9 @@ export default function NetProfitDetails() {
             <div className="text-2xl font-bold text-red-600">
               ${formatNumber(data?.expensesTotal || 0)}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Subtracted from profit</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Subtracted from profit
+            </p>
           </CardContent>
         </Card>
 
@@ -143,11 +180,13 @@ export default function NetProfitDetails() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+            <div
+              className={`text-2xl font-bold ${isProfit ? "text-green-600" : "text-red-600"}`}
+            >
               ${formatNumber(netProfit)}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              {isProfit ? 'Profit' : 'Loss'}
+              {isProfit ? "Profit" : "Loss"}
             </p>
           </CardContent>
         </Card>
@@ -156,61 +195,118 @@ export default function NetProfitDetails() {
       <Card data-testid="card-formula">
         <CardHeader>
           <CardTitle>Calculation Formula</CardTitle>
-          <CardDescription>How Net Profit is calculated</CardDescription>
+          <CardDescription>How Net Position is calculated</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 text-lg flex-wrap">
             <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg">
-              <span className="font-semibold text-green-700 dark:text-green-300">Income</span>
-              <span className="text-green-600">${formatNumber(data?.incomeTotal || 0)}</span>
+              <span className="font-semibold text-green-700 dark:text-green-300">
+                Assets
+              </span>
+              <span className="text-green-600">
+                ${formatNumber(data?.forUsTotal || 0)}
+              </span>
             </div>
             <Minus className="h-5 w-5 text-muted-foreground" />
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950 px-3 py-2 rounded-lg">
-              <span className="font-semibold text-red-700 dark:text-red-300">Expenses</span>
-              <span className="text-red-600">${formatNumber(data?.expensesTotal || 0)}</span>
+              <span className="font-semibold text-red-700 dark:text-red-300">
+                Liabilities
+              </span>
+              <span className="text-red-600">
+                ${formatNumber(data?.onUsTotal || 0)}
+              </span>
+            </div>
+            <Plus className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg">
+              <span className="font-semibold text-green-700 dark:text-green-300">
+                Income
+              </span>
+              <span className="text-green-600">
+                ${formatNumber(data?.incomeTotal || 0)}
+              </span>
+            </div>
+            <Minus className="h-5 w-5 text-muted-foreground" />
+            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950 px-3 py-2 rounded-lg">
+              <span className="font-semibold text-red-700 dark:text-red-300">
+                Expenses
+              </span>
+              <span className="text-red-600">
+                ${formatNumber(data?.expensesTotal || 0)}
+              </span>
             </div>
             <Equal className="h-5 w-5 text-muted-foreground" />
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${isProfit ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
-              <span className={`font-semibold ${isProfit ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                Net Profit
+            <div
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg ${(data?.netPosition || 0) >= 0 ? "bg-green-100 dark:bg-green-900" : "bg-red-100 dark:bg-red-900"}`}
+            >
+              <span
+                className={`font-semibold ${(data?.netPosition || 0) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
+              >
+                Net Position
               </span>
-              <span className={isProfit ? 'text-green-600' : 'text-red-600'}>
-                ${formatNumber(netProfit)}
+              <span
+                className={
+                  (data?.netPosition || 0) >= 0
+                    ? "text-green-600"
+                    : "text-red-600"
+                }
+              >
+                ${formatNumber(data?.netPosition || 0)}
               </span>
             </div>
+          </div>
+          <div className="mt-4">
+            <Badge
+              variant={
+                (data?.netPosition || 0) >= 0 ? "default" : "destructive"
+              }
+            >
+              {data?.netPositionLabel || "Net Position"}
+            </Badge>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card data-testid="card-income-breakdown">
+        <Card data-testid="card-income-accounts">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5 text-green-600" />
-              Income (Added)
+              Income Accounts (Added)
             </CardTitle>
-            <CardDescription>Revenue and income sources</CardDescription>
+            <CardDescription>
+              {data?.income.accounts?.length || 0} accounts
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {data?.income.breakdown && data.income.breakdown.length > 0 ? (
+            {data?.income.accounts && data.income.accounts.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Category</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.income.breakdown.map((item, index) => (
-                    <TableRow key={index} data-testid={`income-row-${index}`}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-right text-green-600">
-                        +${formatNumber(item.value)}
+                  {data.income.accounts.map((acc, index) => (
+                    <TableRow
+                      key={index}
+                      data-testid={`income-account-${index}`}
+                    >
+                      <TableCell className="font-medium">{acc.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {acc.code}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right ${acc.value >= 0 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {acc.value >= 0 ? "+" : "-"}$
+                        {formatNumber(Math.abs(acc.value))}
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="border-t-2 font-bold">
-                    <TableCell>Total Income</TableCell>
+                  <TableRow className="border-t-2 font-bold bg-muted/50">
+                    <TableCell colSpan={2}>Total Income</TableCell>
                     <TableCell className="text-right text-green-600">
                       ${formatNumber(data?.incomeTotal || 0)}
                     </TableCell>
@@ -218,39 +314,53 @@ export default function NetProfitDetails() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No income recorded</p>
+              <p className="text-muted-foreground text-center py-4">
+                No income recorded
+              </p>
             )}
           </CardContent>
         </Card>
 
-        <Card data-testid="card-expenses-breakdown">
+        <Card data-testid="card-expenses-accounts">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Minus className="h-5 w-5 text-red-600" />
-              Expenses (Subtracted)
+              Expense Accounts (Subtracted)
             </CardTitle>
-            <CardDescription>Costs and expenses</CardDescription>
+            <CardDescription>
+              {data?.expenses.accounts?.length || 0} accounts
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {data?.expenses.breakdown && data.expenses.breakdown.length > 0 ? (
+            {data?.expenses.accounts && data.expenses.accounts.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Category</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.expenses.breakdown.map((item, index) => (
-                    <TableRow key={index} data-testid={`expense-row-${index}`}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell className="text-right text-red-600">
-                        -${formatNumber(Math.abs(item.value))}
+                  {data.expenses.accounts.map((acc, index) => (
+                    <TableRow
+                      key={index}
+                      data-testid={`expense-account-${index}`}
+                    >
+                      <TableCell className="font-medium">{acc.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {acc.code}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right ${acc.value >= 0 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {acc.value >= 0 ? "-" : "+"}$
+                        {formatNumber(Math.abs(acc.value))}
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="border-t-2 font-bold">
-                    <TableCell>Total Expenses</TableCell>
+                  <TableRow className="border-t-2 font-bold bg-muted/50">
+                    <TableCell colSpan={2}>Total Expenses</TableCell>
                     <TableCell className="text-right text-red-600">
                       ${formatNumber(data?.expensesTotal || 0)}
                     </TableCell>
@@ -258,124 +368,125 @@ export default function NetProfitDetails() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No expenses recorded</p>
+              <p className="text-muted-foreground text-center py-4">
+                No expenses recorded
+              </p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <Card data-testid="card-net-position">
-        <CardHeader>
-          <CardTitle>Net Position Summary</CardTitle>
-          <CardDescription>Full equity position including assets and liabilities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Assets (For Us)</p>
-                <p className="text-xl font-bold text-green-600">${formatNumber(data?.forUsTotal || 0)}</p>
-              </div>
-              <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Liabilities (On Us)</p>
-                <p className="text-xl font-bold text-red-600">${formatNumber(data?.onUsTotal || 0)}</p>
-              </div>
-              <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Income</p>
-                <p className="text-xl font-bold text-green-600">${formatNumber(data?.incomeTotal || 0)}</p>
-              </div>
-              <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Expenses</p>
-                <p className="text-xl font-bold text-red-600">${formatNumber(data?.expensesTotal || 0)}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 text-lg font-mono bg-muted p-4 rounded-lg flex-wrap">
-              <span className="text-green-600">{formatNumber(data?.forUsTotal || 0)}</span>
-              <span className="text-muted-foreground">-</span>
-              <span className="text-red-600">{formatNumber(data?.onUsTotal || 0)}</span>
-              <span className="text-muted-foreground">+</span>
-              <span className="text-green-600">{formatNumber(data?.incomeTotal || 0)}</span>
-              <span className="text-muted-foreground">-</span>
-              <span className="text-red-600">{formatNumber(data?.expensesTotal || 0)}</span>
-              <span className="text-muted-foreground">=</span>
-              <span className={`font-bold ${(data?.netPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${formatNumber(data?.netPosition || 0)}
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Badge variant={data?.netPosition && data.netPosition >= 0 ? "default" : "destructive"}>
-                {data?.netPositionLabel || "Net Position"}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card data-testid="card-assets-breakdown">
+        <Card data-testid="card-assets-accounts">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-600">
-              Assets Breakdown
+              <Plus className="h-5 w-5" />
+              Asset Accounts (What we have)
             </CardTitle>
-            <CardDescription>What we have or is owed to us</CardDescription>
+            <CardDescription>
+              {data?.forUs.accounts?.length || 0} accounts
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {data?.forUs.breakdown && data.forUs.breakdown.length > 0 ? (
+            {data?.forUs.accounts && data.forUs.accounts.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.forUs.breakdown.map((item, index) => (
-                    <TableRow key={index} data-testid={`asset-row-${index}`}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                  {data.forUs.accounts.map((acc, index) => (
+                    <TableRow
+                      key={index}
+                      data-testid={`asset-account-${index}`}
+                    >
+                      <TableCell className="font-medium">{acc.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {acc.code}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {acc.category}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right text-green-600">
-                        ${formatNumber(item.value)}
+                        ${formatNumber(acc.value)}
                       </TableCell>
                     </TableRow>
                   ))}
+                  <TableRow className="border-t-2 font-bold bg-muted/50">
+                    <TableCell colSpan={3}>Total Assets</TableCell>
+                    <TableCell className="text-right text-green-600">
+                      ${formatNumber(data?.forUsTotal || 0)}
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No assets recorded</p>
+              <p className="text-muted-foreground text-center py-4">
+                No assets recorded
+              </p>
             )}
           </CardContent>
         </Card>
 
-        <Card data-testid="card-liabilities-breakdown">
+        <Card data-testid="card-liabilities-accounts">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-600">
-              Liabilities Breakdown
+              <Minus className="h-5 w-5" />
+              Liability Accounts (What we owe)
             </CardTitle>
-            <CardDescription>What we owe to others</CardDescription>
+            <CardDescription>
+              {data?.onUs.accounts?.length || 0} accounts
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {data?.onUs.breakdown && data.onUs.breakdown.length > 0 ? (
+            {data?.onUs.accounts && data.onUs.accounts.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.onUs.breakdown.map((item, index) => (
-                    <TableRow key={index} data-testid={`liability-row-${index}`}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
+                  {data.onUs.accounts.map((acc, index) => (
+                    <TableRow
+                      key={index}
+                      data-testid={`liability-account-${index}`}
+                    >
+                      <TableCell className="font-medium">{acc.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {acc.code}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {acc.category}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right text-red-600">
-                        ${formatNumber(item.value)}
+                        ${formatNumber(acc.value)}
                       </TableCell>
                     </TableRow>
                   ))}
+                  <TableRow className="border-t-2 font-bold bg-muted/50">
+                    <TableCell colSpan={3}>Total Liabilities</TableCell>
+                    <TableCell className="text-right text-red-600">
+                      ${formatNumber(data?.onUsTotal || 0)}
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No liabilities recorded</p>
+              <p className="text-muted-foreground text-center py-4">
+                No liabilities recorded
+              </p>
             )}
           </CardContent>
         </Card>

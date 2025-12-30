@@ -16666,6 +16666,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expensesBreakdown: { name: string; value: number }[] = [];
       const incomeBreakdown: { name: string; value: number }[] = [];
 
+      // Track individual accounts for detailed view
+      const forUsAccounts: { name: string; code: string; value: number; category: string }[] = [];
+      const onUsAccounts: { name: string; code: string; value: number; category: string }[] = [];
+      const expensesAccounts: { name: string; code: string; value: number; category: string }[] = [];
+      const incomeAccounts: { name: string; code: string; value: number; category: string }[] = [];
+
       // Group accounts by category for cleaner breakdown
       const categoryTotals: Record<string, number> = {};
 
@@ -16685,11 +16691,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (netBalance < 0) {
             incomeTotal += Math.abs(netBalance);
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
+            incomeAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
           } else if (netBalance > 0) {
             // Rare: debit balance on income = refund/return, reduce income
             incomeTotal -= netBalance;
             // Also reduce categoryTotals so breakdown matches total
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
+            incomeAccounts.push({ name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
           }
           continue;
         } else if (isAnyExpenseType) {
@@ -16700,11 +16708,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Normal expense (debit)
               expensesTotal += netBalance;
               categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
+              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
             } else if (netBalance < 0) {
               // Contra-expense / refund (credit) - reduces expenses
               const credit = Math.abs(netBalance);
               expensesTotal -= credit;
               categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
+              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
             }
           }
           // Skip all expense-type accounts from asset/liability calculation
@@ -16727,11 +16737,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               forUsTotal += netBalance;
               const category = acc.accountType || "Liability";
               categoryTotals[`asset_${category} Deposits`] = (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
+              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: category + " Deposits" });
             } else if (netBalance < 0) {
               // Negative = we owe them, it's a liability
               onUsTotal += Math.abs(netBalance);
               const category = acc.accountType || "Liability";
               categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
             }
           } else {
             // Asset-type accounts: positive = asset, negative = liability (overdraft)
@@ -16739,10 +16751,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               forUsTotal += netBalance;
               const category = acc.accountType || "Other";
               categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
+              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
             } else if (netBalance < 0) {
               onUsTotal += Math.abs(netBalance);
               const category = acc.accountType || "Other";
               categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
             }
           }
         }
@@ -16770,6 +16784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stockOnFloor > 0) {
         forUsTotal += stockOnFloor;
         categoryTotals["asset_Stock In Hand"] = stockOnFloor;
+        forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
@@ -16790,9 +16805,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (workerLiabilities > 0) {
           onUsTotal += workerLiabilities;
           categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilities;
+          onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
         } else {
           forUsTotal += Math.abs(workerLiabilities);
           categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + Math.abs(workerLiabilities);
+          forUsAccounts.push({ name: "Worker Advances", code: "COMPUTED", value: Math.abs(workerLiabilities), category: "Worker Advances" });
         }
       }
 
@@ -16811,8 +16828,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) {
               supplierLiabilities += netBalance;
+              onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: netBalance, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
+              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
             }
           }
         }
@@ -16847,6 +16866,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       onUsBreakdown.sort((a, b) => b.value - a.value);
       expensesBreakdown.sort((a, b) => b.value - a.value);
       incomeBreakdown.sort((a, b) => b.value - a.value);
+      
+      // Sort individual account arrays by value (highest first)
+      forUsAccounts.sort((a, b) => b.value - a.value);
+      onUsAccounts.sort((a, b) => b.value - a.value);
+      expensesAccounts.sort((a, b) => b.value - a.value);
+      incomeAccounts.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
       // Helper to round currency values to 2 decimal places (prevents floating point noise)
@@ -16919,18 +16944,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         forUs: {
           total: forUsTotal,
           breakdown: forUsBreakdown,
+          accounts: forUsAccounts,
         },
         onUs: {
           total: onUsTotal,
           breakdown: onUsBreakdown,
+          accounts: onUsAccounts,
         },
         income: {
           total: incomeTotal,
           breakdown: incomeBreakdown,
+          accounts: incomeAccounts,
         },
         expenses: {
           total: expensesTotal,
           breakdown: expensesBreakdown,
+          accounts: expensesAccounts,
         },
         ownersCapital,
         netWorth,
@@ -21773,7 +21802,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company Settings API Routes
   app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const { companyId: queryCompanyId } = req.query;
+      const companyId = queryCompanyId
+        ? parseInt(queryCompanyId as string)
+        : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -21788,7 +21820,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/company-settings", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      const { companyId: bodyCompanyId } = req.body;
+      const companyId = bodyCompanyId
+        ? parseInt(bodyCompanyId as string)
+        : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
