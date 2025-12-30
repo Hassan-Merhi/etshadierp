@@ -33,13 +33,12 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **In subsidiary books**: DR Purchases, CR Lubumbashi Credit (liability - we owe Lubumbashi)
     - **In Lubumbashi books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
     This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers (DR Supplier, CR Lubumbashi Credit in subsidiary + DR [Subsidiary] Credit, CR Supplier in Lubumbashi).
--   **Net Position with Parent Company Setting (Dec 2025)**: Simplified sign-based Net Position calculation:
-    - **Formula**: Net Position = Assets - Liabilities - Expenses
-    - **Sign-based logic**: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
-    - **Expenses**: All expense accounts (Direct/Indirect Expense) are subtracted from Net Position, EXCEPT IMPORT_CHARGES (already in inventory cost)
+-   **Net Position with Parent Company Setting (Dec 2025)**: Pure sign-based Net Position calculation:
+    - **Formula**: Net Position = Sum(positive balances) - Sum(negative balances) = Assets - Liabilities
+    - **Sign-based logic**: Positive balance = Asset (what we have), Negative balance = Liability (what we owe)
     - **Suppliers**: Only included for designated parent company (Lubumbashi pays all suppliers). Subsidiaries use "Lubumbashi Credit" liability instead
     - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools
-    - **Dashboard**: Shows 4-column breakdown: Assets, Liabilities, Expenses, Net Position calculation
+    - **Dashboard**: Shows breakdown of Assets vs Liabilities with Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.
 -   **Known Limitations**: 

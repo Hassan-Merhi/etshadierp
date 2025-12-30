@@ -16977,9 +16977,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       incomeTotal = round2(incomeTotal);
       expensesTotal = round2(expensesTotal);
       
-      // Net Position = Assets - Liabilities + Income - Expenses (full equity position including P&L)
-      // This formula applies to ALL companies consistently
-      const netPosition = round2(forUsTotal - onUsTotal + incomeTotal - expensesTotal);
+      // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)
+      // Positive balance = asset (what we have)
+      // Negative balance = liability (what we owe)
+      // This is a simplified calculation: Assets - Liabilities only
+      const netPosition = round2(forUsTotal - onUsTotal);
       
       // Debug logging for Net Position calculation
       console.log("Net Position Debug:", {
@@ -16987,8 +16989,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shouldIncludeSuppliers,
         forUsTotal,
         onUsTotal,
-        incomeTotal,
-        expensesTotal,
         netPosition,
         stockOnFloor,
         categoryTotals
