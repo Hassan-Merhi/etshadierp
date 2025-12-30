@@ -6522,9 +6522,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const poChargesTotal = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
         const poGrandTotal = poItemsTotal + poChargesTotal;
 
-        // Create voucher for this PO - OPTIONAL (does not affect accounting)
-        // Real accounting entries are created at container offload time per Tally conventions
-        // This voucher is for tracking/reference purposes only
+        // Create voucher for this PO
+        // If subsidiary with parent credit account: entries created here at import time
+        // Otherwise: entries created at container offload time per Tally conventions
         const voucher = await storage.createVoucher({
           companyId: req.session.currentCompanyId!,
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
@@ -6535,8 +6535,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
           optional: false, // Creates real voucher entries immediately at import
         });
 
-        // No voucher entries created here - entries will be created at container offload
-        // This follows Tally Prime convention: Purchases recorded when goods are RECEIVED, not ordered
+        // === INTER-COMPANY CREDIT SYSTEM ===
+        // Check if this is a subsidiary company with a parent credit account configured
+        const parentCompanyId = await storage.getParentCompanyId();
+        const currentCompanyId = req.session.currentCompanyId!;
+        const isSubsidiary = parentCompanyId && parentCompanyId !== currentCompanyId;
+        
+        if (isSubsidiary) {
+          // Get the subsidiary's company settings for parent credit account
+          const companySettings = await storage.getCompanySettings(currentCompanyId);
+          const parentCreditAccountId = companySettings?.parentCreditAccountId;
+          
+          if (parentCreditAccountId) {
+            // Get the current company name for the parent company's receivable account
+            const currentCompany = await storage.getCompanyById(currentCompanyId);
+            const subsidiaryName = currentCompany?.name || `Company ${currentCompanyId}`;
+            
+            // Find or create a Purchases account for the subsidiary
+            let purchasesAccount = await storage.getLedgerAccountByName("Purchases", currentCompanyId);
+            if (!purchasesAccount) {
+              purchasesAccount = await storage.createLedgerAccount({
+                companyId: currentCompanyId,
+                name: "Purchases",
+                code: "PURCHASES",
+                accountType: "Expense",
+                subType: "Direct Expense",
+              });
+            }
+            
+            // Create voucher entries in SUBSIDIARY: DR Purchases, CR Parent Credit Account
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              ledgerAccountId: purchasesAccount.id,
+              debitAmount: poGrandTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `PO ${poNumber} - Container ${containerNumber}`,
+            });
+            
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              ledgerAccountId: parentCreditAccountId,
+              debitAmount: "0",
+              creditAmount: poGrandTotal.toFixed(2),
+              narration: `PO ${poNumber} - Credit from ${subsidiaryName}`,
+            });
+            
+            // === CREATE MATCHING VOUCHER IN PARENT COMPANY ===
+            // Find or create "[Subsidiary Name] Credit" account in parent (Asset - receivable)
+            const subsidiaryAccountName = `${subsidiaryName} Credit`;
+            let subsidiaryReceivableAccount = await storage.getLedgerAccountByName(subsidiaryAccountName, parentCompanyId);
+            if (!subsidiaryReceivableAccount) {
+              // Auto-generate unique code
+              let code = subsidiaryName.substring(0, 3).toUpperCase() + "CRD";
+              let suffix = 1;
+              while (await storage.getLedgerAccountByCode(code, parentCompanyId)) {
+                code = subsidiaryName.substring(0, 3).toUpperCase() + "CRD" + suffix;
+                suffix++;
+              }
+              subsidiaryReceivableAccount = await storage.createLedgerAccount({
+                companyId: parentCompanyId,
+                name: subsidiaryAccountName,
+                code,
+                accountType: "Asset",
+                subType: "Current Asset",
+              });
+            }
+            
+            // Create matching voucher in PARENT: DR Subsidiary Credit, CR Supplier
+            const parentVoucher = await storage.createVoucher({
+              companyId: parentCompanyId,
+              voucherNumber: `IC-${poNumber}-${Date.now()}`,
+              voucherType: "Journal",
+              voucherDate: importDate,
+              description: `Inter-company credit: ${subsidiaryName} - PO ${poNumber}`,
+              totalAmount: poGrandTotal.toString(),
+              optional: false,
+            });
+            
+            // DR: Subsidiary receivable (Asset increases - they owe us)
+            await storage.createVoucherEntry({
+              voucherId: parentVoucher.id,
+              ledgerAccountId: subsidiaryReceivableAccount.id,
+              debitAmount: poGrandTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+            });
+            
+            // CR: Supplier account (Liability increases - we owe supplier)
+            await storage.createVoucherEntry({
+              voucherId: parentVoucher.id,
+              supplierId: supplierId,
+              debitAmount: "0",
+              creditAmount: poGrandTotal.toFixed(2),
+              narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
+            });
+          }
+        }
 
         const po = await storage.createPurchaseOrder({
           companyId: req.session.currentCompanyId!,
