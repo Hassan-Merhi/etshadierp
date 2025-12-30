@@ -6532,7 +6532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherDate: importDate,
           description: `Purchase Order ${poNumber} - Container ${containerNumber} (Pending Offload)`,
           totalAmount: poGrandTotal.toString(),
-          optional: true, // Does not affect accounting - real entries created at offload
+          optional: false, // Creates real voucher entries immediately at import
         });
 
         // No voucher entries created here - entries will be created at container offload
