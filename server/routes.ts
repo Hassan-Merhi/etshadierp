@@ -6544,12 +6544,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isSubsidiary) {
           // Get the subsidiary's company settings for parent credit account
           const companySettings = await storage.getCompanySettings(currentCompanyId);
-          const parentCreditAccountId = companySettings?.parentCreditAccountId;
+          let parentCreditAccountId = companySettings?.parentCreditAccountId;
+          
+          // Get the current company name for the parent company's receivable account
+          const currentCompany = await storage.getCompanyById(currentCompanyId);
+          const subsidiaryName = currentCompany?.name || `Company ${currentCompanyId}`;
+          
+          // Auto-create Parent Credit Account if it doesn't exist
+          if (!parentCreditAccountId) {
+            // Get parent company name for the account
+            const parentCompany = await storage.getCompanyById(parentCompanyId);
+            const parentName = parentCompany?.name || "Parent Company";
+            const creditAccountName = `${parentName} Credit`;
+            
+            // Try to find or create the account (with retry for concurrent requests)
+            for (let attempt = 0; attempt < 3 && !parentCreditAccountId; attempt++) {
+              try {
+                // Always fetch first - handles concurrent creation
+                let existingAccount = await storage.getLedgerAccountByName(creditAccountName, currentCompanyId);
+                
+                if (!existingAccount && attempt < 2) {
+                  // Auto-generate unique code
+                  let code = parentName.substring(0, 3).toUpperCase() + "CRD";
+                  let suffix = 1;
+                  while (await storage.getLedgerAccountByCode(code, currentCompanyId)) {
+                    code = parentName.substring(0, 3).toUpperCase() + "CRD" + suffix;
+                    suffix++;
+                  }
+                  existingAccount = await storage.createLedgerAccount({
+                    companyId: currentCompanyId,
+                    name: creditAccountName,
+                    code,
+                    accountType: "Liability",
+                    subType: "Current Liability",
+                  });
+                }
+                
+                if (existingAccount?.id) {
+                  parentCreditAccountId = existingAccount.id;
+                  
+                  // Save to company settings for future use
+                  await storage.updateCompanySettings(currentCompanyId, {
+                    parentCreditAccountId: parentCreditAccountId,
+                  });
+                  console.log(`Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`);
+                }
+              } catch (err: any) {
+                console.log(`Parent Credit Account creation attempt ${attempt + 1} failed, will retry fetch:`, err?.message);
+                // On any error, loop will retry with fetch-first approach
+              }
+            }
+          }
           
           if (parentCreditAccountId) {
-            // Get the current company name for the parent company's receivable account
-            const currentCompany = await storage.getCompanyById(currentCompanyId);
-            const subsidiaryName = currentCompany?.name || `Company ${currentCompanyId}`;
             
             // Find or create a Purchases account for the subsidiary
             let purchasesAccount = await storage.getLedgerAccountByName("Purchases", currentCompanyId);
