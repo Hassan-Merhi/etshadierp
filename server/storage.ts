@@ -2104,6 +2104,9 @@ export class DbStorage implements IStorage {
       }
     }
 
+    // Track offload items for exact reversal later
+    const offloadItemsToStore: Array<{stockItemId: number; quantity: number; rate: number; totalValue: number}> = [];
+
     // Add inventory to destination location with weighted average cost
     for (const [stockItemId, data] of Array.from(itemsMap.entries())) {
       // Safety check for division by zero
@@ -2114,6 +2117,15 @@ export class DbStorage implements IStorage {
       
       const averageOriginalRate = data.weightedRateSum / data.totalQuantity;
       const newRate = averageOriginalRate + additionalCostPerBale;
+      
+      // Store the EXACT values added for this item (for lossless reversal)
+      const offloadValue = data.totalQuantity * newRate;
+      offloadItemsToStore.push({
+        stockItemId,
+        quantity: data.totalQuantity,
+        rate: newRate,
+        totalValue: offloadValue,
+      });
       
       // Safety check for infinity
       if (!isFinite(newRate)) {
@@ -2561,6 +2573,17 @@ export class DbStorage implements IStorage {
       additionalCostPerBale: additionalCostPerBale.toFixed(2),
       offloadedAt: offloadDate ? new Date(offloadDate) : new Date(),
     }).returning();
+
+    // Store offload items for exact reversal (prevents discrepancies from weighted average changes)
+    for (const item of offloadItemsToStore) {
+      await db.insert(schema.containerOffloadItems).values({
+        offloadId: offload.id,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity.toFixed(3),
+        rate: item.rate.toFixed(2),
+        totalValue: item.totalValue.toFixed(2),
+      });
+    }
 
     return offload;
   }
@@ -3870,9 +3893,37 @@ export class DbStorage implements IStorage {
             // Track value for new inventory
             totalProductionValue += actualTotalAmount;
           } else {
-            // Consumption requires existing inventory - cannot consume what doesn't exist
-            // This guard ensures we never store user-input rates for consumption items
-            throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}. Cannot consume items that don't exist in inventory.`);
+            // Consumption without existing inventory - use stock item's costPrice as fallback
+            // This allows consumption even when no inventory exists at this location
+            const [stockItem] = await tx
+              .select()
+              .from(schema.stockItems)
+              .where(eq(schema.stockItems.id, item.stockItemId));
+            
+            if (!stockItem) {
+              throw new Error(`Stock item ${item.stockItemId} not found.`);
+            }
+            
+            // Use costPrice as the rate for consumption when no inventory exists
+            const fallbackRate = parseFloat(stockItem.costPrice || "0");
+            if (fallbackRate <= 0) {
+              throw new Error(`Stock item "${stockItem.name}" has no cost price set. Please set a cost price before consuming items without existing inventory.`);
+            }
+            
+            actualRate = fallbackRate;
+            actualTotalAmount = Math.abs(quantity) * fallbackRate;
+            totalConsumptionValue += actualTotalAmount;
+            
+            // Create negative inventory record to track the consumption
+            await tx.insert(schema.inventory).values({
+              companyId: location.companyId,
+              locationId,
+              stockItemId: item.stockItemId,
+              quantity: (-Math.abs(quantity)).toFixed(3),
+              averageRate: fallbackRate.toFixed(2),
+              totalValue: (-actualTotalAmount).toFixed(2),
+              lastUpdated: new Date(),
+            });
           }
         }
 

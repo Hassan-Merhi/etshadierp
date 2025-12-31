@@ -59,6 +59,7 @@ import {
   poLineItems,
   containers,
   containerOffloads,
+  containerOffloadItems,
   containerCharges,
   suppliers,
   fixedAssets,
@@ -9044,88 +9045,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         await db.transaction(async (tx) => {
-          // Get all POs for this container
-          const pos = await storage.getPurchaseOrdersByContainer(containerId);
-          
-          // Recalculate the EXACT offload rates (same logic as offloadContainer)
-          // This ensures we subtract the exact values that were added
-          const allLineItems: any[] = [];
-          for (const po of pos) {
-            const items = await storage.getLineItemsByPO(po.id);
-            allLineItems.push(...items);
-          }
-          
-          // Use the stored additionalCostPerBale from offload record
-          // This is the exact value used during offload (includes all charges)
-          const additionalCostPerBale = parseFloat(offloadRecord.additionalCostPerBale || "0");
-          
-          // Group line items by stock item (same as offload)
-          const itemsMap = new Map<number, { 
-            stockItemId: number; 
-            totalQuantity: number; 
-            weightedRateSum: number;
-          }>();
-          
-          for (const item of allLineItems) {
-            const stockItemId = item.stockItemId;
-            if (!stockItemId || stockItemId === 0) continue;
-            
-            const quantity = parseFloat(item.quantity);
-            const rate = parseFloat(item.rate);
-            
-            if (itemsMap.has(stockItemId)) {
-              const existing = itemsMap.get(stockItemId)!;
-              existing.totalQuantity += quantity;
-              existing.weightedRateSum += rate * quantity;
-            } else {
-              itemsMap.set(stockItemId, {
-                stockItemId,
-                totalQuantity: quantity,
-                weightedRateSum: rate * quantity,
-              });
+          // Try to get stored offload items first (new approach - exact values)
+          const storedOffloadItems = await tx
+            .select()
+            .from(containerOffloadItems)
+            .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
+
+          // Use stored offload items if available (lossless reversal)
+          if (storedOffloadItems.length > 0) {
+            // Reduce inventory using EXACT stored values from offload
+            for (const offloadItem of storedOffloadItems) {
+              const [inv] = await tx
+                .select()
+                .from(inventory)
+                .where(
+                  and(
+                    eq(inventory.stockItemId, offloadItem.stockItemId),
+                    eq(inventory.locationId, offloadRecord.locationId),
+                  ),
+                )
+                .limit(1);
+
+              if (inv) {
+                const currentQty = parseFloat(inv.quantity);
+                const currentValue = parseFloat(inv.totalValue);
+                const offloadQty = parseFloat(offloadItem.quantity);
+                const offloadValue = parseFloat(offloadItem.totalValue);
+                const newQty = currentQty - offloadQty;
+                
+                if (newQty <= 0) {
+                  await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                } else {
+                  const newTotalValue = currentValue - offloadValue;
+                  const newAvgRate = newTotalValue / newQty;
+                  await tx
+                    .update(inventory)
+                    .set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue.toFixed(2),
+                      averageRate: newAvgRate.toFixed(2),
+                    })
+                    .where(eq(inventory.id, inv.id));
+                }
+              }
             }
-          }
-
-          // Reduce inventory quantities using the EXACT offload rate for each item
-          for (const [stockItemId, data] of Array.from(itemsMap)) {
-            // Calculate the exact rate that was used during offload
-            const baseRate = data.weightedRateSum / data.totalQuantity;
-            const offloadRate = baseRate + additionalCostPerBale;
-            const offloadValue = data.totalQuantity * offloadRate;
             
-            const [inv] = await tx
-              .select()
-              .from(inventory)
-              .where(
-                and(
-                  eq(inventory.stockItemId, stockItemId),
-                  eq(inventory.locationId, offloadRecord.locationId),
-                ),
-              )
-              .limit(1);
-
-            if (inv) {
-              const currentQty = parseFloat(inv.quantity);
-              const currentValue = parseFloat(inv.totalValue);
-              const newQty = currentQty - data.totalQuantity;
+            // Delete stored offload items
+            await tx
+              .delete(containerOffloadItems)
+              .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
+          } else {
+            // Fallback for old offloads without stored items (legacy approach)
+            const pos = await storage.getPurchaseOrdersByContainer(containerId);
+            const allLineItems: any[] = [];
+            for (const po of pos) {
+              const items = await storage.getLineItemsByPO(po.id);
+              allLineItems.push(...items);
+            }
+            
+            const additionalCostPerBale = parseFloat(offloadRecord.additionalCostPerBale || "0");
+            const itemsMap = new Map<number, { 
+              stockItemId: number; 
+              totalQuantity: number; 
+              weightedRateSum: number;
+            }>();
+            
+            for (const item of allLineItems) {
+              const stockItemId = item.stockItemId;
+              if (!stockItemId || stockItemId === 0) continue;
               
-              if (newQty <= 0) {
-                // Delete if quantity goes to zero or negative
-                await tx
-                  .delete(inventory)
-                  .where(eq(inventory.id, inv.id));
+              const quantity = parseFloat(item.quantity);
+              const rate = parseFloat(item.rate);
+              
+              if (itemsMap.has(stockItemId)) {
+                const existing = itemsMap.get(stockItemId)!;
+                existing.totalQuantity += quantity;
+                existing.weightedRateSum += rate * quantity;
               } else {
-                // Subtract the exact value that was added during offload
-                const newTotalValue = currentValue - offloadValue;
-                const newAvgRate = newTotalValue / newQty;
-                await tx
-                  .update(inventory)
-                  .set({ 
-                    quantity: newQty.toString(),
-                    totalValue: newTotalValue.toFixed(2),
-                    averageRate: newAvgRate.toFixed(2),
-                  })
-                  .where(eq(inventory.id, inv.id));
+                itemsMap.set(stockItemId, {
+                  stockItemId,
+                  totalQuantity: quantity,
+                  weightedRateSum: rate * quantity,
+                });
+              }
+            }
+
+            for (const [stockItemId, data] of Array.from(itemsMap)) {
+              const baseRate = data.weightedRateSum / data.totalQuantity;
+              const offloadRate = baseRate + additionalCostPerBale;
+              const offloadValue = data.totalQuantity * offloadRate;
+              
+              const [inv] = await tx
+                .select()
+                .from(inventory)
+                .where(
+                  and(
+                    eq(inventory.stockItemId, stockItemId),
+                    eq(inventory.locationId, offloadRecord.locationId),
+                  ),
+                )
+                .limit(1);
+
+              if (inv) {
+                const currentQty = parseFloat(inv.quantity);
+                const currentValue = parseFloat(inv.totalValue);
+                const newQty = currentQty - data.totalQuantity;
+                
+                if (newQty <= 0) {
+                  await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                } else {
+                  const newTotalValue = currentValue - offloadValue;
+                  const newAvgRate = newTotalValue / newQty;
+                  await tx
+                    .update(inventory)
+                    .set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue.toFixed(2),
+                      averageRate: newAvgRate.toFixed(2),
+                    })
+                    .where(eq(inventory.id, inv.id));
+                }
               }
             }
           }

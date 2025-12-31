@@ -613,6 +613,17 @@ export type InsertContainerOffload = z.infer<typeof insertContainerOffloadSchema
 export type ContainerOffload = typeof containerOffloads.$inferSelect;
 export type OffloadRequest = z.infer<typeof offloadRequestSchema>;
 
+export const containerOffloadItems = pgTable("container_offload_items", {
+  id: serial("id").primaryKey(),
+  offloadId: integer("offload_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
+});
+
+export type ContainerOffloadItem = typeof containerOffloadItems.$inferSelect;
+
 export const vouchers = pgTable("vouchers", {
   id: serial("id").primaryKey(),
   companyId: integer("company_id").notNull(),
