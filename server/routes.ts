@@ -17952,12 +17952,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
-      // Operating Expenses: Direct Expenses + Indirect Expenses + Government Taxes + COGS
+      // Operating Expenses: Indirect Expenses + Government Taxes + COGS (but NOT directExpenseBalance)
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability accounts + Profit/Equity + Income + Payroll Liabilities
       // Net = (Assets + Operating Expenses) - (Liabilities + Income) (should be 0 when balanced)
       // NOTE: generalExpenseBalance (Purchases) is EXCLUDED because it double-counts with stockOnFloorValue
       //       When containers are offloaded, Purchases expense is debited AND Stock on Floor increases
       //       The inventory value already captures the cost of goods, so we don't add Purchases again
+      // NOTE: directExpenseBalance (IMPORT_CHARGES like duties, transport) is EXCLUDED because:
+      //       - These costs are capitalized into inventory value (stockOnFloorValue) during container offload
+      //       - When offloading, the system: DR Duty Agent/Transporter Agent (creates liability)
+      //         and those costs get added to inventory value via additionalCostPerBale
+      //       - So stockOnFloorValue already includes these costs - adding directExpenseBalance would double-count
       // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
       // NOTE: Production and Consumption are EXCLUDED from the balance formula because:
       //       - Their effects are already reflected in stockOnFloorValue (inventory movements)
@@ -17968,9 +17973,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
         bankBalance +               // Asset (debit) - bank balances
-        stockOnFloorValue +         // Asset - inventory at cost (includes all inventory movements)
+        stockOnFloorValue +         // Asset - inventory at cost (includes offload charges capitalized)
         assetBalance +              // Asset accounts (properties, guarantees, receivables)
-        directExpenseBalance +      // Expense (debit) - not capitalized into inventory
+        // directExpenseBalance is EXCLUDED - already capitalized into stockOnFloorValue
         indirectExpenseBalance +    // Expense (debit) - operating expenses
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
