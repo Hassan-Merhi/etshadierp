@@ -29,15 +29,15 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
 -   **Soft Delete System**: Implemented across key tables (locations, ledger accounts, stock items, suppliers, employees, customers, bank accounts) with a `deletedAt` timestamp. Includes admin-only UI for viewing, restoring, and permanently deleting items.
 -   **AI Chatbot**: Integrated Google Gemini for ERP context-aware responses. Features multi-language support, real-time chat with history, and admin controls for user access and chat history viewing.
 -   **Purchase Order Enhancements**: POs now include editable freight and other charges, which are correctly factored into container offload inventory costs and supplier account balances. **Critical Fix (Dec 2025)**: PO import voucher entries now correctly use company-specific Purchases ledger accounts. Previously, entries were incorrectly posting to a single Purchases account regardless of company, causing inflated balances. Existing data was corrected via SQL migration. **Stock Item Swap Prevention (Dec 2025)**: Editing stock items on offloaded containers is now blocked with a clear error message - users must first reverse the offload, edit the PO, then re-offload.
--   **Inter-Company Credit System (Dec 2025)**: Automated inter-company accounting where Lubumbashi (parent company) pays all suppliers. When a PO is imported to a subsidiary company:
-    - **In subsidiary books**: DR Purchases, CR Lubumbashi Credit (liability - we owe Lubumbashi)
-    - **In Lubumbashi books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
-    This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers (DR Supplier, CR Lubumbashi Credit in subsidiary + DR [Subsidiary] Credit, CR Supplier in Lubumbashi).
+-   **Inter-Company Credit System (Dec 2025)**: Automated inter-company accounting where a configurable parent company pays all suppliers. When a PO is imported to a subsidiary company:
+    - **In subsidiary books**: DR Purchases, CR [Parent] Credit (liability - we owe parent company)
+    - **In parent company books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
+    This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers. **Updated Dec 2025**: Parent company is now configurable via system settings (not hardcoded), voucher numbering uses `INTERCO-PARENT-*` format, and all account names dynamically reflect the configured parent company name.
 -   **Net Position with Parent Company Setting (Dec 2025)**: Pure sign-based Net Position calculation:
     - **Formula**: Net Position = Sum(positive balances) - Sum(negative balances) = Assets - Liabilities
     - **Sign-based logic**: Positive balance = Asset (what we have), Negative balance = Liability (what we owe)
-    - **Suppliers**: Only included for designated parent company (Lubumbashi pays all suppliers). Subsidiaries use "Lubumbashi Credit" liability instead
-    - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools
+    - **Suppliers**: Only included for designated parent company (pays all suppliers). Subsidiaries use "[Parent] Credit" liability instead
+    - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools. This setting is used for both Net Position calculations AND inter-company credit accounting.
     - **Dashboard**: Shows breakdown of Assets vs Liabilities with Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.

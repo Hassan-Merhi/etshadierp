@@ -25921,15 +25921,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Find the Lubumbashi company (parent company that paid for all POs)
+        // Get the parent company from system settings (not hardcoded name)
+        const parentCompanyId = await storage.getParentCompanyId();
         const allCompanies = await storage.getAllCompanies();
-        const lubumbashiCompany = allCompanies.find(c => 
-          c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
-        );
         
-        if (!lubumbashiCompany) {
+        if (!parentCompanyId) {
           return res.status(400).json({ 
-            message: "Could not find a company with 'Lubumbashi' or 'HADI L'shi' in the name. Please ensure the parent company is named correctly." 
+            message: "No parent company configured. Please set the 'Parent Company for Net Position' in Settings first." 
+          });
+        }
+        
+        const parentCompany = allCompanies.find(c => c.id === parentCompanyId);
+        
+        if (!parentCompany) {
+          return res.status(400).json({ 
+            message: "Configured parent company not found. Please check your settings." 
           });
         }
         
@@ -25943,11 +25949,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Check if parent company is selected - if so, process ALL subsidiaries
-        const isParentCompany = selectedCompany.id === lubumbashiCompany.id;
+        const isParentCompanySelected = selectedCompany.id === parentCompany.id;
         
         // Determine which companies to process
-        const companiesToProcess = isParentCompany
-          ? allCompanies.filter(c => c.id !== lubumbashiCompany.id) // All subsidiaries
+        const companiesToProcess = isParentCompanySelected
+          ? allCompanies.filter(c => c.id !== parentCompany.id) // All subsidiaries
           : [selectedCompany]; // Just the selected one
         
         let totalFixed = 0;
@@ -25956,14 +25962,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Process each company
         for (const company of companiesToProcess) {
-          // Get or create "Lubumbashi Credit" account for this company
+          // Get or create "[Parent Company] Credit" account for this subsidiary
+          const parentCreditCode = parentCompany.name.toUpperCase().replace(/\s+/g, '_') + "_CREDIT";
+          const parentCreditName = parentCompany.name + " Credit";
+          
           let creditAccount = await db
             .select()
             .from(ledgerAccounts)
             .where(
               and(
                 eq(ledgerAccounts.companyId, company.id),
-                eq(ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
+                eq(ledgerAccounts.code, parentCreditCode),
                 isNull(ledgerAccounts.deletedAt)
               )
             )
@@ -25972,8 +25981,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!creditAccount.length) {
             const [newAccount] = await db.insert(ledgerAccounts).values({
               companyId: company.id,
-              code: "LUBUMBASHI_CREDIT",
-              name: "Lubumbashi Credit",
+              code: parentCreditCode,
+              name: parentCreditName,
               accountType: "Liability",
               subType: "Current Liability",
               openingBalance: "0",
@@ -26020,20 +26029,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
               continue; // Skip - already has credit entry in subsidiary
             }
             
-            // Check for existing INTERCO-LUB vouchers in Lubumbashi
-            const existingLubumbashiVoucher = await db
+            // Check for existing INTERCO-PARENT vouchers in parent company
+            const existingParentVoucher = await db
               .select()
               .from(vouchers)
               .where(
                 and(
-                  eq(vouchers.companyId, lubumbashiCompany.id),
-                  like(vouchers.voucherNumber, `INTERCO-LUB-${po.poNumber}%`)
+                  eq(vouchers.companyId, parentCompany.id),
+                  like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}%`)
                 )
               )
               .limit(1);
             
-            if (existingLubumbashiVoucher.length > 0) {
-              continue; // Skip - already has credit entry in Lubumbashi
+            if (existingParentVoucher.length > 0) {
+              continue; // Skip - already has credit entry in parent company
             }
             
             // Calculate PO total: items + freight + charges
@@ -26062,7 +26071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               : new Date().toISOString().split('T')[0];
             
             // ============================================================
-            // SUBSIDIARY VOUCHER - Transfer liability from Supplier to Lubumbashi Credit
+            // SUBSIDIARY VOUCHER - Transfer liability from Supplier to Parent Credit
             // ============================================================
             const voucherNumber = `INTERCO-${po.poNumber}-${Date.now()}`;
             const [voucher] = await db.insert(vouchers).values({
@@ -26070,35 +26079,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherNumber,
               voucherType: "Journal",
               voucherDate,
-              description: `Transfer supplier liability to Lubumbashi Credit - PO ${po.poNumber} - Container ${container.containerNumber}`,
+              description: `Transfer supplier liability to ${parentCompany.name} Credit - PO ${po.poNumber} - Container ${container.containerNumber}`,
               totalAmount: poTotal.toFixed(2),
               optional: false,
             }).returning();
             
-            // Debit: Supplier account (reduce payable - they got paid by Lubumbashi)
+            // Debit: Supplier account (reduce payable - they got paid by parent company)
             if (po.supplierId) {
               await db.insert(voucherEntries).values({
                 voucherId: voucher.id,
                 supplierId: po.supplierId,
                 debitAmount: poTotal.toFixed(2),
                 creditAmount: "0",
-                narration: `Transfer to Lubumbashi Credit - PO ${po.poNumber}`,
+                narration: `Transfer to ${parentCompany.name} Credit - PO ${po.poNumber}`,
               });
             }
             
-            // Credit: Lubumbashi Credit account (we owe Lubumbashi, who paid the supplier)
+            // Credit: Parent Credit account (we owe parent company, who paid the supplier)
             await db.insert(voucherEntries).values({
               voucherId: voucher.id,
               ledgerAccountId: creditAccount[0].id,
               debitAmount: "0",
               creditAmount: poTotal.toFixed(2),
-              narration: `PO ${po.poNumber} - Container ${container.containerNumber} (Lubumbashi paid)`,
+              narration: `PO ${po.poNumber} - Container ${container.containerNumber} (${parentCompany.name} paid)`,
             });
             
             // ============================================================
-            // LUBUMBASHI VOUCHER - Record receivable from subsidiary + supplier payable
+            // PARENT COMPANY VOUCHER - Record receivable from subsidiary + supplier payable
             // ============================================================
-            // Get or create "[Subsidiary] Credit" receivable account in Lubumbashi
+            // Get or create "[Subsidiary] Credit" receivable account in parent company
             const subsidiaryCode = company.name.toUpperCase().replace(/\s+/g, '_') + "_CREDIT";
             const subsidiaryName = company.name + " Credit";
             
@@ -26107,7 +26116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(ledgerAccounts)
               .where(
                 and(
-                  eq(ledgerAccounts.companyId, lubumbashiCompany.id),
+                  eq(ledgerAccounts.companyId, parentCompany.id),
                   eq(ledgerAccounts.code, subsidiaryCode),
                   isNull(ledgerAccounts.deletedAt)
                 )
@@ -26116,7 +26125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (!subsidiaryReceivableAccount.length) {
               const [newAccount] = await db.insert(ledgerAccounts).values({
-                companyId: lubumbashiCompany.id,
+                companyId: parentCompany.id,
                 code: subsidiaryCode,
                 name: subsidiaryName,
                 accountType: "Asset",
@@ -26127,11 +26136,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               subsidiaryReceivableAccount = [newAccount];
             }
             
-            // Create Journal voucher in Lubumbashi
-            const lubumbashiVoucherNumber = `INTERCO-LUB-${po.poNumber}-${Date.now()}`;
-            const [lubumbashiVoucher] = await db.insert(vouchers).values({
-              companyId: lubumbashiCompany.id,
-              voucherNumber: lubumbashiVoucherNumber,
+            // Create Journal voucher in parent company
+            const parentVoucherNumber = `INTERCO-PARENT-${po.poNumber}-${Date.now()}`;
+            const [parentVoucher] = await db.insert(vouchers).values({
+              companyId: parentCompany.id,
+              voucherNumber: parentVoucherNumber,
               voucherType: "Journal",
               voucherDate,
               description: `Inter-company credit for PO ${po.poNumber} - ${company.name}`,
@@ -26141,7 +26150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // DR [Subsidiary] Credit (they owe us)
             await db.insert(voucherEntries).values({
-              voucherId: lubumbashiVoucher.id,
+              voucherId: parentVoucher.id,
               ledgerAccountId: subsidiaryReceivableAccount[0].id,
               debitAmount: poTotal.toFixed(2),
               creditAmount: "0",
@@ -26151,7 +26160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // CR Supplier (we owe supplier)
             if (po.supplierId) {
               await db.insert(voucherEntries).values({
-                voucherId: lubumbashiVoucher.id,
+                voucherId: parentVoucher.id,
                 supplierId: po.supplierId,
                 debitAmount: "0",
                 creditAmount: poTotal.toFixed(2),
@@ -26170,7 +26179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const processedCompanyNames = companiesToProcess.map(c => c.name).join(", ");
-        const message = isParentCompany
+        const message = isParentCompanySelected
           ? `Fixed ${totalFixed} POs across ${companiesToProcess.length} subsidiaries: ${processedCompanyNames}`
           : `Fixed ${totalFixed} POs for ${selectedCompany.name}`;
         
@@ -26206,29 +26215,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Find all INTERCO vouchers for this company and delete them
+        // Get parent company from system settings
+        const parentCompanyId = await storage.getParentCompanyId();
         const allCompanies = await storage.getAllCompanies();
         const company = allCompanies.find(c => c.id === companyId);
-        const lubumbashiCompany = allCompanies.find(c => 
-          c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
-        );
+        
+        if (!parentCompanyId) {
+          return res.status(400).json({ 
+            message: "No parent company configured. Please set the 'Parent Company for Net Position' in Settings first." 
+          });
+        }
+        
+        const parentCompany = allCompanies.find(c => c.id === parentCompanyId);
         
         if (!company) {
           return res.status(400).json({ message: "Company not found." });
         }
         
-        if (!lubumbashiCompany) {
+        if (!parentCompany) {
           return res.status(400).json({ 
-            message: "Could not find a company with 'Lubumbashi' or 'HADI L'shi' in the name. Please ensure the parent company is named correctly." 
+            message: "Configured parent company not found. Please check your settings." 
           });
         }
         
         // Check if parent company is selected - if so, process ALL subsidiaries
-        const isParentCompany = company.id === lubumbashiCompany.id;
+        const isParentCompanySelected = company.id === parentCompany.id;
         
         // Determine which companies to process
-        const companiesToProcess = isParentCompany
-          ? allCompanies.filter(c => c.id !== lubumbashiCompany.id) // All subsidiaries
+        const companiesToProcess = isParentCompanySelected
+          ? allCompanies.filter(c => c.id !== parentCompany.id) // All subsidiaries
           : [company]; // Just the selected one
         
         let totalReversed = 0;
@@ -26255,29 +26270,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             details.push({ company: targetCompany.name, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
           }
           
-          // Also delete corresponding INTERCO-LUB vouchers in Lubumbashi for this subsidiary
-          if (lubumbashiCompany) {
-            const lubumbashiIntercoVouchers = await db
+          // Also delete corresponding INTERCO-PARENT vouchers in parent company for this subsidiary
+          if (parentCompany) {
+            const parentIntercoVouchers = await db
               .select()
               .from(vouchers)
               .where(
                 and(
-                  eq(vouchers.companyId, lubumbashiCompany.id),
-                  like(vouchers.voucherNumber, "INTERCO-LUB-%"),
+                  eq(vouchers.companyId, parentCompany.id),
+                  or(
+                    like(vouchers.voucherNumber, "INTERCO-PARENT-%"),
+                    like(vouchers.voucherNumber, "INTERCO-LUB-%") // Also match old format
+                  ),
                   like(vouchers.description, `%${targetCompany.name}%`)
                 )
               );
             
-            for (const v of lubumbashiIntercoVouchers) {
+            for (const v of parentIntercoVouchers) {
               await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
               await db.delete(vouchers).where(eq(vouchers.id, v.id));
               totalReversed++;
-              details.push({ company: `${lubumbashiCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+              details.push({ company: `${parentCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
             }
           }
         }
         
-        const message = isParentCompany
+        const message = isParentCompanySelected
           ? `Reversed ${totalReversed} inter-company vouchers across ${companiesToProcess.length} subsidiaries`
           : `Reversed ${totalReversed} inter-company vouchers for ${company.name}`;
         

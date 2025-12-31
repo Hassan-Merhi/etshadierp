@@ -1389,8 +1389,8 @@ export class DbStorage implements IStorage {
     // ============================================================
     // INTER-COMPANY CREDIT ACCOUNTING
     // Create purchase vouchers when PO is imported, not when offloaded
-    // For non-Lubumbashi: DR Purchases CR Lubumbashi Credit (subsidiary) + DR [Subsidiary] Credit CR Supplier (Lubumbashi)
-    // For Lubumbashi: DR Purchases CR Supplier
+    // For subsidiaries: DR Purchases CR [Parent] Credit (subsidiary) + DR [Subsidiary] Credit CR Supplier (parent)
+    // For parent company: DR Purchases CR Supplier
     // 
     // IMPORTANT: Skip voucher creation if voucherId is already provided!
     // This happens when the PO import route (routes.ts) already creates vouchers.
@@ -1413,11 +1413,10 @@ export class DbStorage implements IStorage {
     const poTotal = poItemsTotal + poChargesAmount;
     
     if (poTotal > 0 && po.companyId) {
-      // Find Lubumbashi company
+      // Get parent company from system settings (not hardcoded name)
+      const parentCompanyId = await this.getParentCompanyId();
       const allCompanies = await db.select().from(schema.companies);
-      const lubumbashiCompany = allCompanies.find(c => 
-        c.name.toLowerCase().includes("lubumbashi") || c.name.toLowerCase().includes("hadi l'shi")
-      );
+      const parentCompany = parentCompanyId ? allCompanies.find(c => c.id === parentCompanyId) : null;
       const currentCompany = allCompanies.find(c => c.id === po.companyId);
       
       // Get or create PURCHASES ledger account for this company
@@ -1447,38 +1446,41 @@ export class DbStorage implements IStorage {
       
       const voucherDate = new Date().toISOString().split('T')[0];
       
-      if (lubumbashiCompany && po.companyId !== lubumbashiCompany.id) {
+      if (parentCompany && po.companyId !== parentCompany.id) {
         // ============================================================
-        // NON-LUBUMBASHI COMPANY - Create TWO vouchers
-        // 1. In subsidiary: DR Purchases, CR Lubumbashi Credit
-        // 2. In Lubumbashi: DR [Subsidiary] Credit, CR Supplier
+        // SUBSIDIARY COMPANY - Create TWO vouchers
+        // 1. In subsidiary: DR Purchases, CR [Parent] Credit
+        // 2. In Parent: DR [Subsidiary] Credit, CR Supplier
         // ============================================================
         
         // --- SUBSIDIARY VOUCHER ---
-        // Get or create "Lubumbashi Credit" liability account in subsidiary
-        let lubumbashiCreditAccount = await db
+        // Get or create "[Parent] Credit" liability account in subsidiary
+        const parentCreditCode = parentCompany.name.toUpperCase().replace(/\s+/g, '_') + "_CREDIT";
+        const parentCreditName = parentCompany.name + " Credit";
+        
+        let parentCreditAccount = await db
           .select()
           .from(schema.ledgerAccounts)
           .where(
             and(
               eq(schema.ledgerAccounts.companyId, po.companyId),
-              eq(schema.ledgerAccounts.code, "LUBUMBASHI_CREDIT"),
+              eq(schema.ledgerAccounts.code, parentCreditCode),
               isNull(schema.ledgerAccounts.deletedAt)
             )
           )
           .limit(1);
         
-        if (!lubumbashiCreditAccount.length) {
+        if (!parentCreditAccount.length) {
           const [newAccount] = await db.insert(schema.ledgerAccounts).values({
             companyId: po.companyId,
-            code: "LUBUMBASHI_CREDIT",
-            name: "Lubumbashi Credit",
+            code: parentCreditCode,
+            name: parentCreditName,
             accountType: "Liability",
             subType: "Current Liability",
             openingBalance: "0",
             openingBalanceSide: "Cr",
           }).returning();
-          lubumbashiCreditAccount = [newAccount];
+          parentCreditAccount = [newAccount];
         }
         
         // Create Purchase voucher in subsidiary
@@ -1488,7 +1490,7 @@ export class DbStorage implements IStorage {
           voucherNumber: subsidiaryVoucherNumber,
           voucherType: "Purchase",
           voucherDate,
-          description: `Purchase for PO ${created.poNumber} (Lubumbashi paid supplier)`,
+          description: `Purchase for PO ${created.poNumber} (${parentCompany.name} paid supplier)`,
           totalAmount: poTotal.toFixed(2),
           optional: false,
         }).returning();
@@ -1502,13 +1504,13 @@ export class DbStorage implements IStorage {
           narration: `PO ${created.poNumber} - Purchases`,
         });
         
-        // CR Lubumbashi Credit (we owe Lubumbashi)
+        // CR [Parent] Credit (we owe parent company)
         await db.insert(schema.voucherEntries).values({
           voucherId: subsidiaryVoucher.id,
-          ledgerAccountId: lubumbashiCreditAccount[0].id,
+          ledgerAccountId: parentCreditAccount[0].id,
           debitAmount: "0",
           creditAmount: poTotal.toFixed(2),
-          narration: `PO ${created.poNumber} - Lubumbashi paid supplier`,
+          narration: `PO ${created.poNumber} - ${parentCompany.name} paid supplier`,
         });
         
         // Update PO with voucher reference
@@ -1516,8 +1518,8 @@ export class DbStorage implements IStorage {
           .set({ voucherId: subsidiaryVoucher.id })
           .where(eq(schema.purchaseOrders.id, created.id));
         
-        // --- LUBUMBASHI VOUCHER ---
-        // Get or create "[Subsidiary] Credit" receivable account in Lubumbashi
+        // --- PARENT COMPANY VOUCHER ---
+        // Get or create "[Subsidiary] Credit" receivable account in parent company
         const subsidiaryCode = currentCompany?.name?.toUpperCase().replace(/\s+/g, '_') + "_CREDIT" || "SUBSIDIARY_CREDIT";
         const subsidiaryName = (currentCompany?.name || "Subsidiary") + " Credit";
         
@@ -1526,7 +1528,7 @@ export class DbStorage implements IStorage {
           .from(schema.ledgerAccounts)
           .where(
             and(
-              eq(schema.ledgerAccounts.companyId, lubumbashiCompany.id),
+              eq(schema.ledgerAccounts.companyId, parentCompany.id),
               eq(schema.ledgerAccounts.code, subsidiaryCode),
               isNull(schema.ledgerAccounts.deletedAt)
             )
@@ -1535,7 +1537,7 @@ export class DbStorage implements IStorage {
         
         if (!subsidiaryReceivableAccount.length) {
           const [newAccount] = await db.insert(schema.ledgerAccounts).values({
-            companyId: lubumbashiCompany.id,
+            companyId: parentCompany.id,
             code: subsidiaryCode,
             name: subsidiaryName,
             accountType: "Asset",
@@ -1546,11 +1548,11 @@ export class DbStorage implements IStorage {
           subsidiaryReceivableAccount = [newAccount];
         }
         
-        // Create Journal voucher in Lubumbashi
-        const lubumbashiVoucherNumber = `INTERCO-${created.poNumber}-${Date.now()}`;
-        const [lubumbashiVoucher] = await db.insert(schema.vouchers).values({
-          companyId: lubumbashiCompany.id,
-          voucherNumber: lubumbashiVoucherNumber,
+        // Create Journal voucher in parent company
+        const parentVoucherNumber = `INTERCO-PARENT-${created.poNumber}-${Date.now()}`;
+        const [parentVoucher] = await db.insert(schema.vouchers).values({
+          companyId: parentCompany.id,
+          voucherNumber: parentVoucherNumber,
           voucherType: "Journal",
           voucherDate,
           description: `Inter-company credit for PO ${created.poNumber} - ${currentCompany?.name || 'Subsidiary'}`,
@@ -1560,7 +1562,7 @@ export class DbStorage implements IStorage {
         
         // DR [Subsidiary] Credit (they owe us)
         await db.insert(schema.voucherEntries).values({
-          voucherId: lubumbashiVoucher.id,
+          voucherId: parentVoucher.id,
           ledgerAccountId: subsidiaryReceivableAccount[0].id,
           debitAmount: poTotal.toFixed(2),
           creditAmount: "0",
@@ -1570,7 +1572,7 @@ export class DbStorage implements IStorage {
         // CR Supplier (we owe supplier)
         if (po.supplierId) {
           await db.insert(schema.voucherEntries).values({
-            voucherId: lubumbashiVoucher.id,
+            voucherId: parentVoucher.id,
             supplierId: po.supplierId,
             debitAmount: "0",
             creditAmount: poTotal.toFixed(2),
@@ -1580,7 +1582,7 @@ export class DbStorage implements IStorage {
         
       } else {
         // ============================================================
-        // LUBUMBASHI COMPANY - Standard purchase voucher
+        // PARENT COMPANY (or no parent set) - Standard purchase voucher
         // DR Purchases, CR Supplier
         // ============================================================
         const voucherNumber = `PURCH-${created.poNumber}-${Date.now()}`;
