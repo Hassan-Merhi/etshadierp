@@ -47,6 +47,11 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - Cost only hits P&L when goods are sold (as COGS - Cost of Goods Sold)
     - This is consistent with how IMPORT_CHARGES accounts are handled
     - Result: Net Profit stays $0 when you have stock OTW balanced by a liability
+-   **Employee Deposit Accounting (Dec 2025)**: Employee deposits now correctly use PAYROLL_LIABILITIES (Liability) instead of SALARY_EXPENSE (Expense). This is correct because:
+    - Employee deposits represent earned wages that employees choose to leave with the company
+    - The salary expense was already recorded during payroll
+    - The deposit just moves liability from "wages owed" to "deposits held for employee"
+    - Result: Employee deposits no longer affect Net Profit (previously they incorrectly reduced it)
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).

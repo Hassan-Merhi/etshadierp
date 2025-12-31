@@ -2496,20 +2496,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Employee not found" });
         }
 
-        // Get or create SALARY_EXPENSE ledger account
+        // Get or create PAYROLL_LIABILITIES ledger account (Liability type - not Expense)
+        // This is used to move wages from "owed to employee" to "held for employee"
+        // so deposits don't affect Net Profit (expense was already recorded during payroll)
         const allAccounts = await storage.getAllLedgerAccounts(
           req.session.currentCompanyId,
         );
-        let salaryExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "SALARY_EXPENSE",
+        let payrollLiabilitiesAccount = allAccounts.find(
+          (a: any) => a.code === "PAYROLL_LIABILITIES",
         );
 
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
+        if (!payrollLiabilitiesAccount) {
+          payrollLiabilitiesAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId,
-            code: "SALARY_EXPENSE",
-            name: "Salary Expense",
-            accountType: "Expense",
+            code: "PAYROLL_LIABILITIES",
+            name: "Payroll Liabilities",
+            accountType: "Liability",
             openingBalance: "0",
             active: true,
           });
@@ -2533,10 +2535,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Create voucher entries (double-entry)
-        // Debit: Salary Expense
+        // Debit: Payroll Liabilities (reduces what we owe via wages payable)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: salaryExpenseAccount.id,
+          ledgerAccountId: payrollLiabilitiesAccount.id,
           debitAmount: depositAmount.toFixed(2),
           creditAmount: "0",
           narration: `Salary deposit - ${voucherNumber}`,
