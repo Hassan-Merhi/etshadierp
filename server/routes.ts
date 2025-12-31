@@ -2496,22 +2496,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Employee not found" });
         }
 
-        // Get or create PAYROLL_LIABILITIES ledger account (Liability type - not Expense)
-        // This is used to move wages from "owed to employee" to "held for employee"
-        // so deposits don't affect Net Profit (expense was already recorded during payroll)
+        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
+        // This is used when employee deposits wages during payroll - it IS an expense
+        // because the deposit happens at payroll time as part of paying the employee
         const allAccounts = await storage.getAllLedgerAccounts(
           req.session.currentCompanyId,
         );
-        let payrollLiabilitiesAccount = allAccounts.find(
-          (a: any) => a.code === "PAYROLL_LIABILITIES",
+        let payrollDepositExpenseAccount = allAccounts.find(
+          (a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE",
         );
 
-        if (!payrollLiabilitiesAccount) {
-          payrollLiabilitiesAccount = await storage.createLedgerAccount({
+        if (!payrollDepositExpenseAccount) {
+          payrollDepositExpenseAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId,
-            code: "PAYROLL_LIABILITIES",
-            name: "Payroll Liabilities",
-            accountType: "Liability",
+            code: "PAYROLL_DEPOSIT_EXPENSE",
+            name: "Payroll Deposit Expense",
+            accountType: "Indirect Expense",
             openingBalance: "0",
             active: true,
           });
@@ -2535,10 +2535,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
 
         // Create voucher entries (double-entry)
-        // Debit: Payroll Liabilities (reduces what we owe via wages payable)
+        // Debit: Payroll Deposit Expense (this IS an expense - affects Net Profit)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: payrollLiabilitiesAccount.id,
+          ledgerAccountId: payrollDepositExpenseAccount.id,
           debitAmount: depositAmount.toFixed(2),
           creditAmount: "0",
           narration: `Salary deposit - ${voucherNumber}`,
@@ -2612,20 +2612,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Get or create SALARY_EXPENSE ledger account
+        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
+        // This is used when employee deposits wages during payroll - it IS an expense
+        // because the deposit happens at payroll time as part of paying the employee
         const allAccounts = await storage.getAllLedgerAccounts(
           req.session.currentCompanyId,
         );
-        let salaryExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "SALARY_EXPENSE",
+        let payrollDepositExpenseAccount = allAccounts.find(
+          (a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE",
         );
 
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
+        if (!payrollDepositExpenseAccount) {
+          payrollDepositExpenseAccount = await storage.createLedgerAccount({
             companyId: req.session.currentCompanyId,
-            code: "SALARY_EXPENSE",
-            name: "Salary Expense",
-            accountType: "Expense",
+            code: "PAYROLL_DEPOSIT_EXPENSE",
+            name: "Payroll Deposit Expense",
+            accountType: "Indirect Expense",
             openingBalance: "0",
             active: true,
           });
@@ -2653,10 +2655,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .returning();
 
-        // Create debit entry for total salary expense
+        // Create debit entry for payroll deposit expense (this IS an expense - affects Net Profit)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: salaryExpenseAccount.id,
+          ledgerAccountId: payrollDepositExpenseAccount.id,
           debitAmount: totalAmount.toFixed(2),
           creditAmount: "0",
           narration: `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`,
@@ -17978,7 +17980,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stockOnFloorValue +         // Asset - inventory at cost (includes offload charges capitalized)
         assetBalance +              // Asset accounts (properties, guarantees, receivables)
         // directExpenseBalance is EXCLUDED - already capitalized into stockOnFloorValue
-        indirectExpenseBalance +    // Expense (debit) - operating expenses
+        indirectExpenseBalance +    // Expense (debit) - operating expenses (includes PAYROLL_DEPOSIT_EXPENSE)
+        payrollExpenseBalance +     // Payroll/Salary expenses (Expense type) - worker salaries in import cycle
         governmentTaxesBalance +    // Government Taxes (expense)
         cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
         salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees

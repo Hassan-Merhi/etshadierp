@@ -47,11 +47,13 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - Cost only hits P&L when goods are sold (as COGS - Cost of Goods Sold)
     - This is consistent with how IMPORT_CHARGES accounts are handled
     - Result: Net Profit stays $0 when you have stock OTW balanced by a liability
--   **Employee Deposit Accounting (Dec 2025)**: Employee deposits now correctly use PAYROLL_LIABILITIES (Liability) instead of SALARY_EXPENSE (Expense). This is correct because:
-    - Employee deposits represent earned wages that employees choose to leave with the company
-    - The salary expense was already recorded during payroll
-    - The deposit just moves liability from "wages owed" to "deposits held for employee"
-    - Result: Employee deposits no longer affect Net Profit (previously they incorrectly reduced it)
+-   **Employee Deposit Accounting (Dec 2025)**: Employee deposits use PAYROLL_DEPOSIT_EXPENSE (Indirect Expense) because deposit and payroll are the same event:
+    - When an employee receives wages and deposits part with the company, it happens during payroll as ONE event
+    - Entry: DR PAYROLL_DEPOSIT_EXPENSE (Expense), CR Employee Balance (Liability)
+    - This correctly hits Net Profit once (at deposit/payroll time)
+    - Withdrawals just reduce the liability (DR Employee Balance, CR Cash) - no Net Profit impact
+    - PAYROLL_DEPOSIT_EXPENSE is included in Import Cycle Balance via indirectExpenseBalance
+    - Regular SALARY_EXPENSE (for workers with salary/payroll/wage in account name) is also now included in Import Cycle Balance via payrollExpenseBalance
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).
