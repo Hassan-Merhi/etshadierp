@@ -16966,9 +16966,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
       }
 
-      // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
-      // Containers in transit are not yet assets - they become assets only when offloaded
-      // At that point, they increase inventory (asset) and create supplier/agent liabilities
+      // Add Stock OTW (containers pending offload) - this IS an asset
+      // When PO is imported, the system creates: DR Purchases, CR Parent Credit
+      // Since Purchases is excluded from expenses, Stock OTW must be added as asset to balance the liability
+      const otwContainers = await db
+        .select({
+          grandTotal: containers.grandTotal,
+        })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+      const stockOtwValue = otwContainers.reduce((sum, container) => {
+        return sum + parseFloat(container.grandTotal || "0");
+      }, 0);
+      
+      if (stockOtwValue > 0) {
+        forUsTotal += stockOtwValue;
+        categoryTotals["asset_Stock OTW"] = stockOtwValue;
+        forUsAccounts.push({ name: "Stock On The Way (OTW)", code: "COMPUTED", value: stockOtwValue, category: "Inventory OTW" });
+      }
 
       // Add Workers/Payroll - employee balances (what we owe them)
       const companyEmployees = await db
