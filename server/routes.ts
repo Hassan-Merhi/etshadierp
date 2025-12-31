@@ -10765,21 +10765,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
           };
         }),
-        // Suppliers (balance already calculated across all companies)
+        // Suppliers (only show suppliers with transactions in this company)
         // Negate balance so positive (we owe them) shows as credit in sidebar
-        ...suppliers.map((supplier) => {
-          const rawBalance = supplierBalances.get(supplier.id) || 0;
-          // Negate: positive payable becomes negative (shown as credit in sidebar)
-          const balance = -rawBalance;
+        ...suppliers
+          .filter((supplier) => supplierBalances.has(supplier.id))
+          .map((supplier) => {
+            const rawBalance = supplierBalances.get(supplier.id) || 0;
+            // Negate: positive payable becomes negative (shown as credit in sidebar)
+            const balance = -rawBalance;
 
-          return {
-            id: supplier.id,
-            type: "supplier",
-            name: supplier.legalName,
-            code: supplier.code,
-            balance,
-          };
-        }),
+            return {
+              id: supplier.id,
+              type: "supplier",
+              name: supplier.legalName,
+              code: supplier.code,
+              balance,
+            };
+          }),
         // Employees
         ...employeesData.map((employee) => {
           const balance = parseFloat(employee.currentBalance || "0");
