@@ -10656,6 +10656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();
       const bankBalances = new Map<number, { debits: number; credits: number }>();
       const assetBalances = new Map<number, { debits: number; credits: number }>();
+      const supplierBalances = new Map<number, number>();
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -10684,28 +10685,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             credits: existing.credits + credit,
           });
         }
-      }
-      
-      // For suppliers, calculate balance across ALL companies (matching /api/suppliers/stats)
-      const supplierBalances = new Map<number, number>();
-      for (const supplier of suppliers) {
-        const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
-        const openingBalance = parseFloat(supplier.openingBalance || "0");
-        
-        const balance = entries.reduce((sum, entry) => {
-          const credit = parseFloat(entry.creditAmount || "0");
-          const debit = parseFloat(entry.debitAmount || "0");
-          
+
+        if (entry.supplierId) {
+          const existing = supplierBalances.get(entry.supplierId) || 0;
           // Only count pure credit or pure debit entries to prevent double-counting
           if (credit > 0 && debit === 0) {
-            return sum + credit; // Increase payable
+            supplierBalances.set(entry.supplierId, existing + credit); // Increase payable
           } else if (debit > 0 && credit === 0) {
-            return sum - debit; // Decrease payable
+            supplierBalances.set(entry.supplierId, existing - debit); // Decrease payable
           }
-          return sum;
-        }, openingBalance);
-        
-        supplierBalances.set(supplier.id, balance);
+        }
+      }
+
+      // Add opening balances for suppliers that have entries in this company
+      // But don't add opening balances for suppliers with no entries (that would double-count)
+      for (const supplier of suppliers) {
+        if (!supplierBalances.has(supplier.id)) {
+          // Only include suppliers with transactions in this company's vouchers
+          continue;
+        }
+        const currentBalance = supplierBalances.get(supplier.id) || 0;
+        const openingBalance = parseFloat(supplier.openingBalance || "0");
+        supplierBalances.set(supplier.id, currentBalance + openingBalance);
       }
 
       // Helper function to calculate signed balance (positive = Dr, negative = Cr)
