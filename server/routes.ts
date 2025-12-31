@@ -10697,17 +10697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Add opening balances for suppliers that have entries in this company
-      // But don't add opening balances for suppliers with no entries (that would double-count)
-      for (const supplier of suppliers) {
-        if (!supplierBalances.has(supplier.id)) {
-          // Only include suppliers with transactions in this company's vouchers
-          continue;
-        }
-        const currentBalance = supplierBalances.get(supplier.id) || 0;
-        const openingBalance = parseFloat(supplier.openingBalance || "0");
-        supplierBalances.set(supplier.id, currentBalance + openingBalance);
-      }
+      // DO NOT add opening balance for suppliers in sidebar calculation
+      // The sidebar should only show transactions from the current company
+      // Opening balance is a global property - it's already factored into the /api/suppliers/stats endpoint
+      // Here we just track movements within this company's vouchers
 
       // Helper function to calculate signed balance (positive = Dr, negative = Cr)
       const calculateSignedBalance = (
@@ -10765,23 +10758,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
           };
         }),
-        // Suppliers (only show suppliers with transactions in this company)
-        // Negate balance so positive (we owe them) shows as credit in sidebar
-        ...suppliers
-          .filter((supplier) => supplierBalances.has(supplier.id))
-          .map((supplier) => {
-            const rawBalance = supplierBalances.get(supplier.id) || 0;
-            // Negate: positive payable becomes negative (shown as credit in sidebar)
-            const balance = -rawBalance;
+        // Suppliers (show all suppliers globally, but only company-specific balances)
+        // Show transactions from current company only (don't add opening balance to avoid double-counting)
+        ...suppliers.map((supplier) => {
+          const transactionBalance = supplierBalances.get(supplier.id) || 0;
+          
+          // For sidebar: only show transaction balance from this company, not global opening balance
+          // This prevents double-counting when supplier is used in multiple companies
+          const rawBalance = transactionBalance;
+          
+          // Negate: positive payable becomes negative (shown as credit in sidebar)
+          const balance = -rawBalance;
 
-            return {
-              id: supplier.id,
-              type: "supplier",
-              name: supplier.legalName,
-              code: supplier.code,
-              balance,
-            };
-          }),
+          return {
+            id: supplier.id,
+            type: "supplier",
+            name: supplier.legalName,
+            code: supplier.code,
+            balance,
+          };
+        }),
         // Employees
         ...employeesData.map((employee) => {
           const balance = parseFloat(employee.currentBalance || "0");
