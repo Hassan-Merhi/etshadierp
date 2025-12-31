@@ -1391,7 +1391,15 @@ export class DbStorage implements IStorage {
     // Create purchase vouchers when PO is imported, not when offloaded
     // For non-Lubumbashi: DR Purchases CR Lubumbashi Credit (subsidiary) + DR [Subsidiary] Credit CR Supplier (Lubumbashi)
     // For Lubumbashi: DR Purchases CR Supplier
+    // 
+    // IMPORTANT: Skip voucher creation if voucherId is already provided!
+    // This happens when the PO import route (routes.ts) already creates vouchers.
     // ============================================================
+    
+    // Skip voucher creation if voucher was already created by the caller (e.g., PO import route)
+    if (po.voucherId) {
+      return created;
+    }
     
     // Calculate PO total: items + freight + other charges
     const poItemsTotal = parseFloat(po.itemsTotal || "0");
