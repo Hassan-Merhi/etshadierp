@@ -38,6 +38,7 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **Sign-based logic**: Positive balance = Asset (what we have), Negative balance = Liability (what we owe)
     - **Suppliers**: Only included for designated parent company (pays all suppliers). Subsidiaries use "[Parent] Credit" liability instead
     - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools. This setting is used for both Net Position calculations AND inter-company credit accounting.
+    - **Stock OTW**: Containers in transit (OTW status) are included as assets in Net Position - this correctly balances the Parent Credit liability created when a subsidiary imports a PO
     - **Dashboard**: Shows breakdown of Assets vs Liabilities with Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.
