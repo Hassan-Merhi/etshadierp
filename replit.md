@@ -41,6 +41,11 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - **Dashboard**: Shows breakdown of Assets vs Liabilities with Net Position calculation
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
 -   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.
+-   **P&L Accounting for Imports (Dec 2025)**: PURCHASES accounts are excluded from all P&L/expense calculations because:
+    - Purchases represent inventory cost (asset), not operating expense
+    - Cost only hits P&L when goods are sold (as COGS - Cost of Goods Sold)
+    - This is consistent with how IMPORT_CHARGES accounts are handled
+    - Result: Net Profit stays $0 when you have stock OTW balanced by a liability
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).

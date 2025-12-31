@@ -17412,10 +17412,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all expense-related ledger accounts
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
+      
+      // Find accounts to EXCLUDE from expenses:
+      // 1. IMPORT_CHARGES parent and children (import costs capitalized into inventory)
+      // 2. PURCHASES accounts (inventory cost, not expense until sold as COGS)
+      const importChargesParent = allAccounts.find(acc => acc.code === "IMPORT_CHARGES");
+      const excludedFromExpenses = new Set<number>();
+      
+      if (importChargesParent) {
+        excludedFromExpenses.add(importChargesParent.id);
+        // Also find all children of IMPORT_CHARGES
+        for (const acc of allAccounts) {
+          if (acc.parentId === importChargesParent.id) {
+            excludedFromExpenses.add(acc.id);
+          }
+        }
+      }
+      
+      // Exclude PURCHASES accounts - these are inventory costs, not expenses
+      for (const acc of allAccounts) {
+        if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
+          excludedFromExpenses.add(acc.id);
+        }
+      }
+      
       const expenseAccounts = allAccounts.filter(acc => 
-        acc.accountType === "Expense" ||
-        acc.accountType === "Direct Expense" ||
-        acc.accountType === "Indirect Expense"
+        (acc.accountType === "Expense" ||
+         acc.accountType === "Direct Expense" ||
+         acc.accountType === "Indirect Expense") &&
+        !excludedFromExpenses.has(acc.id)
       );
 
       // Get all non-optional vouchers for this company
