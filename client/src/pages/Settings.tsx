@@ -1,4 +1,4 @@
-  import { useState } from "react";
+  import { useState, Fragment } from "react";
   import { useForm } from "react-hook-form";
   import { zodResolver } from "@hookform/resolvers/zod";
   import { z } from "zod";
@@ -1235,8 +1235,8 @@
                   </TableHeader>
                   <TableBody>
                     {users.map((user: any) => (
-                      <>
-                        <TableRow key={user.id}>
+                      <Fragment key={user.id}>
+                        <TableRow>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -1381,7 +1381,7 @@
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     ))}
                   </TableBody>
                 </Table>
