@@ -26068,35 +26068,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // NOTE: po.voucherId is for the import voucher (DR Purchases, CR Supplier), NOT inter-company vouchers
             
             // Check for existing INTERCO vouchers in subsidiary
+            // Use both PO number AND container number to identify duplicates (same PO number can apply to multiple containers)
             const existingSubsidiaryVoucher = await db
               .select()
               .from(vouchers)
               .where(
                 and(
                   eq(vouchers.companyId, company.id),
-                  like(vouchers.voucherNumber, `INTERCO-${po.poNumber}%`)
+                  like(vouchers.voucherNumber, `INTERCO-%`),
+                  like(vouchers.description, `%${container.containerNumber}%`)
                 )
               )
               .limit(1);
             
             if (existingSubsidiaryVoucher.length > 0) {
-              continue; // Skip - already has credit entry in subsidiary
+              continue; // Skip - already has credit entry in subsidiary for this container
             }
             
-            // Check for existing INTERCO-PARENT vouchers in parent company
+            // Check for existing INTERCO-PARENT vouchers in parent company for this container
             const existingParentVoucher = await db
               .select()
               .from(vouchers)
               .where(
                 and(
                   eq(vouchers.companyId, parentCompany.id),
-                  like(vouchers.voucherNumber, `INTERCO-PARENT-${po.poNumber}%`)
+                  or(
+                    like(vouchers.voucherNumber, `INTERCO-PARENT-%`),
+                    like(vouchers.voucherNumber, `INTERCO-LUB-%`) // Legacy format
+                  ),
+                  like(vouchers.description, `%${container.containerNumber}%`)
                 )
               )
               .limit(1);
             
             if (existingParentVoucher.length > 0) {
-              continue; // Skip - already has credit entry in parent company
+              continue; // Skip - already has credit entry in parent company for this container
             }
             
             // Calculate PO total: items + freight + charges
@@ -26346,6 +26352,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Reverse PO credits error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ==========================================
+  // Reset Company Data (Admin only)
+  // Deletes Payment/Receipt/Journal vouchers for selected company
+  // ==========================================
+  
+  app.post(
+    "/api/admin/reset-company-data",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { companyId } = req.body;
+        
+        if (!companyId) {
+          return res.status(400).json({ message: "Please select a company to reset." });
+        }
+        
+        const company = await storage.getCompanyById(companyId);
+        if (!company) {
+          return res.status(400).json({ message: "Company not found." });
+        }
+        
+        // Define voucher types to DELETE (Payment, Receipt, Journal - excluding POS, Production, Consumption, Stock Transfer)
+        const voucherTypesToDelete = ["Payment", "Receipt", "Journal"];
+        
+        // Get all vouchers of these types for this company
+        const vouchersToDelete = await db
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              inArray(vouchers.voucherType, voucherTypesToDelete)
+            )
+          );
+        
+        let deletedVoucherCount = 0;
+        let deletedEntryCount = 0;
+        const details: Array<{ voucherType: string; voucherNumber: string; amount: string }> = [];
+        
+        // Delete voucher entries first, then vouchers (respecting foreign keys)
+        for (const v of vouchersToDelete) {
+          // Count entries for this voucher
+          const entries = await db
+            .select()
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, v.id));
+          
+          deletedEntryCount += entries.length;
+          
+          // Delete entries
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          
+          // Delete voucher
+          await db.delete(vouchers).where(eq(vouchers.id, v.id));
+          deletedVoucherCount++;
+          
+          details.push({
+            voucherType: v.voucherType,
+            voucherNumber: v.voucherNumber,
+            amount: v.totalAmount || "0"
+          });
+        }
+        
+        // Summary by type
+        const typeSummary = voucherTypesToDelete.map(type => ({
+          type,
+          count: details.filter(d => d.voucherType === type).length
+        }));
+        
+        res.json({
+          message: `Reset complete for ${company.name}. Deleted ${deletedVoucherCount} voucher(s) and ${deletedEntryCount} entries.`,
+          deletedVouchers: deletedVoucherCount,
+          deletedEntries: deletedEntryCount,
+          typeSummary,
+          preserved: ["Containers", "Container Offloads", "Inventory", "Locations", "Ledger Accounts", "POS Vouchers", "Production/Consumption/Stock Transfer Vouchers", "Purchase Orders"]
+        });
+      } catch (error: any) {
+        console.error("Reset company data error:", error);
         res.status(500).json({ message: error.message });
       }
     }

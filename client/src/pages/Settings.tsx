@@ -247,6 +247,9 @@
     const [selectedCompanyForFix, setSelectedCompanyForFix] = useState<string>("");
     const [selectedParentCompanyForFix, setSelectedParentCompanyForFix] = useState<string>("");
     const [reversePOCreditsResult, setReversePOCreditsResult] = useState<any>(null);
+    const [isResetDataDialogOpen, setIsResetDataDialogOpen] = useState(false);
+    const [resetDataResult, setResetDataResult] = useState<any>(null);
+    const [selectedCompanyForReset, setSelectedCompanyForReset] = useState<string>("");
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -684,6 +687,31 @@
           variant: "destructive",
         });
         setFixPOCreditsResult(null);
+      },
+    });
+
+    const resetCompanyDataMutation = useMutation({
+      mutationFn: async (companyId: number) => {
+        const res = await apiRequest("POST", "/api/admin/reset-company-data", { companyId });
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        setResetDataResult(data);
+        toast({
+          title: "Reset Complete",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      },
+      onError: (error: any) => {
+        console.error("Reset company data error:", error);
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
       },
     });
 
@@ -1610,6 +1638,38 @@
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <Trash2 className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-reset-company-title">Reset Company Data</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Delete Payment/Receipt/Journal vouchers for a company (keeps POS, inventory, containers, POs)
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setResetDataResult(null);
+                        setSelectedCompanyForReset("");
+                        setIsResetDataDialogOpen(true);
+                      }}
+                      disabled={resetCompanyDataMutation.isPending}
+                      data-testid="button-reset-company-data"
+                    >
+                      {resetCompanyDataMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Resetting...</>
+                      ) : (
+                        "Reset Data"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
                       <div className="p-3 bg-red-500/10 rounded-lg">
                         <Calculator className="h-6 w-6 text-red-500" />
                       </div>
@@ -2035,6 +2095,112 @@
                     {fixPOCreditsMutation.isPending ? "Processing..." : "Fix Credits"}
                   </AlertDialogAction>
                 </>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reset Company Data Dialog */}
+        <AlertDialog open={isResetDataDialogOpen} onOpenChange={(open) => {
+          setIsResetDataDialogOpen(open);
+          if (!open) {
+            setSelectedCompanyForReset("");
+            setResetDataResult(null);
+          }
+        }}>
+          <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Company Data</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!resetDataResult ? (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-md">
+                      <p className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                        Warning: This action permanently deletes data. This cannot be undone.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Select Company to Reset</label>
+                      <Select
+                        value={selectedCompanyForReset}
+                        onValueChange={setSelectedCompanyForReset}
+                      >
+                        <SelectTrigger className="mt-1" data-testid="select-company-for-reset">
+                          <SelectValue placeholder="Choose a company..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id.toString()}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-red-600 mb-2">Will be DELETED:</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          <li>• Payment vouchers</li>
+                          <li>• Receipt vouchers</li>
+                          <li>• Journal vouchers</li>
+                          <li>• Associated voucher entries</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-green-600 mb-2">Will be PRESERVED:</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          <li>• All containers & offloads</li>
+                          <li>• Inventory/stock balances</li>
+                          <li>• Locations & accounts</li>
+                          <li>• POS vouchers</li>
+                          <li>• Production/Consumption/Stock Transfer</li>
+                          <li>• Purchase Orders</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{resetDataResult.message}</div>
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded">
+                      <div>
+                        <span className="text-sm text-muted-foreground">Vouchers Deleted:</span>
+                        <span className="ml-2 font-medium">{resetDataResult.deletedVouchers}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-muted-foreground">Entries Deleted:</span>
+                        <span className="ml-2 font-medium">{resetDataResult.deletedEntries}</span>
+                      </div>
+                    </div>
+                    {resetDataResult.typeSummary && (
+                      <div className="text-sm space-y-1">
+                        <div className="font-medium">Breakdown by type:</div>
+                        {resetDataResult.typeSummary.map((ts: any) => (
+                          <div key={ts.type} className="flex justify-between text-muted-foreground">
+                            <span>{ts.type}:</span>
+                            <span>{ts.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel>Close</AlertDialogCancel>
+              {!resetDataResult && (
+                <Button
+                  variant="destructive"
+                  onClick={() => resetCompanyDataMutation.mutate(parseInt(selectedCompanyForReset))}
+                  disabled={resetCompanyDataMutation.isPending || !selectedCompanyForReset}
+                  data-testid="button-confirm-reset"
+                >
+                  {resetCompanyDataMutation.isPending ? "Resetting..." : "Reset Company Data"}
+                </Button>
               )}
             </AlertDialogFooter>
           </AlertDialogContent>
