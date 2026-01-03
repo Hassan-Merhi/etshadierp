@@ -245,6 +245,7 @@
     const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
     const [fixPOCreditsResult, setFixPOCreditsResult] = useState<any>(null);
     const [selectedCompanyForFix, setSelectedCompanyForFix] = useState<string>("");
+    const [selectedParentCompanyForFix, setSelectedParentCompanyForFix] = useState<string>("");
     const [reversePOCreditsResult, setReversePOCreditsResult] = useState<any>(null);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
@@ -662,8 +663,8 @@
     });
 
     const fixPOCreditsMutation = useMutation({
-      mutationFn: async (companyId: number) => {
-        const res = await apiRequest("POST", "/api/fix-old-po-credits", { companyId });
+      mutationFn: async ({ companyId, parentCompanyId }: { companyId: number; parentCompanyId: number }) => {
+        const res = await apiRequest("POST", "/api/fix-old-po-credits", { companyId, parentCompanyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -687,8 +688,8 @@
     });
 
     const reversePOCreditsMutation = useMutation({
-      mutationFn: async (companyId: number) => {
-        const res = await apiRequest("POST", "/api/reverse-po-credits", { companyId });
+      mutationFn: async ({ companyId, parentCompanyId }: { companyId: number; parentCompanyId: number }) => {
+        const res = await apiRequest("POST", "/api/reverse-po-credits", { companyId, parentCompanyId });
         return await res.json();
       },
       onSuccess: (data) => {
@@ -1866,6 +1867,7 @@
           setIsFixPOCreditsDialogOpen(open);
           if (!open) {
             setSelectedCompanyForFix("");
+            setSelectedParentCompanyForFix("");
             setFixPOCreditsResult(null);
             setReversePOCreditsResult(null);
           }
@@ -1876,47 +1878,62 @@
               <AlertDialogDescription asChild>
                 {!fixPOCreditsResult && !reversePOCreditsResult ? (
                   <div className="space-y-4">
-                    {(() => {
-                      const selectedCo = companies.find((c: any) => c.id.toString() === selectedCompanyForFix);
-                      const isParentSelected = selectedCo && (
-                        selectedCo.name.toLowerCase().includes("lubumbashi") || 
-                        selectedCo.name.toLowerCase().includes("hadi l'shi")
-                      );
-                      return (
-                        <>
-                          <p>
-                            <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
-                            <br />
-                            <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers.
-                          </p>
-                          <div className="pt-2">
-                            <label className="text-sm font-medium text-foreground">Select Company</label>
-                            <Select
-                              value={selectedCompanyForFix}
-                              onValueChange={setSelectedCompanyForFix}
-                            >
-                              <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
-                                <SelectValue placeholder="Choose a company..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {companies.map((company: any) => (
-                                  <SelectItem key={company.id} value={company.id.toString()}>
-                                    {company.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {isParentSelected && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
-                              <p className="text-sm text-blue-800 dark:text-blue-200">
-                                <strong>Parent company selected:</strong> This will process ALL subsidiary companies at once.
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
+                    <p>
+                      <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
+                      <br />
+                      <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Subsidiary Company (source)</label>
+                        <Select
+                          value={selectedCompanyForFix}
+                          onValueChange={setSelectedCompanyForFix}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
+                            <SelectValue placeholder="Choose subsidiary..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((c: any) => c.id.toString() !== selectedParentCompanyForFix)
+                              .map((company: any) => (
+                                <SelectItem key={company.id} value={company.id.toString()}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">The company whose POs need fixing</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Parent Company (receiver)</label>
+                        <Select
+                          value={selectedParentCompanyForFix}
+                          onValueChange={setSelectedParentCompanyForFix}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-parent-for-fix">
+                            <SelectValue placeholder="Choose parent..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((c: any) => c.id.toString() !== selectedCompanyForFix)
+                              .map((company: any) => (
+                                <SelectItem key={company.id} value={company.id.toString()}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">The company that paid suppliers</p>
+                      </div>
+                    </div>
+                    {selectedCompanyForFix && selectedParentCompanyForFix && (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          This will create credit entries for <strong>{companies.find((c: any) => c.id.toString() === selectedCompanyForFix)?.name}</strong> towards <strong>{companies.find((c: any) => c.id.toString() === selectedParentCompanyForFix)?.name}</strong>.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : fixPOCreditsResult ? (
                   <div className="space-y-4 mt-4">
@@ -1999,15 +2016,21 @@
                 <>
                   <Button
                     variant="destructive"
-                    onClick={() => reversePOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
-                    disabled={reversePOCreditsMutation.isPending || fixPOCreditsMutation.isPending || !selectedCompanyForFix}
+                    onClick={() => reversePOCreditsMutation.mutate({ 
+                      companyId: parseInt(selectedCompanyForFix), 
+                      parentCompanyId: parseInt(selectedParentCompanyForFix) 
+                    })}
+                    disabled={reversePOCreditsMutation.isPending || fixPOCreditsMutation.isPending || !selectedCompanyForFix || !selectedParentCompanyForFix}
                     data-testid="button-reverse-po-credits"
                   >
                     {reversePOCreditsMutation.isPending ? "Reversing..." : "Reverse Credits"}
                   </Button>
                   <AlertDialogAction
-                    onClick={() => fixPOCreditsMutation.mutate(parseInt(selectedCompanyForFix))}
-                    disabled={fixPOCreditsMutation.isPending || reversePOCreditsMutation.isPending || !selectedCompanyForFix}
+                    onClick={() => fixPOCreditsMutation.mutate({ 
+                      companyId: parseInt(selectedCompanyForFix), 
+                      parentCompanyId: parseInt(selectedParentCompanyForFix) 
+                    })}
+                    disabled={fixPOCreditsMutation.isPending || reversePOCreditsMutation.isPending || !selectedCompanyForFix || !selectedParentCompanyForFix}
                   >
                     {fixPOCreditsMutation.isPending ? "Processing..." : "Fix Credits"}
                   </AlertDialogAction>

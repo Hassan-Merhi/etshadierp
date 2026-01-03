@@ -25968,48 +25968,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole("Admin"),
     async (req, res) => {
       try {
-        const { companyId } = req.body;
+        const { companyId, parentCompanyId } = req.body;
         
         if (!companyId) {
           return res.status(400).json({ 
-            message: "Please select a company to process." 
+            message: "Please select a subsidiary company to process." 
           });
         }
-        
-        // Get the parent company from system settings (not hardcoded name)
-        const parentCompanyId = await storage.getParentCompanyId();
-        const allCompanies = await storage.getAllCompanies();
         
         if (!parentCompanyId) {
           return res.status(400).json({ 
-            message: "No parent company configured. Please set the 'Parent Company for Net Position' in Settings first." 
+            message: "Please select a parent company." 
           });
         }
+        
+        const allCompanies = await storage.getAllCompanies();
         
         const parentCompany = allCompanies.find(c => c.id === parentCompanyId);
         
         if (!parentCompany) {
           return res.status(400).json({ 
-            message: "Configured parent company not found. Please check your settings." 
+            message: "Selected parent company not found." 
           });
         }
         
-        // Find the selected company
+        // Find the selected subsidiary company
         const selectedCompany = allCompanies.find(c => c.id === companyId);
         
         if (!selectedCompany) {
           return res.status(400).json({ 
-            message: "Selected company not found." 
+            message: "Selected subsidiary company not found." 
           });
         }
         
-        // Check if parent company is selected - if so, process ALL subsidiaries
-        const isParentCompanySelected = selectedCompany.id === parentCompany.id;
+        if (selectedCompany.id === parentCompany.id) {
+          return res.status(400).json({ 
+            message: "Subsidiary and parent company cannot be the same." 
+          });
+        }
         
-        // Determine which companies to process
-        const companiesToProcess = isParentCompanySelected
-          ? allCompanies.filter(c => c.id !== parentCompany.id) // All subsidiaries
-          : [selectedCompany]; // Just the selected one
+        // Process only the selected subsidiary
+        const companiesToProcess = [selectedCompany];
         
         let totalFixed = 0;
         let totalAmount = 0;
@@ -26233,17 +26232,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        const processedCompanyNames = companiesToProcess.map(c => c.name).join(", ");
-        const message = isParentCompanySelected
-          ? `Fixed ${totalFixed} POs across ${companiesToProcess.length} subsidiaries: ${processedCompanyNames}`
-          : `Fixed ${totalFixed} POs for ${selectedCompany.name}`;
-        
         res.json({
-          message,
+          message: `Fixed ${totalFixed} POs for ${selectedCompany.name} (parent: ${parentCompany.name})`,
           fixed: totalFixed,
           totalAmount: totalAmount.toFixed(2),
           details,
-          processedCompanies: companiesToProcess.length
+          processedCompanies: 1
         });
       } catch (error: any) {
         console.error("Fix old PO credits error:", error);
@@ -26262,103 +26256,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireRole("Admin"),
     async (req, res) => {
       try {
-        const { companyId } = req.body;
+        const { companyId, parentCompanyId } = req.body;
         
         if (!companyId) {
           return res.status(400).json({ 
-            message: "Please select a company to reverse." 
+            message: "Please select a subsidiary company to reverse." 
           });
         }
-        
-        // Get parent company from system settings
-        const parentCompanyId = await storage.getParentCompanyId();
-        const allCompanies = await storage.getAllCompanies();
-        const company = allCompanies.find(c => c.id === companyId);
         
         if (!parentCompanyId) {
           return res.status(400).json({ 
-            message: "No parent company configured. Please set the 'Parent Company for Net Position' in Settings first." 
+            message: "Please select a parent company." 
           });
         }
         
+        const allCompanies = await storage.getAllCompanies();
+        const company = allCompanies.find(c => c.id === companyId);
         const parentCompany = allCompanies.find(c => c.id === parentCompanyId);
         
         if (!company) {
-          return res.status(400).json({ message: "Company not found." });
+          return res.status(400).json({ message: "Subsidiary company not found." });
         }
         
         if (!parentCompany) {
           return res.status(400).json({ 
-            message: "Configured parent company not found. Please check your settings." 
+            message: "Parent company not found." 
           });
         }
         
-        // Check if parent company is selected - if so, process ALL subsidiaries
-        const isParentCompanySelected = company.id === parentCompany.id;
+        if (company.id === parentCompany.id) {
+          return res.status(400).json({ 
+            message: "Subsidiary and parent company cannot be the same." 
+          });
+        }
         
-        // Determine which companies to process
-        const companiesToProcess = isParentCompanySelected
-          ? allCompanies.filter(c => c.id !== parentCompany.id) // All subsidiaries
-          : [company]; // Just the selected one
+        // Process only the selected subsidiary
+        const targetCompany = company;
         
         let totalReversed = 0;
         const details: Array<{ company: string; voucherNumber: string; amount: string }> = [];
         
-        for (const targetCompany of companiesToProcess) {
-          // Delete INTERCO vouchers in this company
-          const companyIntercoVouchers = await db
-            .select()
-            .from(vouchers)
-            .where(
-              and(
-                eq(vouchers.companyId, targetCompany.id),
-                like(vouchers.voucherNumber, "INTERCO-%")
-              )
-            );
-          
-          for (const v of companyIntercoVouchers) {
-            // Delete voucher entries first
-            await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-            // Delete voucher
-            await db.delete(vouchers).where(eq(vouchers.id, v.id));
-            totalReversed++;
-            details.push({ company: targetCompany.name, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
-          }
-          
-          // Also delete corresponding INTERCO-PARENT vouchers in parent company for this subsidiary
-          if (parentCompany) {
-            const parentIntercoVouchers = await db
-              .select()
-              .from(vouchers)
-              .where(
-                and(
-                  eq(vouchers.companyId, parentCompany.id),
-                  or(
-                    like(vouchers.voucherNumber, "INTERCO-PARENT-%"),
-                    like(vouchers.voucherNumber, "INTERCO-LUB-%") // Also match old format
-                  ),
-                  like(vouchers.description, `%${targetCompany.name}%`)
-                )
-              );
-            
-            for (const v of parentIntercoVouchers) {
-              await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-              await db.delete(vouchers).where(eq(vouchers.id, v.id));
-              totalReversed++;
-              details.push({ company: `${parentCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
-            }
-          }
+        // Delete INTERCO vouchers in this subsidiary company
+        const companyIntercoVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, targetCompany.id),
+              like(vouchers.voucherNumber, "INTERCO-%")
+            )
+          );
+        
+        for (const v of companyIntercoVouchers) {
+          // Delete voucher entries first
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          // Delete voucher
+          await db.delete(vouchers).where(eq(vouchers.id, v.id));
+          totalReversed++;
+          details.push({ company: targetCompany.name, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
         }
         
-        const message = isParentCompanySelected
-          ? `Reversed ${totalReversed} inter-company vouchers across ${companiesToProcess.length} subsidiaries`
-          : `Reversed ${totalReversed} inter-company vouchers for ${company.name}`;
+        // Also delete corresponding INTERCO-PARENT vouchers in parent company for this subsidiary
+        const parentIntercoVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, parentCompany.id),
+              or(
+                like(vouchers.voucherNumber, "INTERCO-PARENT-%"),
+                like(vouchers.voucherNumber, "INTERCO-LUB-%") // Also match old format
+              ),
+              like(vouchers.description, `%${targetCompany.name}%`)
+            )
+          );
+        
+        for (const v of parentIntercoVouchers) {
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          await db.delete(vouchers).where(eq(vouchers.id, v.id));
+          totalReversed++;
+          details.push({ company: `${parentCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
+        }
         
         res.json({
-          message,
+          message: `Reversed ${totalReversed} inter-company vouchers for ${company.name} (parent: ${parentCompany.name})`,
           reversed: totalReversed,
           details,
-          processedCompanies: companiesToProcess.length
+          processedCompanies: 1
         });
       } catch (error: any) {
         console.error("Reverse PO credits error:", error);
