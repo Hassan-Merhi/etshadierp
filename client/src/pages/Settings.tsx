@@ -235,7 +235,6 @@
     const [userToDelete, setUserToDelete] = useState<any>(null);
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
     const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
-    const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
     const [selectedAccountsToZero, setSelectedAccountsToZero] = useState<number[]>([]);
     const [editingRole, setEditingRole] = useState<any>(null);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -263,7 +262,7 @@
     // Query for ledger accounts for zero balance feature
     const { data: allLedgerAccounts = [] } = useQuery<any[]>({
       queryKey: ["/api/ledger-accounts", selectedCompany?.id],
-      enabled: !!selectedCompany && isZeroBalanceDialogOpen,
+      enabled: !!selectedCompany,
     });
   
     // Query for user company roles when a user is expanded
@@ -623,7 +622,6 @@
           description: `Opening balances zeroed for ${data.count} account(s)`,
         });
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-        setIsZeroBalanceDialogOpen(false);
         setSelectedAccountsToZero([]);
       },
       onError: (error: any) => {
@@ -874,6 +872,10 @@
             <TabsTrigger value="role-permissions" data-testid="tab-role-permissions">
               <Shield className="h-4 w-4 mr-2" />
               Role Permissions
+            </TabsTrigger>
+            <TabsTrigger value="zero-balances" data-testid="tab-zero-balances">
+              <Calculator className="h-4 w-4 mr-2" />
+              Zero Balances
             </TabsTrigger>
           </TabsList>
   
@@ -1606,32 +1608,6 @@
                   </div>
                 </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-red-500/10 rounded-lg">
-                        <Calculator className="h-6 w-6 text-red-500" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold" data-testid="text-zero-balances-title">Zero Account Balances</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Reset opening balances to zero for selected accounts (fresh start for new period)
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        setSelectedAccountsToZero([]);
-                        setIsZeroBalanceDialogOpen(true);
-                      }}
-                      disabled={!selectedCompany}
-                      data-testid="button-zero-balances"
-                    >
-                      Zero Balances
-                    </Button>
-                  </div>
-                </Card>
-
                 <Card className="p-6 md:col-span-2">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
@@ -1739,6 +1715,126 @@
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Zero Balances Tab */}
+          <TabsContent value="zero-balances" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">Zero Account Balances</h2>
+              </div>
+
+              <p className="text-muted-foreground">
+                Select accounts to zero their opening balances. This gives you a fresh start for a new period while keeping all historical vouchers intact.
+              </p>
+
+              {!selectedCompany ? (
+                <Card className="p-6">
+                  <p className="text-muted-foreground">Please select a company to view ledger accounts.</p>
+                </Card>
+              ) : (
+                <Card className="p-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-4">
+                        <Checkbox
+                          checked={allLedgerAccounts.filter((a: any) => parseFloat(a.openingBalance || "0") !== 0 && !a.deletedAt && a.active).length > 0 && 
+                            selectedAccountsToZero.length === allLedgerAccounts.filter((a: any) => parseFloat(a.openingBalance || "0") !== 0 && !a.deletedAt && a.active).length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedAccountsToZero(allLedgerAccounts.filter((a: any) => parseFloat(a.openingBalance || "0") !== 0 && !a.deletedAt && a.active).map((a: any) => a.id));
+                            } else {
+                              setSelectedAccountsToZero([]);
+                            }
+                          }}
+                          data-testid="checkbox-select-all-accounts"
+                        />
+                        <Label className="font-medium">Select All with Non-Zero Balances</Label>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge variant="outline">
+                          {selectedAccountsToZero.length} selected
+                        </Badge>
+                        <Button
+                          onClick={() => zeroBalancesMutation.mutate(selectedAccountsToZero)}
+                          disabled={zeroBalancesMutation.isPending || selectedAccountsToZero.length === 0}
+                          variant="destructive"
+                          data-testid="button-zero-selected"
+                        >
+                          {zeroBalancesMutation.isPending ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                          ) : (
+                            `Zero ${selectedAccountsToZero.length} Account(s)`
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {selectedAccountsToZero.length > 0 && (
+                      <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                        <p className="text-sm font-medium text-destructive">
+                          Warning: This will set the opening balance to $0.00 for {selectedAccountsToZero.length} account(s). This action cannot be easily undone.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="border rounded overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12"></TableHead>
+                            <TableHead>Account Name</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead className="text-right">Opening Balance</TableHead>
+                            <TableHead className="text-center">Side</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allLedgerAccounts
+                            .filter((account: any) => !account.deletedAt && account.active)
+                            .sort((a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name))
+                            .map((account: any) => {
+                              const balance = parseFloat(account.openingBalance || "0");
+                              const hasBalance = balance !== 0;
+                              return (
+                                <TableRow key={account.id} className={hasBalance ? "" : "opacity-50"}>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedAccountsToZero.includes(account.id)}
+                                      disabled={!hasBalance}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedAccountsToZero([...selectedAccountsToZero, account.id]);
+                                        } else {
+                                          setSelectedAccountsToZero(selectedAccountsToZero.filter(id => id !== account.id));
+                                        }
+                                      }}
+                                      data-testid={`checkbox-account-${account.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium">{account.name}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">
+                                      {account.accountType}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-right ${hasBalance ? "font-medium" : ""}`}>
+                                    {formatNumber(Math.abs(balance))}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {account.openingBalanceSide || "-"}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 </Card>
               )}
@@ -2013,132 +2109,6 @@
                   </AlertDialogAction>
                 </>
               )}
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Zero Account Balances Dialog */}
-        <AlertDialog open={isZeroBalanceDialogOpen} onOpenChange={(open) => {
-          setIsZeroBalanceDialogOpen(open);
-          if (!open) {
-            setSelectedAccountsToZero([]);
-          }
-        }}>
-          <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-red-500" />
-                Zero Account Balances
-              </AlertDialogTitle>
-              <AlertDialogDescription asChild>
-                <div className="space-y-4">
-                  <p>
-                    Select accounts to zero their opening balances. This gives you a fresh start for a new period while keeping all historical vouchers intact.
-                  </p>
-                  
-                  {!selectedCompany ? (
-                    <p className="text-destructive">Please select a company first.</p>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between border-b pb-2">
-                        <div className="flex items-center gap-4">
-                          <Checkbox
-                            checked={allLedgerAccounts.length > 0 && selectedAccountsToZero.length === allLedgerAccounts.filter((a: any) => parseFloat(a.openingBalance || "0") !== 0).length}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedAccountsToZero(allLedgerAccounts.filter((a: any) => parseFloat(a.openingBalance || "0") !== 0).map((a: any) => a.id));
-                              } else {
-                                setSelectedAccountsToZero([]);
-                              }
-                            }}
-                            data-testid="checkbox-select-all-accounts"
-                          />
-                          <Label className="font-medium">Select All with Non-Zero Balances</Label>
-                        </div>
-                        <Badge variant="outline">
-                          {selectedAccountsToZero.length} selected
-                        </Badge>
-                      </div>
-
-                      <div className="max-h-96 overflow-y-auto border rounded">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-12"></TableHead>
-                              <TableHead>Account Name</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead className="text-right">Opening Balance</TableHead>
-                              <TableHead className="text-center">Side</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {allLedgerAccounts
-                              .filter((account: any) => !account.deletedAt && account.active)
-                              .sort((a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name))
-                              .map((account: any) => {
-                                const balance = parseFloat(account.openingBalance || "0");
-                                const hasBalance = balance !== 0;
-                                return (
-                                  <TableRow key={account.id} className={hasBalance ? "" : "opacity-50"}>
-                                    <TableCell>
-                                      <Checkbox
-                                        checked={selectedAccountsToZero.includes(account.id)}
-                                        disabled={!hasBalance}
-                                        onCheckedChange={(checked) => {
-                                          if (checked) {
-                                            setSelectedAccountsToZero([...selectedAccountsToZero, account.id]);
-                                          } else {
-                                            setSelectedAccountsToZero(selectedAccountsToZero.filter(id => id !== account.id));
-                                          }
-                                        }}
-                                        data-testid={`checkbox-account-${account.id}`}
-                                      />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{account.name}</TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="text-xs">
-                                        {account.accountType}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell className={`text-right ${hasBalance ? "font-medium" : ""}`}>
-                                      {formatNumber(Math.abs(balance))}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      {account.openingBalanceSide || "-"}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      {selectedAccountsToZero.length > 0 && (
-                        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                          <p className="text-sm font-medium text-destructive">
-                            Warning: This will set the opening balance to $0.00 for {selectedAccountsToZero.length} account(s). This action cannot be easily undone.
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-zero-balances">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => zeroBalancesMutation.mutate(selectedAccountsToZero)}
-                disabled={zeroBalancesMutation.isPending || selectedAccountsToZero.length === 0}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                data-testid="button-confirm-zero-balances"
-              >
-                {zeroBalancesMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
-                ) : (
-                  `Zero ${selectedAccountsToZero.length} Account(s)`
-                )}
-              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
