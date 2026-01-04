@@ -17994,9 +17994,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Opening Balance Equity = Credit side opening balances minus debit side
       // This represents the net capital/equity that balances the opening entries
       // When added to the liability side, it offsets the asset-side opening balances
-      const openingBalanceEquity = totalCrOpenings - totalDrOpenings;
+      let openingBalanceEquity = totalCrOpenings - totalDrOpenings;
       // Note: If openingBalanceEquity is negative, it means more assets than liabilities
       // were brought forward - this is normal (represents owner's equity)
+
+      // 22. Opening Stock Equity - stock items with opening values that weren't imported via PO
+      // These are set via "Import Opening Balances" in Stock Items and need implicit equity offset
+      const stockItemsWithOpening = await db
+        .select({
+          openingValue: stockItems.openingValue,
+        })
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            isNull(stockItems.deletedAt)
+          )
+        );
+      
+      const openingStockValue = stockItemsWithOpening.reduce((sum, item) => {
+        return sum + parseFloat(item.openingValue || "0");
+      }, 0);
+      
+      // Add opening stock value to the equity offset (it's an asset that needs balancing)
+      // This is subtracted from the liability side calculation (negative equity offset)
+      openingBalanceEquity -= openingStockValue;
 
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
@@ -18067,6 +18089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           incomeBalance,
           payrollLiabilitiesBalance,
           openingBalanceEquity,
+          openingStockValue,
         },
         netImportCycleBalance,
       }, null, 2));
@@ -18105,6 +18128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           salaryAdvancesBalance,
           payrollLiabilitiesBalance,
           openingBalanceEquity,
+          openingStockValue,
         }
       });
     } catch (error: any) {
