@@ -54,6 +54,7 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - Withdrawals just reduce the liability (DR Employee Balance, CR Cash) - no Net Profit impact
     - PAYROLL_DEPOSIT_EXPENSE is included in Import Cycle Balance via indirectExpenseBalance
     - Regular SALARY_EXPENSE (for workers with salary/payroll/wage in account name) is also now included in Import Cycle Balance via payrollExpenseBalance
+-   **Employee Opening Balance Fix (Jan 2026)**: Employee opening balances are now included in the implicit opening balance equity calculation. When importing payroll data from an old system with employee opening balances (liabilities owed to employees), these are now properly offset in the Import Cycle Balance to maintain $0 balance.
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).
