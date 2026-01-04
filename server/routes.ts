@@ -25887,8 +25887,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results: any[] = [];
 
-      // 1. Find orphaned salesItems (voucher doesn't exist or is deleted)
-      const orphanedSalesItems = await db
+      // 1. Find orphaned salesItems for THIS COMPANY (voucher is deleted but companyId matches)
+      // We only clean up items where we can verify the company to prevent cross-company data loss
+      const orphanedSalesItemsForCompany = await db
         .select({
           id: salesItems.id,
           voucherId: salesItems.voucherId,
@@ -25897,30 +25898,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalCost: salesItems.totalCost,
         })
         .from(salesItems)
-        .leftJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
         .where(
-          or(
-            isNull(vouchers.id),
+          and(
+            eq(vouchers.companyId, companyId),
             isNotNull(vouchers.deletedAt)
           )
         );
 
-      if (orphanedSalesItems.length > 0) {
+      // Also find completely orphaned salesItems (no voucher at all) - these are dangerous orphans
+      // Get all salesItem voucherIds that don't have corresponding vouchers
+      const allSalesItemVoucherIds = await db
+        .selectDistinct({ voucherId: salesItems.voucherId })
+        .from(salesItems);
+      
+      const existingVoucherIds = new Set(
+        (await db.select({ id: vouchers.id }).from(vouchers))
+          .map(v => v.id)
+      );
+      
+      const trulyOrphanedVoucherIds = allSalesItemVoucherIds
+        .filter(item => !existingVoucherIds.has(item.voucherId))
+        .map(item => item.voucherId);
+
+      let trulyOrphanedSalesItems: typeof orphanedSalesItemsForCompany = [];
+      if (trulyOrphanedVoucherIds.length > 0) {
+        trulyOrphanedSalesItems = await db
+          .select({
+            id: salesItems.id,
+            voucherId: salesItems.voucherId,
+            stockItemId: salesItems.stockItemId,
+            quantity: salesItems.quantity,
+            totalCost: salesItems.totalCost,
+          })
+          .from(salesItems)
+          .where(inArray(salesItems.voucherId, trulyOrphanedVoucherIds));
+      }
+
+      const allOrphanedSalesItems = [...orphanedSalesItemsForCompany, ...trulyOrphanedSalesItems];
+
+      if (allOrphanedSalesItems.length > 0) {
         results.push({
           type: "orphaned_sales_items",
-          count: orphanedSalesItems.length,
-          totalCost: orphanedSalesItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0),
-          details: orphanedSalesItems.slice(0, 10), // First 10 for display
+          count: allOrphanedSalesItems.length,
+          companyScoped: orphanedSalesItemsForCompany.length,
+          trulyOrphaned: trulyOrphanedSalesItems.length,
+          totalCost: allOrphanedSalesItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0),
+          details: allOrphanedSalesItems.slice(0, 10),
         });
 
         // Delete orphaned sales items
-        for (const item of orphanedSalesItems) {
+        for (const item of allOrphanedSalesItems) {
           await db.delete(salesItems).where(eq(salesItems.id, item.id));
         }
       }
 
-      // 2. Find orphaned voucherEntries (voucher doesn't exist or is deleted)
-      const orphanedEntries = await db
+      // 2. Find orphaned voucherEntries for THIS COMPANY (voucher is deleted but companyId matches)
+      const orphanedEntriesForCompany = await db
         .select({
           id: voucherEntries.id,
           voucherId: voucherEntries.voucherId,
@@ -25928,30 +25962,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           creditAmount: voucherEntries.creditAmount,
         })
         .from(voucherEntries)
-        .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(
           and(
-            or(
-              isNull(vouchers.id),
-              isNotNull(vouchers.deletedAt)
-            ),
-            eq(voucherEntries.voucherId, sql`${voucherEntries.voucherId}`) // Ensure we have a valid voucherId
+            eq(vouchers.companyId, companyId),
+            isNotNull(vouchers.deletedAt)
           )
         );
 
-      if (orphanedEntries.length > 0) {
-        const totalDebits = orphanedEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
-        const totalCredits = orphanedEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+      // Also find completely orphaned entries (no voucher at all)
+      const allEntryVoucherIds = await db
+        .selectDistinct({ voucherId: voucherEntries.voucherId })
+        .from(voucherEntries);
+      
+      const trulyOrphanedEntryVoucherIds = allEntryVoucherIds
+        .filter(item => item.voucherId && !existingVoucherIds.has(item.voucherId))
+        .map(item => item.voucherId);
+
+      let trulyOrphanedEntries: typeof orphanedEntriesForCompany = [];
+      if (trulyOrphanedEntryVoucherIds.length > 0) {
+        trulyOrphanedEntries = await db
+          .select({
+            id: voucherEntries.id,
+            voucherId: voucherEntries.voucherId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
+          .from(voucherEntries)
+          .where(inArray(voucherEntries.voucherId, trulyOrphanedEntryVoucherIds as number[]));
+      }
+
+      const allOrphanedEntries = [...orphanedEntriesForCompany, ...trulyOrphanedEntries];
+
+      if (allOrphanedEntries.length > 0) {
+        const totalDebits = allOrphanedEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
+        const totalCredits = allOrphanedEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
         
         results.push({
           type: "orphaned_voucher_entries",
-          count: orphanedEntries.length,
+          count: allOrphanedEntries.length,
+          companyScoped: orphanedEntriesForCompany.length,
+          trulyOrphaned: trulyOrphanedEntries.length,
           totalDebits,
           totalCredits,
         });
 
         // Delete orphaned entries
-        for (const entry of orphanedEntries) {
+        for (const entry of allOrphanedEntries) {
           await db.delete(voucherEntries).where(eq(voucherEntries.id, entry.id));
         }
       }
@@ -25982,7 +26039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
-        message: `Cleanup complete: Fixed ${orphanedSalesItems.length} orphaned sales items, ${orphanedEntries.length} orphaned entries. Found ${negativeInventory.length} negative inventory items.`,
+        message: `Cleanup complete: Fixed ${allOrphanedSalesItems.length} orphaned sales items, ${allOrphanedEntries.length} orphaned entries. Found ${negativeInventory.length} negative inventory items.`,
         results,
       });
     } catch (error: any) {
