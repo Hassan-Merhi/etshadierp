@@ -1021,7 +1021,8 @@ export class DbStorage implements IStorage {
     const [item] = await db.select().from(schema.stockItems).where(
       and(
         eq(schema.stockItems.code, code),
-        eq(schema.stockItems.companyId, companyId)
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
       )
     );
     return item;
@@ -1077,14 +1078,15 @@ export class DbStorage implements IStorage {
   }
 
   async getStockItemByCodeOrAlias(code: string, companyId: number): Promise<StockItem | undefined> {
-    // First check if it matches a primary code (case-insensitive)
+    // First check if it matches a primary code (case-insensitive) - exclude soft-deleted items
     const [directMatch] = await db
       .select()
       .from(schema.stockItems)
       .where(
         and(
           sql`LOWER(${schema.stockItems.code}) = LOWER(${code})`,
-          eq(schema.stockItems.companyId, companyId)
+          eq(schema.stockItems.companyId, companyId),
+          isNull(schema.stockItems.deletedAt)
         )
       )
       .limit(1);
@@ -1093,7 +1095,7 @@ export class DbStorage implements IStorage {
       return directMatch;
     }
 
-    // If not found, check if it matches any alias (case-insensitive)
+    // If not found, check if it matches any alias (case-insensitive) - exclude soft-deleted items
     const [aliasMatch] = await db
       .select({
         stockItem: schema.stockItems,
@@ -1107,7 +1109,8 @@ export class DbStorage implements IStorage {
         and(
           sql`LOWER(${schema.stockItemCodeAliases.aliasCode}) = LOWER(${code})`,
           eq(schema.stockItemCodeAliases.companyId, companyId),
-          eq(schema.stockItems.companyId, companyId)
+          eq(schema.stockItems.companyId, companyId),
+          isNull(schema.stockItems.deletedAt)
         )
       )
       .limit(1);

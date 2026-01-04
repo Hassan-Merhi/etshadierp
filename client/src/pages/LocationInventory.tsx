@@ -330,12 +330,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           errors.push(`Row ${rowNumber}: Item_barcode is required`);
         }
 
-        if (!row.quantity || parseFloat(row.quantity) <= 0) {
-          errors.push(`Row ${rowNumber}: Quantity must be greater than 0`);
+        // Allow negative quantities and rates for opening balances from old systems
+        if (row.quantity === undefined || row.quantity === null || row.quantity === "") {
+          errors.push(`Row ${rowNumber}: Quantity is required`);
         }
 
-        if (!row.rate || parseFloat(row.rate) <= 0) {
-          errors.push(`Row ${rowNumber}: Rate must be greater than 0`);
+        if (row.rate === undefined || row.rate === null || row.rate === "") {
+          errors.push(`Row ${rowNumber}: Rate is required`);
         }
 
         rows.push({
