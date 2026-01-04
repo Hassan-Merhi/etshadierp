@@ -884,6 +884,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick stock adjustment - manually add or subtract quantity at a location
+  app.post("/api/inventory/quick-adjust", requireAuth, async (req, res) => {
+    try {
+      const { stockItemId, locationId, quantity, type } = req.body;
+      
+      if (!stockItemId || !locationId || !quantity || !type) {
+        return res.status(400).json({ message: "Missing required fields: stockItemId, locationId, quantity, type" });
+      }
+      
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+      const qty = parseFloat(quantity);
+      
+      if (isNaN(qty) || qty <= 0) {
+        return res.status(400).json({ message: "Quantity must be a positive number" });
+      }
+      
+      if (type !== "add" && type !== "subtract") {
+        return res.status(400).json({ message: "Type must be 'add' or 'subtract'" });
+      }
+
+      // Verify location belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      if (location.companyId !== companyId) {
+        return res.status(403).json({ message: "Location belongs to a different company" });
+      }
+
+      // Verify stock item exists and belongs to current company
+      const stockItem = await storage.getStockItemById(stockItemId);
+      if (!stockItem) {
+        return res.status(404).json({ message: "Stock item not found" });
+      }
+      if (stockItem.companyId !== companyId) {
+        return res.status(403).json({ message: "Stock item belongs to a different company" });
+      }
+
+      // Get or create inventory record
+      const [existingInv] = await db
+        .select()
+        .from(inventory)
+        .where(
+          and(
+            eq(inventory.stockItemId, stockItemId),
+            eq(inventory.locationId, locationId)
+          )
+        )
+        .limit(1);
+
+      const currentQty = existingInv ? parseFloat(existingInv.quantity || "0") : 0;
+      const currentRate = existingInv ? parseFloat(existingInv.averageRate || "0") : 0;
+      
+      // Calculate new quantity
+      const adjustedQty = type === "add" ? qty : -qty;
+      const newQty = currentQty + adjustedQty;
+
+      // Prevent negative inventory
+      if (newQty < 0) {
+        return res.status(400).json({ 
+          message: `Cannot subtract ${qty} units. Only ${currentQty} units available at this location.`,
+          currentQuantity: currentQty,
+          requestedSubtraction: qty,
+        });
+      }
+
+      if (existingInv) {
+        // Update existing inventory
+        const newValue = newQty * currentRate;
+        await db
+          .update(inventory)
+          .set({
+            quantity: newQty.toString(),
+            totalValue: newValue.toString(),
+            lastUpdated: new Date(),
+          })
+          .where(eq(inventory.id, existingInv.id));
+      } else {
+        // Create new inventory record (only for add, not subtract from nothing)
+        if (type === "subtract") {
+          return res.status(400).json({ message: "Cannot subtract from non-existent inventory. Item not found at this location." });
+        }
+        await db.insert(inventory).values({
+          companyId,
+          locationId,
+          stockItemId,
+          quantity: qty.toString(),
+          averageRate: "0",
+          totalValue: "0",
+          lastUpdated: new Date(),
+        });
+      }
+
+      res.json({
+        message: `Successfully ${type === "add" ? "added" : "subtracted"} ${qty} units. New quantity: ${newQty}`,
+        previousQuantity: currentQty,
+        newQuantity: newQty,
+        adjustment: adjustedQty,
+      });
+    } catch (error: any) {
+      console.error("Quick adjust error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Update cost prices by barcode for a location
   app.post(
     "/api/locations/:locationId/import-cost-prices",
@@ -6589,7 +6698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   parentCreditAccountId = existingAccount.id;
                   
                   // Save to company settings for future use
-                  await storage.updateCompanySettings(currentCompanyId, {
+                  await storage.upsertCompanySettings(currentCompanyId, {
                     parentCreditAccountId: parentCreditAccountId,
                   });
                   console.log(`Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`);

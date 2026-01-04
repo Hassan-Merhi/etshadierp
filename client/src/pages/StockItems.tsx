@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download } from "lucide-react";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
@@ -22,9 +22,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
+
+interface Location {
+  id: number;
+  code: string;
+  name: string;
+}
 
 interface StockItem {
   id: number;
@@ -56,6 +78,13 @@ export default function StockItems() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  
+  // Manual stock adjustment dialog state
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [adjustStockItemId, setAdjustStockItemId] = useState<string>("");
+  const [adjustLocationId, setAdjustLocationId] = useState<string>("");
+  const [adjustQuantity, setAdjustQuantity] = useState<string>("");
+  const [adjustType, setAdjustType] = useState<"add" | "subtract">("add");
 
   const { toast } = useToast();
 
@@ -65,6 +94,10 @@ export default function StockItems() {
 
   const { data: stockGroups = [] } = useQuery<StockGroup[]>({
     queryKey: ["/api/stock-groups"],
+  });
+  
+  const { data: locations = [] } = useQuery<Location[]>({
+    queryKey: ["/api/locations"],
   });
 
   const deleteMutation = useMutation({
@@ -107,6 +140,58 @@ export default function StockItems() {
       });
     },
   });
+
+  const adjustStockMutation = useMutation({
+    mutationFn: async (data: { stockItemId: number; locationId: number; quantity: number; type: "add" | "subtract" }) => {
+      return await apiRequest("POST", "/api/inventory/quick-adjust", data);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      setAdjustDialogOpen(false);
+      setAdjustStockItemId("");
+      setAdjustLocationId("");
+      setAdjustQuantity("");
+      setAdjustType("add");
+      toast({
+        title: "Success",
+        description: data.message || "Stock adjusted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to adjust stock",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAdjustStock = () => {
+    if (!adjustStockItemId || !adjustLocationId || !adjustQuantity) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    const qty = parseFloat(adjustQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid quantity greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    adjustStockMutation.mutate({
+      stockItemId: parseInt(adjustStockItemId),
+      locationId: parseInt(adjustLocationId),
+      quantity: qty,
+      type: adjustType,
+    });
+  };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -234,6 +319,15 @@ export default function StockItems() {
           >
             <FileSpreadsheet className="h-4 w-4" />
             Import
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setAdjustDialogOpen(true)}
+            data-testid="button-adjust-stock"
+          >
+            <Edit className="h-4 w-4" />
+            Adjust Stock
           </Button>
           <Button 
             className="gap-2" 
@@ -424,6 +518,102 @@ export default function StockItems() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
+        <DialogContent data-testid="dialog-adjust-stock">
+          <DialogHeader>
+            <DialogTitle>Adjust Stock Manually</DialogTitle>
+            <DialogDescription>
+              Add or subtract quantity from a stock item at a specific location
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Stock Item</Label>
+              <Select value={adjustStockItemId} onValueChange={setAdjustStockItemId}>
+                <SelectTrigger data-testid="select-adjust-stock-item">
+                  <SelectValue placeholder="Select stock item..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {stockItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id.toString()}>
+                      {item.code} - {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Select value={adjustLocationId} onValueChange={setAdjustLocationId}>
+                <SelectTrigger data-testid="select-adjust-location">
+                  <SelectValue placeholder="Select location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id.toString()}>
+                      {loc.code} - {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Adjustment Type</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={adjustType === "add" ? "default" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setAdjustType("add")}
+                  data-testid="button-adjust-add"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Add (+)
+                </Button>
+                <Button
+                  type="button"
+                  variant={adjustType === "subtract" ? "destructive" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setAdjustType("subtract")}
+                  data-testid="button-adjust-subtract"
+                >
+                  <MinusCircle className="h-4 w-4" />
+                  Subtract (-)
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={adjustQuantity}
+                onChange={(e) => setAdjustQuantity(e.target.value)}
+                placeholder="Enter quantity..."
+                data-testid="input-adjust-quantity"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setAdjustDialogOpen(false)}
+              data-testid="button-adjust-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAdjustStock}
+              disabled={adjustStockMutation.isPending}
+              data-testid="button-adjust-confirm"
+            >
+              {adjustStockMutation.isPending ? "Adjusting..." : `${adjustType === "add" ? "Add" : "Subtract"} Stock`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
