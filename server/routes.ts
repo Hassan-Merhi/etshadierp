@@ -18413,6 +18413,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Include employee opening balances in the equity offset calculation
+      // Employee opening balances are liabilities (money owed to employees) - credit side
+      const employeeOpeningBalances = await db
+        .select({
+          openingBalance: employees.openingBalance,
+        })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            isNull(employees.deletedAt)
+          )
+        );
+      
+      const totalEmployeeOpeningBalance = employeeOpeningBalances.reduce((sum, emp) => {
+        return sum + parseFloat(emp.openingBalance || "0");
+      }, 0);
+      
+      // Add employee opening balances to the credit side (they're liabilities)
+      totalCrOpenings += totalEmployeeOpeningBalance;
+      
       // Opening Balance Equity = Credit side opening balances minus debit side
       // This represents the net capital/equity that balances the opening entries
       // When added to the liability side, it offsets the asset-side opening balances
