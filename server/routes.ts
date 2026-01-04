@@ -15233,14 +15233,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Bulk delete vouchers (Admin only)
+  // Bulk delete vouchers (Admin only) - uses same deletion logic as single delete
   app.post("/api/vouchers/bulk-delete", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
-      const { voucherIds } = req.body;
+      // Validate request body with Zod
+      const bodySchema = z.object({
+        voucherIds: z.array(z.union([z.number(), z.string()])).min(1, "At least one voucher ID required"),
+      });
       
-      if (!Array.isArray(voucherIds) || voucherIds.length === 0) {
-        return res.status(400).json({ message: "voucherIds must be a non-empty array" });
+      const parseResult = bodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: parseResult.error.errors[0].message });
       }
+      
+      const { voucherIds } = parseResult.data;
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -15250,9 +15256,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let deletedCount = 0;
       const errors: string[] = [];
 
-      // Process each voucher deletion
+      // Process each voucher deletion using the same logic as single delete
       for (const voucherId of voucherIds) {
-        const id = parseInt(voucherId);
+        const id = typeof voucherId === 'string' ? parseInt(voucherId) : voucherId;
         if (isNaN(id)) {
           errors.push(`Invalid voucher ID: ${voucherId}`);
           continue;
@@ -15271,20 +15277,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Delete in transaction - simplified version that handles common cases
+          // Use the same transaction-wrapped deletion logic as the single delete endpoint
           await db.transaction(async (tx) => {
-            // Handle POS Sales reversal (Receipt/Sales with salesItems)
-            if ((voucher.voucherType === "Receipt" || voucher.voucherType === "Sales") && !voucher.optional) {
-              const saleItems = await tx
+            // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
+            if ((voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") && !voucher.optional) {
+              const [transferVoucher] = await tx
                 .select()
-                .from(salesItems)
-                .where(eq(salesItems.voucherId, id));
+                .from(stockTransferVouchers)
+                .where(eq(stockTransferVouchers.voucherId, id))
+                .limit(1);
 
-              if (saleItems.length > 0 && voucher.locationId) {
-                // Add sold items back to inventory
-                for (const item of saleItems) {
+              if (transferVoucher) {
+                const transferItemsList = await tx
+                  .select()
+                  .from(stockTransferItems)
+                  .where(eq(stockTransferItems.transferId, transferVoucher.id));
+
+                for (const item of transferItemsList) {
                   const qty = parseFloat(item.quantity);
-                  const costPrice = parseFloat(item.costPrice || "0");
+                  const transferRate = parseFloat(item.rate);
+
+                  // Add back to source location
+                  const [sourceInv] = await tx
+                    .select()
+                    .from(inventory)
+                    .where(
+                      and(
+                        eq(inventory.stockItemId, item.stockItemId),
+                        eq(inventory.locationId, transferVoucher.sourceLocationId),
+                      ),
+                    )
+                    .limit(1);
+
+                  if (sourceInv) {
+                    const existingQty = parseFloat(sourceInv.quantity);
+                    const existingRate = parseFloat(sourceInv.averageRate || "0");
+                    const newQty = existingQty + qty;
+                    const newValue = newQty * existingRate;
+                    await tx.update(inventory).set({
+                      quantity: newQty.toString(),
+                      totalValue: newValue.toString(),
+                    }).where(eq(inventory.id, sourceInv.id));
+                  } else {
+                    await tx.insert(inventory).values({
+                      companyId: currentCompanyId,
+                      locationId: transferVoucher.sourceLocationId,
+                      stockItemId: item.stockItemId,
+                      quantity: qty.toString(),
+                      averageRate: transferRate.toString(),
+                      totalValue: (qty * transferRate).toString(),
+                    });
+                  }
+
+                  // Remove from destination location
+                  const [destInv] = await tx
+                    .select()
+                    .from(inventory)
+                    .where(
+                      and(
+                        eq(inventory.stockItemId, item.stockItemId),
+                        eq(inventory.locationId, transferVoucher.destinationLocationId),
+                      ),
+                    )
+                    .limit(1);
+
+                  if (destInv) {
+                    const existingQty = parseFloat(destInv.quantity);
+                    const existingValue = parseFloat(destInv.totalValue || "0");
+                    const newQty = existingQty - qty;
+                    if (newQty <= 0) {
+                      await tx.delete(inventory).where(eq(inventory.id, destInv.id));
+                    } else {
+                      const valueToRemove = qty * transferRate;
+                      let newValue = existingValue - valueToRemove;
+                      if (newValue < 0) newValue = 0;
+                      const newAvgRate = newQty > 0 && newValue > 0 ? newValue / newQty : 0;
+                      await tx.update(inventory).set({
+                        quantity: newQty.toString(),
+                        averageRate: newAvgRate.toString(),
+                        totalValue: newValue.toString(),
+                      }).where(eq(inventory.id, destInv.id));
+                    }
+                  }
+                }
+
+                await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferVoucher.id));
+                await tx.delete(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferVoucher.id));
+              }
+            }
+
+            // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption/Mixed) vouchers
+            if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") && !voucher.optional) {
+              const [adjustmentVoucher] = await tx
+                .select()
+                .from(stockAdjustmentVouchers)
+                .where(eq(stockAdjustmentVouchers.voucherId, id))
+                .limit(1);
+
+              if (adjustmentVoucher) {
+                const adjustmentItemsList = await tx
+                  .select()
+                  .from(stockAdjustmentItems)
+                  .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+                for (const item of adjustmentItemsList) {
+                  const qty = parseFloat(item.quantity);
+                  const adjustmentRate = parseFloat(item.rate);
+                  const absoluteQty = Math.abs(qty);
+                  const adjustmentValue = absoluteQty * adjustmentRate;
+                  const isProduction = adjustmentVoucher.adjustmentType === "Production" || 
+                                       (adjustmentVoucher.adjustmentType === "Mixed" && qty > 0);
 
                   const [inv] = await tx
                     .select()
@@ -15292,37 +15394,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     .where(
                       and(
                         eq(inventory.stockItemId, item.stockItemId),
-                        eq(inventory.locationId, voucher.locationId),
+                        eq(inventory.locationId, adjustmentVoucher.locationId),
                       ),
                     )
                     .limit(1);
 
-                  if (inv) {
-                    const existingQty = parseFloat(inv.quantity);
-                    const existingRate = parseFloat(inv.averageRate || "0");
-                    const newQty = existingQty + qty;
-                    const newValue = newQty * existingRate;
-
-                    await tx
-                      .update(inventory)
-                      .set({
+                  if (isProduction) {
+                    if (inv) {
+                      const existingQty = parseFloat(inv.quantity);
+                      const existingValue = parseFloat(inv.totalValue || "0");
+                      const newQty = existingQty - absoluteQty;
+                      if (newQty <= 0) {
+                        await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                      } else {
+                        let newValue = existingValue - adjustmentValue;
+                        if (newValue < 0) newValue = 0;
+                        const newRate = newQty > 0 && newValue > 0 ? newValue / newQty : 0;
+                        await tx.update(inventory).set({
+                          quantity: newQty.toString(),
+                          averageRate: newRate.toString(),
+                          totalValue: newValue.toString(),
+                        }).where(eq(inventory.id, inv.id));
+                      }
+                    }
+                  } else {
+                    if (inv) {
+                      const existingQty = parseFloat(inv.quantity);
+                      const existingRate = parseFloat(inv.averageRate || "0");
+                      const newQty = existingQty + absoluteQty;
+                      const newValue = newQty * existingRate;
+                      await tx.update(inventory).set({
                         quantity: newQty.toString(),
                         totalValue: newValue.toString(),
-                      })
-                      .where(eq(inventory.id, inv.id));
-                  } else {
-                    await tx.insert(inventory).values({
-                      companyId: currentCompanyId,
-                      locationId: voucher.locationId,
-                      stockItemId: item.stockItemId,
-                      quantity: qty.toString(),
-                      averageRate: costPrice.toString(),
-                      totalValue: (qty * costPrice).toString(),
-                    });
+                      }).where(eq(inventory.id, inv.id));
+                    } else {
+                      await tx.insert(inventory).values({
+                        companyId: currentCompanyId,
+                        locationId: adjustmentVoucher.locationId,
+                        stockItemId: item.stockItemId,
+                        quantity: absoluteQty.toString(),
+                        averageRate: adjustmentRate.toString(),
+                        totalValue: (absoluteQty * adjustmentRate).toString(),
+                      });
+                    }
                   }
                 }
 
-                // Delete sales items
+                await tx.delete(stockAdjustmentItems).where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+                await tx.delete(stockAdjustmentVouchers).where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
+              }
+            }
+
+            // IMPORTANT: Reverse inventory movements for POS Sales vouchers (Receipt/Sales with sales items)
+            if ((voucher.voucherType === "Receipt" || voucher.voucherType === "Sales") && !voucher.optional) {
+              const saleItems = await tx
+                .select()
+                .from(salesItems)
+                .where(eq(salesItems.voucherId, id));
+
+              if (saleItems.length > 0) {
+                // Only reverse inventory if we have a definite location from the voucher
+                if (voucher.locationId) {
+                  for (const item of saleItems) {
+                    const qty = parseFloat(item.quantity);
+                    const costPrice = parseFloat(item.costPrice || "0");
+
+                    const [inv] = await tx
+                      .select()
+                      .from(inventory)
+                      .where(
+                        and(
+                          eq(inventory.stockItemId, item.stockItemId),
+                          eq(inventory.locationId, voucher.locationId),
+                        ),
+                      )
+                      .limit(1);
+
+                    if (inv) {
+                      const existingQty = parseFloat(inv.quantity);
+                      const existingRate = parseFloat(inv.averageRate || "0");
+                      const newQty = existingQty + qty;
+                      const newValue = newQty * existingRate;
+                      await tx.update(inventory).set({
+                        quantity: newQty.toString(),
+                        totalValue: newValue.toString(),
+                      }).where(eq(inventory.id, inv.id));
+                    } else {
+                      await tx.insert(inventory).values({
+                        companyId: currentCompanyId,
+                        locationId: voucher.locationId,
+                        stockItemId: item.stockItemId,
+                        quantity: qty.toString(),
+                        averageRate: costPrice.toString(),
+                        totalValue: (qty * costPrice).toString(),
+                      });
+                    }
+                  }
+                }
+
+                // Delete sales items regardless of whether inventory was reversed
                 await tx.delete(salesItems).where(eq(salesItems.voucherId, id));
               }
             }
