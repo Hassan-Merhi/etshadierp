@@ -15018,6 +15018,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(eq(salesItems.voucherId, id));
 
             if (saleItems.length > 0) {
+              console.log(`[POS Delete] Voucher ${id}: Found ${saleItems.length} sale items to reverse`);
+              
               // Only reverse inventory if we have a definite location from the voucher
               // We don't guess the location to avoid restoring stock to the wrong place
               if (voucher.locationId) {
@@ -15026,6 +15028,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 for (const item of saleItems) {
                   const qty = parseFloat(item.quantity);
                   const costPrice = parseFloat(item.costPrice || "0");
+                  
+                  console.log(`[POS Delete] Restoring item ${item.stockItemId}: qty=${qty}, costPrice=${costPrice}`);
 
                   // Get inventory at target location
                   const [inv] = await tx
@@ -15046,6 +15050,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     const newQty = existingQty + qty;
                     // Keep the same rate - POS sale forward logic doesn't change it
                     const newValue = newQty * existingRate;
+                    
+                    console.log(`[POS Delete] Item ${item.stockItemId}: ${existingQty} + ${qty} = ${newQty} (rate: ${existingRate})`);
 
                     await tx
                       .update(inventory)
@@ -15055,6 +15061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       })
                       .where(eq(inventory.id, inv.id));
                   } else {
+                    console.log(`[POS Delete] Item ${item.stockItemId}: Creating new inventory record with qty=${qty}`);
                     // Create inventory record - use the costPrice as basis since no existing record
                     await tx.insert(inventory).values({
                       companyId: req.session.currentCompanyId!,
@@ -15068,10 +15075,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               } else {
                 // Log warning: can't reverse inventory without location
-                console.warn(`Voucher ${id} deletion: Cannot reverse inventory - no locationId on voucher`);
+                console.warn(`[POS Delete] Voucher ${id}: Cannot reverse inventory - no locationId on voucher`);
               }
 
               // Delete sales items regardless of whether inventory was reversed
+              console.log(`[POS Delete] Deleting ${saleItems.length} sales items for voucher ${id}`);
               await tx
                 .delete(salesItems)
                 .where(eq(salesItems.voucherId, id));
@@ -25862,6 +25870,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Cleanup complete: ${migrated} migrated, ${deleted} deleted, ${skipped} skipped`,
         results,
         summary: { migrated, deleted, skipped, total: results.length },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fix orphaned POS data that might be causing Import Cycle imbalance
+  // This finds sales items linked to deleted vouchers and cleans them up
+  app.post("/api/admin/fix-orphaned-pos-data", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const results: any[] = [];
+
+      // 1. Find orphaned salesItems (voucher doesn't exist or is deleted)
+      const orphanedSalesItems = await db
+        .select({
+          id: salesItems.id,
+          voucherId: salesItems.voucherId,
+          stockItemId: salesItems.stockItemId,
+          quantity: salesItems.quantity,
+          totalCost: salesItems.totalCost,
+        })
+        .from(salesItems)
+        .leftJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          or(
+            isNull(vouchers.id),
+            isNotNull(vouchers.deletedAt)
+          )
+        );
+
+      if (orphanedSalesItems.length > 0) {
+        results.push({
+          type: "orphaned_sales_items",
+          count: orphanedSalesItems.length,
+          totalCost: orphanedSalesItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0),
+          details: orphanedSalesItems.slice(0, 10), // First 10 for display
+        });
+
+        // Delete orphaned sales items
+        for (const item of orphanedSalesItems) {
+          await db.delete(salesItems).where(eq(salesItems.id, item.id));
+        }
+      }
+
+      // 2. Find orphaned voucherEntries (voucher doesn't exist or is deleted)
+      const orphanedEntries = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            or(
+              isNull(vouchers.id),
+              isNotNull(vouchers.deletedAt)
+            ),
+            eq(voucherEntries.voucherId, sql`${voucherEntries.voucherId}`) // Ensure we have a valid voucherId
+          )
+        );
+
+      if (orphanedEntries.length > 0) {
+        const totalDebits = orphanedEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
+        const totalCredits = orphanedEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+        
+        results.push({
+          type: "orphaned_voucher_entries",
+          count: orphanedEntries.length,
+          totalDebits,
+          totalCredits,
+        });
+
+        // Delete orphaned entries
+        for (const entry of orphanedEntries) {
+          await db.delete(voucherEntries).where(eq(voucherEntries.id, entry.id));
+        }
+      }
+
+      // 3. Check for negative inventory and log (don't fix automatically)
+      const negativeInventory = await db
+        .select({
+          id: inventory.id,
+          locationId: inventory.locationId,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+        })
+        .from(inventory)
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            sql`CAST(${inventory.quantity} AS DECIMAL) < 0`
+          )
+        );
+
+      if (negativeInventory.length > 0) {
+        results.push({
+          type: "negative_inventory",
+          count: negativeInventory.length,
+          warning: "These need manual review - might indicate overselling or data issues",
+          items: negativeInventory.slice(0, 10),
+        });
+      }
+
+      res.json({
+        message: `Cleanup complete: Fixed ${orphanedSalesItems.length} orphaned sales items, ${orphanedEntries.length} orphaned entries. Found ${negativeInventory.length} negative inventory items.`,
+        results,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

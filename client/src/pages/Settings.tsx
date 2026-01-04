@@ -1693,6 +1693,55 @@
                   </div>
                 </Card>
 
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-cyan-500/10 rounded-lg">
+                        <Trash2 className="h-6 w-6 text-cyan-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-orphaned-pos-title">Fix Orphaned POS Data</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Clean up orphaned sales items and voucher entries that may cause Import Cycle imbalance
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch("/api/admin/fix-orphaned-pos-data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            toast({
+                              title: "Cleanup Complete",
+                              description: result.message,
+                            });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: result.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid="button-fix-orphaned-pos"
+                    >
+                      Fix Orphaned
+                    </Button>
+                  </div>
+                </Card>
+
                 <Card className="p-6 md:col-span-2">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
