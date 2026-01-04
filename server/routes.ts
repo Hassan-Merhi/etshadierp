@@ -17954,6 +17954,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 20. Profit/Equity accounts (retained earnings - credit side)
       const profitBalance = await getAccountTypeBalance("Profit", true);
 
+      // 21. Opening Balance Equity - automatically balance opening entries
+      // When opening balances are added without matching entries (e.g., cash opening balance without 
+      // corresponding capital), this creates an imbalance. We calculate the net of all opening balances
+      // and treat the difference as implicit equity/capital that should be on the liability side.
+      const allLedgerAccounts = await db
+        .select({
+          openingBalance: ledgerAccounts.openingBalance,
+          openingBalanceSide: ledgerAccounts.openingBalanceSide,
+          accountType: ledgerAccounts.accountType,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      // Calculate net opening balance equity
+      // Dr opening balances = Assets brought forward (positive on asset side)
+      // Cr opening balances = Liabilities/Capital brought forward (positive on liability side)
+      // The difference (Dr - Cr) represents implicit equity that needs to offset
+      let totalDrOpenings = 0;
+      let totalCrOpenings = 0;
+      
+      for (const account of allLedgerAccounts) {
+        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+        if (openingBalanceRaw === 0) continue;
+        
+        const openingSide = account.openingBalanceSide || "Dr";
+        if (openingSide === "Dr") {
+          totalDrOpenings += openingBalanceRaw;
+        } else {
+          totalCrOpenings += openingBalanceRaw;
+        }
+      }
+      
+      // Opening Balance Equity = Credit side opening balances minus debit side
+      // This represents the net capital/equity that balances the opening entries
+      // When added to the liability side, it offsets the asset-side opening balances
+      const openingBalanceEquity = totalCrOpenings - totalDrOpenings;
+      // Note: If openingBalanceEquity is negative, it means more assets than liabilities
+      // were brought forward - this is normal (represents owner's equity)
+
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
       // Operating Expenses: Indirect Expenses + Government Taxes + COGS (but NOT directExpenseBalance)
@@ -17992,7 +18036,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         liabilityBalance +          // Other Liability accounts
         profitBalance +             // Profit/Equity (retained earnings)
         incomeBalance +             // Income (sales revenue - credit)
-        payrollLiabilitiesBalance); // Payroll Liabilities (what we owe employees)
+        payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
+        openingBalanceEquity);      // Opening Balance Equity (implicit capital from opening balances)
 
       // Log components for debugging
       console.log("Import Cycle Balance Components:", JSON.stringify({
@@ -18021,6 +18066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profitBalance,
           incomeBalance,
           payrollLiabilitiesBalance,
+          openingBalanceEquity,
         },
         netImportCycleBalance,
       }, null, 2));
@@ -18058,6 +18104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payrollExpenseBalance,
           salaryAdvancesBalance,
           payrollLiabilitiesBalance,
+          openingBalanceEquity,
         }
       });
     } catch (error: any) {
