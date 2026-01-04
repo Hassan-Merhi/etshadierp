@@ -134,6 +134,8 @@ export default function Accounts() {
   const [editSearchTerm, setEditSearchTerm] = useState("");
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
+  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   // Print functionality
   const printRef = useRef<HTMLDivElement>(null);
@@ -659,6 +661,59 @@ export default function Accounts() {
       });
     },
   });
+
+  const bulkDeleteVouchersMutation = useMutation({
+    mutationFn: async (voucherIds: number[]) => {
+      return await apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds });
+    },
+    onSuccess: (_, voucherIds) => {
+      toast({
+        title: "Success",
+        description: `Deleted ${voucherIds.length} voucher(s) successfully`,
+      });
+      setSelectedVoucherIds(new Set());
+      setShowBulkDeleteConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      if (selectedAccount) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/accounts/${selectedAccount.type.toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`] 
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete vouchers",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleVoucherSelection = (voucherId: number) => {
+    setSelectedVoucherIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(voucherId)) {
+        newSet.delete(voucherId);
+      } else {
+        newSet.add(voucherId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedVoucherIds.size === vouchersWithBalance.length) {
+      setSelectedVoucherIds(new Set());
+    } else {
+      setSelectedVoucherIds(new Set(vouchersWithBalance.map(v => v.voucherId)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedVoucherIds.size > 0) {
+      bulkDeleteVouchersMutation.mutate(Array.from(selectedVoucherIds));
+    }
+  };
 
   const handleDeleteAccount = () => {
     if (!accountToEdit) return;
@@ -1211,8 +1266,19 @@ export default function Accounts() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Ledger: {selectedAccount?.name}</CardTitle>
+              {selectedVoucherIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  data-testid="button-delete-selected"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Selected ({selectedVoucherIds.size})
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {transactionsLoading ? (
@@ -1240,6 +1306,13 @@ export default function Accounts() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/30">
+                          <TableHead className="w-[40px] py-2 print:hidden">
+                            <Checkbox
+                              checked={vouchersWithBalance.length > 0 && selectedVoucherIds.size === vouchersWithBalance.length}
+                              onCheckedChange={toggleSelectAll}
+                              data-testid="checkbox-select-all"
+                            />
+                          </TableHead>
                           <TableHead className="w-[100px] py-2">Date</TableHead>
                           <TableHead className="w-[100px] py-2">Type</TableHead>
                           <TableHead className="py-2">Particulars</TableHead>
@@ -1251,6 +1324,7 @@ export default function Accounts() {
                       <TableBody>
                         {/* Opening Balance Row */}
                         <TableRow className="bg-accent/30 border-b-2" data-testid="row-opening-balance">
+                          <TableCell className="py-2 print:hidden"></TableCell>
                           <TableCell className="font-mono text-sm py-2" colSpan={3}>
                             <span className="font-semibold">Opening Balance</span>
                           </TableCell>
@@ -1275,7 +1349,7 @@ export default function Accounts() {
                         {/* Voucher Rows */}
                         {vouchersWithBalance.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                               <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
                               <p>No transactions found for this account</p>
                               {(startDate || endDate) && (
@@ -1290,6 +1364,13 @@ export default function Accounts() {
                               className="hover-elevate"
                               data-testid={`row-voucher-${voucher.voucherId}`}
                             >
+                              <TableCell className="py-2 print:hidden">
+                                <Checkbox
+                                  checked={selectedVoucherIds.has(voucher.voucherId)}
+                                  onCheckedChange={() => toggleVoucherSelection(voucher.voucherId)}
+                                  data-testid={`checkbox-voucher-${voucher.voucherId}`}
+                                />
+                              </TableCell>
                               <TableCell className="font-mono text-sm py-2">
                                 {voucher.voucherDate
                                   ? formatDisplayDate(new Date(voucher.voucherDate))
@@ -1797,6 +1878,37 @@ export default function Accounts() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Selected Vouchers</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedVoucherIds.size} selected voucher(s)? 
+              This will also delete all associated entries and reverse any inventory movements.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkDeleteConfirm(false)}
+              data-testid="button-cancel-bulk-delete"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleteVouchersMutation.isPending}
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteVouchersMutation.isPending ? "Deleting..." : "Delete All"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

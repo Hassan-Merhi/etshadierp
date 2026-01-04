@@ -6698,7 +6698,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   parentCreditAccountId = existingAccount.id;
                   
                   // Save to company settings for future use
-                  await storage.upsertCompanySettings(currentCompanyId, {
+                  await storage.upsertCompanySettings({
+                    companyId: currentCompanyId,
                     parentCreditAccountId: parentCreditAccountId,
                   });
                   console.log(`Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`);
@@ -15231,6 +15232,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // Bulk delete vouchers (Admin only)
+  app.post("/api/vouchers/bulk-delete", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { voucherIds } = req.body;
+      
+      if (!Array.isArray(voucherIds) || voucherIds.length === 0) {
+        return res.status(400).json({ message: "voucherIds must be a non-empty array" });
+      }
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const currentCompanyId = req.session.currentCompanyId;
+      let deletedCount = 0;
+      const errors: string[] = [];
+
+      // Process each voucher deletion
+      for (const voucherId of voucherIds) {
+        const id = parseInt(voucherId);
+        if (isNaN(id)) {
+          errors.push(`Invalid voucher ID: ${voucherId}`);
+          continue;
+        }
+
+        try {
+          // Get voucher and verify it belongs to current company
+          const voucher = await storage.getVoucherById(id);
+          if (!voucher) {
+            errors.push(`Voucher ${id} not found`);
+            continue;
+          }
+
+          if (voucher.companyId !== currentCompanyId) {
+            errors.push(`Voucher ${id} does not belong to current company`);
+            continue;
+          }
+
+          // Delete in transaction - simplified version that handles common cases
+          await db.transaction(async (tx) => {
+            // Handle POS Sales reversal (Receipt/Sales with salesItems)
+            if ((voucher.voucherType === "Receipt" || voucher.voucherType === "Sales") && !voucher.optional) {
+              const saleItems = await tx
+                .select()
+                .from(salesItems)
+                .where(eq(salesItems.voucherId, id));
+
+              if (saleItems.length > 0 && voucher.locationId) {
+                // Add sold items back to inventory
+                for (const item of saleItems) {
+                  const qty = parseFloat(item.quantity);
+                  const costPrice = parseFloat(item.costPrice || "0");
+
+                  const [inv] = await tx
+                    .select()
+                    .from(inventory)
+                    .where(
+                      and(
+                        eq(inventory.stockItemId, item.stockItemId),
+                        eq(inventory.locationId, voucher.locationId),
+                      ),
+                    )
+                    .limit(1);
+
+                  if (inv) {
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingRate = parseFloat(inv.averageRate || "0");
+                    const newQty = existingQty + qty;
+                    const newValue = newQty * existingRate;
+
+                    await tx
+                      .update(inventory)
+                      .set({
+                        quantity: newQty.toString(),
+                        totalValue: newValue.toString(),
+                      })
+                      .where(eq(inventory.id, inv.id));
+                  } else {
+                    await tx.insert(inventory).values({
+                      companyId: currentCompanyId,
+                      locationId: voucher.locationId,
+                      stockItemId: item.stockItemId,
+                      quantity: qty.toString(),
+                      averageRate: costPrice.toString(),
+                      totalValue: (qty * costPrice).toString(),
+                    });
+                  }
+                }
+
+                // Delete sales items
+                await tx.delete(salesItems).where(eq(salesItems.voucherId, id));
+              }
+            }
+
+            // Reverse employee balance effects for non-optional vouchers
+            if (!voucher.optional) {
+              const entries = await tx
+                .select()
+                .from(voucherEntries)
+                .where(eq(voucherEntries.voucherId, id));
+
+              await syncEmployeeBalancesFromEntries(
+                entries.map(e => ({
+                  ledgerAccountId: e.ledgerAccountId,
+                  employeeId: e.employeeId,
+                  debitAmount: e.debitAmount,
+                  creditAmount: e.creditAmount,
+                })),
+                currentCompanyId,
+                true // reverse
+              );
+            }
+
+            // Delete voucher entries and voucher
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
+            await tx.delete(vouchers).where(eq(vouchers.id, id));
+          });
+
+          deletedCount++;
+        } catch (err: any) {
+          errors.push(`Failed to delete voucher ${id}: ${err.message}`);
+        }
+      }
+
+      res.json({
+        message: `Deleted ${deletedCount} voucher(s)`,
+        deletedCount,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Fiscal Period Closing
   // Close a fiscal period (Admin/Owner only)
