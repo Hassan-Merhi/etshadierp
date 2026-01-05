@@ -17548,20 +17548,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
       }
 
-      // Build breakdowns from category totals
+      // ============ ROUNDING HELPER ============
+      // Helper to round currency values to 2 decimal places (prevents floating point noise)
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+      // Build breakdowns from category totals (with rounding)
       for (const [key, value] of Object.entries(categoryTotals)) {
         if (value === 0) continue;
+        const roundedValue = round2(value);
         
         if (key.startsWith("asset_")) {
-          forUsBreakdown.push({ name: key.replace("asset_", ""), value });
+          forUsBreakdown.push({ name: key.replace("asset_", ""), value: roundedValue });
         } else if (key.startsWith("liability_")) {
-          onUsBreakdown.push({ name: key.replace("liability_", ""), value });
+          onUsBreakdown.push({ name: key.replace("liability_", ""), value: roundedValue });
         } else if (key.startsWith("exp_")) {
-          expensesBreakdown.push({ name: key.replace("exp_", ""), value });
+          expensesBreakdown.push({ name: key.replace("exp_", ""), value: roundedValue });
         } else if (key.startsWith("income_")) {
-          incomeBreakdown.push({ name: key.replace("income_", ""), value });
+          incomeBreakdown.push({ name: key.replace("income_", ""), value: roundedValue });
         }
       }
+
+      // Round individual account values
+      forUsAccounts.forEach(acc => acc.value = round2(acc.value));
+      onUsAccounts.forEach(acc => acc.value = round2(acc.value));
+      expensesAccounts.forEach(acc => acc.value = round2(acc.value));
+      incomeAccounts.forEach(acc => acc.value = round2(acc.value));
 
       // Sort breakdowns by value (highest first)
       forUsBreakdown.sort((a, b) => b.value - a.value);
@@ -17576,8 +17587,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       incomeAccounts.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      // Helper to round currency values to 2 decimal places (prevents floating point noise)
-      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
       
       // Round all totals to prevent floating point noise
       forUsTotal = round2(forUsTotal);
