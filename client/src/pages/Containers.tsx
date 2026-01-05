@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -45,6 +46,7 @@ export default function Containers() {
   const [showFilters, setShowFilters] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
   
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers/active", selectedCompany?.id],
@@ -112,6 +114,28 @@ export default function Containers() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Containers");
     XLSX.writeFile(workbook, "containers.xlsx");
+
+  const exportAllContainersFull = async () => {
+    try {
+      const response = await fetch("/api/containers/export-all");
+      if (!response.ok) throw new Error("Export failed");
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `containers_full_export_${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({ title: "Export successful", description: "All containers exported with full details" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
+
   };
 
   if (isLoading) {
@@ -146,6 +170,15 @@ export default function Containers() {
             >
               <Download className="h-4 w-4" />
               Export
+            </Button>
+            <Button
+              onClick={exportAllContainersFull}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-export-all-full"
+            >
+              <Download className="h-4 w-4" />
+              Export All (Full)
             </Button>
             <Button
               onClick={() => setAddDialogOpen(true)}

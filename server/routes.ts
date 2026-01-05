@@ -8910,6 +8910,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Export single container with all details (JSON)
+  app.get("/api/containers/:id/export", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const containerId = parseInt(req.params.id);
+      const container = await storage.getContainerById(containerId);
+      
+      if (!container) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      const supplier = await storage.getSupplierById(container.supplierId);
+      const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
+      
+      const posWithItems = await Promise.all(purchaseOrders.map(async (po) => {
+        const lineItems = await storage.getLineItemsByPO(po.id);
+        const itemsWithNames = await Promise.all(lineItems.map(async (item) => {
+          const stockItem = item.stockItemId ? await storage.getStockItemById(item.stockItemId) : null;
+          return {
+            stockItemCode: stockItem?.code || "",
+            stockItemName: stockItem?.name || item.itemName,
+            quantity: item.quantity,
+            rate: item.rate,
+            lineTotal: item.lineTotal,
+          };
+        }));
+        return {
+          poNumber: po.poNumber,
+          currency: po.currency,
+          itemsTotal: po.itemsTotal,
+          freight: po.freight,
+          surcharge: po.surcharge,
+          fumigation: po.fumigation,
+          documentCharges: po.documentCharges,
+          discount: po.discount,
+          otherCharges: po.otherCharges,
+          status: po.status,
+          lineItems: itemsWithNames,
+        };
+      }));
+
+      const [offloadRecord] = await db
+        .select()
+        .from(containerOffloads)
+        .where(eq(containerOffloads.containerId, containerId))
+        .limit(1);
+      let offloadDetails = null;
+      if (offloadRecord) {
+        const location = await storage.getLocationById(offloadRecord.locationId);
+        const offloadItems = await db
+          .select()
+          .from(containerOffloadItems)
+          .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
+        
+        const itemsWithNames = await Promise.all(offloadItems.map(async (item) => {
+          const stockItem = await storage.getStockItemById(item.stockItemId);
+          return {
+            stockItemCode: stockItem?.code || "",
+            stockItemName: stockItem?.name || "",
+            quantity: item.quantity,
+            rate: item.rate,
+            totalValue: item.totalValue,
+          };
+        }));
+
+        offloadDetails = {
+          locationName: location?.name || "",
+          duties: offloadRecord.duties,
+          officeCharges: offloadRecord.officeCharges,
+          transferCharges: offloadRecord.transferCharges,
+          transportFees: offloadRecord.transportFees,
+          totalCharges: offloadRecord.totalCharges,
+          totalBales: offloadRecord.totalBales,
+          additionalCostPerBale: offloadRecord.additionalCostPerBale,
+          offloadedAt: offloadRecord.offloadedAt,
+          offloadItems: itemsWithNames,
+        };
+      }
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        container: {
+          containerNumber: container.containerNumber,
+          supplierName: supplier?.name || "",
+          status: container.status,
+          importDate: container.importDate,
+          itemsTotal: container.itemsTotal,
+          chargesTotal: container.chargesTotal,
+          grandTotal: container.grandTotal,
+          itemName: container.itemName,
+          ratePerKg: container.ratePerKg,
+          totalKg: container.totalKg,
+        },
+        purchaseOrders: posWithItems,
+        offload: offloadDetails,
+      };
+
+      res.json(exportData);
+    } catch (error: any) {
+      console.error("Container export error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Export all containers as Excel (one sheet per container)
+  app.get("/api/containers/export-all", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const XLSX = require("xlsx");
+      const allContainers = await storage.getAllContainers(req.session.currentCompanyId);
+      const workbook = XLSX.utils.book_new();
+
+      for (const container of allContainers) {
+        const supplier = await storage.getSupplierById(container.supplierId);
+        const purchaseOrders = await storage.getPurchaseOrdersByContainer(container.id);
+        
+        const sheetData: any[][] = [];
+        
+        sheetData.push(["CONTAINER DETAILS"]);
+        sheetData.push(["Container Number", container.containerNumber]);
+        sheetData.push(["Supplier", supplier?.name || ""]);
+        sheetData.push(["Status", container.status]);
+        sheetData.push(["Import Date", container.importDate]);
+        sheetData.push(["Items Total", container.itemsTotal]);
+        sheetData.push(["Charges Total", container.chargesTotal]);
+        sheetData.push(["Grand Total", container.grandTotal]);
+        if (container.itemName) {
+          sheetData.push(["Manual Item", container.itemName]);
+          sheetData.push(["Rate/Kg", container.ratePerKg]);
+          sheetData.push(["Total Kg", container.totalKg]);
+        }
+        sheetData.push([]);
+
+        for (const po of purchaseOrders) {
+          sheetData.push(["PURCHASE ORDER: " + po.poNumber]);
+          sheetData.push(["Currency", po.currency]);
+          sheetData.push(["Items Total", po.itemsTotal]);
+          sheetData.push(["Freight", po.freight]);
+          sheetData.push(["Surcharge", po.surcharge]);
+          sheetData.push(["Fumigation", po.fumigation]);
+          sheetData.push(["Document Charges", po.documentCharges]);
+          sheetData.push(["Discount", po.discount]);
+          sheetData.push(["Other Charges", po.otherCharges]);
+          sheetData.push([]);
+
+          const lineItems = await storage.getLineItemsByPO(po.id);
+          if (lineItems.length > 0) {
+            sheetData.push(["Stock Code", "Item Name", "Quantity", "Rate", "Line Total"]);
+            for (const item of lineItems) {
+              const stockItem = item.stockItemId ? await storage.getStockItemById(item.stockItemId) : null;
+              sheetData.push([
+                stockItem?.code || "",
+                stockItem?.name || item.itemName,
+                item.quantity,
+                item.rate,
+                item.lineTotal,
+              ]);
+            }
+            sheetData.push([]);
+          }
+        }
+
+        const [offloadRecord] = await db
+          .select()
+          .from(containerOffloads)
+          .where(eq(containerOffloads.containerId, container.id))
+          .limit(1);
+        if (offloadRecord) {
+          const location = await storage.getLocationById(offloadRecord.locationId);
+          sheetData.push(["OFFLOAD DETAILS"]);
+          sheetData.push(["Location", location?.name || ""]);
+          sheetData.push(["Duties", offloadRecord.duties]);
+          sheetData.push(["Office Charges", offloadRecord.officeCharges]);
+          sheetData.push(["Transfer Charges", offloadRecord.transferCharges]);
+          sheetData.push(["Transport Fees", offloadRecord.transportFees]);
+          sheetData.push(["Total Charges", offloadRecord.totalCharges]);
+          sheetData.push(["Total Bales", offloadRecord.totalBales]);
+          sheetData.push(["Additional Cost/Bale", offloadRecord.additionalCostPerBale]);
+          sheetData.push(["Offloaded At", offloadRecord.offloadedAt?.toISOString() || ""]);
+          sheetData.push([]);
+
+          const offloadItems = await db
+            .select()
+            .from(containerOffloadItems)
+            .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
+          
+          if (offloadItems.length > 0) {
+            sheetData.push(["OFFLOAD ITEMS"]);
+            sheetData.push(["Stock Code", "Item Name", "Quantity", "Rate", "Total Value"]);
+            for (const item of offloadItems) {
+              const stockItem = await storage.getStockItemById(item.stockItemId);
+              sheetData.push([
+                stockItem?.code || "",
+                stockItem?.name || "",
+                item.quantity,
+                item.rate,
+                item.totalValue,
+              ]);
+            }
+          }
+        }
+
+        const sheetName = container.containerNumber
+          .replace(/[\\/*?:\[\]]/g, "_")
+          .substring(0, 31);
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      }
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="containers_export_${new Date().toISOString().split("T")[0]}.xlsx"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("Container export-all error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create a manual container
   app.post("/api/containers", requireAuth, requireNonPOS, async (req, res) => {
     try {

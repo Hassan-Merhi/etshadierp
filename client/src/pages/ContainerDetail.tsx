@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +77,30 @@ export default function ContainerDetail() {
   });
 
   const containerSale = containerSales.find((sale: ContainerSale) => sale.containerId === parseInt(containerId!));
+
+  const handleExportContainer = async () => {
+    try {
+      const response = await fetch(`/api/containers/${containerId}/export`);
+      const data = await response.json();
+      
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `container_${data.container.containerNumber}_export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({ title: "Export successful", description: "Container data downloaded as JSON" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+
 
   // Determine the back URL based on container status
   const backUrl = containerData?.container?.status === "SOLD" ? "/sold-containers" : "/containers";
@@ -319,6 +343,15 @@ export default function ContainerDetail() {
             </Button>
           </>
         )}
+        <Button
+          variant="outline"
+          onClick={handleExportContainer}
+          className="gap-2"
+          data-testid="button-export-container"
+        >
+          <Download className="w-4 h-4" />
+          Export
+        </Button>
         <Button
           variant="destructive"
           onClick={handleDeleteContainer}
