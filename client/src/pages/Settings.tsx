@@ -53,7 +53,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -384,6 +384,10 @@
     const [isResetDataDialogOpen, setIsResetDataDialogOpen] = useState(false);
     const [resetDataResult, setResetDataResult] = useState<any>(null);
     const [selectedCompanyForReset, setSelectedCompanyForReset] = useState<string>("");
+    const [userToResetPassword, setUserToResetPassword] = useState<any>(null);
+    const [newPasswordForReset, setNewPasswordForReset] = useState("");
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [changePasswordData, setChangePasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -685,6 +689,50 @@
         toast({
           title: "Error",
           description: error.message || "Failed to delete user",
+          variant: "destructive",
+        });
+      },
+    });
+
+    const resetPasswordMutation = useMutation({
+      mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+        const res = await apiRequest("POST", `/api/admin/reset-password/${userId}`, { newPassword });
+        return res.json();
+      },
+      onSuccess: (data) => {
+        toast({
+          title: "Success",
+          description: data.message || "Password reset successfully",
+        });
+        setUserToResetPassword(null);
+        setNewPasswordForReset("");
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to reset password",
+          variant: "destructive",
+        });
+      },
+    });
+
+    const changePasswordMutation = useMutation({
+      mutationFn: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
+        const res = await apiRequest("POST", "/api/user/change-password", { currentPassword, newPassword });
+        return res.json();
+      },
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Password changed successfully",
+        });
+        setIsChangePasswordOpen(false);
+        setChangePasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to change password",
           variant: "destructive",
         });
       },
@@ -1269,6 +1317,69 @@
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          {/* Admin Reset Password Dialog */}
+          <Dialog open={!!userToResetPassword} onOpenChange={(open) => {
+            if (!open) {
+              setUserToResetPassword(null);
+              setNewPasswordForReset("");
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Reset Password for {userToResetPassword?.username}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter a new password for this user. They will be able to log in with this password immediately.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="reset-new-password">New Password</Label>
+                  <Input
+                    id="reset-new-password"
+                    type="password"
+                    value={newPasswordForReset}
+                    onChange={(e) => setNewPasswordForReset(e.target.value)}
+                    placeholder="Enter new password (min 4 characters)"
+                    data-testid="input-reset-new-password"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setUserToResetPassword(null);
+                      setNewPasswordForReset("");
+                    }}
+                    disabled={resetPasswordMutation.isPending}
+                    data-testid="button-cancel-reset-password"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (newPasswordForReset.length < 4) {
+                        toast({
+                          title: "Error",
+                          description: "Password must be at least 4 characters",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      resetPasswordMutation.mutate({
+                        userId: userToResetPassword.id,
+                        newPassword: newPasswordForReset,
+                      });
+                    }}
+                    disabled={resetPasswordMutation.isPending || newPasswordForReset.length < 4}
+                    data-testid="button-submit-reset-password"
+                  >
+                    {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
   
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4">
@@ -1445,6 +1556,15 @@
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                onClick={() => setUserToResetPassword(user)}
+                                title="Reset Password"
+                                data-testid={`button-reset-password-${user.id}`}
+                              >
+                                <Key className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
                                 onClick={() => setUserToDelete(user)}
                                 data-testid={`button-delete-${user.id}`}
                               >
@@ -1602,8 +1722,116 @@
                   </div>
                 </div>
               </Card>
+
+              <Card className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-5 w-5" />
+                    <h3 className="text-lg font-medium">Change Password</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Update your account password. You will need to enter your current password.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsChangePasswordOpen(true)}
+                    data-testid="button-open-change-password"
+                  >
+                    <Key className="h-4 w-4 mr-2" />
+                    Change Password
+                  </Button>
+                </div>
+              </Card>
             </div>
           </TabsContent>
+
+          {/* Change Password Dialog */}
+          <Dialog open={isChangePasswordOpen} onOpenChange={(open) => {
+            setIsChangePasswordOpen(open);
+            if (!open) setChangePasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Change Password</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={changePasswordData.currentPassword}
+                    onChange={(e) => setChangePasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Enter current password"
+                    data-testid="input-current-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={changePasswordData.newPassword}
+                    onChange={(e) => setChangePasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    placeholder="Enter new password (min 4 characters)"
+                    data-testid="input-new-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={changePasswordData.confirmPassword}
+                    onChange={(e) => setChangePasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Confirm new password"
+                    data-testid="input-confirm-password"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsChangePasswordOpen(false);
+                      setChangePasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                    }}
+                    disabled={changePasswordMutation.isPending}
+                    data-testid="button-cancel-change-password"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (changePasswordData.newPassword !== changePasswordData.confirmPassword) {
+                        toast({
+                          title: "Error",
+                          description: "New passwords do not match",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (changePasswordData.newPassword.length < 4) {
+                        toast({
+                          title: "Error",
+                          description: "New password must be at least 4 characters",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      changePasswordMutation.mutate({
+                        currentPassword: changePasswordData.currentPassword,
+                        newPassword: changePasswordData.newPassword,
+                      });
+                    }}
+                    disabled={changePasswordMutation.isPending || !changePasswordData.currentPassword || !changePasswordData.newPassword || !changePasswordData.confirmPassword}
+                    data-testid="button-submit-change-password"
+                  >
+                    {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
   
           {/* System Tab */}
           <TabsContent value="system" className="space-y-4">
