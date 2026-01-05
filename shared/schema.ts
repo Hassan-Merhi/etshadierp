@@ -1151,6 +1151,7 @@ export const companySettings = pgTable("company_settings", {
   logoUpdatedAt: timestamp("logo_updated_at"),
   invoiceFooter: text("invoice_footer"),
   parentCreditAccountId: integer("parent_credit_account_id"),
+  netPositionAdjustment: decimal("net_position_adjustment", { precision: 15, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1165,6 +1166,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
   logoFileName: z.string().optional(),
   invoiceFooter: z.string().optional(),
   parentCreditAccountId: z.number().optional(),
+  netPositionAdjustment: z.string().optional(),
 });
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
