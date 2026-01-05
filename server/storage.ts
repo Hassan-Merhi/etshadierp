@@ -2071,12 +2071,16 @@ export class DbStorage implements IStorage {
     }, 0);
 
     // Calculate total charges including additional charges AND PO charges (freight + otherCharges)
-    // NOTE: Office charges are NOT included because they are assets (money set aside for later use),
-    // not expenses to be capitalized into inventory. They have their own asset account tracking.
+    // ALL import-related charges are capitalized into inventory cost to keep import cycle balanced:
+    // - Duties, Transfer Charges, Transport Fees (agent liabilities)
+    // - Office Charges (stored as Loans liability - money owed for office/clearing expenses)
+    // - Additional Charges (misc charges with specific ledger accounts)
+    // - PO Charges (freight + otherCharges from purchase orders)
     const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
     const poCharges = parseFloat(container.chargesTotal || "0"); // Freight + otherCharges from POs
     const totalCharges = 
       parseFloat(duties) + 
+      parseFloat(officeCharges) +  // Office charges are capitalized to balance Loans liability
       parseFloat(transferCharges) + 
       parseFloat(transportFees) +
       additionalChargesTotal +
