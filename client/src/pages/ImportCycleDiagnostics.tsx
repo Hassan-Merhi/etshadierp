@@ -126,30 +126,7 @@ export default function ImportCycleDiagnostics() {
 
   const netBalance = data?.netImportCycleBalance || 0;
   const isBalanced = Math.abs(netBalance) < 0.01;
-  const components = data?.components || {};
-
-  // Calculate totals for display
-  const assetTotal = (components.stockOtwValue || 0) + 
-    (components.cashBalance || 0) + 
-    (components.bankBalance || 0) + 
-    (components.stockOnFloorValue || 0) + 
-    (components.assetBalance || 0) + 
-    (components.salaryAdvancesBalance || 0);
-
-  const expenseTotal = (components.indirectExpenseBalance || 0) + 
-    (components.payrollExpenseBalance || 0) + 
-    (components.governmentTaxesBalance || 0) + 
-    (components.cogsBalance || 0);
-
-  const liabilityTotal = (components.supplierBalance || 0) + 
-    (components.dutyAgentBalance || 0) + 
-    (components.transporterAgentBalance || 0) + 
-    (components.loansBalance || 0) + 
-    (components.liabilityBalance || 0) + 
-    (components.profitBalance || 0) + 
-    (components.incomeBalance || 0) + 
-    (components.payrollLiabilitiesBalance || 0) - 
-    (components.openingBalanceEquity || 0);
+  const components = data?.components || {} as ImportCycleData['components'];
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -215,28 +192,14 @@ export default function ImportCycleDiagnostics() {
             )}
           </CardTitle>
           <CardDescription>
-            Formula: (Assets + Expenses) - Liabilities = Net Balance
+            This is the same balance shown on the dashboard. Formula: (Assets + Expenses) - Liabilities = Net Balance
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-              <div className="text-sm text-muted-foreground mb-1">Assets</div>
-              <div className="text-xl font-bold text-green-600">${formatNumber(assetTotal)}</div>
-            </div>
-            <div className="text-center p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
-              <div className="text-sm text-muted-foreground mb-1">Expenses</div>
-              <div className="text-xl font-bold text-orange-600">${formatNumber(expenseTotal)}</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-              <div className="text-sm text-muted-foreground mb-1">Liabilities</div>
-              <div className="text-xl font-bold text-red-600">${formatNumber(liabilityTotal)}</div>
-            </div>
-            <div className={`text-center p-4 rounded-lg ${isBalanced ? 'bg-green-50 dark:bg-green-950' : 'bg-destructive/10'}`}>
-              <div className="text-sm text-muted-foreground mb-1">Net Balance</div>
-              <div className={`text-xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
-                ${formatNumber(netBalance)}
-              </div>
+          <div className={`text-center p-6 rounded-lg ${isBalanced ? 'bg-green-50 dark:bg-green-950' : 'bg-destructive/10'}`}>
+            <div className="text-sm text-muted-foreground mb-2">Net Import Cycle Balance</div>
+            <div className={`text-3xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
+              ${formatNumber(netBalance)}
             </div>
           </div>
         </CardContent>
