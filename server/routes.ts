@@ -17452,6 +17452,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Add OTW (On The Way) inventory value as an asset
+      // Containers with OTW status represent goods we own that are in transit
+      const otwContainers = await db
+        .select()
+        .from(containers)
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
+        .execute();
+      
+      let stockOtwValue = 0;
+      for (const container of otwContainers) {
+        // Use grandTotal (items + charges) if available, otherwise use itemsTotal
+        const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
+        stockOtwValue += containerValue;
+      }
+      
+      if (stockOtwValue > 0) {
+        forUsTotal += stockOtwValue;
+        categoryTotals["asset_Stock OTW"] = stockOtwValue;
+        forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+      }
+
       // Build breakdowns from category totals
       for (const [key, value] of Object.entries(categoryTotals)) {
         if (value === 0) continue;
