@@ -9185,11 +9185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Reverse container offload (Admin only)
+  // Reverse container offload (Admin, Owner, or Manager)
   app.post(
     "/api/containers/:id/reverse-offload",
     requireAuth,
-    requireRole("Admin"),
+    requireRole("Admin", "Owner", "Manager"),
     async (req, res) => {
       try {
         const containerId = parseInt(req.params.id);
