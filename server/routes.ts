@@ -20506,6 +20506,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Orphaned Charge Vouchers Diagnostics - Find charge vouchers for OTW containers
+  // These are vouchers (DUTY-, TRANS-, OFFICE-, CHG-, XFER-) that should only exist for OFFLOADED containers
+  app.get("/api/debug/orphaned-charge-vouchers", requireAuth, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all OTW containers for this company
+      const otwContainers = await db
+        .select({ id: containers.id, containerNumber: containers.containerNumber })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+
+      const orphanedVouchers: Array<{
+        voucherId: number;
+        voucherNumber: string;
+        voucherType: string;
+        containerNumber: string;
+        containerId: number;
+        totalDebit: number;
+        totalCredit: number;
+      }> = [];
+
+      // For each OTW container, find any charge vouchers that shouldn't exist
+      for (const container of otwContainers) {
+        const chargeVouchersForContainer = await db
+          .select({
+            id: vouchers.id,
+            voucherNumber: vouchers.voucherNumber,
+            voucherType: vouchers.voucherType,
+          })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              or(
+                sql`${vouchers.voucherNumber} LIKE ${'DUTY-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'TRANS-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'OFFICE-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'CHG-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'XFER-' + container.containerNumber + '%'}`
+              )
+            )
+          );
+
+        for (const v of chargeVouchersForContainer) {
+          // Get entries to calculate impact
+          const entries = await db
+            .select({
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, v.id));
+
+          const totalDebit = entries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
+          const totalCredit = entries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+
+          orphanedVouchers.push({
+            voucherId: v.id,
+            voucherNumber: v.voucherNumber,
+            voucherType: v.voucherType,
+            containerNumber: container.containerNumber,
+            containerId: container.id,
+            totalDebit,
+            totalCredit,
+          });
+        }
+      }
+
+      res.json({
+        otwContainerCount: otwContainers.length,
+        orphanedVoucherCount: orphanedVouchers.length,
+        orphanedVouchers,
+        totalImpact: orphanedVouchers.reduce((sum, v) => sum + Math.abs(v.totalDebit - v.totalCredit), 0),
+      });
+    } catch (error: any) {
+      console.error("Orphaned charge vouchers diagnostics error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete orphaned charge vouchers for OTW containers
+  app.post("/api/admin/fix-orphaned-charge-vouchers", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all OTW containers for this company
+      const otwContainers = await db
+        .select({ id: containers.id, containerNumber: containers.containerNumber })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+
+      const deletedVouchers: Array<{ voucherId: number; voucherNumber: string }> = [];
+
+      // For each OTW container, find and delete charge vouchers
+      for (const container of otwContainers) {
+        const chargeVouchersForContainer = await db
+          .select({
+            id: vouchers.id,
+            voucherNumber: vouchers.voucherNumber,
+          })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              or(
+                sql`${vouchers.voucherNumber} LIKE ${'DUTY-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'TRANS-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'OFFICE-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'CHG-' + container.containerNumber + '%'}`,
+                sql`${vouchers.voucherNumber} LIKE ${'XFER-' + container.containerNumber + '%'}`
+              )
+            )
+          );
+
+        for (const v of chargeVouchersForContainer) {
+          // Delete voucher entries first
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
+          // Then delete the voucher
+          await db.delete(vouchers).where(eq(vouchers.id, v.id));
+          
+          deletedVouchers.push({
+            voucherId: v.id,
+            voucherNumber: v.voucherNumber,
+          });
+        }
+      }
+
+      res.json({
+        message: `Deleted ${deletedVouchers.length} orphaned charge vouchers`,
+        deletedCount: deletedVouchers.length,
+        deletedVouchers,
+      });
+    } catch (error: any) {
+      console.error("Fix orphaned charge vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Net Profit (P&L) Report - Tally Prime style
   app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
     try {
