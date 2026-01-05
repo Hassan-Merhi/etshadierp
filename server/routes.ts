@@ -408,6 +408,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // User changes their own password
+  app.post("/api/user/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+      
+      if (newPassword.length < 4) {
+        return res.status(400).json({ message: "New password must be at least 4 characters" });
+      }
+      
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get current user with password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Verify current password
+      const { valid } = await verifyPassword(currentPassword, user.password);
+      if (!valid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+      
+      // Hash new password and update
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(userId, { password: hashedPassword });
+      
+      res.json({ message: "Password changed successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin resets any user's password
+  app.post(
+    "/api/admin/reset-password/:userId",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const { userId } = req.params;
+        const { newPassword } = req.body;
+        
+        if (!newPassword) {
+          return res.status(400).json({ message: "New password is required" });
+        }
+        
+        if (newPassword.length < 4) {
+          return res.status(400).json({ message: "Password must be at least 4 characters" });
+        }
+        
+        // Verify user exists
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // Hash new password and update
+        const hashedPassword = await hashPassword(newPassword);
+        await storage.updateUser(userId, { password: hashedPassword });
+        
+        res.json({ message: `Password reset successfully for user: ${user.username}` });
+      } catch (error: any) {
+        res.status(500).json({ message: error.message });
+      }
+    },
+  );
+
   // User-Company-Role management routes
   app.get(
     "/api/users/:userId/company-roles",
