@@ -114,6 +114,7 @@ export default function Containers() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Containers");
     XLSX.writeFile(workbook, "containers.xlsx");
+  };
 
   const exportAllContainersFull = async () => {
     try {
@@ -134,8 +135,6 @@ export default function Containers() {
     } catch (error: any) {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
     }
-  };
-
   };
 
   if (isLoading) {
