@@ -9128,20 +9128,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            // Delete old OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG- prefixes)
+            // Delete old OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG-, XFER- prefixes)
             // DO NOT delete PO vouchers that track supplier balances
+            const containerDescPattern = `%container ${container.containerNumber}%`;
             const oldVouchers = await db
               .select()
               .from(vouchers)
               .where(
                 and(
                   eq(vouchers.companyId, container.companyId),
-                  sql`LOWER(${vouchers.description}) LIKE LOWER('%container ${container.containerNumber}%')`,
+                  sql`LOWER(${vouchers.description}) LIKE LOWER(${containerDescPattern})`,
                   sql`(
                     ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
                     ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
                     ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
-                    ${vouchers.voucherNumber} LIKE 'CHG-%'
+                    ${vouchers.voucherNumber} LIKE 'CHG-%' OR
+                    ${vouchers.voucherNumber} LIKE 'XFER-%'
                   )`,
                 ),
               );
