@@ -18554,17 +18554,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate the net balance:
       // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
-      // Operating Expenses: Direct Expenses (IMPORT_CHARGES) + Indirect Expenses + Government Taxes + COGS
+      // Operating Expenses: Indirect Expenses + Government Taxes + COGS (but NOT directExpenseBalance)
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability accounts + Profit/Equity + Income + Payroll Liabilities
       // Net = (Assets + Operating Expenses) - (Liabilities + Income) (should be 0 when balanced)
       // NOTE: generalExpenseBalance (Purchases) is EXCLUDED because it double-counts with stockOnFloorValue
       //       When containers are offloaded, Purchases expense is debited AND Stock on Floor increases
       //       The inventory value already captures the cost of goods, so we don't add Purchases again
-      // NOTE: directExpenseBalance (IMPORT_CHARGES like office charges) is INCLUDED because:
-      //       - Office charges create a liability (CR Office Charge account) AND an expense (DR Direct Expense)
-      //       - These are NOT capitalized into inventory (not added to additionalCostPerBale)
-      //       - Without including directExpenseBalance, the liability would be counted but not the expense
-      //       - This caused the import cycle to show negative balance equal to office charge amounts
+      // NOTE: directExpenseBalance (IMPORT_CHARGES like duties, transport) is EXCLUDED because:
+      //       - These costs are capitalized into inventory value (stockOnFloorValue) during container offload
+      //       - When offloading, the system: DR Duty Agent/Transporter Agent (creates liability)
+      //         and those costs get added to inventory value via additionalCostPerBale
+      //       - So stockOnFloorValue already includes these costs - adding directExpenseBalance would double-count
+      //       - Office charges stored as Loans are also capitalized into inventory via additionalCostPerBale
       // NOTE: COGS from salesItems balances the inventory reduction when goods are sold
       // NOTE: Production and Consumption are EXCLUDED from the balance formula because:
       //       - Their effects are already reflected in stockOnFloorValue (inventory movements)
@@ -18575,9 +18576,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (stockOtwValue +            // Asset (debit) - containers in transit
         cashBalance +               // Asset (debit) - cash on hand
         bankBalance +               // Asset (debit) - bank balances
-        stockOnFloorValue +         // Asset - inventory at cost (includes offload charges capitalized)
+        stockOnFloorValue +         // Asset - inventory at cost (includes ALL offload charges capitalized)
         assetBalance +              // Asset accounts (properties, guarantees, receivables)
-        directExpenseBalance +      // Direct Expense (IMPORT_CHARGES) - office charges NOT capitalized into inventory
+        // directExpenseBalance is EXCLUDED - already capitalized into stockOnFloorValue
         indirectExpenseBalance +    // Expense (debit) - operating expenses (includes PAYROLL_DEPOSIT_EXPENSE)
         payrollExpenseBalance +     // Payroll/Salary expenses (Expense type) - worker salaries in import cycle
         governmentTaxesBalance +    // Government Taxes (expense)
@@ -18586,7 +18587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (supplierBalance +          // Liability (what we owe to suppliers)
         dutyAgentBalance +          // Liability (what we owe to duty agents)
         transporterAgentBalance +   // Liability (what we owe to transporters)
-        loansBalance +              // Liability (loans/borrowings)
+        loansBalance +              // Liability (loans/borrowings - includes office charges)
         liabilityBalance +          // Other Liability accounts
         profitBalance +             // Profit/Equity (retained earnings)
         incomeBalance +             // Income (sales revenue - credit)
