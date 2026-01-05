@@ -319,15 +319,42 @@ export default function ImportCycleDiagnostics() {
             </TableHeader>
             <TableBody>
               {data?.components && Object.entries(data.components).map(([key, value]) => {
-                const isAsset = ['stockOtwValue', 'cashBalance', 'bankBalance', 'stockOnFloorValue', 'assetBalance'].includes(key);
-                const isExpense = ['indirectExpenseBalance', 'governmentTaxesBalance', 'cogsBalance'].includes(key);
-                const category = isAsset ? 'Asset' : isExpense ? 'Expense' : 'Liability';
-                const colorClass = isAsset ? 'text-green-600' : isExpense ? 'text-orange-600' : 'text-red-600';
+                const isAsset = ['stockOtwValue', 'cashBalance', 'bankBalance', 'stockOnFloorValue', 'assetBalance', 'salaryAdvancesBalance'].includes(key);
+                const isExpense = ['indirectExpenseBalance', 'governmentTaxesBalance', 'cogsBalance', 'payrollExpenseBalance'].includes(key);
+                const isEquity = ['openingBalanceEquity', 'openingStockValue'].includes(key);
+                const category = isAsset ? 'Asset' : isExpense ? 'Expense' : isEquity ? 'Equity' : 'Liability';
+                const colorClass = isAsset ? 'text-green-600' : isExpense ? 'text-orange-600' : isEquity ? 'text-blue-600' : 'text-red-600';
+                
+                const formatLabel = (k: string) => {
+                  const labels: Record<string, string> = {
+                    stockOtwValue: 'Stock OTW (Containers in Transit)',
+                    cashBalance: 'Cash',
+                    bankBalance: 'Bank',
+                    stockOnFloorValue: 'Stock on Floor (Inventory)',
+                    assetBalance: 'Other Assets',
+                    salaryAdvancesBalance: 'Salary Advances',
+                    indirectExpenseBalance: 'Indirect Expenses',
+                    payrollExpenseBalance: 'Payroll Expenses',
+                    governmentTaxesBalance: 'Government Taxes',
+                    cogsBalance: 'Cost of Goods Sold',
+                    supplierBalance: 'Supplier Payables',
+                    dutyAgentBalance: 'Duty Agent',
+                    transporterAgentBalance: 'Transporter Agent',
+                    loansBalance: 'Loans',
+                    liabilityBalance: 'Other Liabilities',
+                    profitBalance: 'Profit/Retained Earnings',
+                    incomeBalance: 'Income',
+                    payrollLiabilitiesBalance: 'Payroll Liabilities',
+                    openingBalanceEquity: 'Opening Balance Equity',
+                    openingStockValue: 'Opening Stock Value',
+                  };
+                  return labels[k] || k.replace(/([A-Z])/g, ' $1').replace(/Balance$/, '').trim();
+                };
                 
                 return (
                   <TableRow key={key} data-testid={`component-row-${key}`}>
                     <TableCell className="font-medium">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/Balance$/, '').trim()}
+                      {formatLabel(key)}
                     </TableCell>
                     <TableCell className={`text-right ${colorClass}`}>
                       ${formatNumber(value)}

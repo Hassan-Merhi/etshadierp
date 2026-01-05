@@ -20430,6 +20430,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const incomeBalance = await getAccountTypeBalance("Income", true);
       const indirectExpenseBalance = await getAccountTypeBalance("Indirect Expense", false);
       const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
+      const payrollExpenseBalance = await getAccountTypeBalance("Payroll Expense", false);
+      const salaryAdvancesBalance = await getAccountTypeBalance("Salary Advances", false);
 
       // Stock on floor (excluding orphaned)
       const inventoryItems = await db
@@ -20457,12 +20459,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return sum + (bal > 0 ? bal : 0);
       }, 0);
 
-      // Calculate net balance
+      // Opening Balance Equity calculation (matches import-cycle-balance endpoint)
+      const allAccountsForOpening = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      let totalDrOpenings = 0;
+      let totalCrOpenings = 0;
+      for (const account of allAccountsForOpening) {
+        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+        const openingSide = account.openingBalanceSide || "Dr";
+        if (openingSide === "Dr") {
+          totalDrOpenings += openingBalanceRaw;
+        } else {
+          totalCrOpenings += openingBalanceRaw;
+        }
+      }
+      let openingBalanceEquity = totalCrOpenings - totalDrOpenings;
+
+      // Opening Stock Value - stock items with opening values
+      const stockItemsWithOpening = await db
+        .select({ openingValue: stockItems.openingValue })
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            isNull(stockItems.deletedAt)
+          )
+        );
+      
+      const openingStockValue = stockItemsWithOpening.reduce((sum, item) => {
+        return sum + parseFloat(item.openingValue || "0");
+      }, 0);
+      
+      // Subtract opening stock value from equity (it's an asset that needs balancing)
+      openingBalanceEquity -= openingStockValue;
+
+      // Calculate net balance (EXACT same formula as import-cycle-balance endpoint)
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
       
-      const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance);
-      const totalExpenses = round2(indirectExpenseBalance + governmentTaxesBalance + cogsBalance);
-      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance);
+      // Assets: Stock OTW + Cash + Bank + Stock on Floor + Asset accounts + Salary Advances
+      const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance);
+      
+      // Operating Expenses: Indirect Expenses + Government Taxes + COGS + Payroll Expenses
+      const totalExpenses = round2(indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance);
+      
+      // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability + Profit + Income + Payroll Liabilities - Opening Balance Equity
+      const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance - openingBalanceEquity);
+      
       const netImportCycleBalance = round2((totalAssets + totalExpenses) - totalLiabilities);
 
       // Sum up issue impacts
@@ -20481,7 +20531,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bankBalance: round2(bankBalance),
           stockOnFloorValue: round2(stockOnFloorValue),
           assetBalance: round2(assetBalance),
+          salaryAdvancesBalance: round2(salaryAdvancesBalance),
           indirectExpenseBalance: round2(indirectExpenseBalance),
+          payrollExpenseBalance: round2(payrollExpenseBalance),
           governmentTaxesBalance: round2(governmentTaxesBalance),
           cogsBalance: round2(cogsBalance),
           supplierBalance: round2(supplierBalance),
@@ -20492,6 +20544,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profitBalance: round2(profitBalance),
           incomeBalance: round2(incomeBalance),
           payrollLiabilitiesBalance: round2(payrollLiabilitiesBalance),
+          openingBalanceEquity: round2(openingBalanceEquity),
+          openingStockValue: round2(openingStockValue),
         },
         issues,
         summary: {
