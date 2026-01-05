@@ -2223,6 +2223,8 @@ export class DbStorage implements IStorage {
     }
 
     // Update container status to OFFLOADED
+    // When status changes from OTW to OFFLOADED, the container is no longer counted in Stock OTW
+    // The import cycle balance uses container.status to filter which containers to include
     await this.updateContainer(containerId, { status: "OFFLOADED" });
 
     // Get location details for voucher entries (container already fetched at top)

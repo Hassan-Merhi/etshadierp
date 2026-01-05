@@ -9374,7 +9374,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
                   ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
                   ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
-                  ${vouchers.voucherNumber} LIKE 'CHG-%'
+                  ${vouchers.voucherNumber} LIKE 'CHG-%' OR
+                  ${vouchers.voucherNumber} LIKE 'XFER-%'
                 )`,
               ),
             );
@@ -9394,12 +9395,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .delete(containerOffloads)
             .where(eq(containerOffloads.id, offloadRecord.id));
 
-          // Update container status back to OTW (On The Way) so it's properly counted in import cycle balance
+          // Update container status back to OTW
+          // The import cycle balance uses container.status to filter which containers to include
+          // When status changes to OTW, the container's grandTotal is counted in Stock OTW
           await tx
             .update(containers)
-            .set({
-              status: "OTW",
-            })
+            .set({ status: "OTW" })
             .where(eq(containers.id, containerId));
         });
 
