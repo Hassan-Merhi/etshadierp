@@ -20777,6 +20777,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const netImportCycleBalance = round2((totalAssets + totalExpenses) - totalLiabilities);
 
+
+      // === RECONCILIATION SECTION ===
+      // Re-compute buckets from account-level data to identify the source of any discrepancy
+      
+      interface AccountContribution {
+        accountId: number;
+        accountName: string;
+        accountCode: string;
+        parentType: string;
+        bucket: string;
+        balance: number;
+      }
+      
+      const accountContributions: AccountContribution[] = [];
+      
+      // Map all ledger accounts to their contributions
+      const allAccountsForRecon = await db
+        .select({
+          id: ledgerAccounts.id,
+          name: ledgerAccounts.name,
+          code: ledgerAccounts.code,
+          parentType: ledgerAccounts.parentType,
+          currentBalance: ledgerAccounts.currentBalance,
+          currentBalanceSide: ledgerAccounts.currentBalanceSide,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+      
+      // Bucket sums from account-level data
+      const reconBuckets: Record<string, number> = {
+        supplierBalance: 0,
+        dutyAgentBalance: 0,
+        transporterAgentBalance: 0,
+        loansBalance: 0,
+        liabilityBalance: 0,
+        profitBalance: 0,
+        incomeBalance: 0,
+        assetBalance: 0,
+        indirectExpenseBalance: 0,
+        governmentTaxesBalance: 0,
+        salaryAdvancesBalance: 0,
+        payrollExpenseBalance: 0,
+        cashBalance: 0,
+        bankBalance: 0,
+        uncategorized: 0,
+      };
+      
+      for (const account of allAccountsForRecon) {
+        const balanceRaw = parseFloat(account.currentBalance || "0");
+        if (Math.abs(balanceRaw) < 0.01) continue;
+        
+        const parentType = account.parentType || "UNKNOWN";
+        const name = account.name?.toUpperCase() || "";
+        let bucket = "uncategorized";
+        let signedBalance = balanceRaw;
+        
+        // Apply sign based on account type and balance side
+        const side = account.currentBalanceSide || "Dr";
+        
+        // Categorize by parent type and name patterns
+        if (parentType === "SUPPLIER") {
+          bucket = "supplierBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "DUTY_AGENT") {
+          bucket = "dutyAgentBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "TRANSPORTER_AGENT") {
+          bucket = "transporterAgentBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "LOAN") {
+          bucket = "loansBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "LIABILITY") {
+          bucket = "liabilityBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "PROFIT") {
+          bucket = "profitBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "INCOME" || parentType === "SALES") {
+          bucket = "incomeBalance";
+          signedBalance = side === "Cr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "ASSET") {
+          bucket = "assetBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "INDIRECT_EXPENSE" || parentType === "OPERATING_EXPENSE") {
+          bucket = "indirectExpenseBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "GOVERNMENT_TAXES") {
+          bucket = "governmentTaxesBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "SALARY_ADVANCE") {
+          bucket = "salaryAdvancesBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "CASH") {
+          bucket = "cashBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (parentType === "BANK") {
+          bucket = "bankBalance";
+          signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+        } else if (name.includes("SALARY") || name.includes("PAYROLL") || name.includes("WAGE")) {
+          if (parentType?.includes("EXPENSE")) {
+            bucket = "payrollExpenseBalance";
+            signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
+          }
+        }
+        
+        reconBuckets[bucket] = round2((reconBuckets[bucket] || 0) + signedBalance);
+        
+        accountContributions.push({
+          accountId: account.id,
+          accountName: account.name || "Unknown",
+          accountCode: account.code || "",
+          parentType,
+          bucket,
+          balance: round2(signedBalance),
+        });
+      }
+      
+      // Calculate variances between computed totals and bucket sums
+      interface BucketVariance {
+        bucket: string;
+        computed: number;
+        fromAccounts: number;
+        variance: number;
+        accountsInBucket: number;
+      }
+      
+      const variances: BucketVariance[] = [
+        { bucket: "supplierBalance", computed: round2(supplierBalance), fromAccounts: reconBuckets.supplierBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "dutyAgentBalance", computed: round2(dutyAgentBalance), fromAccounts: reconBuckets.dutyAgentBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "transporterAgentBalance", computed: round2(transporterAgentBalance), fromAccounts: reconBuckets.transporterAgentBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "loansBalance", computed: round2(loansBalance), fromAccounts: reconBuckets.loansBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "liabilityBalance", computed: round2(liabilityBalance), fromAccounts: reconBuckets.liabilityBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "profitBalance", computed: round2(profitBalance), fromAccounts: reconBuckets.profitBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "incomeBalance", computed: round2(incomeBalance), fromAccounts: reconBuckets.incomeBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "assetBalance", computed: round2(assetBalance), fromAccounts: reconBuckets.assetBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "indirectExpenseBalance", computed: round2(indirectExpenseBalance), fromAccounts: reconBuckets.indirectExpenseBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "governmentTaxesBalance", computed: round2(governmentTaxesBalance), fromAccounts: reconBuckets.governmentTaxesBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "salaryAdvancesBalance", computed: round2(salaryAdvancesBalance), fromAccounts: reconBuckets.salaryAdvancesBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "payrollExpenseBalance", computed: round2(payrollExpenseBalance), fromAccounts: reconBuckets.payrollExpenseBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "cashBalance", computed: round2(cashBalance), fromAccounts: reconBuckets.cashBalance, variance: 0, accountsInBucket: 0 },
+        { bucket: "bankBalance", computed: round2(bankBalance), fromAccounts: reconBuckets.bankBalance, variance: 0, accountsInBucket: 0 },
+      ];
+      
+      for (const v of variances) {
+        v.variance = round2(v.computed - v.fromAccounts);
+        v.accountsInBucket = accountContributions.filter(a => a.bucket === v.bucket).length;
+      }
+      
+      // Filter to only significant variances
+      const significantVariances = variances.filter(v => Math.abs(v.variance) > 1);
+      
+      // Find uncategorized accounts (potential issues)
+      const uncategorizedAccounts = accountContributions.filter(a => a.bucket === "uncategorized" && Math.abs(a.balance) > 1);
+      
+      // Add issue for uncategorized accounts if any
+      if (uncategorizedAccounts.length > 0) {
+        const totalUncategorized = uncategorizedAccounts.reduce((sum, a) => sum + a.balance, 0);
+        issues.push({
+          id: "uncategorized-accounts",
+          severity: "warning",
+          title: "Accounts with Unknown Category",
+          description: `Found ${uncategorizedAccounts.length} account(s) with balance of $${Math.abs(totalUncategorized).toFixed(2)} that don't fit any standard category. These may be causing the imbalance.`,
+          impact: Math.abs(totalUncategorized),
+          howToFix: "Review these accounts and ensure they have the correct parent type set: " + uncategorizedAccounts.map(a => a.accountName).join(", "),
+          category: "Account Mapping"
+        });
+      }
+      
+      // Add issue for significant variances
+      if (significantVariances.length > 0) {
+        for (const v of significantVariances) {
+          issues.push({
+            id: `variance-${v.bucket}`,
+            severity: "warning",
+            title: `Variance in ${v.bucket}`,
+            description: `Computed value ($${v.computed.toFixed(2)}) differs from account-level sum ($${v.fromAccounts.toFixed(2)}) by $${Math.abs(v.variance).toFixed(2)}. This may indicate double-counting or a calculation discrepancy.`,
+            impact: Math.abs(v.variance),
+            howToFix: "Check if any accounts are being counted in multiple buckets, or if there's a special calculation that's not reflected in the account balances.",
+            category: "Reconciliation"
+          });
+        }
+      }
+      
+      // === COMPONENT AUDIT FOR DEBUGGING ===
+      // Show ALL components with source information for debugging the $819.12 discrepancy
+      
+      interface ComponentAudit {
+        key: string;
+        label: string;
+        value: number;
+        source: "ledger" | "inventory" | "containers" | "sales" | "employees" | "calculated";
+        ledgerVerified: boolean;
+        ledgerSum?: number;
+        variance?: number;
+      }
+      
+      const componentAudit: ComponentAudit[] = [
+        // Assets
+        { key: "stockOtwValue", label: "Stock OTW", value: round2(stockOtwValue), source: "containers", ledgerVerified: false },
+        { key: "cashBalance", label: "Cash", value: round2(cashBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.cashBalance, variance: round2(cashBalance - reconBuckets.cashBalance) },
+        { key: "bankBalance", label: "Bank", value: round2(bankBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.bankBalance, variance: round2(bankBalance - reconBuckets.bankBalance) },
+        { key: "stockOnFloorValue", label: "Stock on Floor", value: round2(stockOnFloorValue), source: "inventory", ledgerVerified: false },
+        { key: "assetBalance", label: "Other Assets", value: round2(assetBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.assetBalance, variance: round2(assetBalance - reconBuckets.assetBalance) },
+        { key: "salaryAdvancesBalance", label: "Salary Advances", value: round2(salaryAdvancesBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.salaryAdvancesBalance, variance: round2(salaryAdvancesBalance - reconBuckets.salaryAdvancesBalance) },
+        // Expenses
+        { key: "indirectExpenseBalance", label: "Indirect Expenses", value: round2(indirectExpenseBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.indirectExpenseBalance, variance: round2(indirectExpenseBalance - reconBuckets.indirectExpenseBalance) },
+        { key: "payrollExpenseBalance", label: "Payroll Expenses", value: round2(payrollExpenseBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.payrollExpenseBalance, variance: round2(payrollExpenseBalance - reconBuckets.payrollExpenseBalance) },
+        { key: "governmentTaxesBalance", label: "Gov Taxes", value: round2(governmentTaxesBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.governmentTaxesBalance, variance: round2(governmentTaxesBalance - reconBuckets.governmentTaxesBalance) },
+        { key: "cogsBalance", label: "COGS", value: round2(cogsBalance), source: "sales", ledgerVerified: false },
+        // Liabilities
+        { key: "supplierBalance", label: "Suppliers", value: round2(supplierBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.supplierBalance, variance: round2(supplierBalance - reconBuckets.supplierBalance) },
+        { key: "dutyAgentBalance", label: "Duty Agent", value: round2(dutyAgentBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.dutyAgentBalance, variance: round2(dutyAgentBalance - reconBuckets.dutyAgentBalance) },
+        { key: "transporterAgentBalance", label: "Transporter", value: round2(transporterAgentBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.transporterAgentBalance, variance: round2(transporterAgentBalance - reconBuckets.transporterAgentBalance) },
+        { key: "loansBalance", label: "Loans", value: round2(loansBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.loansBalance, variance: round2(loansBalance - reconBuckets.loansBalance) },
+        { key: "liabilityBalance", label: "Other Liabilities", value: round2(liabilityBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.liabilityBalance, variance: round2(liabilityBalance - reconBuckets.liabilityBalance) },
+        { key: "profitBalance", label: "Profit", value: round2(profitBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.profitBalance, variance: round2(profitBalance - reconBuckets.profitBalance) },
+        { key: "incomeBalance", label: "Income", value: round2(incomeBalance), source: "ledger", ledgerVerified: true, ledgerSum: reconBuckets.incomeBalance, variance: round2(incomeBalance - reconBuckets.incomeBalance) },
+        { key: "payrollLiabilitiesBalance", label: "Payroll Liabilities", value: round2(payrollLiabilitiesBalance), source: "employees", ledgerVerified: false },
+        { key: "openingBalanceEquity", label: "Opening Equity", value: round2(openingBalanceEquity), source: "calculated", ledgerVerified: false },
+      ];
+      
+      // Find any component with non-zero variance
+      const componentsWithVariance = componentAudit.filter(c => c.ledgerVerified && c.variance && Math.abs(c.variance) > 0.5);
+      
+      // Add issues for components with variances
+      for (const comp of componentsWithVariance) {
+        issues.push({
+          id: "variance-" + comp.key,
+          severity: "warning",
+          title: "Variance in " + comp.label,
+          description: "Computed: $" + comp.value.toFixed(2) + ", Ledger sum: $" + (comp.ledgerSum || 0).toFixed(2) + ", Difference: $" + Math.abs(comp.variance || 0).toFixed(2),
+          impact: Math.abs(comp.variance || 0),
+          howToFix: "Check the account categorization for " + comp.label + " accounts. Some accounts may be miscategorized or double-counted.",
+          category: "Reconciliation"
+        });
+      }
+      const reconciliation = {
+        buckets: variances,
+        uncategorizedAccounts: uncategorizedAccounts.slice(0, 20), // Limit for response size
+        totalUncategorized: round2(reconBuckets.uncategorized),
+        significantVarianceCount: significantVariances.length,
+        componentAudit,
+      };
+      // === END RECONCILIATION SECTION ===
+
       // Sum up issue impacts
       const totalIssueImpact = round2(issues.reduce((sum, issue) => sum + issue.impact, 0));
 
@@ -20816,6 +21067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           warningIssues: issues.filter(i => i.severity === "warning").length,
           totalIssueImpact,
         },
+        reconciliation,
       });
     } catch (error: any) {
       console.error("Import cycle diagnostics error:", error);

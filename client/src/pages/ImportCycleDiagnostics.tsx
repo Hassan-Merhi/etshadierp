@@ -20,7 +20,8 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Wrench
+  Wrench,
+  Database
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
@@ -65,6 +66,41 @@ interface DiagnosticIssue {
   category: string;
 }
 
+interface BucketVariance {
+  bucket: string;
+  computed: number;
+  fromAccounts: number;
+  variance: number;
+  accountsInBucket: number;
+}
+
+interface UncategorizedAccount {
+  accountId: number;
+  accountName: string;
+  accountCode: string;
+  parentType: string;
+  bucket: string;
+  balance: number;
+}
+
+interface ComponentAudit {
+  key: string;
+  label: string;
+  value: number;
+  source: "ledger" | "inventory" | "containers" | "sales" | "employees" | "calculated";
+  ledgerVerified: boolean;
+  ledgerSum?: number;
+  variance?: number;
+}
+
+interface Reconciliation {
+  buckets: BucketVariance[];
+  uncategorizedAccounts: UncategorizedAccount[];
+  totalUncategorized: number;
+  significantVarianceCount: number;
+  componentAudit?: ComponentAudit[];
+}
+
 interface DiagnosticsData {
   issues: DiagnosticIssue[];
   summary: {
@@ -73,6 +109,7 @@ interface DiagnosticsData {
     warningCount: number;
     totalImpact: number;
   };
+  reconciliation?: Reconciliation;
 }
 
 interface ComponentInfo {
@@ -488,6 +525,125 @@ export default function ImportCycleDiagnostics() {
                 })}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reconciliation Section */}
+      {diagnosticsData?.reconciliation && (
+        <Card data-testid="card-reconciliation">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Reconciliation Analysis
+              {diagnosticsData.reconciliation.significantVarianceCount > 0 ? (
+                <Badge variant="destructive">{diagnosticsData.reconciliation.significantVarianceCount} Variance(s)</Badge>
+              ) : (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">All Matched</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Comparing computed totals vs account-level sums to identify discrepancies
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bucket</TableHead>
+                  <TableHead className="text-right">Computed</TableHead>
+                  <TableHead className="text-right">From Accounts</TableHead>
+                  <TableHead className="text-right">Variance</TableHead>
+                  <TableHead className="text-right">Accounts</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {diagnosticsData.reconciliation.buckets
+                  .filter(b => b.computed !== 0 || b.fromAccounts !== 0 || b.variance !== 0)
+                  .map((bucket) => (
+                  <TableRow 
+                    key={bucket.bucket} 
+                    className={Math.abs(bucket.variance) > 1 ? 'bg-yellow-50 dark:bg-yellow-950' : ''}
+                    data-testid={`recon-row-${bucket.bucket}`}
+                  >
+                    <TableCell className="font-medium">{bucket.bucket}</TableCell>
+                    <TableCell className="text-right font-mono">${formatNumber(bucket.computed)}</TableCell>
+                    <TableCell className="text-right font-mono">${formatNumber(bucket.fromAccounts)}</TableCell>
+                    <TableCell className={`text-right font-mono ${Math.abs(bucket.variance) > 1 ? 'text-destructive font-bold' : ''}`}>
+                      ${formatNumber(bucket.variance)}
+                    </TableCell>
+                    <TableCell className="text-right">{bucket.accountsInBucket}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {diagnosticsData.reconciliation.uncategorizedAccounts.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  Uncategorized Accounts (potential issue source)
+                </h4>
+                <div className="space-y-2">
+                  {diagnosticsData.reconciliation.uncategorizedAccounts.map((account) => (
+                    <div key={account.accountId} className="flex items-center justify-between p-2 bg-muted rounded">
+                      <span>
+                        <span className="font-mono text-sm">{account.accountCode}</span>
+                        <span className="ml-2">{account.accountName}</span>
+                        <Badge variant="outline" className="ml-2">{account.parentType}</Badge>
+                      </span>
+                      <span className={`font-mono ${account.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        ${formatNumber(account.balance)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {diagnosticsData.reconciliation.componentAudit && diagnosticsData.reconciliation.componentAudit.length > 0 && (
+              <div className="mt-6">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  Component Audit (All {diagnosticsData.reconciliation.componentAudit.length} Balance Components)
+                </h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Component</TableHead>
+                      <TableHead className="text-right">Value</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead className="text-right">Ledger Sum</TableHead>
+                      <TableHead className="text-right">Variance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {diagnosticsData.reconciliation.componentAudit.map((comp) => (
+                      <TableRow 
+                        key={comp.key}
+                        className={comp.variance && Math.abs(comp.variance) > 0.5 ? 'bg-red-50 dark:bg-red-950' : ''}
+                        data-testid={`audit-row-${comp.key}`}
+                      >
+                        <TableCell className="font-medium">{comp.label}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${formatNumber(comp.value)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={comp.ledgerVerified ? "default" : "outline"}>
+                            {comp.source}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {comp.ledgerVerified ? `$${formatNumber(comp.ledgerSum || 0)}` : 'N/A'}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono ${comp.variance && Math.abs(comp.variance) > 0.5 ? 'text-destructive font-bold' : ''}`}>
+                          {comp.ledgerVerified ? `$${formatNumber(comp.variance || 0)}` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
