@@ -20812,7 +20812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           let stockItemCode: string | null = null;
           let stockItemName: string | null = null;
           if (item.stockItemId) {
-            const stockItem = await storage.getStockItem(item.stockItemId);
+            const stockItem = await storage.getStockItemById(item.stockItemId);
             if (stockItem) {
               stockItemCode = stockItem.code;
               stockItemName = stockItem.name;
@@ -20837,7 +20837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check for duplicates
       const duplicates: Array<{stockItemId: number; poId: number; lineItemIds: number[]}> = [];
-      for (const [key, lineItemIds] of duplicateCheck.entries()) {
+      for (const [key, lineItemIds] of Array.from(duplicateCheck.entries())) {
         if (lineItemIds.length > 1) {
           const [poId, stockItemId] = key.split("-").map(Number);
           duplicates.push({ stockItemId, poId, lineItemIds });
