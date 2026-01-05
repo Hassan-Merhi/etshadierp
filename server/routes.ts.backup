@@ -17157,9 +17157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // ============ SIMPLIFIED NET POSITION CALCULATION ============
-      // Logic: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
-      // Expenses (except IMPORT_CHARGES) are subtracted from Net Position
-      // Suppliers only counted for parent company (or all companies if no parent set)
+      // EXPLICIT FORMULA as requested:
+      // ASSETS = Inventory + Inventory OTW + Customers + Cash in Hand + Banks + All Other Assets
+      // LIABILITIES = Workers + Loans
+      // NET POSITION = ASSETS - LIABILITIES - Adjustment
 
       // Helper function to calculate net balance for an account
       const getAccountNetBalance = (acc: typeof companyAccounts[0]): number => {
@@ -17170,101 +17171,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return signedOpening + balance.debit - balance.credit;
       };
 
-      // Get parent company setting for supplier handling
-      const parentCompanyId = await storage.getParentCompanyId();
-      const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
+      // Get the net position adjustment from company settings
+      const companySettingsData = await db
+        .select({ netPositionAdjustment: companySettings.netPositionAdjustment })
+        .from(companySettings)
+        .where(eq(companySettings.companyId, companyId))
+        .limit(1);
+      const netPositionAdjustment = parseFloat(companySettingsData[0]?.netPositionAdjustment || "0");
 
-      // Find accounts to EXCLUDE from expenses:
-      // 1. IMPORT_CHARGES parent and children (import costs capitalized into inventory)
-      // 2. PURCHASES accounts (inventory cost, not expense until sold)
-      const importChargesParent = companyAccounts.find(acc => acc.code === "IMPORT_CHARGES");
-      const excludedFromExpenses = new Set<number>();
-      
-      if (importChargesParent) {
-        excludedFromExpenses.add(importChargesParent.id);
-        // Also find all children of IMPORT_CHARGES
-        for (const acc of companyAccounts) {
-          if (acc.parentId === importChargesParent.id) {
-            excludedFromExpenses.add(acc.id);
-          }
-        }
-      }
-      
-      // Exclude PURCHASES accounts - these are inventory costs, not expenses
-      for (const acc of companyAccounts) {
-        if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
-          excludedFromExpenses.add(acc.id);
-        }
-      }
+      // Track totals for explicit categories
+      let inventoryTotal = 0;
+      let inventoryOtwTotal = 0;
+      let customersTotal = 0;
+      let cashInHandTotal = 0;
+      let banksTotal = 0;
+      let otherAssetsTotal = 0;
+      let workersTotal = 0;
+      let loansTotal = 0;
 
-      // Categorize accounts
-      const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
-      const isExpenseAccount = (acc: typeof companyAccounts[0]) => 
-        expenseTypes.includes(acc.accountType || "") && !excludedFromExpenses.has(acc.id);
-      
-      // Exclude these account types from Net Position calculation:
-      // - Income: P&L account, not balance sheet
-      // - Profit: Equity/Capital, not operating liability
-      // - Equity: Owner's capital
-      // - Fixed Asset: Not liquid assets for operating position
-      const excludedAccountTypes = ["Income", "Profit", "Equity", "Fixed Asset"];
-      
-      // Asset types that might contain fixed assets by name pattern
-      const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
-      
-      // Fixed asset name patterns - only apply to asset-type accounts
-      const fixedAssetNamePatterns = [
-        "rover", "toyota", "mercedes", "vehicle", "car", "truck",
-        "land", "property", "building", "house",
-        "rolex", "watch", "luxury", "jewelry",
-        "guarantee", "deposit", "caution"
-      ];
-      
-      // Stock/Inventory account patterns - exclude from ledger assets because we add computed stockOnFloor separately
-      // This prevents double-counting inventory (once from ledger accounts, once from inventory table)
-      const stockInventoryPatterns = [
-        "closing stock", "opening stock", "stock in hand", "stock on hand",
-        "inventory", "stock account", "goods in stock", "merchandise"
-      ];
-      const stockInventoryCodes = [
-        "CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"
-      ];
-      
-      const isExcludedFromNetPosition = (acc: typeof companyAccounts[0]) => {
-        // First check excluded account types
-        if (excludedAccountTypes.includes(acc.accountType || "")) return true;
-        
-        // Exclude Supplier-type ledger accounts for subsidiary companies
-        // Suppliers are only tracked for the parent company (Lubumbashi)
-        if (acc.accountType === "Supplier" && !shouldIncludeSuppliers) return true;
-        
-        const nameLower = (acc.name || "").toLowerCase();
-        const codeLower = (acc.code || "").toLowerCase();
-        
-        // Only apply pattern-based filters to asset-type accounts (not liabilities)
-        // This prevents accidentally excluding liability accounts that happen to contain these words
-        if (assetAccountTypes.includes(acc.accountType || "")) {
-          // Exclude stock/inventory ledger accounts - we add computed stockOnFloor separately
-          // This prevents double-counting inventory
-          if (stockInventoryPatterns.some(pattern => nameLower.includes(pattern))) {
-            return true;
-          }
-          if (stockInventoryCodes.some(code => codeLower === code.toLowerCase() || codeLower.startsWith(code.toLowerCase() + "_"))) {
-            return true;
-          }
-          
-          // Exclude fixed assets by name pattern
-          if (fixedAssetNamePatterns.some(pattern => nameLower.includes(pattern))) {
-            return true;
-          }
-        }
-        
-        return false;
-      };
-
-      // Track totals
-      let forUsTotal = 0;
-      let onUsTotal = 0;
+      // Track for P&L (kept for backward compatibility)
       let expensesTotal = 0;
       let incomeTotal = 0;
       const forUsBreakdown: { name: string; value: number }[] = [];
@@ -17281,94 +17206,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Group accounts by category for cleaner breakdown
       const categoryTotals: Record<string, number> = {};
 
-      // Process all ledger accounts with sign-based logic
+      // Process ledger accounts for EXPLICIT NET POSITION categories
+      // Categories: Cash in Hand, Banks, Loans, Other Assets
+      const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+      
       for (const acc of companyAccounts) {
         const netBalance = getAccountNetBalance(acc);
+        if (netBalance === 0) continue;
         
-        // Check if this is ANY expense-type account (regardless of excludedFromExpenses)
-        const isAnyExpenseType = expenseTypes.includes(acc.accountType || "");
+        const accountType = acc.accountType || "";
+        const nameLower = (acc.name || "").toLowerCase();
+        const codeLower = (acc.code || "").toLowerCase();
         
-        // Check if this is an Income account
-        const isIncomeAccount = acc.accountType === "Income";
-        
-        if (isIncomeAccount) {
-          // Income accounts: track in incomeTotal (typically have credit balances = negative netBalance)
-          // Income credits show as negative netBalance, so we take absolute value
+        // Income accounts (for P&L, not Net Position)
+        if (accountType === "Income") {
           if (netBalance < 0) {
             incomeTotal += Math.abs(netBalance);
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
             incomeAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
-          } else if (netBalance > 0) {
-            // Rare: debit balance on income = refund/return, reduce income
-            incomeTotal -= netBalance;
-            // Also reduce categoryTotals so breakdown matches total
-            categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
-            incomeAccounts.push({ name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
           }
           continue;
-        } else if (isAnyExpenseType) {
-          // Skip PURCHASES / IMPORT_CHARGES (handled elsewhere)
-          if (!excludedFromExpenses.has(acc.id)) {
-            const category = acc.accountType || "Expense";
-            if (netBalance > 0) {
-              // Normal expense (debit)
-              expensesTotal += netBalance;
-              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) + netBalance;
-              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
-            } else if (netBalance < 0) {
-              // Contra-expense / refund (credit) - reduces expenses
-              const credit = Math.abs(netBalance);
-              expensesTotal -= credit;
-              categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
-              expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
-            }
+        }
+        
+        // Expense accounts (for P&L, not Net Position)
+        if (expenseTypes.includes(accountType)) {
+          if (netBalance > 0) {
+            expensesTotal += netBalance;
+            categoryTotals[`exp_${accountType}`] = (categoryTotals[`exp_${accountType}`] || 0) + netBalance;
+            expensesAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: accountType });
           }
-          // Skip all expense-type accounts from asset/liability calculation
           continue;
-        } else if (isExcludedFromNetPosition(acc)) {
-          // Skip Profit/Equity accounts - they're not part of Net Position (Income now handled separately)
-          continue;
-        } else {
-          // Determine if account is naturally a liability type (should be treated as liability regardless of balance sign)
-          const liabilityAccountTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
-          const isLiabilityType = liabilityAccountTypes.includes(acc.accountType || "");
-          
-          if (isLiabilityType) {
-            // Liability-type accounts with SIGN-based classification:
-            // - POSITIVE balance (debit side) = we paid a deposit/advance = ASSET (we'll get it back)
-            // - NEGATIVE balance (credit side) = we owe them = LIABILITY
-            // Examples: Guarantee deposits PAID by us have positive balances = assets
-            if (netBalance > 0) {
-              // Positive = we paid/deposited, it's an asset (refundable deposit)
-              forUsTotal += netBalance;
-              const category = acc.accountType || "Liability";
-              categoryTotals[`asset_${category} Deposits`] = (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
-              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: category + " Deposits" });
-            } else if (netBalance < 0) {
-              // Negative = we owe them, it's a liability
-              onUsTotal += Math.abs(netBalance);
-              const category = acc.accountType || "Liability";
-              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            }
+        }
+        
+        // Skip Profit/Equity accounts (not part of Net Position)
+        if (["Profit", "Equity", "Income"].includes(accountType)) continue;
+        
+        // LOANS - check by account type or name pattern
+        if (accountType === "Loan" || nameLower.includes("loan")) {
+          if (netBalance < 0) {
+            // Negative balance = we owe (liability)
+            loansTotal += Math.abs(netBalance);
+            categoryTotals["liability_Loans"] = (categoryTotals["liability_Loans"] || 0) + Math.abs(netBalance);
+            onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Loans" });
           } else {
-            // Asset-type accounts: positive = asset, negative = liability (overdraft)
-            if (netBalance > 0) {
-              forUsTotal += netBalance;
-              const category = acc.accountType || "Other";
-              categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
-              forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category });
-            } else if (netBalance < 0) {
-              onUsTotal += Math.abs(netBalance);
-              const category = acc.accountType || "Other";
-              categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-              onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            }
+            // Positive balance = someone owes us (rare for loans, but possible)
+            otherAssetsTotal += netBalance;
+            categoryTotals["asset_Loan Receivable"] = (categoryTotals["asset_Loan Receivable"] || 0) + netBalance;
+            forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: "Loan Receivable" });
           }
+          continue;
+        }
+        
+        // CASH IN HAND - check by code pattern, account type or name pattern
+        // Find parent account if exists
+        const parentAcc = acc.parentId ? companyAccounts.find(p => p.id === acc.parentId) : null;
+        const isUnderCashInHand = parentAcc?.code === "CASH_IN_HAND";
+        if (isUnderCashInHand || accountType === "Cash" || 
+            codeLower.includes("cash") || nameLower.includes("cash in hand") || nameLower.includes("petty cash")) {
+          if (netBalance > 0) {
+            cashInHandTotal += netBalance;
+            categoryTotals["asset_Cash In Hand"] = (categoryTotals["asset_Cash In Hand"] || 0) + netBalance;
+            forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: "Cash In Hand" });
+          }
+          continue;
+        }
+        
+        // BANKS - check by account type or name pattern
+        if (accountType === "Bank" || nameLower.includes("bank")) {
+          if (netBalance > 0) {
+            banksTotal += netBalance;
+            categoryTotals["asset_Banks"] = (categoryTotals["asset_Banks"] || 0) + netBalance;
+            forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: "Banks" });
+          } else {
+            // Overdraft (negative bank balance) - treat as liability
+            loansTotal += Math.abs(netBalance);
+            categoryTotals["liability_Bank Overdraft"] = (categoryTotals["liability_Bank Overdraft"] || 0) + Math.abs(netBalance);
+            onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Bank Overdraft" });
+          }
+          continue;
+        }
+        
+        // ALL OTHER ASSETS - any remaining asset-type accounts with positive balance
+        if (["Asset", "Current Asset", "Fixed Asset"].includes(accountType) && netBalance > 0) {
+          otherAssetsTotal += netBalance;
+          categoryTotals["asset_Other Assets"] = (categoryTotals["asset_Other Assets"] || 0) + netBalance;
+          forUsAccounts.push({ name: acc.name, code: acc.code || "", value: netBalance, category: "Other Assets" });
         }
       }
 
-      // Add Stock on Floor (current inventory value) - always positive asset
+      // ============ INVENTORY (Stock on Floor) ============
       const activeLocationsData = await db
         .select({ id: locations.id })
         .from(locations)
@@ -17376,7 +17302,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .execute();
       const activeLocationIds = activeLocationsData.map((l) => l.id);
 
-      let stockOnFloor = 0;
       if (activeLocationIds.length > 0) {
         const inventoryData = await db
           .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
@@ -17384,72 +17309,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(inArray(inventory.locationId, activeLocationIds))
           .execute();
         for (const inv of inventoryData) {
-          stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+          inventoryTotal += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
         }
       }
-      if (stockOnFloor > 0) {
-        forUsTotal += stockOnFloor;
-        categoryTotals["asset_Stock In Hand"] = stockOnFloor;
-        forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
+      if (inventoryTotal > 0) {
+        categoryTotals["asset_Inventory"] = inventoryTotal;
+        forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: inventoryTotal, category: "Inventory" });
       }
 
-      // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
-      // Containers in transit are not yet assets - they become assets only when offloaded
-      // At that point, they increase inventory (asset) and create supplier/agent liabilities
+      // ============ INVENTORY OTW (Stock On The Way) ============
+      const otwContainers = await db
+        .select({
+          grandTotal: containers.grandTotal,
+        })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW")
+          )
+        );
+      inventoryOtwTotal = otwContainers.reduce((sum, container) => {
+        return sum + parseFloat(container.grandTotal || "0");
+      }, 0);
+      
+      if (inventoryOtwTotal > 0) {
+        categoryTotals["asset_Inventory OTW"] = inventoryOtwTotal;
+        forUsAccounts.push({ name: "Stock On The Way (OTW)", code: "COMPUTED", value: inventoryOtwTotal, category: "Inventory OTW" });
+      }
 
-      // Add Workers/Payroll - employee balances (what we owe them)
+      // ============ WORKERS (Employee Liabilities) ============
       const companyEmployees = await db
         .select()
         .from(employees)
         .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
         .execute();
-      let workerLiabilities = 0;
       for (const emp of companyEmployees) {
-        workerLiabilities += parseFloat(emp.currentBalance || "0");
-      }
-      if (workerLiabilities !== 0) {
-        if (workerLiabilities > 0) {
-          onUsTotal += workerLiabilities;
-          categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilities;
-          onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilities, category: "Workers" });
-        } else {
-          forUsTotal += Math.abs(workerLiabilities);
-          categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + Math.abs(workerLiabilities);
-          forUsAccounts.push({ name: "Worker Advances", code: "COMPUTED", value: Math.abs(workerLiabilities), category: "Worker Advances" });
+        const balance = parseFloat(emp.currentBalance || "0");
+        if (balance > 0) {
+          workersTotal += balance;
         }
+      }
+      if (workersTotal > 0) {
+        categoryTotals["liability_Workers"] = workersTotal;
+        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workersTotal, category: "Workers" });
       }
 
-      // Add Suppliers (only for parent company or if no parent set)
-      if (shouldIncludeSuppliers) {
-        const allSuppliers = await db.select().from(suppliers).where(isNull(suppliers.deletedAt)).execute();
-        let supplierLiabilities = 0;
-        let supplierAssets = 0;
-        
-        for (const sup of allSuppliers) {
-          const balance = supplierBalances.get(sup.id);
-          if (balance) {
-            const opening = parseFloat(sup.openingBalance || "0");
-            // Suppliers: Credit = we owe them, Debit = we paid them
-            // Net positive = we owe them (liability), Net negative = they owe us (asset)
-            const netBalance = opening + balance.credit - balance.debit;
-            if (netBalance > 0) {
-              supplierLiabilities += netBalance;
-              onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: netBalance, category: "Supplier" });
-            } else if (netBalance < 0) {
-              supplierAssets += Math.abs(netBalance);
-              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
-            }
+      // ============ CUSTOMERS (Receivables) ============
+      // Customers use ledger accounts for their balances
+      // Find customer ledger accounts and calculate from voucher entries
+      const companyCustomers = await db
+        .select()
+        .from(customers)
+        .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)))
+        .execute();
+      for (const cust of companyCustomers) {
+        // Calculate from opening balance and voucher entries using their linked ledger account
+        let custBalance = 0;
+        if (cust.ledgerAccountId) {
+          const custAcc = companyAccounts.find(a => a.id === cust.ledgerAccountId);
+          if (custAcc) {
+            custBalance = getAccountNetBalance(custAcc);
           }
+        } else {
+          // Fallback: use opening balance if no ledger account
+          const opening = parseFloat(cust.openingBalance || "0");
+          const openingSide = cust.openingBalanceSide === "Dr" ? 1 : -1;
+          custBalance = opening * openingSide;
         }
-        
-        if (supplierLiabilities > 0) {
-          onUsTotal += supplierLiabilities;
-          categoryTotals["liability_Suppliers"] = supplierLiabilities;
+        if (custBalance > 0) {
+          customersTotal += custBalance;
         }
-        if (supplierAssets > 0) {
-          forUsTotal += supplierAssets;
-          categoryTotals["asset_Supplier Overpayment"] = supplierAssets;
-        }
+      }
+      if (customersTotal > 0) {
+        categoryTotals["asset_Customers"] = customersTotal;
+        forUsAccounts.push({ name: "Customer Receivables", code: "COMPUTED", value: customersTotal, category: "Customers" });
       }
 
       // Build breakdowns from category totals
@@ -17483,26 +17417,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Helper to round currency values to 2 decimal places (prevents floating point noise)
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
       
-      // Round all totals to prevent floating point noise
-      forUsTotal = round2(forUsTotal);
-      onUsTotal = round2(onUsTotal);
+      // Round all totals
+      inventoryTotal = round2(inventoryTotal);
+      inventoryOtwTotal = round2(inventoryOtwTotal);
+      customersTotal = round2(customersTotal);
+      cashInHandTotal = round2(cashInHandTotal);
+      banksTotal = round2(banksTotal);
+      otherAssetsTotal = round2(otherAssetsTotal);
+      workersTotal = round2(workersTotal);
+      loansTotal = round2(loansTotal);
       incomeTotal = round2(incomeTotal);
       expensesTotal = round2(expensesTotal);
       
-      // Net Position = Pure sign-based: Sum(positive balances) - Sum(negative balances)
-      // Positive balance = asset (what we have)
-      // Negative balance = liability (what we owe)
-      // This is a simplified calculation: Assets - Liabilities only
-      const netPosition = round2(forUsTotal - onUsTotal);
+      // EXPLICIT FORMULA:
+      // ASSETS = Inventory + Inventory OTW + Customers + Cash + Banks
+      // LIABILITIES = Workers + Loans
+      // NET POSITION = ASSETS - LIABILITIES - Adjustment
+      const totalAssets = round2(inventoryTotal + inventoryOtwTotal + customersTotal + cashInHandTotal + banksTotal);
+      const totalLiabilities = round2(workersTotal + loansTotal);
+      const netPosition = round2(totalAssets - totalLiabilities - netPositionAdjustment);
+      
+      // For backward compatibility
+      const forUsTotal = totalAssets;
+      const onUsTotal = totalLiabilities;
       
       // Debug logging for Net Position calculation
-      console.log("Net Position Debug:", {
+      console.log("Net Position Debug (Explicit Formula):", {
         companyId,
-        shouldIncludeSuppliers,
-        forUsTotal,
-        onUsTotal,
+        inventoryTotal,
+        inventoryOtwTotal,
+        customersTotal,
+        cashInHandTotal,
+        banksTotal,
+        totalAssets,
+        workersTotal,
+        loansTotal,
+        totalLiabilities,
+        netPositionAdjustment,
         netPosition,
-        stockOnFloor,
         categoryTotals
       });
       const netPositionLabel = netPosition >= 0 

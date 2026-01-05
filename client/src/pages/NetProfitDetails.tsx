@@ -201,7 +201,7 @@ export default function NetProfitDetails() {
           <div className="flex items-center gap-3 text-lg flex-wrap">
             <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg">
               <span className="font-semibold text-green-700 dark:text-green-300">
-                Assets
+                What We Have
               </span>
               <span className="text-green-600">
                 ${formatNumber(data?.forUsTotal || 0)}
@@ -210,28 +210,10 @@ export default function NetProfitDetails() {
             <Minus className="h-5 w-5 text-muted-foreground" />
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950 px-3 py-2 rounded-lg">
               <span className="font-semibold text-red-700 dark:text-red-300">
-                Liabilities
+                What We Owe
               </span>
               <span className="text-red-600">
                 ${formatNumber(data?.onUsTotal || 0)}
-              </span>
-            </div>
-            <Plus className="h-5 w-5 text-muted-foreground" />
-            <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950 px-3 py-2 rounded-lg">
-              <span className="font-semibold text-green-700 dark:text-green-300">
-                Income
-              </span>
-              <span className="text-green-600">
-                ${formatNumber(data?.incomeTotal || 0)}
-              </span>
-            </div>
-            <Minus className="h-5 w-5 text-muted-foreground" />
-            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950 px-3 py-2 rounded-lg">
-              <span className="font-semibold text-red-700 dark:text-red-300">
-                Expenses
-              </span>
-              <span className="text-red-600">
-                ${formatNumber(data?.expensesTotal || 0)}
               </span>
             </div>
             <Equal className="h-5 w-5 text-muted-foreground" />
