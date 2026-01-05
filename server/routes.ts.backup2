@@ -9265,18 +9265,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const offloadValue = parseFloat(offloadItem.totalValue);
                 const newQty = currentQty - offloadQty;
                 
-                // Allow negative stock - don't delete inventory records
-                const newTotalValue = currentValue - offloadValue;
-                // For negative/zero stock, preserve the average rate for future offloads
-                const newAvgRate = newQty > 0 ? newTotalValue / newQty : parseFloat(inv.averageRate || "0");
-                await tx
-                  .update(inventory)
-                  .set({ 
-                    quantity: newQty.toString(),
-                    totalValue: newTotalValue.toFixed(2),
-                    averageRate: newAvgRate.toFixed(2),
-                  })
-                  .where(eq(inventory.id, inv.id));
+                if (newQty <= 0) {
+                  await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                } else {
+                  const newTotalValue = currentValue - offloadValue;
+                  const newAvgRate = newTotalValue / newQty;
+                  await tx
+                    .update(inventory)
+                    .set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue.toFixed(2),
+                      averageRate: newAvgRate.toFixed(2),
+                    })
+                    .where(eq(inventory.id, inv.id));
+                }
               }
             }
             
@@ -9341,18 +9343,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const currentValue = parseFloat(inv.totalValue);
                 const newQty = currentQty - data.totalQuantity;
                 
-                // Allow negative stock - don't delete inventory records
-                const newTotalValue = currentValue - offloadValue;
-                // For negative/zero stock, preserve the average rate for future offloads
-                const newAvgRate = newQty > 0 ? newTotalValue / newQty : parseFloat(inv.averageRate || "0");
-                await tx
-                  .update(inventory)
-                  .set({ 
-                    quantity: newQty.toString(),
-                    totalValue: newTotalValue.toFixed(2),
-                    averageRate: newAvgRate.toFixed(2),
-                  })
-                  .where(eq(inventory.id, inv.id));
+                if (newQty <= 0) {
+                  await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                } else {
+                  const newTotalValue = currentValue - offloadValue;
+                  const newAvgRate = newTotalValue / newQty;
+                  await tx
+                    .update(inventory)
+                    .set({ 
+                      quantity: newQty.toString(),
+                      totalValue: newTotalValue.toFixed(2),
+                      averageRate: newAvgRate.toFixed(2),
+                    })
+                    .where(eq(inventory.id, inv.id));
+                }
               }
             }
           }
@@ -15229,24 +15233,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     .limit(1);
 
                   if (inv) {
-                    // Add quantity back using weighted average with original costPrice
+                    // Add quantity back at existing rate (forward sale didn't change rate)
                     const existingQty = parseFloat(inv.quantity);
-                    const existingValue = parseFloat(inv.totalValue || "0");
-                    const returnedValue = qty * costPrice;
+                    const existingRate = parseFloat(inv.averageRate || "0");
                     const newQty = existingQty + qty;
-                    // Weighted average: blend existing value with returned value
-                    const newValue = existingValue + returnedValue;
-                    // Calculate new average rate - maintain totalValue/quantity consistency
-                    // For negative stock, still calculate the rate to keep averageRate × quantity = totalValue
-                    const newRate = newQty !== 0 ? newValue / newQty : costPrice;
+                    // Keep the same rate - POS sale forward logic doesn't change it
+                    const newValue = newQty * existingRate;
                     
-                    console.log(`[POS Delete] Item ${item.stockItemId}: qty ${existingQty} + ${qty} = ${newQty}, value ${existingValue.toFixed(2)} + ${returnedValue.toFixed(2)} = ${newValue.toFixed(2)}, rate: ${newRate.toFixed(2)}`);
+                    console.log(`[POS Delete] Item ${item.stockItemId}: ${existingQty} + ${qty} = ${newQty} (rate: ${existingRate})`);
 
                     await tx
                       .update(inventory)
                       .set({
                         quantity: newQty.toString(),
-                        averageRate: newRate.toString(),
                         totalValue: newValue.toString(),
                       })
                       .where(eq(inventory.id, inv.id));
@@ -15295,12 +15294,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
 
-          // Soft delete: Keep voucher entries but set deletedAt on voucher
-          // This automatically excludes entries from balance calculations
-          // (calculateAccountBalance filters by isNull(vouchers.deletedAt))
+          // Delete voucher entries first (foreign key constraint)
           await tx
-            .update(vouchers)
-            .set({ deletedAt: new Date() })
+            .delete(voucherEntries)
+            .where(eq(voucherEntries.voucherId, id));
+          
+          // Delete voucher
+          await tx
+            .delete(vouchers)
             .where(eq(vouchers.id, id));
         });
 
@@ -15594,8 +15595,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
             }
 
-            // Soft delete: Set deletedAt instead of hard delete
-            await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, id));
+            // Delete voucher entries and voucher
+            await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
+            await tx.delete(vouchers).where(eq(vouchers.id, id));
           });
 
           deletedCount++;
