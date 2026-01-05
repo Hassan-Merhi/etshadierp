@@ -17430,10 +17430,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       expensesTotal = round2(expensesTotal);
       
       // EXPLICIT FORMULA:
-      // ASSETS = Inventory + Inventory OTW + Customers + Cash in Hand + Banks + Other Assets
+      // ASSETS = Inventory + Inventory OTW + Customers + Cash + Banks
       // LIABILITIES = Workers + Loans
       // NET POSITION = ASSETS - LIABILITIES - Adjustment
-      const totalAssets = round2(inventoryTotal + inventoryOtwTotal + customersTotal + cashInHandTotal + banksTotal + otherAssetsTotal);
+      const totalAssets = round2(inventoryTotal + inventoryOtwTotal + customersTotal + cashInHandTotal + banksTotal);
       const totalLiabilities = round2(workersTotal + loansTotal);
       const netPosition = round2(totalAssets - totalLiabilities - netPositionAdjustment);
       
@@ -17449,7 +17449,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customersTotal,
         cashInHandTotal,
         banksTotal,
-        otherAssetsTotal,
         totalAssets,
         workersTotal,
         loansTotal,
