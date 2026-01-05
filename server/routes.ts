@@ -21028,6 +21028,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       // === END RECONCILIATION SECTION ===
 
+      // === CONTAINER OFFLOAD AUDIT ===
+      // For each offloaded container, compare total debits vs total credits to find discrepancies
+      
+      interface ContainerAuditEntry {
+        containerId: number;
+        containerNumber: string;
+        status: string;
+        supplierName: string;
+        itemsTotal: number;
+        chargesTotal: number;
+        grandTotal: number;
+        voucherDebits: number;
+        voucherCredits: number;
+        difference: number;
+        voucherCount: number;
+        hasDiscrepancy: boolean;
+      }
+      
+      const containerAudit: ContainerAuditEntry[] = [];
+      
+      // Get all offloaded containers for this company
+      const offloadedContainers = await db
+        .select({
+          id: containers.id,
+          containerNumber: containers.containerNumber,
+          status: containers.status,
+          supplierId: containers.supplierId,
+          itemsTotal: containers.itemsTotal,
+          chargesTotal: containers.chargesTotal,
+          grandTotal: containers.grandTotal,
+        })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OFFLOADED")
+          )
+        );
+      
+      // For each container, find all related voucher entries by matching narration
+      for (const container of offloadedContainers) {
+        // Get supplier name
+        const supplier = await db
+          .select({ name: suppliers.name })
+          .from(suppliers)
+          .where(eq(suppliers.id, container.supplierId))
+          .limit(1);
+        
+        const supplierName = supplier[0]?.name || "Unknown";
+        
+        // Find voucher entries with this container number in narration
+        const containerPattern = `%${container.containerNumber}%`;
+        
+        const relatedEntries = await db
+          .select({
+            id: voucherEntries.id,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+            narration: voucherEntries.narration,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`${voucherEntries.narration} ILIKE ${containerPattern}`,
+              sql`COALESCE(${vouchers.optional}, false) = false` // Exclude optional/draft vouchers
+            )
+          );
+        
+        // Sum debits and credits
+        let totalDebits = 0;
+        let totalCredits = 0;
+        
+        for (const entry of relatedEntries) {
+          totalDebits += parseFloat(entry.debitAmount || "0");
+          totalCredits += parseFloat(entry.creditAmount || "0");
+        }
+        
+        const difference = round2(totalDebits - totalCredits);
+        
+        containerAudit.push({
+          containerId: container.id,
+          containerNumber: container.containerNumber,
+          status: container.status,
+          supplierName,
+          itemsTotal: parseFloat(container.itemsTotal || "0"),
+          chargesTotal: parseFloat(container.chargesTotal || "0"),
+          grandTotal: parseFloat(container.grandTotal || "0"),
+          voucherDebits: round2(totalDebits),
+          voucherCredits: round2(totalCredits),
+          difference,
+          voucherCount: relatedEntries.length,
+          hasDiscrepancy: Math.abs(difference) > 1,
+        });
+      }
+      
+      // Find containers with discrepancies
+      const containersWithDiscrepancy = containerAudit.filter(c => c.hasDiscrepancy);
+      
+      // Add issues for containers with discrepancies
+      for (const c of containersWithDiscrepancy) {
+        issues.push({
+          id: `container-discrepancy-${c.containerId}`,
+          severity: "critical",
+          title: `Container ${c.containerNumber} has unbalanced entries`,
+          description: `Voucher debits ($${c.voucherDebits.toFixed(2)}) do not equal credits ($${c.voucherCredits.toFixed(2)}). Difference: $${Math.abs(c.difference).toFixed(2)}. This container's offload entries are not balanced.`,
+          impact: Math.abs(c.difference),
+          howToFix: `Review voucher entries for container ${c.containerNumber}. A correction journal entry of $${Math.abs(c.difference).toFixed(2)} is needed to balance the books.`,
+          category: "Container Offload"
+        });
+      }
+      
+      // === END CONTAINER OFFLOAD AUDIT ===
+
       // Sum up issue impacts
       const totalIssueImpact = round2(issues.reduce((sum, issue) => sum + issue.impact, 0));
 
@@ -21068,6 +21183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalIssueImpact,
         },
         reconciliation,
+        containerAudit,
       });
     } catch (error: any) {
       console.error("Import cycle diagnostics error:", error);

@@ -21,7 +21,8 @@ import {
   TrendingDown,
   Minus,
   Wrench,
-  Database
+  Database,
+  Package
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
@@ -101,6 +102,21 @@ interface Reconciliation {
   componentAudit?: ComponentAudit[];
 }
 
+interface ContainerAuditEntry {
+  containerId: number;
+  containerNumber: string;
+  status: string;
+  supplierName: string;
+  itemsTotal: number;
+  chargesTotal: number;
+  grandTotal: number;
+  voucherDebits: number;
+  voucherCredits: number;
+  difference: number;
+  voucherCount: number;
+  hasDiscrepancy: boolean;
+}
+
 interface DiagnosticsData {
   issues: DiagnosticIssue[];
   summary: {
@@ -110,6 +126,7 @@ interface DiagnosticsData {
     totalImpact: number;
   };
   reconciliation?: Reconciliation;
+  containerAudit?: ContainerAuditEntry[];
 }
 
 interface ComponentInfo {
@@ -644,6 +661,79 @@ export default function ImportCycleDiagnostics() {
                 </Table>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Container Offload Audit */}
+      {diagnosticsData?.containerAudit && diagnosticsData.containerAudit.length > 0 && (
+        <Card data-testid="container-audit-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Container Offload Audit
+              {diagnosticsData.containerAudit.filter(c => c.hasDiscrepancy).length > 0 ? (
+                <Badge variant="destructive">
+                  {diagnosticsData.containerAudit.filter(c => c.hasDiscrepancy).length} Discrepancy
+                </Badge>
+              ) : (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">All Balanced</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Comparing voucher debits vs credits for each offloaded container to find unbalanced entries
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Container</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead className="text-right">Container Total</TableHead>
+                  <TableHead className="text-right">Voucher Debits</TableHead>
+                  <TableHead className="text-right">Voucher Credits</TableHead>
+                  <TableHead className="text-right">Difference</TableHead>
+                  <TableHead className="text-right">Entries</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {diagnosticsData.containerAudit.map((container) => (
+                  <TableRow 
+                    key={container.containerId}
+                    className={container.hasDiscrepancy ? 'bg-red-50 dark:bg-red-950' : ''}
+                    data-testid={`container-row-${container.containerId}`}
+                  >
+                    <TableCell className="font-medium">{container.containerNumber}</TableCell>
+                    <TableCell>{container.supplierName}</TableCell>
+                    <TableCell className="text-right font-mono">${formatNumber(container.grandTotal)}</TableCell>
+                    <TableCell className="text-right font-mono">${formatNumber(container.voucherDebits)}</TableCell>
+                    <TableCell className="text-right font-mono">${formatNumber(container.voucherCredits)}</TableCell>
+                    <TableCell className={`text-right font-mono ${container.hasDiscrepancy ? 'text-destructive font-bold' : ''}`}>
+                      ${formatNumber(container.difference)}
+                    </TableCell>
+                    <TableCell className="text-right">{container.voucherCount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Summary row */}
+            <div className="mt-4 p-4 bg-muted rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">Total Discrepancy:</span>
+                <span className={`font-mono text-lg ${diagnosticsData.containerAudit.reduce((sum, c) => sum + c.difference, 0) !== 0 ? 'text-destructive font-bold' : 'text-green-600'}`}>
+                  ${formatNumber(diagnosticsData.containerAudit.reduce((sum, c) => sum + c.difference, 0))}
+                </span>
+              </div>
+              {diagnosticsData.containerAudit.filter(c => c.hasDiscrepancy).length > 0 && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  The containers highlighted in red have unbalanced voucher entries. 
+                  A positive difference means debits exceed credits (possible missing liability).
+                  A negative difference means credits exceed debits (possible missing expense/asset).
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
