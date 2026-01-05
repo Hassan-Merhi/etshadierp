@@ -20508,6 +20508,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Orphaned Charge Vouchers Diagnostics - Find charge vouchers for OTW containers
   // These are vouchers (DUTY-, TRANS-, OFFICE-, CHG-, XFER-) that should only exist for OFFLOADED containers
+  // Business logic: Charge vouchers are created ONLY during container offload. If a container's status is OTW
+  // (not offloaded) but has charge vouchers, those are definitively orphaned because:
+  // 1. Containers start as OTW with no charges
+  // 2. Offload creates charge vouchers AND changes status to OFFLOADED  
+  // 3. If status is OTW with charge vouchers, offload was reversed without proper cleanup
   app.get("/api/debug/orphaned-charge-vouchers", requireAuth, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -20515,14 +20520,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Get all OTW containers for this company
+      // Get all OTW containers for this company that do NOT have an active offload record
+      // This ensures we're only looking at containers that were reversed (orphaned)
       const otwContainers = await db
         .select({ id: containers.id, containerNumber: containers.containerNumber })
         .from(containers)
+        .leftJoin(containerOffloads, eq(containers.id, containerOffloads.containerId))
         .where(
           and(
             eq(containers.companyId, companyId),
-            eq(containers.status, "OTW")
+            eq(containers.status, "OTW"),
+            isNull(containerOffloads.id) // No active offload record = was reversed
           )
         );
 
@@ -20534,9 +20542,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         containerId: number;
         totalDebit: number;
         totalCredit: number;
+        reason: string;
       }> = [];
 
-      // For each OTW container, find any charge vouchers that shouldn't exist
+      // For each OTW container without offload record, find any charge vouchers that shouldn't exist
       for (const container of otwContainers) {
         const chargeVouchersForContainer = await db
           .select({
@@ -20580,6 +20589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containerId: container.id,
             totalDebit,
             totalCredit,
+            reason: "Container is OTW with no offload record but has charge vouchers (offload was reversed without cleanup)",
           });
         }
       }
@@ -20589,6 +20599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orphanedVoucherCount: orphanedVouchers.length,
         orphanedVouchers,
         totalImpact: orphanedVouchers.reduce((sum, v) => sum + Math.abs(v.totalDebit - v.totalCredit), 0),
+        explanation: "These vouchers exist for containers in OTW status that have no offload record. They were created during offload but not cleaned up when the offload was reversed.",
       });
     } catch (error: any) {
       console.error("Orphaned charge vouchers diagnostics error:", error);
@@ -20597,6 +20608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete orphaned charge vouchers for OTW containers
+  // Only deletes vouchers for containers that are OTW AND have no offload record (confirmed reversed)
   app.post("/api/admin/fix-orphaned-charge-vouchers", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -20604,20 +20616,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      // Get all OTW containers for this company
+      // Get all OTW containers that do NOT have an active offload record
       const otwContainers = await db
         .select({ id: containers.id, containerNumber: containers.containerNumber })
         .from(containers)
+        .leftJoin(containerOffloads, eq(containers.id, containerOffloads.containerId))
         .where(
           and(
             eq(containers.companyId, companyId),
-            eq(containers.status, "OTW")
+            eq(containers.status, "OTW"),
+            isNull(containerOffloads.id) // No active offload record = was reversed
           )
         );
 
-      const deletedVouchers: Array<{ voucherId: number; voucherNumber: string }> = [];
+      const deletedVouchers: Array<{ voucherId: number; voucherNumber: string; containerNumber: string }> = [];
 
-      // For each OTW container, find and delete charge vouchers
+      // For each OTW container without offload record, find and delete charge vouchers
       for (const container of otwContainers) {
         const chargeVouchersForContainer = await db
           .select({
@@ -20648,7 +20662,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           deletedVouchers.push({
             voucherId: v.id,
             voucherNumber: v.voucherNumber,
+            containerNumber: container.containerNumber,
           });
+          
+          console.log(`Deleted orphaned voucher: ${v.voucherNumber} for container ${container.containerNumber}`);
         }
       }
 
@@ -20656,6 +20673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Deleted ${deletedVouchers.length} orphaned charge vouchers`,
         deletedCount: deletedVouchers.length,
         deletedVouchers,
+        containersChecked: otwContainers.length,
       });
     } catch (error: any) {
       console.error("Fix orphaned charge vouchers error:", error);

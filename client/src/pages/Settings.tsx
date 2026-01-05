@@ -388,6 +388,8 @@
     const [newPasswordForReset, setNewPasswordForReset] = useState("");
     const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
     const [changePasswordData, setChangePasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    const [orphanedChargesDiagnostic, setOrphanedChargesDiagnostic] = useState<{ count: number; impact: number; vouchers: any[] } | null>(null);
+    const [isFixingOrphanedCharges, setIsFixingOrphanedCharges] = useState(false);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -2101,6 +2103,126 @@
                     >
                       Fix Orphaned
                     </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-amber-500/10 rounded-lg">
+                          <AlertTriangle className="h-6 w-6 text-amber-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-fix-orphaned-charges-title">Fix Orphaned Charge Vouchers</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Delete charge vouchers (DUTY, TRANS, etc.) that shouldn't exist for OTW containers
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              setOrphanedChargesDiagnostic(null);
+                              const response = await fetch("/api/debug/orphaned-charge-vouchers", {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setOrphanedChargesDiagnostic({
+                                  count: result.orphanedVoucherCount,
+                                  impact: result.totalImpact,
+                                  vouchers: result.orphanedVouchers || [],
+                                });
+                                if (result.orphanedVoucherCount === 0) {
+                                  toast({
+                                    title: "No Orphaned Vouchers",
+                                    description: "All OTW containers have no leftover charge vouchers.",
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          data-testid="button-diagnose-orphaned-charges"
+                        >
+                          Diagnose
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0 || isFixingOrphanedCharges}
+                          onClick={async () => {
+                            if (!orphanedChargesDiagnostic || orphanedChargesDiagnostic.count === 0) return;
+                            if (!confirm(`Delete ${orphanedChargesDiagnostic.count} orphaned vouchers with impact of $${orphanedChargesDiagnostic.impact.toFixed(2)}? This cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              setIsFixingOrphanedCharges(true);
+                              const response = await fetch("/api/admin/fix-orphaned-charge-vouchers", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                toast({
+                                  title: "Cleanup Complete",
+                                  description: result.message,
+                                });
+                                setOrphanedChargesDiagnostic(null);
+                                queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsFixingOrphanedCharges(false);
+                            }
+                          }}
+                          data-testid="button-fix-orphaned-charges"
+                        >
+                          {isFixingOrphanedCharges ? "Deleting..." : "Delete Orphaned"}
+                        </Button>
+                      </div>
+                    </div>
+                    {orphanedChargesDiagnostic && orphanedChargesDiagnostic.count > 0 && (
+                      <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
+                        <p className="font-medium text-destructive">
+                          Found {orphanedChargesDiagnostic.count} orphaned vouchers (Impact: ${orphanedChargesDiagnostic.impact.toFixed(2)})
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-sm">
+                          {orphanedChargesDiagnostic.vouchers.map((v: any, i: number) => (
+                            <div key={i} className="flex justify-between text-muted-foreground py-1 border-b last:border-0">
+                              <span>{v.voucherNumber}</span>
+                              <span>Container: {v.containerNumber}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
 
