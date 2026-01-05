@@ -2162,40 +2162,45 @@ export class DbStorage implements IStorage {
         // Add to existing inventory with weighted average rate
         const existingQty = parseFloat(existing.quantity);
         const existingRate = parseFloat(existing.averageRate);
+        const existingValue = parseFloat(existing.totalValue || "0");
         
-        // Handle corrupt negative inventory - replace instead of add
+        // Negative inventory is VALID when sales happen before container offload
+        // We must ADD to it (not replace) so: -2 + 15 = 13 (correct)
+        // Previously this was replaced: -2 -> 15 (incorrect, lost the pre-sale)
         if (existingQty < 0) {
-          console.warn(`Detected corrupt negative inventory for stock item ${stockItemId} at location ${locationId}. Existing qty: ${existingQty}. Replacing with new qty: ${data.totalQuantity}`);
-          
-          const newTotalValue = data.totalQuantity * newRate;
-          
-          await db
-            .update(schema.inventory)
-            .set({
-              quantity: data.totalQuantity.toString(),
-              averageRate: newRate.toFixed(2),
-              totalValue: newTotalValue.toFixed(2),
-              lastUpdated: new Date(),
-            })
-            .where(eq(schema.inventory.id, existing.id));
-          continue;
+          console.log(`Pre-sale inventory detected for stock item ${stockItemId}: existing qty = ${existingQty}, adding ${data.totalQuantity}`);
         }
         
         const newQty = existingQty + data.totalQuantity;
         
-        // Safety check for division by zero
-        if (newQty <= 0) {
-          throw new Error(`New quantity is ${newQty} for stock item ${stockItemId}. Existing: ${existingQty}, Adding: ${data.totalQuantity}. This indicates corrupt inventory data.`);
-        }
+        // Calculate weighted average rate
+        // Handle special cases where standard weighted average doesn't apply
+        let weightedAvgRate: number;
+        let newTotalValue: number;
         
-        const weightedAvgRate = ((existingQty * existingRate) + (data.totalQuantity * newRate)) / newQty;
+        if (newQty === 0) {
+          // Sold exactly what arrived - no inventory left, use incoming rate for tracking
+          weightedAvgRate = newRate;
+          newTotalValue = 0;
+          console.log(`Zero inventory after offload for stock item ${stockItemId}: sold ${Math.abs(existingQty)}, received ${data.totalQuantity}`);
+        } else if (newQty < 0) {
+          // Oversold more than arrived - still negative inventory
+          // Use the incoming rate for tracking (this is an unusual situation)
+          weightedAvgRate = newRate;
+          newTotalValue = newQty * newRate; // Will be negative (represents owed value)
+          console.warn(`Still negative inventory after offload for stock item ${stockItemId}: existing ${existingQty} + received ${data.totalQuantity} = ${newQty}`);
+        } else {
+          // Normal case: positive quantity - calculate weighted average
+          // Total value = existing value + incoming value, divided by total quantity
+          const incomingValue = data.totalQuantity * newRate;
+          newTotalValue = existingValue + incomingValue;
+          weightedAvgRate = newTotalValue / newQty;
+        }
         
         // Safety check for infinity
         if (!isFinite(weightedAvgRate)) {
           throw new Error(`Calculated weighted average rate is infinite for stock item ${stockItemId}. existingQty=${existingQty}, existingRate=${existingRate}, newQty=${newQty}, newRate=${newRate}`);
         }
-        
-        const newTotalValue = newQty * weightedAvgRate;
 
         await db
           .update(schema.inventory)

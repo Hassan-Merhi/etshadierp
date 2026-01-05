@@ -20682,6 +20682,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Container Offload Diagnostics - Analyze PO line items for potential issues
+  app.get("/api/containers/:id/offload-diagnostics", requireAuth, async (req, res) => {
+    try {
+      const containerId = parseInt(req.params.id);
+      if (isNaN(containerId)) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get container
+      const container = await storage.getContainerById(containerId);
+      if (!container || container.companyId !== companyId) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      // Get all POs for this container
+      const pos = await storage.getPurchaseOrdersByContainer(containerId);
+      
+      const lineItemDetails: Array<{
+        poId: number;
+        poNumber: string;
+        lineItemId: number;
+        stockItemId: number | null;
+        stockItemCode: string | null;
+        stockItemName: string | null;
+        quantity: string;
+        quantityParsed: number;
+        rate: string;
+        isValid: boolean;
+        issues: string[];
+      }> = [];
+
+      const duplicateCheck = new Map<string, number[]>(); // stockItemId -> [lineItemIds]
+      let totalQuantity = 0;
+      let invalidLineItems = 0;
+      let blankQuantities = 0;
+      
+      for (const po of pos) {
+        const lineItems = await storage.getLineItemsByPO(po.id);
+        
+        for (const item of lineItems) {
+          const issues: string[] = [];
+          const quantityParsed = parseFloat(item.quantity);
+          
+          // Check for issues
+          if (!item.stockItemId || item.stockItemId === 0) {
+            issues.push("No stock item assigned");
+            invalidLineItems++;
+          }
+          
+          if (isNaN(quantityParsed) || item.quantity === "" || item.quantity === null) {
+            issues.push("Blank or invalid quantity");
+            blankQuantities++;
+          } else if (quantityParsed <= 0) {
+            issues.push("Zero or negative quantity");
+          } else {
+            totalQuantity += quantityParsed;
+          }
+          
+          // Track for duplicate detection
+          if (item.stockItemId && item.stockItemId !== 0) {
+            const key = `${po.id}-${item.stockItemId}`;
+            if (!duplicateCheck.has(key)) {
+              duplicateCheck.set(key, []);
+            }
+            duplicateCheck.get(key)!.push(item.id);
+          }
+          
+          // Get stock item details
+          let stockItemCode: string | null = null;
+          let stockItemName: string | null = null;
+          if (item.stockItemId) {
+            const stockItem = await storage.getStockItem(item.stockItemId);
+            if (stockItem) {
+              stockItemCode = stockItem.code;
+              stockItemName = stockItem.name;
+            }
+          }
+          
+          lineItemDetails.push({
+            poId: po.id,
+            poNumber: po.poNumber || `PO-${po.id}`,
+            lineItemId: item.id,
+            stockItemId: item.stockItemId,
+            stockItemCode,
+            stockItemName,
+            quantity: item.quantity,
+            quantityParsed: isNaN(quantityParsed) ? 0 : quantityParsed,
+            rate: item.rate,
+            isValid: issues.length === 0,
+            issues,
+          });
+        }
+      }
+      
+      // Check for duplicates
+      const duplicates: Array<{stockItemId: number; poId: number; lineItemIds: number[]}> = [];
+      for (const [key, lineItemIds] of duplicateCheck.entries()) {
+        if (lineItemIds.length > 1) {
+          const [poId, stockItemId] = key.split("-").map(Number);
+          duplicates.push({ stockItemId, poId, lineItemIds });
+          
+          // Mark duplicates in lineItemDetails
+          for (const detail of lineItemDetails) {
+            if (lineItemIds.includes(detail.lineItemId)) {
+              detail.issues.push(`Duplicate: ${lineItemIds.length} entries for same stock item in same PO`);
+              detail.isValid = false;
+            }
+          }
+        }
+      }
+
+      // Check existing inventory for pre-sales
+      const inventoryWarnings: Array<{stockItemId: number; stockItemCode: string; currentQty: number; incomingQty: number; resultQty: number}> = [];
+      
+      // Group by stock item
+      const stockItemTotals = new Map<number, number>();
+      for (const item of lineItemDetails) {
+        if (item.stockItemId && item.isValid) {
+          stockItemTotals.set(item.stockItemId, (stockItemTotals.get(item.stockItemId) || 0) + item.quantityParsed);
+        }
+      }
+
+      res.json({
+        containerId,
+        containerNumber: container.containerNumber,
+        containerStatus: container.status,
+        poCount: pos.length,
+        lineItemCount: lineItemDetails.length,
+        totalQuantity,
+        invalidLineItems,
+        blankQuantities,
+        duplicateCount: duplicates.length,
+        duplicates,
+        lineItems: lineItemDetails,
+        inventoryWarnings,
+        hasIssues: invalidLineItems > 0 || blankQuantities > 0 || duplicates.length > 0,
+        summary: {
+          valid: lineItemDetails.filter(i => i.isValid).length,
+          invalid: lineItemDetails.filter(i => !i.isValid).length,
+        }
+      });
+    } catch (error: any) {
+      console.error("Container offload diagnostics error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all containers for diagnostics selection
+  app.get("/api/admin/containers-for-diagnostics", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const allContainers = await db
+        .select({
+          id: containers.id,
+          containerNumber: containers.containerNumber,
+          status: containers.status,
+          itemsTotal: containers.itemsTotal,
+        })
+        .from(containers)
+        .where(eq(containers.companyId, companyId))
+        .orderBy(desc(containers.id));
+
+      res.json(allContainers);
+    } catch (error: any) {
+      console.error("Get containers for diagnostics error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Net Profit (P&L) Report - Tally Prime style
   app.get("/api/reports/net-profit-statement", requireAuth, async (req, res) => {
     try {

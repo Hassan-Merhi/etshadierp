@@ -53,7 +53,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -390,6 +390,9 @@
     const [changePasswordData, setChangePasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
     const [orphanedChargesDiagnostic, setOrphanedChargesDiagnostic] = useState<{ count: number; impact: number; vouchers: any[] } | null>(null);
     const [isFixingOrphanedCharges, setIsFixingOrphanedCharges] = useState(false);
+    const [selectedContainerForDiag, setSelectedContainerForDiag] = useState<string>("");
+    const [containerDiagResult, setContainerDiagResult] = useState<any>(null);
+    const [isLoadingContainerDiag, setIsLoadingContainerDiag] = useState(false);
   
     const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
       queryKey: ["/api/companies"],
@@ -420,6 +423,12 @@
     const { data: rolePermissions = [], isLoading: isLoadingPermissions } = useQuery<any[]>({
       queryKey: ["/api/settings/role-permissions", selectedCompany?.id],
       enabled: !!selectedCompany,
+    });
+
+    // Query for containers for offload diagnostics
+    const { data: containersForDiag = [] } = useQuery<any[]>({
+      queryKey: ["/api/admin/containers-for-diagnostics"],
+      enabled: !!selectedCompany && currentUser?.role === "Admin",
     });
 
     // Build a lookup map for role permissions: { "role:featureKey": enabled }
@@ -2221,6 +2230,136 @@
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6 md:col-span-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-500/10 rounded-lg">
+                          <Package className="h-6 w-6 text-blue-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-container-offload-analysis">Container Offload Analysis</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Analyze PO line items for a container to detect duplicates, blank quantities, and other issues
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={selectedContainerForDiag}
+                          onValueChange={setSelectedContainerForDiag}
+                        >
+                          <SelectTrigger className="w-[200px]" data-testid="select-container-for-diag">
+                            <SelectValue placeholder="Select container" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {containersForDiag.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.containerNumber} ({c.status})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          disabled={!selectedContainerForDiag || isLoadingContainerDiag}
+                          onClick={async () => {
+                            if (!selectedContainerForDiag) return;
+                            try {
+                              setIsLoadingContainerDiag(true);
+                              setContainerDiagResult(null);
+                              const response = await fetch(`/api/containers/${selectedContainerForDiag}/offload-diagnostics`, {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setContainerDiagResult(result);
+                                if (!result.hasIssues) {
+                                  toast({
+                                    title: "No Issues Found",
+                                    description: `Container ${result.containerNumber} has ${result.lineItemCount} valid line items, total ${result.totalQuantity} bales.`,
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsLoadingContainerDiag(false);
+                            }
+                          }}
+                          data-testid="button-analyze-container"
+                        >
+                          {isLoadingContainerDiag ? "Analyzing..." : "Analyze"}
+                        </Button>
+                      </div>
+                    </div>
+                    {containerDiagResult && (
+                      <div className={`p-4 rounded-lg space-y-3 ${containerDiagResult.hasIssues ? 'bg-destructive/10' : 'bg-green-500/10'}`}>
+                        <div className="flex items-center justify-between">
+                          <p className={`font-medium ${containerDiagResult.hasIssues ? 'text-destructive' : 'text-green-600'}`}>
+                            {containerDiagResult.containerNumber} ({containerDiagResult.containerStatus})
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {containerDiagResult.poCount} POs, {containerDiagResult.lineItemCount} line items
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Total Quantity</p>
+                            <p className="font-semibold">{containerDiagResult.totalQuantity} bales</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Valid Items</p>
+                            <p className="font-semibold text-green-600">{containerDiagResult.summary?.valid || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Invalid Items</p>
+                            <p className={`font-semibold ${containerDiagResult.summary?.invalid > 0 ? 'text-destructive' : ''}`}>
+                              {containerDiagResult.summary?.invalid || 0}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Duplicates</p>
+                            <p className={`font-semibold ${containerDiagResult.duplicateCount > 0 ? 'text-destructive' : ''}`}>
+                              {containerDiagResult.duplicateCount}
+                            </p>
+                          </div>
+                        </div>
+                        {containerDiagResult.hasIssues && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-destructive">Issues Found:</p>
+                            <div className="max-h-48 overflow-y-auto text-sm space-y-1">
+                              {containerDiagResult.lineItems
+                                .filter((item: any) => !item.isValid)
+                                .map((item: any, i: number) => (
+                                  <div key={i} className="flex justify-between gap-2 py-1 border-b last:border-0">
+                                    <span className="truncate">
+                                      {item.poNumber} - {item.stockItemCode || 'No stock item'} (Qty: {item.quantity})
+                                    </span>
+                                    <span className="text-destructive whitespace-nowrap">
+                                      {item.issues.join(', ')}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
