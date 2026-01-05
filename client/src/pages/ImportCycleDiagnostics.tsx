@@ -15,9 +15,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  Info,
   TrendingUp,
   TrendingDown,
-  Minus
+  Minus,
+  Wrench
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
@@ -52,6 +55,26 @@ interface ImportCycleData {
   };
 }
 
+interface DiagnosticIssue {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description: string;
+  impact: number;
+  howToFix: string;
+  category: string;
+}
+
+interface DiagnosticsData {
+  issues: DiagnosticIssue[];
+  summary: {
+    totalIssues: number;
+    criticalCount: number;
+    warningCount: number;
+    totalImpact: number;
+  };
+}
+
 interface ComponentInfo {
   key: string;
   label: string;
@@ -61,19 +84,16 @@ interface ComponentInfo {
 }
 
 const componentConfig: ComponentInfo[] = [
-  // Assets (+ in formula)
   { key: "stockOtwValue", label: "Stock OTW (Containers in Transit)", category: "asset", inFormula: true, sign: "+" },
   { key: "cashBalance", label: "Cash", category: "asset", inFormula: true, sign: "+" },
   { key: "bankBalance", label: "Bank", category: "asset", inFormula: true, sign: "+" },
   { key: "stockOnFloorValue", label: "Stock on Floor (Inventory)", category: "asset", inFormula: true, sign: "+" },
   { key: "assetBalance", label: "Other Assets", category: "asset", inFormula: true, sign: "+" },
   { key: "salaryAdvancesBalance", label: "Salary Advances", category: "asset", inFormula: true, sign: "+" },
-  // Expenses (+ in formula)
   { key: "indirectExpenseBalance", label: "Indirect Expenses", category: "expense", inFormula: true, sign: "+" },
   { key: "payrollExpenseBalance", label: "Payroll Expenses", category: "expense", inFormula: true, sign: "+" },
   { key: "governmentTaxesBalance", label: "Government Taxes", category: "expense", inFormula: true, sign: "+" },
   { key: "cogsBalance", label: "Cost of Goods Sold", category: "expense", inFormula: true, sign: "+" },
-  // Liabilities (- in formula)
   { key: "supplierBalance", label: "Supplier Payables", category: "liability", inFormula: true, sign: "-" },
   { key: "dutyAgentBalance", label: "Duty Agent", category: "liability", inFormula: true, sign: "-" },
   { key: "transporterAgentBalance", label: "Transporter Agent", category: "liability", inFormula: true, sign: "-" },
@@ -83,7 +103,6 @@ const componentConfig: ComponentInfo[] = [
   { key: "incomeBalance", label: "Income", category: "liability", inFormula: true, sign: "-" },
   { key: "payrollLiabilitiesBalance", label: "Payroll Liabilities", category: "liability", inFormula: true, sign: "-" },
   { key: "openingBalanceEquity", label: "Opening Balance Equity", category: "liability", inFormula: true, sign: "+" },
-  // Not in formula (for reference only)
   { key: "directExpenseBalance", label: "Import Charges (capitalized)", category: "expense", inFormula: false, sign: "+" },
   { key: "generalExpenseBalance", label: "General Expenses (Purchases)", category: "expense", inFormula: false, sign: "+" },
   { key: "consumptionBalance", label: "Consumption (in inventory)", category: "expense", inFormula: false, sign: "+" },
@@ -91,9 +110,35 @@ const componentConfig: ComponentInfo[] = [
   { key: "openingStockValue", label: "Opening Stock Value", category: "asset", inFormula: false, sign: "+" },
 ];
 
+const SeverityIcon = ({ severity }: { severity: string }) => {
+  switch (severity) {
+    case "critical":
+      return <AlertCircle className="h-5 w-5 text-destructive" />;
+    case "warning":
+      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+    default:
+      return <Info className="h-5 w-5 text-blue-500" />;
+  }
+};
+
+const SeverityBadge = ({ severity }: { severity: string }) => {
+  switch (severity) {
+    case "critical":
+      return <Badge variant="destructive">Critical</Badge>;
+    case "warning":
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Warning</Badge>;
+    default:
+      return <Badge variant="secondary">Info</Badge>;
+  }
+};
+
 export default function ImportCycleDiagnostics() {
   const { data, isLoading, error, refetch } = useQuery<ImportCycleData>({
     queryKey: ["/api/stats/import-cycle-balance"],
+  });
+
+  const { data: diagnosticsData, isLoading: diagnosticsLoading } = useQuery<DiagnosticsData>({
+    queryKey: ["/api/stats/import-cycle-diagnostics"],
   });
 
   if (isLoading) {
@@ -127,6 +172,7 @@ export default function ImportCycleDiagnostics() {
   const netBalance = data?.netImportCycleBalance || 0;
   const isBalanced = Math.abs(netBalance) < 0.01;
   const components = data?.components || {} as ImportCycleData['components'];
+  const issues = diagnosticsData?.issues || [];
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -146,7 +192,6 @@ export default function ImportCycleDiagnostics() {
     }
   };
 
-  // Filter to only show components in formula with non-zero values
   const activeComponents = componentConfig.filter(c => 
     c.inFormula && (components[c.key as keyof typeof components] || 0) !== 0
   );
@@ -154,6 +199,32 @@ export default function ImportCycleDiagnostics() {
   const excludedComponents = componentConfig.filter(c => 
     !c.inFormula && (components[c.key as keyof typeof components] || 0) !== 0
   );
+
+  // Calculate totals for explanation
+  const assetTotal = (components.stockOtwValue || 0) + (components.cashBalance || 0) + 
+    (components.bankBalance || 0) + (components.stockOnFloorValue || 0) + 
+    (components.assetBalance || 0) + (components.salaryAdvancesBalance || 0);
+  
+  const expenseTotal = (components.indirectExpenseBalance || 0) + 
+    (components.payrollExpenseBalance || 0) + (components.governmentTaxesBalance || 0) + 
+    (components.cogsBalance || 0);
+  
+  const liabilityTotal = (components.supplierBalance || 0) + (components.dutyAgentBalance || 0) + 
+    (components.transporterAgentBalance || 0) + (components.loansBalance || 0) + 
+    (components.liabilityBalance || 0) + (components.profitBalance || 0) + 
+    (components.incomeBalance || 0) + (components.payrollLiabilitiesBalance || 0) - 
+    (components.openingBalanceEquity || 0);
+
+  // Find largest contributors
+  const getLargestContributors = () => {
+    const contributors = activeComponents.map(c => ({
+      label: c.label,
+      value: components[c.key as keyof typeof components] || 0,
+      sign: c.sign,
+      category: c.category
+    })).filter(c => Math.abs(c.value) > 100).sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+    return contributors.slice(0, 5);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -166,7 +237,7 @@ export default function ImportCycleDiagnostics() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Import Cycle Balance Breakdown</h1>
-            <p className="text-muted-foreground">Detailed breakdown of the import cycle balance shown on the dashboard</p>
+            <p className="text-muted-foreground">Understand what's causing your import cycle balance</p>
           </div>
         </div>
         <Button onClick={() => refetch()} variant="outline" data-testid="button-refresh">
@@ -192,7 +263,7 @@ export default function ImportCycleDiagnostics() {
             )}
           </CardTitle>
           <CardDescription>
-            This is the same balance shown on the dashboard. Formula: (Assets + Expenses) - Liabilities = Net Balance
+            This is the same balance shown on the dashboard
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -204,6 +275,129 @@ export default function ImportCycleDiagnostics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* What's Causing the Imbalance? - Only show if not balanced */}
+      {!isBalanced && (
+        <Card className="border-2 border-yellow-500" data-testid="card-diagnostics">
+          <CardHeader className="bg-yellow-50 dark:bg-yellow-950">
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-yellow-600" />
+              What's Causing the Imbalance?
+            </CardTitle>
+            <CardDescription>
+              The system has analyzed your data and found these potential issues
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {diagnosticsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-24" />
+                <Skeleton className="h-24" />
+              </div>
+            ) : issues.length === 0 ? (
+              <div className="space-y-4">
+                <div className="bg-background p-4 rounded-lg border">
+                  <h4 className="font-semibold mb-3">Balance Breakdown</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                    <div className="p-3 bg-green-50 dark:bg-green-950 rounded">
+                      <div className="text-xs text-muted-foreground">Assets + Expenses</div>
+                      <div className="text-lg font-bold text-green-600">${formatNumber(assetTotal + expenseTotal)}</div>
+                    </div>
+                    <div className="flex items-center justify-center text-2xl font-bold">−</div>
+                    <div className="p-3 bg-red-50 dark:bg-red-950 rounded">
+                      <div className="text-xs text-muted-foreground">Liabilities</div>
+                      <div className="text-lg font-bold text-red-600">${formatNumber(liabilityTotal)}</div>
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded">
+                    <div className="text-xs text-muted-foreground">= Net Balance</div>
+                    <div className={`text-xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
+                      ${formatNumber(netBalance)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-background p-4 rounded-lg border">
+                  <h4 className="font-semibold mb-3">Largest Components</h4>
+                  <div className="space-y-2">
+                    {getLargestContributors().map((c, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                        <span className="flex items-center gap-2">
+                          {c.sign === "+" ? (
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                          {c.label}
+                        </span>
+                        <span className={`font-mono ${c.category === 'liability' ? 'text-red-600' : 'text-green-600'}`}>
+                          ${formatNumber(c.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-blue-800 dark:text-blue-200">What This Means</h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        {netBalance < 0 
+                          ? `Your liabilities ($${formatNumber(liabilityTotal)}) exceed your assets plus expenses ($${formatNumber(assetTotal + expenseTotal)}) by $${formatNumber(Math.abs(netBalance))}. This could indicate unpaid supplier bills without corresponding inventory, or adjustments from a previous system.`
+                          : `Your assets plus expenses ($${formatNumber(assetTotal + expenseTotal)}) exceed your liabilities ($${formatNumber(liabilityTotal)}) by $${formatNumber(netBalance)}. This could indicate inventory that wasn't properly accounted for, or missing liability entries.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {issues.map((issue) => (
+                  <div 
+                    key={issue.id} 
+                    className={`p-4 rounded-lg border-l-4 ${
+                      issue.severity === "critical" 
+                        ? "border-l-destructive bg-destructive/5" 
+                        : issue.severity === "warning"
+                        ? "border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950"
+                        : "border-l-blue-500 bg-blue-50 dark:bg-blue-950"
+                    }`}
+                    data-testid={`issue-${issue.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <SeverityIcon severity={issue.severity} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <SeverityBadge severity={issue.severity} />
+                          <span className="font-semibold">{issue.title}</span>
+                          {issue.impact > 0 && (
+                            <Badge variant="outline" className="ml-auto">
+                              Impact: ${formatNumber(issue.impact)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          {issue.description}
+                        </p>
+                        <div className="bg-background p-3 rounded border">
+                          <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                            <Wrench className="h-4 w-4" />
+                            How to Fix
+                          </div>
+                          <p className="text-sm">{issue.howToFix}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Components Breakdown */}
       <Card data-testid="card-components">

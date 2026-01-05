@@ -18669,6 +18669,268 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Cycle Diagnostics - analyze and explain what's causing imbalance
+  app.get("/api/stats/import-cycle-diagnostics", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      interface DiagnosticIssue {
+        id: string;
+        severity: "critical" | "warning" | "info";
+        title: string;
+        description: string;
+        impact: number;
+        howToFix: string;
+        category: string;
+      }
+
+      const issues: DiagnosticIssue[] = [];
+
+      // 1. Check for orphaned inventory at deleted locations
+      const orphanedInventory = await db
+        .select({
+          id: inventory.id,
+          stockItemId: inventory.stockItemId,
+          locationId: inventory.locationId,
+          quantity: inventory.quantity,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .leftJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            or(
+              isNotNull(locations.deletedAt),
+              isNull(locations.id)
+            )
+          )
+        );
+
+      if (orphanedInventory.length > 0) {
+        const totalOrphanedValue = orphanedInventory.reduce((sum, inv) => 
+          sum + parseFloat(inv.totalValue || "0"), 0);
+        
+        if (totalOrphanedValue > 0) {
+          issues.push({
+            id: "orphaned-inventory",
+            severity: "critical",
+            title: "Orphaned Inventory at Deleted Locations",
+            description: `You have ${orphanedInventory.length} inventory records worth $${totalOrphanedValue.toFixed(2)} at locations that have been deleted. This inventory is counted as an asset but doesn't exist in any active location.`,
+            impact: totalOrphanedValue,
+            howToFix: "Go to Settings > System Tools > View Deleted Items > Locations. Either restore the deleted location(s) and transfer the inventory elsewhere, or permanently delete the location which will also remove the orphaned inventory.",
+            category: "Orphaned Data"
+          });
+        }
+      }
+
+      // 2. Check for negative inventory (should never happen)
+      const negativeInventory = await db
+        .select({
+          id: inventory.id,
+          stockItemId: inventory.stockItemId,
+          locationId: inventory.locationId,
+          quantity: inventory.quantity,
+          totalValue: inventory.totalValue,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            isNull(locations.deletedAt),
+            sql`CAST(${inventory.quantity} AS DECIMAL) < 0`
+          )
+        );
+
+      if (negativeInventory.length > 0) {
+        const totalNegativeValue = negativeInventory.reduce((sum, inv) => 
+          sum + Math.abs(parseFloat(inv.totalValue || "0")), 0);
+        
+        issues.push({
+          id: "negative-inventory",
+          severity: "critical",
+          title: "Negative Inventory Quantities",
+          description: `You have ${negativeInventory.length} items with negative quantities. This shouldn't happen and indicates a data issue.`,
+          impact: totalNegativeValue,
+          howToFix: "Create a Production voucher to add the missing quantity back, or review recent Consumption/Sales vouchers that may have removed more than available.",
+          category: "Data Integrity"
+        });
+      }
+
+      // 3. Check for stale OTW containers (in transit for too long)
+      const staleContainers = await db
+        .select({
+          id: containers.id,
+          containerNumber: containers.containerNumber,
+          grandTotal: containers.grandTotal,
+          createdAt: containers.createdAt,
+        })
+        .from(containers)
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status, "OTW"),
+            sql`${containers.createdAt} < NOW() - INTERVAL '90 days'`
+          )
+        );
+
+      if (staleContainers.length > 0) {
+        const totalStaleValue = staleContainers.reduce((sum, c) => 
+          sum + parseFloat(c.grandTotal || "0"), 0);
+        
+        issues.push({
+          id: "stale-containers",
+          severity: "warning",
+          title: "Containers In Transit for Over 90 Days",
+          description: `You have ${staleContainers.length} container(s) worth $${totalStaleValue.toFixed(2)} that have been "On The Way" for more than 90 days. These may need to be offloaded or marked as lost.`,
+          impact: totalStaleValue,
+          howToFix: "Go to Containers, find the stale containers, and either Offload them to a location if they've arrived, or cancel them if they're lost.",
+          category: "Pending Transactions"
+        });
+      }
+
+      // 4. Check for unbalanced vouchers (debits != credits)
+      const unbalancedVouchers = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          totalDebits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0)`,
+          totalCredits: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
+        })
+        .from(vouchers)
+        .leftJoin(voucherEntries, eq(vouchers.id, voucherEntries.voucherId))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        )
+        .groupBy(vouchers.id, vouchers.voucherNumber, vouchers.voucherType)
+        .having(sql`ABS(COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0) - COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)) > 0.01`);
+
+      if (unbalancedVouchers.length > 0) {
+        const totalImbalance = unbalancedVouchers.reduce((sum, v) => {
+          const debits = parseFloat(v.totalDebits || "0");
+          const credits = parseFloat(v.totalCredits || "0");
+          return sum + Math.abs(debits - credits);
+        }, 0);
+
+        issues.push({
+          id: "unbalanced-vouchers",
+          severity: "critical",
+          title: "Unbalanced Voucher Entries",
+          description: `You have ${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: $${totalImbalance.toFixed(2)}.`,
+          impact: totalImbalance,
+          howToFix: "Go to Vouchers, find the unbalanced entries (check Daybook), and edit them to ensure total debits equal total credits.",
+          category: "Data Integrity"
+        });
+      }
+
+      // 5. Check if opening balance equity is significantly off
+      const allLedgerAccounts = await db
+        .select({
+          openingBalance: ledgerAccounts.openingBalance,
+          openingBalanceSide: ledgerAccounts.openingBalanceSide,
+          accountType: ledgerAccounts.accountType,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
+
+      let totalDrOpenings = 0;
+      let totalCrOpenings = 0;
+      for (const account of allLedgerAccounts) {
+        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+        if (openingBalanceRaw === 0) continue;
+        const openingSide = account.openingBalanceSide || "Dr";
+        if (openingSide === "Dr") {
+          totalDrOpenings += openingBalanceRaw;
+        } else {
+          totalCrOpenings += openingBalanceRaw;
+        }
+      }
+
+      const openingImbalance = Math.abs(totalDrOpenings - totalCrOpenings);
+      if (openingImbalance > 100) {
+        issues.push({
+          id: "opening-balance-imbalance",
+          severity: "info",
+          title: "Opening Balance Equity Adjustment",
+          description: `Your opening debit balances ($${totalDrOpenings.toFixed(2)}) differ from opening credit balances ($${totalCrOpenings.toFixed(2)}) by $${openingImbalance.toFixed(2)}. This is treated as implicit opening equity.`,
+          impact: openingImbalance,
+          howToFix: "This is often normal when importing data from another system. If you need to balance it, add an opening balance to an Equity or Capital account to offset the difference.",
+          category: "Opening Balances"
+        });
+      }
+
+      // 6. Check for payroll liabilities without matching expenses
+      const employeesData = await db
+        .select({
+          id: employees.id,
+          currentBalance: employees.currentBalance,
+        })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            isNull(employees.deletedAt),
+            sql`CAST(${employees.currentBalance} AS DECIMAL) > 100`
+          )
+        );
+
+      if (employeesData.length > 0) {
+        const totalOwed = employeesData.reduce((sum, e) => 
+          sum + parseFloat(e.currentBalance || "0"), 0);
+
+        issues.push({
+          id: "employee-balances",
+          severity: "info",
+          title: "Outstanding Employee Balances",
+          description: `You owe ${employeesData.length} employee(s) a total of $${totalOwed.toFixed(2)}. This is recorded as a liability.`,
+          impact: totalOwed,
+          howToFix: "These balances are normal and represent wages owed. Pay employees through Payroll to reduce these liabilities.",
+          category: "Liabilities"
+        });
+      }
+
+      // Sort issues by impact (highest first), then by severity
+      const severityOrder = { critical: 0, warning: 1, info: 2 };
+      issues.sort((a, b) => {
+        if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+          return severityOrder[a.severity] - severityOrder[b.severity];
+        }
+        return b.impact - a.impact;
+      });
+
+      // Calculate summary
+      const criticalCount = issues.filter(i => i.severity === "critical").length;
+      const warningCount = issues.filter(i => i.severity === "warning").length;
+      const totalImpact = issues.reduce((sum, i) => sum + i.impact, 0);
+
+      res.json({
+        issues,
+        summary: {
+          totalIssues: issues.length,
+          criticalCount,
+          warningCount,
+          totalImpact,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Sales Report - gain/loss from POS transactions
   app.get("/api/sales-report", requireAuth, async (req, res) => {
     try {
