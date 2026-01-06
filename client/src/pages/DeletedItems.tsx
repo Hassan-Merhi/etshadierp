@@ -50,6 +50,7 @@ import {
   Truck,
   Building2,
   Loader2,
+  Receipt,
 } from "lucide-react";
 
 interface DeletedItem {
@@ -59,6 +60,9 @@ interface DeletedItem {
   code: string;
   accountType?: string;
   deletedAt: string;
+  amount?: number;
+  date?: string;
+  locationName?: string;
 }
 
 interface DeletedItemsResponse {
@@ -70,6 +74,7 @@ interface DeletedItemsResponse {
   customers: DeletedItem[];
   suppliers: DeletedItem[];
   bankAccounts: DeletedItem[];
+  orphanedPosSales: DeletedItem[];
   totalCount: number;
 }
 
@@ -82,6 +87,7 @@ const typeLabels: Record<string, string> = {
   customer: "Customer",
   supplier: "Supplier",
   bankAccount: "Bank Account",
+  orphanedPosSale: "Orphaned POS Sale",
 };
 
 const typeIcons: Record<string, any> = {
@@ -93,6 +99,7 @@ const typeIcons: Record<string, any> = {
   customer: User,
   supplier: Truck,
   bankAccount: Building2,
+  orphanedPosSale: Receipt,
 };
 
 export default function DeletedItems() {
@@ -171,6 +178,7 @@ export default function DeletedItems() {
       ...data.customers,
       ...data.suppliers,
       ...data.bankAccounts,
+      ...(data.orphanedPosSales || []),
     ];
     if (filterType === "all") return allItems;
     return allItems.filter((item) => item.type === filterType);
@@ -247,6 +255,7 @@ export default function DeletedItems() {
                   <SelectItem value="customer">Customers ({data?.customers.length || 0})</SelectItem>
                   <SelectItem value="supplier">Suppliers ({data?.suppliers.length || 0})</SelectItem>
                   <SelectItem value="bankAccount">Bank Accounts ({data?.bankAccounts.length || 0})</SelectItem>
+                  <SelectItem value="orphanedPosSale">Orphaned POS Sales ({data?.orphanedPosSales?.length || 0})</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -260,7 +269,9 @@ export default function DeletedItems() {
               <p className="text-sm text-muted-foreground mt-1">
                 {filterType === "all"
                   ? "Items you delete will appear here for recovery."
-                  : `No deleted ${typeLabels[filterType]?.toLowerCase() || filterType}s found.`}
+                  : filterType === "orphanedPosSale"
+                    ? "No orphaned POS sales found. These are vouchers linked to deleted locations."
+                    : `No deleted ${typeLabels[filterType]?.toLowerCase() || filterType}s found.`}
               </p>
             </div>
           ) : (
@@ -296,6 +307,11 @@ export default function DeletedItems() {
                           {item.accountType && (
                             <span className="text-xs text-muted-foreground">{item.accountType}</span>
                           )}
+                          {item.type === "orphanedPosSale" && (
+                            <span className="text-xs text-muted-foreground">
+                              {item.locationName} | ${item.amount?.toLocaleString() || "0"}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -305,16 +321,18 @@ export default function DeletedItems() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRestore(item)}
-                            disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
-                            data-testid={`button-restore-${item.type}-${item.id}`}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-1" />
-                            Restore
-                          </Button>
+                          {item.type !== "orphanedPosSale" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestore(item)}
+                              disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
+                              data-testid={`button-restore-${item.type}-${item.id}`}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Restore
+                            </Button>
+                          )}
                           <Button
                             variant="destructive"
                             size="sm"
