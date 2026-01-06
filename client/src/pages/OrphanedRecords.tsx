@@ -135,6 +135,24 @@ export default function OrphanedRecordsPage() {
     },
   });
 
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", "/api/orphaned-records/delete-all");
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Deleted", 
+        description: `${data.deleted} orphaned vouchers permanently deleted` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/orphaned-records"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
+      setSelectedVouchers([]);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSelectAll = () => {
     if (selectedVouchers.length === orphanedRecords.length) {
       setSelectedVouchers([]);
@@ -278,12 +296,26 @@ export default function OrphanedRecordsPage() {
       )}
 
       <Card className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <AlertCircle className="h-6 w-6 text-orange-500" />
-          <div>
-            <h2 className="text-xl font-semibold">Deleted Location Vouchers</h2>
-            <p className="text-sm text-muted-foreground">Vouchers referencing locations that have been deleted</p>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-6 w-6 text-orange-500" />
+            <div>
+              <h2 className="text-xl font-semibold">Deleted Location Vouchers</h2>
+              <p className="text-sm text-muted-foreground">Vouchers referencing locations that have been deleted</p>
+            </div>
           </div>
+          {orphanedRecords.length > 0 && (
+            <Button 
+              variant="destructive"
+              onClick={() => deleteAllMutation.mutate()}
+              disabled={deleteAllMutation.isPending}
+              data-testid="button-delete-all-orphaned"
+            >
+              {deleteAllMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete All ({orphanedRecords.length})
+            </Button>
+          )}
         </div>
 
         {isLoading ? (

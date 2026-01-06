@@ -25012,6 +25012,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete all orphaned vouchers permanently
+  app.delete("/api/orphaned-records/delete-all", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      
+      // Find all orphaned vouchers (those with deleted or non-existent locations)
+      const orphanedVouchers = await db
+        .select({ id: vouchers.id })
+        .from(vouchers)
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            isNotNull(vouchers.locationId),
+            or(
+              isNull(locations.name), // Location doesn't exist
+              isNotNull(locations.deletedAt) // Location is soft-deleted
+            )
+          )
+        );
+      
+      if (orphanedVouchers.length === 0) {
+        return res.json({ success: true, deleted: 0, message: "No orphaned vouchers found" });
+      }
+      
+      const orphanedIds = orphanedVouchers.map(v => v.id);
+      
+      // Delete all related records in a transaction
+      await db.transaction(async (tx) => {
+        // Delete from all tables that reference voucherId
+        await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedIds));
+        await tx.delete(stockTransferVouchers).where(inArray(stockTransferVouchers.voucherId, orphanedIds));
+        await tx.delete(stockAdjustmentVouchers).where(inArray(stockAdjustmentVouchers.voucherId, orphanedIds));
+        await tx.delete(salesItems).where(inArray(salesItems.voucherId, orphanedIds));
+        await tx.delete(salaryAdvances).where(inArray(salaryAdvances.voucherId, orphanedIds));
+        
+        // Finally delete the vouchers themselves
+        await tx.delete(vouchers).where(inArray(vouchers.id, orphanedIds));
+      });
+      
+      res.json({ success: true, deleted: orphanedIds.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Stock Item Monthly Summary - Get aggregated monthly data for a stock item
   app.get("/api/stock-items/:id/monthly-summary", requireAuth, async (req, res) => {
     try {
