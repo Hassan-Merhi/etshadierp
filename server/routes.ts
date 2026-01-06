@@ -28563,14 +28563,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const otwContainerNumbers = otwContainers.map(c => c.containerNumber);
         console.log("OTW containers to preserve:", otwContainerNumbers);
 
-        // 2. Get ALL vouchers for this company
+        // 2. Get inter-company credit account IDs (accounts with "Credit" in name - e.g., "KINSHASA Credit")
+        const interCompanyAccounts = await tx
+          .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              sql`"ledger_accounts"."name" ILIKE '%Credit%'`
+            )
+          );
+        const interCompanyAccountIds = new Set(interCompanyAccounts.map(a => a.id));
+        console.log("Inter-company credit accounts to preserve:", interCompanyAccounts.map(a => a.name));
+
+        // 3. Get voucher IDs that have entries involving inter-company credit accounts
+        const interCompanyAccountIdArray = [...interCompanyAccountIds];
+        const interCompanyVoucherEntries = interCompanyAccountIdArray.length > 0 
+          ? await tx
+              .select({ voucherId: voucherEntries.voucherId })
+              .from(voucherEntries)
+              .where(inArray(voucherEntries.ledgerAccountId, interCompanyAccountIdArray))
+          : [];
+        const interCompanyVoucherIds = new Set(interCompanyVoucherEntries.map(e => e.voucherId));
+        console.log("Vouchers involving inter-company accounts to preserve:", interCompanyVoucherIds.size);
+
+        // 4. Get ALL vouchers for this company
         const allVouchers = await tx
           .select({ id: vouchers.id, voucherType: vouchers.voucherType, description: vouchers.description })
           .from(vouchers)
           .where(eq(vouchers.companyId, companyId));
 
-        // 3. Filter out Purchase vouchers that belong to OTW containers
+        // 5. Filter out vouchers that should be preserved:
+        //    - Purchase vouchers that belong to OTW containers
+        //    - Any vouchers involving inter-company credit accounts
         const vouchersToDelete = allVouchers.filter(v => {
+          // Preserve vouchers that involve inter-company credit accounts
+          if (interCompanyVoucherIds.has(v.id)) {
+            console.log("Preserving inter-company voucher:", v.id, v.voucherType, v.description);
+            return false; // Don't delete
+          }
+          
           // If it's a Purchase voucher, check if it belongs to an OTW container
           if (v.voucherType === "Purchase") {
             // Check if any OTW container number is in the description
@@ -28584,10 +28616,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return true; // Delete all other vouchers
         });
-
         const voucherIdsToDelete = vouchersToDelete.map(v => v.id);
         console.log("Vouchers to delete:", voucherIdsToDelete.length);
-        console.log("Vouchers to preserve (OTW):", allVouchers.length - voucherIdsToDelete.length);
+        console.log("Vouchers preserved (OTW + inter-company):", allVouchers.length - voucherIdsToDelete.length);
 
         if (voucherIdsToDelete.length > 0) {
           // Format voucherIds as PostgreSQL array literal
