@@ -28561,7 +28561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, companyId),
-                inArray(voucherEntries.accountId, accountIds)
+                sql`${voucherEntries.accountId} = ANY(${accountIds}::int[])`
               )
             );
 
@@ -28571,7 +28571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Delete all entries for those vouchers (not just the selected account entries)
             await tx
               .delete(voucherEntries)
-              .where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
+              .where(sql`${voucherEntries.voucherId} = ANY(${voucherIdsToDelete}::int[])`);
             
             results.voucherEntriesDeleted = entriesToDelete.length;
 
@@ -28582,7 +28582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(
                 and(
                   eq(vouchers.companyId, companyId),
-                  inArray(vouchers.id, voucherIdsToDelete)
+                  sql`${vouchers.id} = ANY(${voucherIdsToDelete}::int[])`
                 )
               );
             
@@ -28596,7 +28596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                inArray(ledgerAccounts.id, accountIds)
+                sql`${ledgerAccounts.id} = ANY(${accountIds}::int[])`
               )
             );
           
