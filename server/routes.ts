@@ -25052,26 +25052,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const orphanedIds = orphanedVouchers.map(v => v.id);
       
-      // Delete all related records in a transaction
+      // Delete all related records using raw SQL for maximum compatibility across schema versions
+      // Build a comma-separated list of IDs for SQL
+      const idList = orphanedIds.join(',');
+      console.log("[DELETE-ALL] Deleting from related tables for", orphanedIds.length, "vouchers");
+      
       await db.transaction(async (tx) => {
-        // Delete from all tables that have foreign keys to vouchers
-        await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedIds));
-        await tx.delete(stockTransferVouchers).where(inArray(stockTransferVouchers.voucherId, orphanedIds));
-        await tx.delete(stockAdjustmentVouchers).where(inArray(stockAdjustmentVouchers.voucherId, orphanedIds));
-        await tx.delete(salesItems).where(inArray(salesItems.voucherId, orphanedIds));
-        await tx.delete(salaryAdvances).where(inArray(salaryAdvances.voucherId, orphanedIds));
-        
-        // Delete fiscal period closures that reference these vouchers
-        await tx.delete(fiscalPeriodClosures).where(inArray(fiscalPeriodClosures.closingVoucherId, orphanedIds));
-        
-        // Null out voucher references in other tables (purchaseOrders, interCompanyTransfers, bales)
-        await tx.update(purchaseOrders).set({ voucherId: null }).where(inArray(purchaseOrders.voucherId, orphanedIds));
-        await tx.update(interCompanyTransfers).set({ fromVoucherId: null }).where(inArray(interCompanyTransfers.fromVoucherId, orphanedIds));
-        await tx.update(interCompanyTransfers).set({ toVoucherId: null }).where(inArray(interCompanyTransfers.toVoucherId, orphanedIds));
-        await tx.update(bales).set({ soldVoucherId: null }).where(inArray(bales.soldVoucherId, orphanedIds));
+        // Delete from core tables that definitely exist
+        await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id IN (${sql.raw(idList)})`);
+        await tx.execute(sql`DELETE FROM stock_transfer_vouchers WHERE voucher_id IN (${sql.raw(idList)})`);
+        await tx.execute(sql`DELETE FROM stock_adjustment_vouchers WHERE voucher_id IN (${sql.raw(idList)})`);
+        await tx.execute(sql`DELETE FROM sales_items WHERE voucher_id IN (${sql.raw(idList)})`);
+        await tx.execute(sql`DELETE FROM salary_advances WHERE voucher_id IN (${sql.raw(idList)})`);
         
         // Finally delete the vouchers themselves
-        await tx.delete(vouchers).where(inArray(vouchers.id, orphanedIds));
+        await tx.execute(sql`DELETE FROM vouchers WHERE id IN (${sql.raw(idList)})`);
       });
       
       res.json({ success: true, deleted: orphanedIds.length });
