@@ -134,8 +134,8 @@ export default function CompanyDataReset() {
             Warning: Destructive Action
           </CardTitle>
           <CardDescription>
-            This will permanently delete vouchers (POS Sales, Payments, Receipts, Journals, Stock Transfers, Production, Consumption) and clear opening balances for selected accounts.
-            <strong className="text-foreground"> Purchase Order and Container Offload vouchers will NOT be deleted.</strong> Supplier balances are also preserved.
+            This will delete ALL vouchers (including offloaded containers) and clear opening balances for selected accounts.
+            <strong className="text-foreground"> Only OTW (On The Way) container Purchase vouchers will be preserved.</strong> Supplier balances are also preserved.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -279,11 +279,11 @@ export default function CompanyDataReset() {
             <AlertDialogDescription className="space-y-2">
               <p>This will:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Delete ALL vouchers (POS Sales, Payments, Receipts, Journals, Stock Transfers, Production, Consumption) for this company</li>
+                <li>Delete ALL vouchers including offloaded container vouchers for this company</li>
                 <li>Clear opening balances for the {selectedAccountIds.length} selected account(s)</li>
                 {clearStockOpeningBalances && <li>Reset stock item opening balances to zero</li>}
               </ul>
-              <p className="font-medium mt-2 text-green-600">Purchase Order and Container Offload vouchers will be preserved. Supplier balances will also be preserved.</p>
+              <p className="font-medium mt-2 text-green-600">Only OTW (On The Way) container Purchase vouchers will be preserved. Supplier balances will also be preserved.</p>
               <p className="text-sm">You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
