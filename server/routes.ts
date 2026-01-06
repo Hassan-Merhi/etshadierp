@@ -27143,12 +27143,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orphanedPosSales: orphanedPosSales.map(v => ({
           id: v.id,
           type: "orphanedPosSale",
-          name: v.voucherNumber,
-          code: v.voucherType,
+          name: v.voucherNumber || "Unknown Voucher",
+          code: v.voucherType || "-",
           amount: Number(v.totalAmount) || 0,
-          date: v.date,
+          date: v.date ? String(v.date) : null,
           locationName: v.locationName ? `${v.locationName} (Deleted)` : "(Location Missing)",
-          deletedAt: v.locationDeletedAt || v.date, // Use location deletedAt or voucher date if location is missing
+          deletedAt: v.locationDeletedAt ? String(v.locationDeletedAt) : (v.date ? String(v.date) : null),
         })),
         totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length +
           deletedLedgerAccounts.length + deletedEmployees.length + deletedCustomers.length +
