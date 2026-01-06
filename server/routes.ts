@@ -28533,7 +28533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Company Data Reset - Delete vouchers and clear opening balances for selected accounts
+  // Company Data Reset - Delete ALL vouchers for company and clear opening balances for selected accounts
   app.post("/api/admin/company-data-reset", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const { companyId, accountIds, clearStockOpeningBalances } = req.body;
@@ -28551,51 +28551,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Start a transaction
       await db.transaction(async (tx) => {
-        // 1. Find all vouchers that have entries involving the selected accounts
+        // 1. Delete ALL vouchers for the company (not just selected accounts)
+        // First, get all voucher IDs for this company
+        const companyVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(eq(vouchers.companyId, companyId));
+
+        const voucherIdsToDelete = companyVouchers.map(v => v.id);
+
+        if (voucherIdsToDelete.length > 0) {
+          // Format voucherIds as PostgreSQL array literal
+          const voucherIdsArray = `ARRAY[${voucherIdsToDelete.join(',')}]::int[]`;
+          
+          // Count entries before deleting
+          const entryCount = await tx
+            .select({ count: sql<number>`count(*)` })
+            .from(voucherEntries)
+            .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
+          
+          results.voucherEntriesDeleted = entryCount[0]?.count || 0;
+
+          // Delete all voucher entries for those vouchers
+          await tx
+            .delete(voucherEntries)
+            .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
+
+          // Soft delete all vouchers for the company
+          await tx
+            .update(vouchers)
+            .set({ deletedAt: new Date() })
+            .where(eq(vouchers.companyId, companyId));
+          
+          results.vouchersDeleted = voucherIdsToDelete.length;
+        }
+
+        // 2. Clear opening balances for selected accounts
         if (accountIds.length > 0) {
-          // Format accountIds as PostgreSQL array literal
           const accountIdsArray = `ARRAY[${accountIds.join(',')}]::int[]`;
           
-          // Get all voucher entries for the selected accounts
-          const entriesToDelete = await tx
-            .select({ voucherId: voucherEntries.voucherId, id: voucherEntries.id })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(
-              and(
-                eq(vouchers.companyId, companyId),
-                sql.raw(`"voucher_entries"."ledger_account_id" = ANY(${accountIdsArray})`)
-              )
-            );
-
-          const voucherIdsToDelete = [...new Set(entriesToDelete.map(e => e.voucherId))];
-
-          if (voucherIdsToDelete.length > 0) {
-            // Format voucherIds as PostgreSQL array literal
-            const voucherIdsArray = `ARRAY[${voucherIdsToDelete.join(',')}]::int[]`;
-            
-            // Delete all entries for those vouchers (not just the selected account entries)
-            await tx
-              .delete(voucherEntries)
-              .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
-            
-            results.voucherEntriesDeleted = entriesToDelete.length;
-
-            // Soft delete the vouchers themselves
-            await tx
-              .update(vouchers)
-              .set({ deletedAt: new Date() })
-              .where(
-                and(
-                  eq(vouchers.companyId, companyId),
-                  sql.raw(`"vouchers"."id" = ANY(${voucherIdsArray})`)
-                )
-              );
-            
-            results.vouchersDeleted = voucherIdsToDelete.length;
-          }
-
-          // 2. Clear opening balances for selected accounts
           await tx
             .update(ledgerAccounts)
             .set({ openingBalance: "0", openingBalanceSide: null })
@@ -28611,18 +28605,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 3. Clear stock item opening balances if requested
         if (clearStockOpeningBalances) {
-          await tx
-            .update(stockItems)
-            .set({ openingQty: "0", openingRate: "0", openingValue: "0" })
-            .where(eq(stockItems.companyId, companyId));
-          
-          // Count how many were updated
+          // Count first
           const stockItemCount = await tx
-            .select({ count: sql<number>`count(*)`  })
+            .select({ count: sql<number>`count(*)` })
             .from(stockItems)
             .where(eq(stockItems.companyId, companyId));
           
           results.stockOpeningBalancesCleared = stockItemCount[0]?.count || 0;
+
+          await tx
+            .update(stockItems)
+            .set({ openingQty: "0", openingRate: "0", openingValue: "0" })
+            .where(eq(stockItems.companyId, companyId));
         }
       });
 
