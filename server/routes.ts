@@ -78,6 +78,8 @@ import {
   chatMessages,
   customerBalances,
   companySettings,
+  bales,
+  fiscalPeriodClosures,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
@@ -25043,12 +25045,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Delete all related records in a transaction
       await db.transaction(async (tx) => {
-        // Delete from all tables that reference voucherId
+        // Delete from all tables that have foreign keys to vouchers
         await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedIds));
         await tx.delete(stockTransferVouchers).where(inArray(stockTransferVouchers.voucherId, orphanedIds));
         await tx.delete(stockAdjustmentVouchers).where(inArray(stockAdjustmentVouchers.voucherId, orphanedIds));
         await tx.delete(salesItems).where(inArray(salesItems.voucherId, orphanedIds));
         await tx.delete(salaryAdvances).where(inArray(salaryAdvances.voucherId, orphanedIds));
+        
+        // Delete fiscal period closures that reference these vouchers
+        await tx.delete(fiscalPeriodClosures).where(inArray(fiscalPeriodClosures.closingVoucherId, orphanedIds));
+        
+        // Null out voucher references in other tables (purchaseOrders, interCompanyTransfers, bales)
+        await tx.update(purchaseOrders).set({ voucherId: null }).where(inArray(purchaseOrders.voucherId, orphanedIds));
+        await tx.update(interCompanyTransfers).set({ fromVoucherId: null }).where(inArray(interCompanyTransfers.fromVoucherId, orphanedIds));
+        await tx.update(interCompanyTransfers).set({ toVoucherId: null }).where(inArray(interCompanyTransfers.toVoucherId, orphanedIds));
+        await tx.update(bales).set({ soldVoucherId: null }).where(inArray(bales.soldVoucherId, orphanedIds));
         
         // Finally delete the vouchers themselves
         await tx.delete(vouchers).where(inArray(vouchers.id, orphanedIds));
@@ -25056,6 +25067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true, deleted: orphanedIds.length });
     } catch (error: any) {
+      console.error("Error deleting orphaned vouchers:", error);
       res.status(500).json({ message: error.message });
     }
   });
