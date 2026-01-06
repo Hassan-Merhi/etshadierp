@@ -2614,7 +2614,13 @@ export class DbStorage implements IStorage {
 
   // Vouchers and Journal Entries
   async getAllVouchers(companyId: number): Promise<Voucher[]> {
-    return await db.select().from(schema.vouchers).where(eq(schema.vouchers.companyId, companyId)).orderBy(asc(schema.vouchers.voucherNumber));
+    // Filter out soft-deleted vouchers
+    return await db.select().from(schema.vouchers).where(
+      and(
+        eq(schema.vouchers.companyId, companyId),
+        isNull(schema.vouchers.deletedAt)
+      )
+    ).orderBy(asc(schema.vouchers.voucherNumber));
   }
 
   async getVoucherById(id: number): Promise<Voucher | undefined> {
@@ -2623,13 +2629,15 @@ export class DbStorage implements IStorage {
   }
 
   async getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]> {
+    // Filter out soft-deleted vouchers
     const vouchers = await db
       .select()
       .from(schema.vouchers)
       .where(
         and(
           sql`${schema.vouchers.voucherDate} >= ${startDate}`,
-          sql`${schema.vouchers.voucherDate} <= ${endDate}`
+          sql`${schema.vouchers.voucherDate} <= ${endDate}`,
+          isNull(schema.vouchers.deletedAt)
         )
       );
     return vouchers;
