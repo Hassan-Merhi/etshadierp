@@ -9025,7 +9025,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const XLSX = require("xlsx");
       const allContainers = await storage.getAllContainers(req.session.currentCompanyId);
       const workbook = XLSX.utils.book_new();
 
