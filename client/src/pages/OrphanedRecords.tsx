@@ -137,7 +137,8 @@ export default function OrphanedRecordsPage() {
 
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("DELETE", "/api/orphaned-records/delete-all");
+      const res = await apiRequest("DELETE", "/api/orphaned-records/delete-all");
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({ 
