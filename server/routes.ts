@@ -28533,7 +28533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Company Data Reset - Delete vouchers (excluding Purchase/PO vouchers) and clear opening balances
+  // Company Data Reset - Delete vouchers (keep OTW container vouchers only) and clear opening balances
   app.post("/api/admin/company-data-reset", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const { companyId, accountIds, clearStockOpeningBalances } = req.body;
@@ -28544,47 +28544,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results = {
         vouchersDeleted: 0,
-        voucherEntriesDeleted: 0,
         openingBalancesCleared: 0,
         stockOpeningBalancesCleared: 0,
       };
 
-      // Voucher types to DELETE (excludes Purchase which includes PO import and container offload)
-      const voucherTypesToDelete = ['Payment', 'Receipt', 'Journal', 'Sales', 'Contra', 'Stock Transfer', 'Production', 'Consumption', 'Mixed'];
-
       // Start a transaction
       await db.transaction(async (tx) => {
-        // 1. Get vouchers to delete (excluding Purchase type)
-        const companyVouchers = await tx
-          .select({ id: vouchers.id })
-          .from(vouchers)
+        // 1. Get OTW container numbers to preserve their Purchase vouchers
+        const otwContainers = await tx
+          .select({ containerNumber: containers.containerNumber })
+          .from(containers)
           .where(
             and(
-              eq(vouchers.companyId, companyId),
-              sql.raw(`"vouchers"."voucher_type" = ANY(ARRAY['${voucherTypesToDelete.join("','")}']::text[])`)
+              eq(containers.companyId, companyId),
+              eq(containers.status, "OTW")
             )
           );
+        
+        const otwContainerNumbers = otwContainers.map(c => c.containerNumber);
+        console.log("OTW containers to preserve:", otwContainerNumbers);
 
-        const voucherIdsToDelete = companyVouchers.map(v => v.id);
+        // 2. Get ALL vouchers for this company
+        const allVouchers = await tx
+          .select({ id: vouchers.id, voucherType: vouchers.voucherType, description: vouchers.description })
+          .from(vouchers)
+          .where(eq(vouchers.companyId, companyId));
+
+        // 3. Filter out Purchase vouchers that belong to OTW containers
+        const vouchersToDelete = allVouchers.filter(v => {
+          // If it's a Purchase voucher, check if it belongs to an OTW container
+          if (v.voucherType === "Purchase") {
+            // Check if any OTW container number is in the description
+            const belongsToOtw = otwContainerNumbers.some(cn => 
+              v.description && v.description.includes(cn)
+            );
+            if (belongsToOtw) {
+              console.log("Preserving OTW voucher:", v.id, v.description);
+              return false; // Don't delete - it's for an OTW container
+            }
+          }
+          return true; // Delete all other vouchers
+        });
+
+        const voucherIdsToDelete = vouchersToDelete.map(v => v.id);
+        console.log("Vouchers to delete:", voucherIdsToDelete.length);
+        console.log("Vouchers to preserve (OTW):", allVouchers.length - voucherIdsToDelete.length);
 
         if (voucherIdsToDelete.length > 0) {
           // Format voucherIds as PostgreSQL array literal
           const voucherIdsArray = `ARRAY[${voucherIdsToDelete.join(',')}]::int[]`;
           
-          // Count entries before deleting
-          const entryCount = await tx
-            .select({ count: sql<number>`count(*)` })
-            .from(voucherEntries)
-            .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
-          
-          results.voucherEntriesDeleted = Number(entryCount[0]?.count) || 0;
-
-          // Delete all voucher entries for those vouchers
-          await tx
-            .delete(voucherEntries)
-            .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
-
-          // Soft delete the vouchers (excluding Purchase types)
+          // SOFT DELETE vouchers only - DON'T delete voucher entries
+          // This allows undo to work properly
           await tx
             .update(vouchers)
             .set({ deletedAt: new Date() })
@@ -28593,7 +28604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           results.vouchersDeleted = voucherIdsToDelete.length;
         }
 
-        // 2. Clear opening balances for selected accounts
+        // 4. Clear opening balances for selected accounts
         if (accountIds.length > 0) {
           const accountIdsArray = `ARRAY[${accountIds.join(',')}]::int[]`;
           
@@ -28610,7 +28621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           results.openingBalancesCleared = accountIds.length;
         }
 
-        // 3. Clear stock item opening balances if requested
+        // 5. Clear stock item opening balances if requested
         if (clearStockOpeningBalances) {
           // Count first
           const stockItemCount = await tx
