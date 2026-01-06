@@ -3763,6 +3763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   and(
                     eq(vouchers.companyId, req.session.currentCompanyId!),
                     eq(voucherEntries.ledgerAccountId, employeeAccount.id),
+                    isNull(vouchers.deletedAt),
                     eq(vouchers.optional, false),
                   ),
                 );
@@ -17417,7 +17418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
       const companyVoucherIds = companyVouchers.map((v) => v.id);
 
@@ -17930,6 +17931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             eq(vouchers.voucherType, "Sales"),
+            isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
           ),
         )
@@ -18007,7 +18009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id, voucherDate: vouchers.voucherDate })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -18209,7 +18211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(vouchers.companyId, companyId),
-            eq(vouchers.optional, false)
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt)
           )
         )
         .execute();
@@ -19439,7 +19442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(vouchers)
           .where(eq(vouchers.companyId, companyId));
 
-        const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false)];
+        const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
         }
@@ -21786,6 +21789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build voucher filter conditions
       const voucherConditions = [
         eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
         eq(vouchers.optional, false)
       ];
       
@@ -21920,6 +21924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // NOTE: Must calculate Sales BEFORE Gross Profit for Tally-style calculation
       const salesConditions = [
         eq(vouchers.companyId, companyId),
+        isNull(vouchers.deletedAt),
         eq(vouchers.optional, false)
       ];
       if (startDate) {
@@ -22347,7 +22352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
       
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -22415,7 +22420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
       
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -22503,7 +22508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
       
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -22571,7 +22576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false)))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
       
       const companyVoucherIds = companyVouchers.map((v) => v.id);
@@ -22662,6 +22667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(voucherEntries.ledgerAccountId, accountId),
             eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
             lt(vouchers.voucherDate, start.toISOString().split("T")[0])
           )
@@ -22687,6 +22693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(voucherEntries.ledgerAccountId, accountId),
             eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
             gte(vouchers.voucherDate, start.toISOString().split("T")[0]),
             lte(vouchers.voucherDate, end.toISOString().split("T")[0])
@@ -22798,6 +22805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(voucherEntries.ledgerAccountId, accountId),
             eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
             lt(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0])
           )
@@ -22829,6 +22837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(voucherEntries.ledgerAccountId, accountId),
             eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
             eq(vouchers.optional, false),
             gte(vouchers.voucherDate, startOfMonth.toISOString().split("T")[0]),
             lte(vouchers.voucherDate, endOfMonth.toISOString().split("T")[0])
@@ -23472,6 +23481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 and(
                   eq(voucherEntries.ledgerAccountId, accountId),
                   eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
                   or(eq(vouchers.optional, false), isNull(vouchers.optional))
                 )
               )
@@ -25068,6 +25078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
         ));
@@ -25088,6 +25099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
         ));
@@ -25106,6 +25118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
         ));
@@ -25262,6 +25275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
         ));
@@ -25293,6 +25307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
         ));
@@ -25315,6 +25330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
         ));
@@ -25402,6 +25418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
           sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
@@ -25476,6 +25493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
           sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
@@ -25525,6 +25543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
           sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`
@@ -25726,6 +25745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
           or(
@@ -25765,6 +25785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(stockAdjustmentVouchers.locationId, locationId),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
@@ -25795,6 +25816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(vouchers.locationId, locationId),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`
@@ -25991,6 +26013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`,
           or(
@@ -26024,6 +26047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(stockAdjustmentVouchers.locationId, locationId),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
@@ -26053,6 +26077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(vouchers.locationId, locationId),
           sql`${vouchers.voucherDate}::date < ${monthStartStr}::date`
@@ -26130,6 +26155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`,
           or(
@@ -26163,6 +26189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(stockAdjustmentVouchers.locationId, locationId),
           sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`
@@ -26184,6 +26211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(vouchers.locationId, locationId),
           sql`${vouchers.voucherDate}::date > ${monthEndStr}::date`
@@ -26260,6 +26288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockTransferItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
           sql`EXTRACT(MONTH FROM ${vouchers.voucherDate}) = ${month}`,
@@ -26339,6 +26368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(stockAdjustmentItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(stockAdjustmentVouchers.locationId, locationId),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
@@ -26384,6 +26414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(
           eq(salesItems.stockItemId, stockItemId),
           eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
           eq(vouchers.optional, false),
           eq(vouchers.locationId, locationId),
           sql`EXTRACT(YEAR FROM ${vouchers.voucherDate}) = ${year}`,
