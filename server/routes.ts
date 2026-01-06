@@ -27055,32 +27055,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .orderBy(desc(bankAccounts.deletedAt));
 
       // Get orphaned POS sales - vouchers with locationId pointing to deleted or non-existent locations
-      // Use locations.name to detect missing locations (will be null if no match from left join)
-      const orphanedPosSales = await db
-        .select({
-          id: vouchers.id,
-          voucherNumber: vouchers.voucherNumber,
-          voucherType: vouchers.voucherType,
-          date: vouchers.date,
-          totalAmount: vouchers.totalAmount,
-          locationId: vouchers.locationId,
-          locationName: locations.name,
-          locationDeletedAt: locations.deletedAt,
-        })
-        .from(vouchers)
-        .leftJoin(locations, eq(vouchers.locationId, locations.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            isNotNull(vouchers.locationId),
-            or(
-              isNull(locations.name), // Location doesn't exist (null from left join)
-              isNotNull(locations.deletedAt) // Location is soft-deleted
+      // Wrap in try-catch to prevent breaking the entire endpoint if this query fails
+      let orphanedPosSales: any[] = [];
+      try {
+        orphanedPosSales = await db
+          .select({
+            id: vouchers.id,
+            voucherNumber: vouchers.voucherNumber,
+            voucherType: vouchers.voucherType,
+            date: vouchers.date,
+            totalAmount: vouchers.totalAmount,
+            locationId: vouchers.locationId,
+            locationName: locations.name,
+            locationDeletedAt: locations.deletedAt,
+          })
+          .from(vouchers)
+          .leftJoin(locations, eq(vouchers.locationId, locations.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              isNotNull(vouchers.locationId),
+              or(
+                isNull(locations.name), // Location doesn't exist (null from left join)
+                isNotNull(locations.deletedAt) // Location is soft-deleted
+              )
             )
           )
-        )
-        .orderBy(desc(vouchers.date));
+          .orderBy(desc(vouchers.date));
+      } catch (err) {
+        console.error("Error fetching orphaned POS sales:", err);
+        orphanedPosSales = [];
+      }
 
       res.json({
         locations: deletedLocations.map(l => ({
@@ -27140,19 +27146,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: b.code,
           deletedAt: b.deletedAt,
         })),
-        orphanedPosSales: orphanedPosSales.map(v => ({
+        orphanedPosSales: (orphanedPosSales || []).map(v => ({
           id: v.id,
           type: "orphanedPosSale",
           name: v.voucherNumber || "Unknown Voucher",
           code: v.voucherType || "-",
-          amount: Number(v.totalAmount) || 0,
-          date: v.date ? String(v.date) : null,
+          amount: v.totalAmount != null ? Number(v.totalAmount) : 0,
+          date: v.date != null ? v.date : null,
           locationName: v.locationName ? `${v.locationName} (Deleted)` : "(Location Missing)",
-          deletedAt: v.locationDeletedAt ? String(v.locationDeletedAt) : (v.date ? String(v.date) : null),
+          deletedAt: v.locationDeletedAt != null ? v.locationDeletedAt : (v.date != null ? v.date : null),
         })),
         totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length +
           deletedLedgerAccounts.length + deletedEmployees.length + deletedCustomers.length +
-          deletedSuppliers.length + deletedBankAccounts.length + orphanedPosSales.length,
+          deletedSuppliers.length + deletedBankAccounts.length + (orphanedPosSales || []).length,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
