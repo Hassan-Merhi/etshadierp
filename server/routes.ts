@@ -27864,6 +27864,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get orphaned POS sales (vouchers at deleted locations)
+  app.get("/api/admin/orphaned-pos-sales", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Find all vouchers with locationId pointing to deleted or non-existent locations
+      const orphanedVouchers = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          locationId: vouchers.locationId,
+          notes: vouchers.notes,
+        })
+        .from(vouchers)
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            isNotNull(vouchers.locationId),
+            or(
+              isNull(locations.id), // Location doesn't exist
+              isNotNull(locations.deletedAt) // Location is soft-deleted
+            )
+          )
+        );
+
+      // Get entry totals for each orphaned voucher
+      const vouchersWithTotals = await Promise.all(
+        orphanedVouchers.map(async (v) => {
+          const entries = await db
+            .select({
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            })
+            .from(voucherEntries)
+            .where(eq(voucherEntries.voucherId, v.id));
+
+          const totalDebit = entries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
+          const totalCredit = entries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
+
+          // Check if it has sales items
+          const saleItems = await db
+            .select({ id: salesItems.id, quantity: salesItems.quantity, totalCost: salesItems.totalCost })
+            .from(salesItems)
+            .where(eq(salesItems.voucherId, v.id));
+
+          return {
+            ...v,
+            totalDebit,
+            totalCredit,
+            salesItemCount: saleItems.length,
+            salesItemsTotalCost: saleItems.reduce((sum, s) => sum + parseFloat(s.totalCost || "0"), 0),
+          };
+        })
+      );
+
+      const totalImpact = vouchersWithTotals.reduce((sum, v) => sum + Math.abs(v.totalDebit - v.totalCredit), 0);
+
+      res.json({
+        count: vouchersWithTotals.length,
+        totalImpact,
+        vouchers: vouchersWithTotals,
+        explanation: "These vouchers have a locationId that points to a deleted or non-existent location. They are orphaned and can be safely deleted.",
+      });
+    } catch (error: any) {
+      console.error("Orphaned POS sales check error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete orphaned POS sales (vouchers at deleted locations)
+  app.post("/api/admin/delete-orphaned-pos-sales", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Find all vouchers with locationId pointing to deleted or non-existent locations
+      const orphanedVouchers = await db
+        .select({
+          id: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+        })
+        .from(vouchers)
+        .leftJoin(locations, eq(vouchers.locationId, locations.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            isNotNull(vouchers.locationId),
+            or(
+              isNull(locations.id), // Location doesn't exist
+              isNotNull(locations.deletedAt) // Location is soft-deleted
+            )
+          )
+        );
+
+      if (orphanedVouchers.length === 0) {
+        return res.json({ message: "No orphaned POS sales found", deleted: 0 });
+      }
+
+      const voucherIds = orphanedVouchers.map(v => v.id);
+
+      // Use batch deletes with inArray for efficiency
+      // Delete sales items first (foreign key constraint)
+      const salesResult = await db.delete(salesItems).where(inArray(salesItems.voucherId, voucherIds));
+      const deletedSalesItems = (salesResult as any).rowCount || voucherIds.length;
+
+      // Delete voucher entries
+      const entriesResult = await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
+      const deletedEntries = (entriesResult as any).rowCount || voucherIds.length;
+
+      // Delete the vouchers themselves (hard delete since they're orphaned garbage)
+      const vouchersResult = await db.delete(vouchers).where(inArray(vouchers.id, voucherIds));
+      const deletedVouchers = (vouchersResult as any).rowCount || voucherIds.length;
+
+      res.json({
+        message: `Deleted ${deletedVouchers} orphaned POS vouchers, ${deletedEntries} entries, and ${deletedSalesItems} sales items`,
+        deleted: deletedVouchers,
+        deletedEntries,
+        deletedSalesItems,
+        voucherNumbers: orphanedVouchers.map(v => v.voucherNumber),
+      });
+    } catch (error: any) {
+      console.error("Delete orphaned POS sales error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Role Feature Permissions API
   // Get all role permissions for the current company
   app.get(

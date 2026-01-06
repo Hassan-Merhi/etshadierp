@@ -390,6 +390,9 @@
     const [changePasswordData, setChangePasswordData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
     const [orphanedChargesDiagnostic, setOrphanedChargesDiagnostic] = useState<{ count: number; impact: number; vouchers: any[] } | null>(null);
     const [isFixingOrphanedCharges, setIsFixingOrphanedCharges] = useState(false);
+    const [orphanedPosSalesDiagnostic, setOrphanedPosSalesDiagnostic] = useState<{ count: number; totalImpact: number; vouchers: any[] } | null>(null);
+    const [isFixingOrphanedPosSales, setIsFixingOrphanedPosSales] = useState(false);
+    const [isLoadingOrphanedPosSales, setIsLoadingOrphanedPosSales] = useState(false);
     const [selectedContainerForDiag, setSelectedContainerForDiag] = useState<string>("");
     const [containerDiagResult, setContainerDiagResult] = useState<any>(null);
     const [isLoadingContainerDiag, setIsLoadingContainerDiag] = useState(false);
@@ -2246,6 +2249,128 @@
                             <div key={i} className="flex justify-between text-muted-foreground py-1 border-b last:border-0">
                               <span>{v.voucherNumber}</span>
                               <span>Container: {v.containerNumber}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-lg">
+                          <Trash2 className="h-6 w-6 text-red-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="text-orphaned-pos-sales-title">Orphaned POS Sales at Deleted Locations</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Find and delete POS sale vouchers linked to deleted locations
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          disabled={isLoadingOrphanedPosSales}
+                          onClick={async () => {
+                            try {
+                              setIsLoadingOrphanedPosSales(true);
+                              const response = await fetch("/api/admin/orphaned-pos-sales", {
+                                method: "GET",
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                setOrphanedPosSalesDiagnostic({
+                                  count: result.count,
+                                  totalImpact: result.totalImpact,
+                                  vouchers: result.vouchers || [],
+                                });
+                                if (result.count === 0) {
+                                  toast({
+                                    title: "No Orphaned Sales Found",
+                                    description: "All POS sales are linked to valid locations.",
+                                  });
+                                }
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsLoadingOrphanedPosSales(false);
+                            }
+                          }}
+                          data-testid="button-diagnose-orphaned-pos-sales"
+                        >
+                          {isLoadingOrphanedPosSales ? "Checking..." : "Diagnose"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0 || isFixingOrphanedPosSales}
+                          onClick={async () => {
+                            if (!orphanedPosSalesDiagnostic || orphanedPosSalesDiagnostic.count === 0) return;
+                            if (!confirm(`Delete ${orphanedPosSalesDiagnostic.count} orphaned POS vouchers with impact of $${orphanedPosSalesDiagnostic.totalImpact.toFixed(2)}? This cannot be undone.`)) {
+                              return;
+                            }
+                            try {
+                              setIsFixingOrphanedPosSales(true);
+                              const response = await fetch("/api/admin/delete-orphaned-pos-sales", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                              });
+                              const result = await response.json();
+                              if (response.ok) {
+                                toast({
+                                  title: "Cleanup Complete",
+                                  description: result.message,
+                                });
+                                setOrphanedPosSalesDiagnostic(null);
+                              } else {
+                                toast({
+                                  title: "Error",
+                                  description: result.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            } catch (error: any) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setIsFixingOrphanedPosSales(false);
+                            }
+                          }}
+                          data-testid="button-delete-orphaned-pos-sales"
+                        >
+                          {isFixingOrphanedPosSales ? "Deleting..." : "Delete Orphaned"}
+                        </Button>
+                      </div>
+                    </div>
+                    {orphanedPosSalesDiagnostic && orphanedPosSalesDiagnostic.count > 0 && (
+                      <div className="bg-destructive/10 p-4 rounded-lg space-y-2">
+                        <p className="font-medium text-destructive">
+                          Found {orphanedPosSalesDiagnostic.count} orphaned POS vouchers (Impact: ${orphanedPosSalesDiagnostic.totalImpact.toFixed(2)})
+                        </p>
+                        <div className="max-h-32 overflow-y-auto text-sm">
+                          {orphanedPosSalesDiagnostic.vouchers.slice(0, 20).map((v: any, i: number) => (
+                            <div key={i} className="flex justify-between text-muted-foreground py-1 border-b last:border-0">
+                              <span>{v.voucherNumber}</span>
+                              <span>Location ID: {v.locationId} (deleted)</span>
                             </div>
                           ))}
                         </div>
