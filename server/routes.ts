@@ -25021,6 +25021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
       // Find all orphaned vouchers (those with deleted or non-existent locations)
+      // Must match the exact same query as GET /api/orphaned-records
       const orphanedVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
@@ -25029,10 +25030,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             isNull(vouchers.deletedAt),
-            isNotNull(vouchers.locationId),
+            sql`${vouchers.locationId} IS NOT NULL`,
             or(
-              isNull(locations.name), // Location doesn't exist
-              isNotNull(locations.deletedAt) // Location is soft-deleted
+              sql`${locations.id} IS NULL`,
+              isNotNull(locations.deletedAt)
             )
           )
         );
