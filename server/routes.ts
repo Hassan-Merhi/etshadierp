@@ -28553,6 +28553,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.transaction(async (tx) => {
         // 1. Find all vouchers that have entries involving the selected accounts
         if (accountIds.length > 0) {
+          // Format accountIds as PostgreSQL array literal
+          const accountIdsArray = `ARRAY[${accountIds.join(',')}]::int[]`;
+          
           // Get all voucher entries for the selected accounts
           const entriesToDelete = await tx
             .select({ voucherId: voucherEntries.voucherId, id: voucherEntries.id })
@@ -28561,17 +28564,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, companyId),
-                sql`${voucherEntries.accountId} = ANY(${accountIds}::int[])`
+                sql.raw(`"voucher_entries"."account_id" = ANY(${accountIdsArray})`)
               )
             );
 
           const voucherIdsToDelete = [...new Set(entriesToDelete.map(e => e.voucherId))];
 
           if (voucherIdsToDelete.length > 0) {
+            // Format voucherIds as PostgreSQL array literal
+            const voucherIdsArray = `ARRAY[${voucherIdsToDelete.join(',')}]::int[]`;
+            
             // Delete all entries for those vouchers (not just the selected account entries)
             await tx
               .delete(voucherEntries)
-              .where(sql`${voucherEntries.voucherId} = ANY(${voucherIdsToDelete}::int[])`);
+              .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
             
             results.voucherEntriesDeleted = entriesToDelete.length;
 
@@ -28582,7 +28588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(
                 and(
                   eq(vouchers.companyId, companyId),
-                  sql`${vouchers.id} = ANY(${voucherIdsToDelete}::int[])`
+                  sql.raw(`"vouchers"."id" = ANY(${voucherIdsArray})`)
                 )
               );
             
@@ -28596,7 +28602,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                sql`${ledgerAccounts.id} = ANY(${accountIds}::int[])`
+                sql.raw(`"ledger_accounts"."id" = ANY(${accountIdsArray})`)
               )
             );
           
