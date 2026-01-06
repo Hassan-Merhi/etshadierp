@@ -25029,7 +25029,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
             sql`${vouchers.locationId} IS NOT NULL`,
             or(
               sql`${locations.id} IS NULL`,
