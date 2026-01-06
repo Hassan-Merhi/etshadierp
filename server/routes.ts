@@ -28533,7 +28533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Company Data Reset - Delete ALL vouchers for company and clear opening balances for selected accounts
+  // Company Data Reset - Delete vouchers (excluding Purchase/PO vouchers) and clear opening balances
   app.post("/api/admin/company-data-reset", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const { companyId, accountIds, clearStockOpeningBalances } = req.body;
@@ -28549,14 +28549,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stockOpeningBalancesCleared: 0,
       };
 
+      // Voucher types to DELETE (excludes Purchase which includes PO import and container offload)
+      const voucherTypesToDelete = ['Payment', 'Receipt', 'Journal', 'Sales', 'Contra', 'Stock Transfer', 'Production', 'Consumption', 'Mixed'];
+
       // Start a transaction
       await db.transaction(async (tx) => {
-        // 1. Delete ALL vouchers for the company (not just selected accounts)
-        // First, get all voucher IDs for this company
+        // 1. Get vouchers to delete (excluding Purchase type)
         const companyVouchers = await tx
           .select({ id: vouchers.id })
           .from(vouchers)
-          .where(eq(vouchers.companyId, companyId));
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql.raw(`"vouchers"."voucher_type" = ANY(ARRAY['${voucherTypesToDelete.join("','")}']::text[])`)
+            )
+          );
 
         const voucherIdsToDelete = companyVouchers.map(v => v.id);
 
@@ -28570,18 +28577,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(voucherEntries)
             .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
           
-          results.voucherEntriesDeleted = entryCount[0]?.count || 0;
+          results.voucherEntriesDeleted = Number(entryCount[0]?.count) || 0;
 
           // Delete all voucher entries for those vouchers
           await tx
             .delete(voucherEntries)
             .where(sql.raw(`"voucher_entries"."voucher_id" = ANY(${voucherIdsArray})`));
 
-          // Soft delete all vouchers for the company
+          // Soft delete the vouchers (excluding Purchase types)
           await tx
             .update(vouchers)
             .set({ deletedAt: new Date() })
-            .where(eq(vouchers.companyId, companyId));
+            .where(sql.raw(`"vouchers"."id" = ANY(${voucherIdsArray})`));
           
           results.vouchersDeleted = voucherIdsToDelete.length;
         }
@@ -28611,7 +28618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(stockItems)
             .where(eq(stockItems.companyId, companyId));
           
-          results.stockOpeningBalancesCleared = stockItemCount[0]?.count || 0;
+          results.stockOpeningBalancesCleared = Number(stockItemCount[0]?.count) || 0;
 
           await tx
             .update(stockItems)
@@ -28624,6 +28631,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, results });
     } catch (error: any) {
       console.error("Company data reset error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Undo Last Reset - Restore soft-deleted vouchers for a company
+  app.post("/api/admin/undo-company-reset", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { companyId } = req.body;
+
+      if (!companyId) {
+        return res.status(400).json({ message: "companyId is required" });
+      }
+
+      // Restore soft-deleted vouchers by clearing deletedAt
+      const result = await db
+        .update(vouchers)
+        .set({ deletedAt: null })
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNotNull(vouchers.deletedAt)
+          )
+        )
+        .returning({ id: vouchers.id });
+
+      const restoredCount = result.length;
+
+      console.log(`Undo reset completed for company ${companyId}: restored ${restoredCount} vouchers`);
+      res.json({ 
+        success: true, 
+        message: `Restored ${restoredCount} vouchers`,
+        vouchersRestored: restoredCount 
+      });
+    } catch (error: any) {
+      console.error("Undo company reset error:", error);
       res.status(500).json({ message: error.message });
     }
   });

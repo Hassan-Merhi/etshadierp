@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, Trash2, Shield } from "lucide-react";
+import { AlertTriangle, Trash2, Shield, Undo2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Company, LedgerAccount } from "@shared/schema";
 import {
@@ -27,6 +27,7 @@ export default function CompanyDataReset() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
   const [clearStockOpeningBalances, setClearStockOpeningBalances] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [undoDialogOpen, setUndoDialogOpen] = useState(false);
 
   const { data: companies = [], isLoading: loadingCompanies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
@@ -59,6 +60,34 @@ export default function CompanyDataReset() {
       toast({ title: "Reset Failed", description: error.message, variant: "destructive" });
     },
   });
+
+  const undoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/undo-company-reset", {
+        companyId: parseInt(selectedCompanyId),
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Undo Complete", 
+        description: `Restored ${data.vouchersRestored || 0} vouchers successfully` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Undo Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleUndo = () => {
+    setUndoDialogOpen(true);
+  };
+
+  const confirmUndo = () => {
+    setUndoDialogOpen(false);
+    undoMutation.mutate();
+  };
 
   const toggleAccount = (accountId: number) => {
     setSelectedAccountIds(prev => 
@@ -105,8 +134,8 @@ export default function CompanyDataReset() {
             Warning: Destructive Action
           </CardTitle>
           <CardDescription>
-            This will permanently delete vouchers and clear opening balances for selected accounts.
-            Stock items, containers, POs, offloads, and supplier balances will NOT be affected.
+            This will permanently delete vouchers (POS Sales, Payments, Receipts, Journals, Stock Transfers, Production, Consumption) and clear opening balances for selected accounts.
+            <strong className="text-foreground"> Purchase Order and Container Offload vouchers will NOT be deleted.</strong> Supplier balances are also preserved.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -217,15 +246,26 @@ export default function CompanyDataReset() {
                 <div className="text-sm text-muted-foreground">
                   {selectedAccountIds.length} account(s) selected
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={handleReset}
-                  disabled={selectedAccountIds.length === 0 && !clearStockOpeningBalances || resetMutation.isPending}
-                  data-testid="button-reset"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {resetMutation.isPending ? "Resetting..." : "Reset Selected Data"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleUndo}
+                    disabled={undoMutation.isPending}
+                    data-testid="button-undo"
+                  >
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    {undoMutation.isPending ? "Restoring..." : "Undo Last Reset"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleReset}
+                    disabled={selectedAccountIds.length === 0 && !clearStockOpeningBalances || resetMutation.isPending}
+                    data-testid="button-reset"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {resetMutation.isPending ? "Resetting..." : "Reset Selected Data"}
+                  </Button>
+                </div>
               </div>
             </>
           )}
@@ -237,19 +277,38 @@ export default function CompanyDataReset() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>This action cannot be undone. This will:</p>
+              <p>This will:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Delete ALL vouchers (POS, Journal, Stock Transfer, Payment, Receipt, Production, Consumption) that involve the {selectedAccountIds.length} selected account(s)</li>
-                <li>Clear opening balances for selected accounts</li>
+                <li>Delete ALL vouchers (POS Sales, Payments, Receipts, Journals, Stock Transfers, Production, Consumption) for this company</li>
+                <li>Clear opening balances for the {selectedAccountIds.length} selected account(s)</li>
                 {clearStockOpeningBalances && <li>Reset stock item opening balances to zero</li>}
               </ul>
-              <p className="font-medium mt-2">Supplier balances will be preserved.</p>
+              <p className="font-medium mt-2 text-green-600">Purchase Order and Container Offload vouchers will be preserved. Supplier balances will also be preserved.</p>
+              <p className="text-sm">You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmReset} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Yes, Reset Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={undoDialogOpen} onOpenChange={setUndoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore Deleted Vouchers?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will restore all previously deleted vouchers for this company. 
+              Note: Opening balances that were cleared cannot be restored automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUndo}>
+              Yes, Restore Vouchers
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
