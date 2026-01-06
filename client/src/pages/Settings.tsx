@@ -1948,6 +1948,25 @@
                   </Card>
                 </Link>
 
+
+                <Link href="/company-data-reset">
+                  <Card className="p-6 hover-elevate cursor-pointer">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-red-500/10 rounded-lg">
+                          <Trash2 className="h-6 w-6 text-red-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold" data-testid="link-company-data-reset">Company Data Reset</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Clear vouchers and opening balances for selected accounts
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </Card>
+                </Link>
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">

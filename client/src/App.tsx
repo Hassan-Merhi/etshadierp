@@ -68,6 +68,7 @@ import FactoryProduction from "@/pages/FactoryProduction";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
+import CompanyDataReset from "@/pages/CompanyDataReset";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -150,6 +151,7 @@ function Router({ user }: { user: any }) {
       {user?.role === "Admin" && <Route path="/test-data-import" component={TestDataImport} />}
       {user?.role === "Admin" && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
       {user?.role === "Admin" && <Route path="/net-profit-details" component={NetProfitDetails} />}
+      {user?.role === "Admin" && <Route path="/company-data-reset" component={CompanyDataReset} />}
       <Route component={NotFound} />
     </Switch>
   );

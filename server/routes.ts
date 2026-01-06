@@ -28533,6 +28533,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // Company Data Reset - Delete vouchers and clear opening balances for selected accounts
+  app.post("/api/admin/company-data-reset", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const { companyId, accountIds, clearStockOpeningBalances } = req.body;
+
+      if (!companyId || !Array.isArray(accountIds)) {
+        return res.status(400).json({ message: "companyId and accountIds array are required" });
+      }
+
+      const results = {
+        vouchersDeleted: 0,
+        voucherEntriesDeleted: 0,
+        openingBalancesCleared: 0,
+        stockOpeningBalancesCleared: 0,
+      };
+
+      // Start a transaction
+      await db.transaction(async (tx) => {
+        // 1. Find all vouchers that have entries involving the selected accounts
+        if (accountIds.length > 0) {
+          // Get all voucher entries for the selected accounts
+          const entriesToDelete = await tx
+            .select({ voucherId: voucherEntries.voucherId, id: voucherEntries.id })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                inArray(voucherEntries.accountId, accountIds)
+              )
+            );
+
+          const voucherIdsToDelete = [...new Set(entriesToDelete.map(e => e.voucherId))];
+
+          if (voucherIdsToDelete.length > 0) {
+            // Delete all entries for those vouchers (not just the selected account entries)
+            await tx
+              .delete(voucherEntries)
+              .where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
+            
+            results.voucherEntriesDeleted = entriesToDelete.length;
+
+            // Soft delete the vouchers themselves
+            await tx
+              .update(vouchers)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  inArray(vouchers.id, voucherIdsToDelete)
+                )
+              );
+            
+            results.vouchersDeleted = voucherIdsToDelete.length;
+          }
+
+          // 2. Clear opening balances for selected accounts
+          await tx
+            .update(ledgerAccounts)
+            .set({ openingBalance: "0", openingBalanceSide: null })
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                inArray(ledgerAccounts.id, accountIds)
+              )
+            );
+          
+          results.openingBalancesCleared = accountIds.length;
+        }
+
+        // 3. Clear stock item opening balances if requested
+        if (clearStockOpeningBalances) {
+          await tx
+            .update(stockItems)
+            .set({ openingQty: "0", openingRate: "0", openingValue: "0" })
+            .where(eq(stockItems.companyId, companyId));
+          
+          // Count how many were updated
+          const stockItemCount = await tx
+            .select({ count: sql<number>`count(*)`  })
+            .from(stockItems)
+            .where(eq(stockItems.companyId, companyId));
+          
+          results.stockOpeningBalancesCleared = stockItemCount[0]?.count || 0;
+        }
+      });
+
+      console.log(`Company data reset completed for company ${companyId}:`, results);
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("Company data reset error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
