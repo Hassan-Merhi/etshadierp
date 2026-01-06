@@ -25018,12 +25018,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/orphaned-records/delete-all", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
+      console.log("[DELETE-ALL] Starting delete-all for companyId:", companyId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
       // Find all orphaned vouchers (those with deleted or non-existent locations)
-      // Must match the exact same query as GET /api/orphaned-records
+      // Must match the exact same query as GET /api/orphaned-records (NO deletedAt filter!)
       const orphanedVouchers = await db
-        .select({ id: vouchers.id })
+        .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, locationId: vouchers.locationId, voucherCompanyId: vouchers.companyId })
         .from(vouchers)
         .leftJoin(locations, eq(vouchers.locationId, locations.id))
         .where(
@@ -25037,8 +25038,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           )
         );
       
+      console.log("[DELETE-ALL] Found orphaned vouchers:", orphanedVouchers.length);
+      if (orphanedVouchers.length > 0) {
+        console.log("[DELETE-ALL] First 3 vouchers:", JSON.stringify(orphanedVouchers.slice(0, 3)));
+      }
+      
       if (orphanedVouchers.length === 0) {
-        return res.json({ success: true, deleted: 0, message: "No orphaned vouchers found" });
+        // Debug: check what vouchers exist for this company at all
+        const allVouchers = await db.select({ id: vouchers.id, locationId: vouchers.locationId }).from(vouchers).where(eq(vouchers.companyId, companyId)).limit(5);
+        console.log("[DELETE-ALL] Sample vouchers for company:", JSON.stringify(allVouchers));
+        return res.json({ success: true, deleted: 0, message: "No orphaned vouchers found", debug: { companyId, sampleVouchers: allVouchers.length } });
       }
       
       const orphanedIds = orphanedVouchers.map(v => v.id);
