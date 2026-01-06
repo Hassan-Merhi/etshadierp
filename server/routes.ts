@@ -28564,7 +28564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, companyId),
-                sql.raw(`"voucher_entries"."account_id" = ANY(${accountIdsArray})`)
+                sql.raw(`"voucher_entries"."ledger_account_id" = ANY(${accountIdsArray})`)
               )
             );
 
