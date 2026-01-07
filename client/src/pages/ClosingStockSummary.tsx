@@ -4,10 +4,9 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, ChevronRight, ArrowRightLeft } from "lucide-react";
+import { ArrowLeft, Package, ChevronRight, RefreshCw } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -58,46 +57,35 @@ export default function ClosingStockSummary() {
     enabled: !!selectedCompany?.id,
   });
 
-  // Get all companies user has access to for transfer
-  const { data: userCompanies } = useQuery<Array<{ companyId: number; companyName: string }>>({
-    queryKey: ["/api/user/companies"],
-  });
-
   const { toast } = useToast();
-  const [showTransferDialog, setShowTransferDialog] = useState(false);
-  const [targetCompanyId, setTargetCompanyId] = useState<string>("");
+  const [showCarryForwardDialog, setShowCarryForwardDialog] = useState(false);
 
-  const transferMutation = useMutation({
-    mutationFn: async (targetId: number) => {
-      const response = await apiRequest("POST", "/api/reports/transfer-closing-stock", {
-        targetCompanyId: targetId,
-      });
+  const carryForwardMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/reports/carryforward-closing-stock", {});
       return response.json();
     },
     onSuccess: (data) => {
       toast({
-        title: "Transfer Successful",
+        title: "Success",
         description: data.message,
       });
-      setShowTransferDialog(false);
-      setTargetCompanyId("");
+      setShowCarryForwardDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/reports/closing-stock-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/opening-stock-summary"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Transfer Failed",
-        description: error.message || "Failed to transfer closing stock",
+        title: "Failed",
+        description: error.message || "Failed to carry forward closing stock",
         variant: "destructive",
       });
     },
   });
 
-  const handleTransfer = () => {
-    if (!targetCompanyId) return;
-    transferMutation.mutate(parseInt(targetCompanyId));
+  const handleCarryForward = () => {
+    carryForwardMutation.mutate();
   };
-
-  const otherCompanies = userCompanies?.filter(c => c.companyId !== selectedCompany?.id) || [];
 
   const handleGroupClick = (groupId: number, groupName: string) => {
     navigate(`/closing-stock/${groupId}?name=${encodeURIComponent(groupName)}`);
@@ -105,7 +93,7 @@ export default function ClosingStockSummary() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -125,55 +113,51 @@ export default function ClosingStockSummary() {
             </p>
           </div>
         </div>
-        {otherCompanies.length > 0 && data?.grandTotal && data.grandTotal.value > 0 && (
+        {data?.grandTotal && data.grandTotal.value > 0 && (
           <Button
-            onClick={() => setShowTransferDialog(true)}
-            data-testid="button-transfer-stock"
+            onClick={() => setShowCarryForwardDialog(true)}
+            data-testid="button-carryforward-stock"
           >
-            <ArrowRightLeft className="h-4 w-4 mr-2" />
-            Transfer to Company
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Set as Opening Stock
           </Button>
         )}
       </div>
 
-      {/* Transfer Stock Dialog */}
-      <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+      {/* Carry Forward Confirmation Dialog */}
+      <Dialog open={showCarryForwardDialog} onOpenChange={setShowCarryForwardDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Transfer Closing Stock</DialogTitle>
+            <DialogTitle>Set Closing Stock as Opening Stock</DialogTitle>
             <DialogDescription>
-              Transfer all current inventory as opening stock to another company.
-              Total value: ${data?.grandTotal ? formatNumber(data.grandTotal.value) : "0.00"}
+              This will replace the current opening stock with the closing stock values shown below.
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <label className="text-sm font-medium mb-2 block">Target Company</label>
-            <Select value={targetCompanyId} onValueChange={setTargetCompanyId}>
-              <SelectTrigger data-testid="select-target-company">
-                <SelectValue placeholder="Select company..." />
-              </SelectTrigger>
-              <SelectContent>
-                {otherCompanies.map((company) => (
-                  <SelectItem key={company.companyId} value={company.companyId.toString()}>
-                    {company.companyName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-2">
-              Note: Target company must have no existing inventory and matching stock items.
-            </p>
+          <div className="py-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Company:</span>
+              <span className="font-medium">{selectedCompany?.name}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Quantity:</span>
+              <span className="font-mono">{data?.grandTotal ? formatNumber(data.grandTotal.quantity) : "0"} BL</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total Value:</span>
+              <span className="font-mono font-medium">${data?.grandTotal ? formatNumber(data.grandTotal.value) : "0.00"}</span>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTransferDialog(false)}>
+            <Button variant="outline" onClick={() => setShowCarryForwardDialog(false)}>
               Cancel
             </Button>
             <Button
-              onClick={handleTransfer}
-              disabled={!targetCompanyId || transferMutation.isPending}
-              data-testid="button-confirm-transfer"
+              onClick={handleCarryForward}
+              disabled={carryForwardMutation.isPending}
+              data-testid="button-confirm-carryforward"
             >
-              {transferMutation.isPending ? "Transferring..." : "Transfer Stock"}
+              {carryForwardMutation.isPending ? "Processing..." : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -9346,7 +9346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await db.delete(inventory).where(eq(inventory.id, inv.id));
                   } else {
                     // Recalculate totalValue as newQty * averageRate
-                    const rate = parseFloat(inv.averageRate);
+                    const rate = parseFloat(inv.averageRate) || 0;
                     const newTotalValue = (newQty * rate).toFixed(2);
                     await db.update(inventory).set({ 
                       quantity: newQty.toString(),
@@ -19925,8 +19925,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stockItemCode: item.code,
             stockItemName: item.name,
             locations: itemInventory.map((inv) => {
-              const qty = parseFloat(inv.quantity);
-              const rate = parseFloat(inv.averageRate);
+              const qty = parseFloat(inv.quantity) || 0;
+              const rate = parseFloat(inv.averageRate) || 0;
               return {
                 locationId: inv.locationId,
                 locationName: inv.locationName,
@@ -20255,8 +20255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate value dynamically as qty * averageRate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
-        const qty = parseFloat(inv.quantity);
-        const rate = parseFloat(inv.averageRate);
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
@@ -20401,8 +20401,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate value dynamically as qty * averageRate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
-        const qty = parseFloat(inv.quantity);
-        const rate = parseFloat(inv.averageRate);
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
@@ -22150,8 +22150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggregate inventory by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
-        const qty = parseFloat(inv.quantity);
-        const rate = parseFloat(inv.averageRate);
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
@@ -22279,8 +22279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggregate by stock item (combine quantities from multiple locations)
       const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of sourceInventory) {
-        const qty = parseFloat(inv.quantity);
-        const rate = parseFloat(inv.averageRate);
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
         
         if (aggregatedInventory.has(inv.stockItemId)) {
@@ -22384,6 +22384,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Carry Forward Closing Stock to Opening Stock (same company)
+  app.post("/api/reports/carryforward-closing-stock", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get current inventory from active locations, aggregated by stock item
+      const currentInventory = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+
+      if (currentInventory.length === 0) {
+        return res.status(400).json({ message: "No inventory found to carry forward" });
+      }
+
+      // Aggregate by stock item (combine quantities from multiple locations)
+      const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of currentInventory) {
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(inv.stockItemId)) {
+          const existing = aggregatedInventory.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Get all stock items for this company to update those with zero inventory
+      const allStockItems = await db
+        .select({ id: stockItems.id })
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.active, true),
+            isNull(stockItems.deletedAt)
+          )
+        )
+        .execute();
+
+      let itemsUpdated = 0;
+      let totalValue = 0;
+
+      // Update stock items with closing stock as new opening stock
+      await db.transaction(async (tx) => {
+        // First, reset all stock items opening to zero (in case some items had inventory before but don't now)
+        for (const item of allStockItems) {
+          if (!aggregatedInventory.has(item.id)) {
+            await tx.update(stockItems)
+              .set({
+                openingQty: "0",
+                openingRate: "0",
+                openingValue: "0",
+              })
+              .where(eq(stockItems.id, item.id));
+          }
+        }
+
+        // Then update items that have closing inventory
+        for (const [stockItemId, data] of aggregatedInventory) {
+          const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
+          
+          await tx.update(stockItems)
+            .set({
+              openingQty: data.quantity.toFixed(3),
+              openingRate: avgRate.toFixed(2),
+              openingValue: data.totalValue.toFixed(2),
+            })
+            .where(eq(stockItems.id, stockItemId));
+          
+          itemsUpdated++;
+          totalValue += data.totalValue;
+        }
+      });
+
+      const company = await storage.getCompanyById(companyId);
+
+      res.json({
+        success: true,
+        message: `Successfully updated opening stock for ${company?.name}. ${itemsUpdated} items updated with total value $${totalValue.toFixed(2)}`,
+        itemsUpdated,
+        totalValue: totalValue.toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("Error carrying forward closing stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Closing Stock Detail - Items in a stock group
   // Closing Stock Detail - Items in a stock group
   app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
     try {
@@ -22437,8 +22546,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Aggregate by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
-        const qty = parseFloat(inv.quantity);
-        const rate = parseFloat(inv.averageRate);
+        const qty = parseFloat(inv.quantity) || 0;
+        const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
         
         if (inventoryByItem.has(inv.stockItemId)) {
