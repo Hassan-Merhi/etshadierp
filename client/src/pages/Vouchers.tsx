@@ -3084,9 +3084,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     : 0;
                                   const entryAmount = parseFloat(entry?.amount || "0");
                                   const isDebit = entry?.type === "DR";
-                                  const projectedBalance = isDebit 
+                                  // For liability accounts (employee, supplier), their natural balance is Credit
+                                  // A positive balance means we owe them (Cr), negative means they owe us (Dr)
+                                  const isLiabilityAccount = entry?.accountType === "employee" || entry?.accountType === "supplier";
+                                  let projectedBalance = isDebit 
                                     ? currentBalance + entryAmount 
                                     : currentBalance - entryAmount;
+                                  // For liability accounts, flip the sign for proper Dr/Cr display
+                                  const displayBalance = isLiabilityAccount ? -projectedBalance : projectedBalance;
                                     
                                   return (
                                     <FormItem>
@@ -3190,8 +3195,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                           />
                                           {entry?.accountId > 0 && (
                                             <div className="text-xs text-muted-foreground pl-1">
-                                              <span>New Bal: <span className={cn("font-mono", projectedBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                                ${Math.abs(projectedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {projectedBalance >= 0 ? "Dr" : "Cr"}
+                                              <span>New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                                                ${Math.abs(displayBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {displayBalance >= 0 ? "Dr" : "Cr"}
                                               </span></span>
                                             </div>
                                           )}
