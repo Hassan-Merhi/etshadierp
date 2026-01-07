@@ -3411,7 +3411,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               </div>
                               <div className={cn(
                                 "text-xs font-mono",
-                                balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                                // For liability accounts (employee/supplier), flip the color logic
+                                // Positive balance = Cr (we owe them) = Red, Negative = Dr (they owe us) = Green
+                                (account.type === "employee" || account.type === "supplier")
+                                  ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
+                                  : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
                               )}>
                                 ${Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </div>
