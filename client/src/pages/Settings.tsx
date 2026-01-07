@@ -2138,6 +2138,57 @@
                 </Card>
 
                 <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-recalc-equity-title">Recalculate Equity Adjustment</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Zero out the Import Cycle Balance by adjusting the opening balance equity offset
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch("/api/admin/recalculate-equity-adjustment", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                          });
+                          const result = await response.json();
+                          if (response.ok) {
+                            toast({
+                              title: "Equity Adjusted",
+                              description: result.message,
+                            });
+                            // Refresh dashboard stats
+                            queryClient.invalidateQueries({ queryKey: ["/api/stats/import-cycle-balance"] });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: result.message,
+                              variant: "destructive",
+                            });
+                          }
+                        } catch (error: any) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid="button-recalc-equity"
+                    >
+                      Recalculate
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">

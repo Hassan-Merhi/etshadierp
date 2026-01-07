@@ -18856,10 +18856,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         netImportCycleBalance,
       }, null, 2));
 
+      // Get stored equity adjustment for this company (if any)
+      const equityAdjustmentSetting = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.key, `equity_adjustment_${companyId}`));
+      
+      const storedEquityAdjustment = equityAdjustmentSetting.length > 0 
+        ? parseFloat(equityAdjustmentSetting[0].value || "0") 
+        : 0;
+      
+      // Apply the stored adjustment to the final balance
+      const adjustedImportCycleBalance = netImportCycleBalance + storedEquityAdjustment;
+
       // Round to 2 decimal places to eliminate floating-point noise
       // If the balance is within ±$5, round to 0 to handle accumulated floating-point precision errors
       const ROUNDING_THRESHOLD = 5;
-      let roundedBalance = Math.round(netImportCycleBalance * 100) / 100;
+      let roundedBalance = Math.round(adjustedImportCycleBalance * 100) / 100;
       if (Math.abs(roundedBalance) <= ROUNDING_THRESHOLD) {
         roundedBalance = 0;
       }
@@ -28075,6 +28088,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         summary: { migrated, deleted, skipped, total: results.length },
       });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Recalculate Opening Balance Equity adjustment
+  // This calculates what adjustment is needed to zero out the import cycle balance
+  app.post("/api/admin/recalculate-equity-adjustment", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get current equity adjustment (if any)
+      const settingKey = `equity_adjustment_${companyId}`;
+      const existingAdjustment = await db
+        .select()
+        .from(systemSettings)
+        .where(eq(systemSettings.key, settingKey));
+      
+      const currentAdjustment = existingAdjustment.length > 0 
+        ? parseFloat(existingAdjustment[0].value || "0") 
+        : 0;
+
+      // Temporarily set adjustment to 0 to get raw imbalance
+      if (existingAdjustment.length > 0) {
+        await db
+          .update(systemSettings)
+          .set({ value: "0", updatedAt: new Date() })
+          .where(eq(systemSettings.key, settingKey));
+      }
+
+      // Make internal request to get current import cycle balance components
+      // (this calculates without the adjustment since we zeroed it)
+      const response = await fetch(`http://localhost:5000/api/stats/import-cycle-balance`, {
+        headers: { 
+          'Cookie': req.headers.cookie || '',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch import cycle balance');
+      }
+      
+      const balanceData = await response.json();
+      const rawImbalance = balanceData.netImportCycleBalance;
+
+      // The adjustment needed is the negative of the raw balance
+      const newAdjustment = -rawImbalance;
+
+      // Store the adjustment
+      if (existingAdjustment.length > 0) {
+        await db
+          .update(systemSettings)
+          .set({ value: newAdjustment.toFixed(2), updatedAt: new Date() })
+          .where(eq(systemSettings.key, settingKey));
+      } else {
+        await db.insert(systemSettings).values({
+          key: settingKey,
+          value: newAdjustment.toFixed(2),
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `Equity adjustment recalculated. The import cycle balance should now be $0.`,
+        previousAdjustment: currentAdjustment.toFixed(2),
+        newAdjustment: newAdjustment.toFixed(2),
+        rawImbalance: rawImbalance.toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("Recalculate equity adjustment error:", error);
       res.status(500).json({ message: error.message });
     }
   });
