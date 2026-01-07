@@ -592,6 +592,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -624,6 +625,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
