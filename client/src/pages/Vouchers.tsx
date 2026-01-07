@@ -1281,6 +1281,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Handle account selection from sidebar
   const handleJournalAccountSelect = (account: CombinedAccount) => {
+    console.log("handleJournalAccountSelect called", { account, activeJournalRow });
     if (activeJournalRow !== null) {
       journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
       journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
@@ -1291,6 +1292,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // - When making entries for them, we typically DEBIT to reduce what we owe them
       // - So default to DR (Debit) for liability accounts
       if (account.type === "employee" || account.type === "supplier") {
+        console.log("Setting type to DR for liability account:", account.name);
         journalForm.setValue(`entries.${activeJournalRow}.type`, "DR");
       }
       
