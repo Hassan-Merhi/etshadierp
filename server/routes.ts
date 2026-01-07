@@ -22225,6 +22225,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transfer Closing Stock to Another Company as Opening Stock
+  app.post("/api/reports/transfer-closing-stock", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const sourceCompanyId = req.session.currentCompanyId;
+      if (!sourceCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { targetCompanyId: rawTargetId } = req.body;
+      if (!rawTargetId) {
+        return res.status(400).json({ message: "Target company is required" });
+      }
+      
+      const targetCompanyId = typeof rawTargetId === 'string' ? parseInt(rawTargetId, 10) : rawTargetId;
+      if (isNaN(targetCompanyId)) {
+        return res.status(400).json({ message: "Invalid target company ID" });
+      }
+
+      if (sourceCompanyId === targetCompanyId) {
+        return res.status(400).json({ message: "Cannot transfer to the same company" });
+      }
+
+      // Verify user has access to target company
+      const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
+      const hasAccessToTarget = userCompanies.some(uc => uc.companyId === targetCompanyId);
+      if (!hasAccessToTarget) {
+        return res.status(403).json({ message: "You don't have access to the target company" });
+      }
+
+      // Get source company inventory from active locations
+      const sourceInventory = await db
+        .select({
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(locations, eq(inventory.locationId, locations.id))
+        .where(
+          and(
+            eq(inventory.companyId, sourceCompanyId),
+            eq(locations.active, true),
+            isNull(locations.deletedAt)
+          )
+        )
+        .execute();
+
+      if (sourceInventory.length === 0) {
+        return res.status(400).json({ message: "No inventory found in source company" });
+      }
+
+      // Aggregate by stock item (combine quantities from multiple locations)
+      const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
+      for (const inv of sourceInventory) {
+        const qty = parseFloat(inv.quantity);
+        const rate = parseFloat(inv.averageRate);
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(inv.stockItemId)) {
+          const existing = aggregatedInventory.get(inv.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Check if target company already has inventory
+      const existingTargetInventory = await db
+        .select({ id: inventory.id })
+        .from(inventory)
+        .where(eq(inventory.companyId, targetCompanyId))
+        .limit(1);
+
+      if (existingTargetInventory.length > 0) {
+        return res.status(400).json({ message: "Target company already has inventory. Please reset it first." });
+      }
+
+      // Get the first location in target company (or create a default one)
+      let targetLocations = await storage.getAllLocations(targetCompanyId);
+      if (targetLocations.length === 0) {
+        return res.status(400).json({ message: "Target company has no locations. Please create at least one location first." });
+      }
+      const defaultLocation = targetLocations[0];
+
+      // Get stock items that exist in source - we need to ensure they exist in target
+      const sourceStockItemIds = Array.from(aggregatedInventory.keys());
+      const sourceStockItems = await db
+        .select()
+        .from(stockItems)
+        .where(inArray(stockItems.id, sourceStockItemIds));
+
+      // Map source stock item codes to target stock items
+      const stockItemMapping = new Map<number, number>();
+      for (const sourceItem of sourceStockItems) {
+        // Find matching stock item in target by code
+        const targetItem = await db
+          .select()
+          .from(stockItems)
+          .where(
+            and(
+              eq(stockItems.companyId, targetCompanyId),
+              eq(stockItems.code, sourceItem.code)
+            )
+          )
+          .limit(1);
+
+        if (targetItem.length > 0) {
+          stockItemMapping.set(sourceItem.id, targetItem[0].id);
+        } else {
+          // Stock item doesn't exist in target - return error with the missing item name
+          return res.status(400).json({ 
+            message: `Stock item "${sourceItem.name}" (code: ${sourceItem.code}) doesn't exist in target company. Please create matching stock items first.`
+          });
+        }
+      }
+
+      // Calculate total value for the opening balance voucher
+      let totalTransferValue = 0;
+      for (const [, data] of aggregatedInventory) {
+        totalTransferValue += data.totalValue;
+      }
+
+      // Create opening inventory records in target company
+      await db.transaction(async (tx) => {
+        for (const [sourceStockItemId, data] of aggregatedInventory) {
+          const targetStockItemId = stockItemMapping.get(sourceStockItemId);
+          if (!targetStockItemId) continue;
+
+          const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
+
+          await tx.insert(inventory).values({
+            companyId: targetCompanyId,
+            locationId: defaultLocation.id,
+            stockItemId: targetStockItemId,
+            quantity: data.quantity.toFixed(3),
+            averageRate: avgRate.toFixed(2),
+            totalValue: data.totalValue.toFixed(2),
+          });
+        }
+      });
+
+      // Get company names for response
+      const sourceCompany = await storage.getCompanyById(sourceCompanyId);
+      const targetCompany = await storage.getCompanyById(targetCompanyId);
+
+      res.json({
+        success: true,
+        message: `Successfully transferred closing stock from ${sourceCompany?.name} to ${targetCompany?.name}`,
+        itemsTransferred: aggregatedInventory.size,
+        totalValue: totalTransferValue.toFixed(2),
+        targetLocation: defaultLocation.name,
+      });
+    } catch (error: any) {
+      console.error("Error transferring closing stock:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Closing Stock Detail - Items in a stock group
   app.get("/api/reports/closing-stock-summary/:stockGroupId/items", requireAuth, async (req, res) => {
     try {
