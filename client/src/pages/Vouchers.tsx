@@ -1027,7 +1027,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Invalidate all affected data - use invalidateQueries for prefix matching with company IDs
+      // Invalidate all affected data - use full query keys including company ID for proper cache invalidation
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
@@ -1036,9 +1036,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] }),
       ]);
       
       // Clear edit mode and navigate back to daybook
@@ -1468,7 +1468,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Invalidate all affected data - use invalidateQueries for prefix matching with company IDs
+      // Invalidate all affected data - use full query keys including company ID for proper cache invalidation
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
@@ -1477,9 +1477,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] }),
       ]);
       
       // Clear edit mode and navigate back to daybook or reset form
