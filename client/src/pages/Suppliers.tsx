@@ -267,7 +267,10 @@ export default function Suppliers() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-balance-${supplier.id}`}>
-                        ${supplier.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className={supplier.balance > 0 ? "text-red-600" : supplier.balance < 0 ? "text-green-600" : ""}>
+                          ${Math.abs(supplier.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Badge variant={supplier.active ? "default" : "secondary"}>
