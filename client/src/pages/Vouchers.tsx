@@ -1285,6 +1285,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       journalForm.setValue(`entries.${activeJournalRow}.accountType`, account.type);
       journalForm.setValue(`entries.${activeJournalRow}.accountId`, account.id);
       journalForm.setValue(`entries.${activeJournalRow}.accountName`, account.name);
+      
+      // Auto-set entry type based on account type:
+      // - Employee and Supplier accounts are liabilities, so default to CR (Credit)
+      // - Other accounts default to DR (Debit)
+      if (account.type === "employee" || account.type === "supplier") {
+        journalForm.setValue(`entries.${activeJournalRow}.type`, "CR");
+      }
+      
       // Focus the amount field after selection
       setTimeout(() => {
         const amountInput = document.querySelector(`[data-testid="input-journal-amount-${activeJournalRow}"]`) as HTMLInputElement;
