@@ -2650,7 +2650,8 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.ledgerAccountId, ledgerAccountId),
-      eq(schema.vouchers.optional, false)
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
     ];
     
     if (startDate) {
@@ -2687,7 +2688,8 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.bankAccountId, bankAccountId),
-      eq(schema.vouchers.optional, false)
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
     ];
     
     if (startDate) {
@@ -2724,7 +2726,8 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.fixedAssetId, fixedAssetId),
-      eq(schema.vouchers.optional, false)
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
     ];
     
     if (startDate) {
@@ -2807,7 +2810,8 @@ export class DbStorage implements IStorage {
   ): Promise<any[]> {
     const conditions = [
       eq(schema.voucherEntries.employeeId, employeeId),
-      eq(schema.vouchers.optional, false)
+      eq(schema.vouchers.optional, false),
+      isNull(schema.vouchers.deletedAt)
     ];
     
     if (companyId) {
