@@ -80,6 +80,7 @@ import {
   companySettings,
   bales,
   fiscalPeriodClosures,
+  systemSettings,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
