@@ -162,6 +162,15 @@ async function syncEmployeeBalancesFromEntries(
     const debit = parseFloat(entry.debitAmount || "0");
     const credit = parseFloat(entry.creditAmount || "0");
     
+    console.log("[Payroll Sync] Processing entry:", { 
+      employeeId: entry.employeeId, 
+      ledgerAccountId: entry.ledgerAccountId,
+      debitAmount: entry.debitAmount,
+      creditAmount: entry.creditAmount,
+      debit, 
+      credit 
+    });
+    
     // For normal operations:
     // - Debit to employee account = decrease balance (money going out/payment to employee)
     // - Credit to employee account = increase balance (owed to employee)
@@ -171,10 +180,13 @@ async function syncEmployeeBalancesFromEntries(
       change = -change;
     }
     
+    console.log("[Payroll Sync] Calculated change:", { change, reverse });
+    
     // Check if entry has direct employeeId
     if (entry.employeeId) {
       const current = employeeBalanceChangesById.get(entry.employeeId) || 0;
       employeeBalanceChangesById.set(entry.employeeId, current + change);
+      console.log("[Payroll Sync] Updated employee balance by ID:", { employeeId: entry.employeeId, previousAccum: current, newAccum: current + change });
       continue;
     }
     
