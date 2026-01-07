@@ -107,10 +107,19 @@ export default function AccountSidebar({
     return balance < 0 ? `($${formatted})` : `$${formatted}`;
   };
 
-  const getBalanceColorClass = (balance: number | undefined) => {
+  const getBalanceColorClass = (balance: number | undefined, accountType?: string) => {
     if (balance === undefined) return "text-muted-foreground";
-    if (balance < 0) return "text-destructive";
-    if (balance > 0) return "text-chart-2";
+    // For liability accounts (employee/supplier), flip the color logic:
+    // Positive balance = Cr (we owe them) = Red
+    // Negative balance = Dr (they owe us) = Green
+    const isLiabilityAccount = accountType === "employee" || accountType === "supplier";
+    if (isLiabilityAccount) {
+      if (balance > 0) return "text-destructive";
+      if (balance < 0) return "text-chart-2";
+    } else {
+      if (balance < 0) return "text-destructive";
+      if (balance > 0) return "text-chart-2";
+    }
     return "text-muted-foreground";
   };
 
@@ -165,7 +174,7 @@ export default function AccountSidebar({
                           {formatBalance(account.balance)}
                         </div>
                       )}
-                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance)}`}>
+                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}>
                         {formatBalance(projectedBalance)}
                       </div>
                     </div>
