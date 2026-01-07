@@ -2153,10 +2153,22 @@
                     <Button
                       onClick={async () => {
                         try {
+                          // First fetch the current import cycle balance
+                          const balanceRes = await fetch("/api/stats/import-cycle-balance", {
+                            credentials: "include",
+                          });
+                          if (!balanceRes.ok) {
+                            throw new Error("Failed to fetch current balance");
+                          }
+                          const balanceData = await balanceRes.json();
+                          const currentBalance = balanceData.netImportCycleBalance;
+
+                          // Now recalculate with that balance
                           const response = await fetch("/api/admin/recalculate-equity-adjustment", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             credentials: "include",
+                            body: JSON.stringify({ currentBalance }),
                           });
                           const result = await response.json();
                           if (response.ok) {

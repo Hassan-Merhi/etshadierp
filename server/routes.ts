@@ -28102,6 +28102,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      // Frontend passes the current displayed import cycle balance
+      const { currentBalance } = req.body;
+      if (typeof currentBalance !== 'number') {
+        return res.status(400).json({ message: "currentBalance is required" });
+      }
+
       // Get current equity adjustment (if any)
       const settingKey = `equity_adjustment_${companyId}`;
       const existingAdjustment = await db
@@ -28113,31 +28119,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? parseFloat(existingAdjustment[0].value || "0") 
         : 0;
 
-      // Temporarily set adjustment to 0 to get raw imbalance
-      if (existingAdjustment.length > 0) {
-        await db
-          .update(systemSettings)
-          .set({ value: "0", updatedAt: new Date() })
-          .where(eq(systemSettings.key, settingKey));
-      }
-
-      // Make internal request to get current import cycle balance components
-      // (this calculates without the adjustment since we zeroed it)
-      const response = await fetch(`http://localhost:5000/api/stats/import-cycle-balance`, {
-        headers: { 
-          'Cookie': req.headers.cookie || '',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch import cycle balance');
-      }
-      
-      const balanceData = await response.json();
-      const rawImbalance = balanceData.netImportCycleBalance;
-
-      // The adjustment needed is the negative of the raw balance
-      const newAdjustment = -rawImbalance;
+      // The adjustment needed is the additional offset to zero out the current balance
+      // New adjustment = current adjustment - current balance
+      // This way: new balance = current balance + (new adjustment - current adjustment) = current balance - current balance = 0
+      const newAdjustment = currentAdjustment - currentBalance;
 
       // Store the adjustment
       if (existingAdjustment.length > 0) {
@@ -28154,10 +28139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: `Equity adjustment recalculated. The import cycle balance should now be $0.`,
+        message: `Equity adjustment updated. The import cycle balance should now be $0.`,
         previousAdjustment: currentAdjustment.toFixed(2),
         newAdjustment: newAdjustment.toFixed(2),
-        rawImbalance: rawImbalance.toFixed(2),
+        balanceZeroed: currentBalance.toFixed(2),
       });
     } catch (error: any) {
       console.error("Recalculate equity adjustment error:", error);
