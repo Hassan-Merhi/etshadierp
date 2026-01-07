@@ -1027,18 +1027,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Refetch all affected data immediately
+      // Invalidate all affected data - use invalidateQueries for prefix matching with company IDs
       await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["/api/vouchers"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/daybook"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/accounts/all"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/bank-accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/ledger-accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/employees"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
       ]);
       
       // Clear edit mode and navigate back to daybook
@@ -1468,18 +1468,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Refetch all affected data immediately
+      // Invalidate all affected data - use invalidateQueries for prefix matching with company IDs
       await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["/api/daybook"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/vouchers"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/accounts/all"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/bank-accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/ledger-accounts"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/employees"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances"] }),
       ]);
       
       // Clear edit mode and navigate back to daybook or reset form
