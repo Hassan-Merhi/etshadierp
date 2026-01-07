@@ -1036,10 +1036,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees"], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id], refetchType: 'all' }),
         queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id], refetchType: 'all' }),
       ]);
       
       // Clear edit mode and navigate back to daybook
@@ -1478,10 +1478,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees"], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id], refetchType: 'all' }),
         queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id], refetchType: 'all' }),
       ]);
       
       // Clear edit mode and navigate back to daybook or reset form
