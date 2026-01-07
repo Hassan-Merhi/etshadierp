@@ -2236,6 +2236,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Employees
   app.get("/api/employees", requireAuth, async (req, res) => {
+    // Disable HTTP caching - employee balances are dynamically calculated
+    res.set('Cache-Control', 'no-store');
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -3704,6 +3706,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/payroll/employees-with-balances",
     requireAuth,
     async (req, res) => {
+      // Disable HTTP caching - employee balances are dynamically calculated
+      res.set('Cache-Control', 'no-store');
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
