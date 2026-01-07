@@ -55,6 +55,7 @@ export default function CompanyDataReset() {
       setClearStockOpeningBalances(false);
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
       toast({ title: "Reset Failed", description: error.message, variant: "destructive" });
@@ -74,6 +75,7 @@ export default function CompanyDataReset() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
     },
     onError: (error: any) => {
       toast({ title: "Undo Failed", description: error.message, variant: "destructive" });

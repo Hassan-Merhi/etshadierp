@@ -145,7 +145,7 @@ export default function Accounts() {
   });
 
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
-    queryKey: ["/api/accounts/all"],
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -1014,7 +1014,10 @@ export default function Accounts() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedAccount(null)}
+                onClick={() => {
+                  setSelectedAccount(null);
+                  updateUrlParams({ accountId: null, accountType: null });
+                }}
                 data-testid="button-change-account"
               >
                 <X className="w-4 h-4 mr-1" />
