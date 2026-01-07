@@ -3088,9 +3088,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   // For liability accounts (employee, supplier), their natural balance is Credit
                                   // A positive balance means we owe them (Cr), negative means they owe us (Dr)
                                   const isLiabilityAccount = entry?.accountType === "employee" || entry?.accountType === "supplier";
-                                  let projectedBalance = isDebit 
-                                    ? currentBalance + entryAmount 
-                                    : currentBalance - entryAmount;
+                                  // For liability accounts (natural CR balance): DR reduces, CR increases
+                                  // For asset accounts (natural DR balance): DR increases, CR reduces
+                                  let projectedBalance: number;
+                                  if (isLiabilityAccount) {
+                                    // Liability: DR reduces balance (payment), CR increases balance (accrual)
+                                    projectedBalance = isDebit 
+                                      ? currentBalance - entryAmount 
+                                      : currentBalance + entryAmount;
+                                  } else {
+                                    // Asset/Expense: DR increases balance, CR reduces balance
+                                    projectedBalance = isDebit 
+                                      ? currentBalance + entryAmount 
+                                      : currentBalance - entryAmount;
+                                  }
                                   // For liability accounts, flip the sign for proper Dr/Cr display
                                   const displayBalance = isLiabilityAccount ? -projectedBalance : projectedBalance;
                                     
