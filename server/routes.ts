@@ -19426,13 +19426,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return sum + Math.abs(debits - credits);
         }, 0);
 
+        // Create detailed list of unbalanced vouchers
+        const voucherDetails = unbalancedVouchers.slice(0, 10).map(v => {
+          const debits = parseFloat(v.totalDebits || "0");
+          const credits = parseFloat(v.totalCredits || "0");
+          const diff = debits - credits;
+          return `${v.voucherNumber} (${v.voucherType}): DR ${debits.toFixed(2)} - CR ${credits.toFixed(2)} = ${diff.toFixed(2)}`;
+        }).join("; ");
+
         issues.push({
           id: "unbalanced-vouchers",
           severity: "critical",
-          title: "Unbalanced Voucher Entries",
-          description: `You have ${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: $${totalImbalance.toFixed(2)}.`,
+          title: `Unbalanced Voucher Entries (${unbalancedVouchers.length})`,
+          description: `${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: ${totalImbalance.toFixed(2)}. Details: ${voucherDetails}${unbalancedVouchers.length > 10 ? '...' : ''}`,
           impact: totalImbalance,
-          howToFix: "Go to Vouchers, find the unbalanced entries (check Daybook), and edit them to ensure total debits equal total credits.",
+          howToFix: "Edit these vouchers in the Daybook to correct the imbalance, ensuring total debits equal total credits.",
           category: "Data Integrity"
         });
       }
