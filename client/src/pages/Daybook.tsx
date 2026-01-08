@@ -293,6 +293,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     endDate: format(new Date(), "yyyy-MM-dd"),
     voucherType: "all",
     searchQuery: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
@@ -531,9 +532,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       return true;
     }).sort((a, b) => {
-      // Sort by date chronologically (oldest first), then group by voucher type within same date
+      // Sort by date, then by voucher type, then by voucher number
       const dateCompare = a.voucherDate.localeCompare(b.voucherDate);
-      if (dateCompare !== 0) return dateCompare;
+      if (dateCompare !== 0) return filters.sortOrder === "desc" ? -dateCompare : dateCompare;
       const typeCompare = a.voucherType.localeCompare(b.voucherType);
       if (typeCompare !== 0) return typeCompare;
       return a.voucherNumber.localeCompare(b.voucherNumber);
@@ -755,6 +756,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       endDate: "",
       voucherType: "all",
       searchQuery: "",
+      sortOrder: "desc",
     });
   };
 
