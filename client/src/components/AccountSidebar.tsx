@@ -81,11 +81,19 @@ export default function AccountSidebar({
         )
         .reduce((sum, entry) => sum + Number(entry.amount), 0);
       
-      // Entry amounts affect balance differently for payment vs receipt:
-      // - Payment: entry accounts increase (we spend/owe more)
-      // - Receipt: entry accounts decrease (they owe us less)
+      // Entry amounts affect balance differently based on account type:
+      // - For liability accounts (employee, supplier): Payment DECREASES balance (we're paying off what we owe)
+      // - For asset/expense accounts: Payment INCREASES balance (we're spending/acquiring)
+      // The inverse is true for receipts
+      const isLiabilityAccount = account.type === "employee" || account.type === "supplier";
       if (entryAmount > 0) {
-        adjustment += mode === "payment" ? entryAmount : -entryAmount;
+        if (isLiabilityAccount) {
+          // Liability: Payment reduces balance (debit), Receipt increases balance (credit)
+          adjustment += mode === "payment" ? -entryAmount : entryAmount;
+        } else {
+          // Asset/Expense: Payment increases balance (debit), Receipt reduces balance (credit)
+          adjustment += mode === "payment" ? entryAmount : -entryAmount;
+        }
       }
     }
     
