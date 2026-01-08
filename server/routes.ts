@@ -83,7 +83,7 @@ import {
   systemSettings,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt } from "drizzle-orm";
 import { format } from "date-fns";
 
 // Configure multer with file size limit (10MB) to prevent memory exhaustion
@@ -22768,6 +22768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
+      const { asOfDate } = req.body;
+      const targetDate = asOfDate ? new Date(asOfDate) : new Date();
+      const targetDateStr = targetDate.toISOString().split('T')[0];
+
       // Get current inventory from active locations, aggregated by stock item
       const currentInventory = await db
         .select({
@@ -22786,10 +22790,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .execute();
 
-      if (currentInventory.length === 0) {
-        return res.status(400).json({ message: "No inventory found to carry forward" });
-      }
-
       // Aggregate by stock item (combine quantities from multiple locations)
       const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of currentInventory) {
@@ -22804,6 +22804,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
         }
+      }
+
+      // Get sales items from vouchers AFTER the target date and add them back
+      // (Sales reduce inventory, so we add them back to get historical inventory)
+      const salesAfterDate = await db
+        .select({
+          stockItemId: salesItems.stockItemId,
+          quantity: salesItems.quantity,
+          costPrice: salesItems.costPrice,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            gt(vouchers.voucherDate, targetDateStr)
+          )
+        )
+        .execute();
+
+      for (const sale of salesAfterDate) {
+        const qty = parseFloat(sale.quantity) || 0;
+        const cost = parseFloat(sale.costPrice) || 0;
+        const val = qty * cost;
+        
+        if (aggregatedInventory.has(sale.stockItemId)) {
+          const existing = aggregatedInventory.get(sale.stockItemId)!;
+          existing.quantity += qty;
+          existing.totalValue += val;
+        } else {
+          aggregatedInventory.set(sale.stockItemId, { quantity: qty, totalValue: val });
+        }
+      }
+
+      // Get stock adjustments AFTER the target date and reverse them
+      // Production (positive qty) reduces historical inventory (subtract)
+      // Consumption (negative qty) increases historical inventory (add back the consumed amount)
+      const adjustmentsAfterDate = await db
+        .select({
+          stockItemId: stockAdjustmentItems.stockItemId,
+          quantity: stockAdjustmentItems.quantity,
+          rate: stockAdjustmentItems.rate,
+        })
+        .from(stockAdjustmentItems)
+        .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+        .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.optional, false),
+            gt(vouchers.voucherDate, targetDateStr)
+          )
+        )
+        .execute();
+
+      for (const adj of adjustmentsAfterDate) {
+        const qty = parseFloat(adj.quantity) || 0;
+        const rate = parseFloat(adj.rate) || 0;
+        const val = Math.abs(qty) * rate;
+        
+        if (aggregatedInventory.has(adj.stockItemId)) {
+          const existing = aggregatedInventory.get(adj.stockItemId)!;
+          // Reverse the adjustment: subtract what was added (production), add back what was consumed
+          existing.quantity -= qty;
+          existing.totalValue -= (qty >= 0 ? val : -val);
+        } else {
+          // If no current inventory, create with reversed values
+          aggregatedInventory.set(adj.stockItemId, { 
+            quantity: -qty, 
+            totalValue: qty >= 0 ? -val : val 
+          });
+        }
+      }
+
+      // Get container offloads AFTER the target date and subtract them
+      // (Container offloads add inventory, so we subtract them to get historical inventory)
+      const offloadsAfterDate = await db
+        .select({
+          stockItemId: containerOffloadItems.stockItemId,
+          quantity: containerOffloadItems.quantity,
+          rate: containerOffloadItems.rate,
+        })
+        .from(containerOffloadItems)
+        .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            gt(containerOffloads.offloadedAt, targetDate)
+          )
+        )
+        .execute();
+
+      for (const offload of offloadsAfterDate) {
+        const qty = parseFloat(offload.quantity) || 0;
+        const rate = parseFloat(offload.rate) || 0;
+        const val = qty * rate;
+        
+        if (aggregatedInventory.has(offload.stockItemId)) {
+          const existing = aggregatedInventory.get(offload.stockItemId)!;
+          // Subtract offloaded items to reverse the inbound transaction
+          existing.quantity -= qty;
+          existing.totalValue -= val;
+        } else {
+          // If no current inventory, create with negative values (unlikely but handle it)
+          aggregatedInventory.set(offload.stockItemId, { quantity: -qty, totalValue: -val });
+        }
+      }
+
+      // Filter out items with zero or negative quantities
+      for (const [stockItemId, data] of aggregatedInventory) {
+        if (data.quantity <= 0) {
+          aggregatedInventory.delete(stockItemId);
+        }
+      }
+
+      if (aggregatedInventory.size === 0) {
+        return res.status(400).json({ message: "No inventory found for the selected date" });
       }
 
       // Get all stock items for this company to update those with zero inventory
@@ -22822,9 +22941,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let itemsUpdated = 0;
       let totalValue = 0;
 
-      // Update stock items with closing stock as new opening stock
+      // Update stock items with calculated historical inventory as new opening stock
       await db.transaction(async (tx) => {
-        // First, reset all stock items opening to zero (in case some items had inventory before but don't now)
+        // First, reset all stock items opening to zero
         for (const item of allStockItems) {
           if (!aggregatedInventory.has(item.id)) {
             await tx.update(stockItems)
@@ -22837,7 +22956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        // Then update items that have closing inventory
+        // Then update items that have historical inventory
         for (const [stockItemId, data] of aggregatedInventory) {
           const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
           
@@ -22858,9 +22977,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: `Successfully updated opening stock for ${company?.name}. ${itemsUpdated} items updated with total value $${totalValue.toFixed(2)}`,
+        message: `Successfully set opening stock for ${company?.name} as of ${targetDateStr}. ${itemsUpdated} items updated with total value $${totalValue.toFixed(2)}`,
         itemsUpdated,
         totalValue: totalValue.toFixed(2),
+        asOfDate: targetDateStr,
       });
     } catch (error: any) {
       console.error("Error carrying forward closing stock:", error);
