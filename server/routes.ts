@@ -16914,7 +16914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate } = req.body;
+      const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -16951,6 +16951,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (existingVoucher.voucherType !== "Sales") {
         return res.status(400).json({ message: "Only Sales vouchers can be updated with this endpoint" });
+      }
+
+      // Determine target location - use new location if provided, otherwise keep existing
+      const oldLocationId = existingVoucher.locationId!;
+      const targetLocationId = newLocationId ? parseInt(newLocationId) : oldLocationId;
+      const locationChanged = targetLocationId !== oldLocationId;
+
+      // Validate new location belongs to company if changed
+      if (locationChanged) {
+        const [newLocation] = await db
+          .select()
+          .from(locations)
+          .where(
+            and(
+              eq(locations.id, targetLocationId),
+              eq(locations.companyId, req.session.currentCompanyId!),
+              isNull(locations.deletedAt)
+            )
+          )
+          .limit(1);
+        
+        if (!newLocation) {
+          return res.status(400).json({ message: "Invalid location or location not found" });
+        }
+        console.log(`[POS Sales Edit] Location changing from ${oldLocationId} to ${targetLocationId}`);
       }
 
       // Get old sales items to reverse inventory and preserve historical cost
@@ -17036,7 +17061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .from(inventory)
             .where(
               and(
-                eq(inventory.locationId, existingVoucher.locationId!),
+                eq(inventory.locationId, targetLocationId),
                 eq(inventory.stockItemId, stockItemId)
               )
             )
@@ -17049,7 +17074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .insert(inventory)
               .values({
                 companyId: existingVoucher.companyId,
-                locationId: existingVoucher.locationId!,
+                locationId: targetLocationId,
                 stockItemId: stockItemId,
                 quantity: "0",
                 averageRate: "0",
@@ -17110,11 +17135,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           grandTotal += totalSales;
         }
 
-        // Update voucher description, total amount, and optionally date
+        // Update voucher description, total amount, location, and optionally date
         const voucherUpdate: any = {
           description: description || null,
           totalAmount: grandTotal.toString(),
         };
+        if (locationChanged) {
+          voucherUpdate.locationId = targetLocationId;
+          console.log(`[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`);
+        }
         if (voucherDate) {
           voucherUpdate.voucherDate = new Date(voucherDate);
         }
