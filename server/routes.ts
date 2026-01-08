@@ -2776,26 +2776,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           narration: `Salary deposit - ${voucherNumber}`,
         });
 
-        // Update employee balance
-        const newBalance = parseFloat(employee.currentBalance) + depositAmount;
-        const newTotalDeposits =
-          parseFloat(employee.totalDeposits) + depositAmount;
+        // Sync employee balance from voucher entries (instead of direct update)
+        // This ensures consistent behavior with voucher edit/delete operations
+        await syncEmployeeBalancesFromEntries(
+          [
+            {
+              ledgerAccountId: null,
+              employeeId: employee.id,
+              debitAmount: "0",
+              creditAmount: depositAmount.toFixed(2),
+            }
+          ],
+          req.session.currentCompanyId!
+        );
 
-        await db
-          .update(employees)
-          .set({
-            currentBalance: newBalance.toFixed(2),
-            totalDeposits: newTotalDeposits.toFixed(2),
-          })
+        // Get updated employee balance after sync
+        const [updatedDepositEmployee] = await db
+          .select()
+          .from(employees)
           .where(eq(employees.id, employeeId));
 
         res.json({
           voucher,
-          employee: {
-            ...employee,
-            currentBalance: newBalance.toFixed(2),
-            totalDeposits: newTotalDeposits.toFixed(2),
-          },
+          employee: updatedDepositEmployee || employee,
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -2915,31 +2918,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             narration: `Salary deposit for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
           });
 
-          // Update employee balance
-          const newBalance =
-            parseFloat(employee.currentBalance) + depositAmount;
-          const newTotalDeposits =
-            parseFloat(employee.totalDeposits) + depositAmount;
-
-          await db
-            .update(employees)
-            .set({
-              currentBalance: newBalance.toFixed(2),
-              totalDeposits: newTotalDeposits.toFixed(2),
-            })
-            .where(eq(employees.id, deposit.employeeId));
-
           results.push({
             employeeId: employee.id,
             name: `${employee.firstName} ${employee.lastName}`,
             amount: depositAmount,
-            newBalance,
+          });
+        }
+
+        // Sync all employee balances from voucher entries
+        const allDepositEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, voucher.id));
+        
+        await syncEmployeeBalancesFromEntries(
+          allDepositEntries.map(e => ({
+            ledgerAccountId: e.ledgerAccountId,
+            employeeId: e.employeeId,
+            debitAmount: e.debitAmount,
+            creditAmount: e.creditAmount,
+          })),
+          req.session.currentCompanyId!
+        );
+
+        // Get updated balances for all employees
+        const updatedResults = [];
+        for (const result of results) {
+          const [updatedEmp] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, result.employeeId));
+          updatedResults.push({
+            ...result,
+            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
         }
 
         res.json({
           voucher,
-          deposits: results,
+          deposits: updatedResults,
           totalAmount,
         });
       } catch (error: any) {
@@ -3058,31 +3075,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             narration: `Bonus for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
           });
 
-          // Update employee balance (bonuses also add to deposits/balance)
-          const newBalance =
-            parseFloat(employee.currentBalance) + bonusAmount;
-          const newTotalDeposits =
-            parseFloat(employee.totalDeposits) + bonusAmount;
-
-          await db
-            .update(employees)
-            .set({
-              currentBalance: newBalance.toFixed(2),
-              totalDeposits: newTotalDeposits.toFixed(2),
-            })
-            .where(eq(employees.id, bonus.employeeId));
-
           results.push({
             employeeId: employee.id,
             name: `${employee.firstName} ${employee.lastName}`,
             amount: bonusAmount,
-            newBalance,
+          });
+        }
+
+        // Sync all employee balances from voucher entries
+        const allBonusEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, voucher.id));
+        
+        await syncEmployeeBalancesFromEntries(
+          allBonusEntries.map(e => ({
+            ledgerAccountId: e.ledgerAccountId,
+            employeeId: e.employeeId,
+            debitAmount: e.debitAmount,
+            creditAmount: e.creditAmount,
+          })),
+          req.session.currentCompanyId!
+        );
+
+        // Get updated balances for all employees
+        const updatedBonusResults = [];
+        for (const result of results) {
+          const [updatedEmp] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, result.employeeId));
+          updatedBonusResults.push({
+            ...result,
+            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
         }
 
         res.json({
           voucher,
-          bonuses: results,
+          bonuses: updatedBonusResults,
           totalAmount,
         });
       } catch (error: any) {
@@ -3179,7 +3210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
           .returning();
 
-        // Create debit entry for payment account
+        // Create CREDIT entry for payment account (cash going OUT for withdrawal)
         const paymentAccountId_num = parseInt(paymentAccountId);
         const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
         let paymentLedgerAccount;
@@ -3201,8 +3232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: paymentLedgerAccount.id,
-          debitAmount: totalAmount.toFixed(2),
-          creditAmount: "0",
+          debitAmount: "0",
+          creditAmount: totalAmount.toFixed(2),
           narration: `Bulk withdrawal - ${validWithdrawals.length} employees - ${voucherNumber}`,
         });
 
@@ -3229,29 +3260,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             narration: `Withdrawal for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
           });
 
-          // Update employee balance (decrease)
-          const newBalance = parseFloat(employee.currentBalance) - withdrawAmount;
-          const newTotalWithdrawals = parseFloat(employee.totalWithdrawals) + withdrawAmount;
-
-          await db
-            .update(employees)
-            .set({
-              currentBalance: newBalance.toFixed(2),
-              totalWithdrawals: newTotalWithdrawals.toFixed(2),
-            })
-            .where(eq(employees.id, withdrawal.employeeId));
-
           results.push({
             employeeId: employee.id,
             name: `${employee.firstName} ${employee.lastName}`,
             amount: withdrawAmount,
-            newBalance,
+          });
+        }
+
+        // Sync all employee balances from voucher entries
+        const allWithdrawEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(eq(voucherEntries.voucherId, voucher.id));
+        
+        await syncEmployeeBalancesFromEntries(
+          allWithdrawEntries.map(e => ({
+            ledgerAccountId: e.ledgerAccountId,
+            employeeId: e.employeeId,
+            debitAmount: e.debitAmount,
+            creditAmount: e.creditAmount,
+          })),
+          req.session.currentCompanyId!
+        );
+
+        // Get updated balances for all employees
+        const updatedWithdrawResults = [];
+        for (const result of results) {
+          const [updatedEmp] = await db
+            .select()
+            .from(employees)
+            .where(eq(employees.id, result.employeeId));
+          updatedWithdrawResults.push({
+            ...result,
+            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
         }
 
         res.json({
           voucher,
-          withdrawals: results,
+          withdrawals: updatedWithdrawResults,
           totalAmount,
         });
       } catch (error: any) {
@@ -3351,26 +3398,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           narration: `Bonus payment - ${voucherNumber}`,
         });
 
-        // Update employee balance
-        const newBalance = parseFloat(employee.currentBalance) + bonusAmount;
-        const newTotalDeposits =
-          parseFloat(employee.totalDeposits) + bonusAmount;
+        // Sync employee balance from voucher entries (instead of direct update)
+        await syncEmployeeBalancesFromEntries(
+          [
+            {
+              ledgerAccountId: null,
+              employeeId: employee.id,
+              debitAmount: "0",
+              creditAmount: bonusAmount.toFixed(2),
+            }
+          ],
+          req.session.currentCompanyId!
+        );
 
-        await db
-          .update(employees)
-          .set({
-            currentBalance: newBalance.toFixed(2),
-            totalDeposits: newTotalDeposits.toFixed(2),
-          })
+        // Get updated employee balance
+        const [updatedBonusEmployee] = await db
+          .select()
+          .from(employees)
           .where(eq(employees.id, employeeId));
 
         res.json({
           voucher,
-          employee: {
-            ...employee,
-            currentBalance: newBalance.toFixed(2),
-            totalDeposits: newTotalDeposits.toFixed(2),
-          },
+          employee: updatedBonusEmployee || employee,
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -3481,26 +3530,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await db.insert(voucherEntries).values(creditEntry);
 
-        // Update employee balance
-        const newBalance = currentBalance - withdrawalAmount;
-        const newTotalWithdrawals =
-          parseFloat(employee.totalWithdrawals) + withdrawalAmount;
+        // Sync employee balance from voucher entries (instead of direct update)
+        await syncEmployeeBalancesFromEntries(
+          [
+            {
+              ledgerAccountId: null,
+              employeeId: employee.id,
+              debitAmount: withdrawalAmount.toFixed(2),
+              creditAmount: "0",
+            }
+          ],
+          req.session.currentCompanyId!
+        );
 
-        await db
-          .update(employees)
-          .set({
-            currentBalance: newBalance.toFixed(2),
-            totalWithdrawals: newTotalWithdrawals.toFixed(2),
-          })
+        // Get updated employee balance
+        const [updatedEmployee] = await db
+          .select()
+          .from(employees)
           .where(eq(employees.id, employeeId));
 
         res.json({
           voucher,
-          employee: {
-            ...employee,
-            currentBalance: newBalance.toFixed(2),
-            totalWithdrawals: newTotalWithdrawals.toFixed(2),
-          },
+          employee: updatedEmployee || employee,
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
