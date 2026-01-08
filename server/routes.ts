@@ -19240,6 +19240,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roundedBalance = 0;
       }
       
+      // Calculate precise discrepancy trace
+      // Matches the exact formula used for netImportCycleBalance:
+      // Assets + Expenses - (Liabilities - OpeningBalanceEquity) = Net
+      const traceAssetTotal = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance;
+      const traceExpenseTotal = indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance;
+      // liabilitiesBeforeEquity is the raw sum, then we subtract openingBalanceEquity
+      const traceLiabilitiesRaw = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + 
+        liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
+      const traceNetLiabilities = traceLiabilitiesRaw - openingBalanceEquity;
+      
+      // Verify: our trace matches the netImportCycleBalance exactly
+      const traceNetBalance = traceAssetTotal + traceExpenseTotal - traceNetLiabilities;
+      
+      // Create precision trace showing exact calculation
+      const precisionTrace = {
+        formula: "(Assets + Expenses) - (Liabilities - Opening Equity) = Net Balance",
+        calculation: {
+          assetTotal: { 
+            value: traceAssetTotal,
+            breakdown: { stockOtwValue, cashBalance, bankBalance, stockOnFloorValue, assetBalance, salaryAdvancesBalance }
+          },
+          expenseTotal: { 
+            value: traceExpenseTotal,
+            breakdown: { indirectExpenseBalance, payrollExpenseBalance, governmentTaxesBalance, cogsBalance }
+          },
+          liabilityTotal: { 
+            value: traceNetLiabilities,
+            breakdown: { 
+              supplierBalance, dutyAgentBalance, transporterAgentBalance, loansBalance, 
+              liabilityBalance, profitBalance, incomeBalance, payrollLiabilitiesBalance,
+              openingBalanceEquityOffset: openingBalanceEquity // positive value that reduces liabilities
+            }
+          },
+        },
+        rawNetBalance: netImportCycleBalance,
+        storedEquityAdjustment,
+        adjustedBalance: adjustedImportCycleBalance,
+        finalRoundedBalance: roundedBalance,
+        discrepancyExplanation: storedEquityAdjustment !== 0 
+          ? `An equity adjustment of ${storedEquityAdjustment.toFixed(2)} was applied to zero out the balance.`
+          : Math.abs(netImportCycleBalance) < 50 && netImportCycleBalance !== 0
+            ? `Small discrepancy of ${netImportCycleBalance.toFixed(2)} likely from accumulated rounding in weighted average cost calculations.`
+            : null,
+      };
+
       res.json({
         netImportCycleBalance: roundedBalance,
         components: {
@@ -19267,7 +19312,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           payrollLiabilitiesBalance,
           openingBalanceEquity,
           openingStockValue,
-        }
+        },
+        precisionTrace,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

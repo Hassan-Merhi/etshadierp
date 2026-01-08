@@ -27,6 +27,20 @@ import {
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
 
+interface PrecisionTrace {
+  formula: string;
+  calculation: {
+    assetTotal: { value: number; breakdown: Record<string, number> };
+    expenseTotal: { value: number; breakdown: Record<string, number> };
+    liabilityTotal: { value: number; breakdown: Record<string, number> };
+  };
+  rawNetBalance: number;
+  storedEquityAdjustment: number;
+  adjustedBalance: number;
+  finalRoundedBalance: number;
+  discrepancyExplanation: string | null;
+}
+
 interface ImportCycleData {
   netImportCycleBalance: number;
   components: {
@@ -55,6 +69,7 @@ interface ImportCycleData {
     openingBalanceEquity: number;
     openingStockValue: number;
   };
+  precisionTrace?: PrecisionTrace;
 }
 
 interface DiagnosticIssue {
@@ -329,6 +344,88 @@ export default function ImportCycleDiagnostics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Precision Trace - Exact Discrepancy Source */}
+      {data?.precisionTrace && (
+        <Card className="border-2 border-blue-500" data-testid="card-precision-trace">
+          <CardHeader className="bg-blue-50 dark:bg-blue-950">
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-blue-600" />
+              Exact Calculation Breakdown
+            </CardTitle>
+            <CardDescription>
+              Shows exactly how the balance is calculated with full precision
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            {/* Formula visualization */}
+            <div className="bg-muted p-4 rounded-lg font-mono text-sm">
+              <div className="grid grid-cols-5 gap-2 items-center text-center">
+                <div className="p-3 bg-green-100 dark:bg-green-900 rounded">
+                  <div className="text-xs text-muted-foreground mb-1">Assets</div>
+                  <div className="font-bold text-green-700 dark:text-green-300">
+                    ${formatNumber(data.precisionTrace.calculation.assetTotal.value)}
+                  </div>
+                </div>
+                <div className="text-lg font-bold">+</div>
+                <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded">
+                  <div className="text-xs text-muted-foreground mb-1">Expenses</div>
+                  <div className="font-bold text-orange-700 dark:text-orange-300">
+                    ${formatNumber(data.precisionTrace.calculation.expenseTotal.value)}
+                  </div>
+                </div>
+                <div className="text-lg font-bold">−</div>
+                <div className="p-3 bg-red-100 dark:bg-red-900 rounded">
+                  <div className="text-xs text-muted-foreground mb-1">Liabilities</div>
+                  <div className="font-bold text-red-700 dark:text-red-300">
+                    ${formatNumber(data.precisionTrace.calculation.liabilityTotal.value)}
+                  </div>
+                </div>
+              </div>
+              <div className="text-center mt-4 pt-4 border-t">
+                <div className="text-xs text-muted-foreground mb-1">= Raw Balance (before adjustment)</div>
+                <div className={`text-xl font-bold ${data.precisionTrace.rawNetBalance === 0 ? 'text-green-600' : 'text-destructive'}`}>
+                  ${data.precisionTrace.rawNetBalance.toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            {/* Equity Adjustment if applied */}
+            {data.precisionTrace.storedEquityAdjustment !== 0 && (
+              <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-purple-800 dark:text-purple-200">Equity Adjustment Applied</h4>
+                    <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+                      An equity adjustment of <span className="font-mono font-bold">${data.precisionTrace.storedEquityAdjustment.toFixed(2)}</span> was 
+                      applied to zero out the raw balance of <span className="font-mono">${data.precisionTrace.rawNetBalance.toFixed(2)}</span>.
+                    </p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                      This adjustment was made via "Recalculate Opening Balance Equity" in Settings.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Discrepancy explanation */}
+            {data.precisionTrace.discrepancyExplanation && (
+              <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-2">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200">Discrepancy Explanation</h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      {data.precisionTrace.discrepancyExplanation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* What's Causing the Imbalance? - Only show if not balanced */}
       {!isBalanced && (
