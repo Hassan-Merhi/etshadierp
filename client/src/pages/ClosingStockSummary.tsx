@@ -4,11 +4,14 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, Package, ChevronRight, RefreshCw, Calendar } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { format } from "date-fns";
 
 interface StockGroupSummary {
   id: number;
@@ -59,10 +62,11 @@ export default function ClosingStockSummary() {
 
   const { toast } = useToast();
   const [showCarryForwardDialog, setShowCarryForwardDialog] = useState(false);
+  const [asOfDate, setAsOfDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
 
   const carryForwardMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/reports/carryforward-closing-stock", {});
+    mutationFn: async (date: string) => {
+      const response = await apiRequest("POST", "/api/reports/carryforward-closing-stock", { asOfDate: date });
       return response.json();
     },
     onSuccess: (data) => {
@@ -84,7 +88,7 @@ export default function ClosingStockSummary() {
   });
 
   const handleCarryForward = () => {
-    carryForwardMutation.mutate();
+    carryForwardMutation.mutate(asOfDate);
   };
 
   const handleGroupClick = (groupId: number, groupName: string) => {
@@ -130,22 +134,35 @@ export default function ClosingStockSummary() {
           <DialogHeader>
             <DialogTitle>Set Closing Stock as Opening Stock</DialogTitle>
             <DialogDescription>
-              This will replace the current opening stock with the closing stock values shown below.
-              This action cannot be undone.
+              Select a date to calculate inventory as of that date. This will replace the current opening stock values.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Company:</span>
-              <span className="font-medium">{selectedCompany?.name}</span>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="as-of-date" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Calculate inventory as of date
+              </Label>
+              <Input
+                id="as-of-date"
+                type="date"
+                value={asOfDate}
+                onChange={(e) => setAsOfDate(e.target.value)}
+                data-testid="input-as-of-date"
+              />
+              <p className="text-xs text-muted-foreground">
+                The system will calculate what inventory was on this date by reversing transactions after it.
+              </p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total Quantity:</span>
-              <span className="font-mono">{data?.grandTotal ? formatNumber(data.grandTotal.quantity) : "0"} BL</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total Value:</span>
-              <span className="font-mono font-medium">${data?.grandTotal ? formatNumber(data.grandTotal.value) : "0.00"}</span>
+            <div className="border-t pt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Company:</span>
+                <span className="font-medium">{selectedCompany?.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current Inventory Value:</span>
+                <span className="font-mono font-medium">${data?.grandTotal ? formatNumber(data.grandTotal.value) : "0.00"}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -157,7 +174,7 @@ export default function ClosingStockSummary() {
               disabled={carryForwardMutation.isPending}
               data-testid="button-confirm-carryforward"
             >
-              {carryForwardMutation.isPending ? "Processing..." : "Confirm"}
+              {carryForwardMutation.isPending ? "Processing..." : "Set as Opening Stock"}
             </Button>
           </DialogFooter>
         </DialogContent>
