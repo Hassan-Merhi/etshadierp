@@ -154,27 +154,38 @@ async function syncEmployeeBalancesFromEntries(
     }
   }
   
-  // Track balance changes per employee (by employee ID for direct entries, by code for ledger account entries)
-  const employeeBalanceChangesById = new Map<number, number>();
-  const employeeBalanceChangesByCode = new Map<string, number>();
+  // Track balance changes AND deposits/withdrawals per employee
+  // deposits = sum of credits, withdrawals = sum of debits
+  const employeeChangesById = new Map<number, { balanceChange: number; deposits: number; withdrawals: number }>();
+  const employeeChangesByCode = new Map<string, { balanceChange: number; deposits: number; withdrawals: number }>();
   
   for (const entry of entries) {
     const debit = parseFloat(entry.debitAmount || "0");
     const credit = parseFloat(entry.creditAmount || "0");
     
-    // For normal operations:
+    // Balance change:
     // - Debit to employee account = decrease balance (money going out/payment to employee)
     // - Credit to employee account = increase balance (owed to employee)
-    // When reversing (e.g., deleting voucher), flip the signs
-    let change = credit - debit;
+    // When reversing (e.g., deleting voucher), flip the balance change sign
+    let balanceChange = credit - debit;
     if (reverse) {
-      change = -change;
+      balanceChange = -balanceChange;
     }
+    
+    // Deposits/Withdrawals track raw amounts:
+    // - Forward: deposits += credit, withdrawals += debit
+    // - Reverse: deposits -= credit, withdrawals -= debit
+    const depositChange = reverse ? -credit : credit;
+    const withdrawalChange = reverse ? -debit : debit;
     
     // Check if entry has direct employeeId
     if (entry.employeeId) {
-      const current = employeeBalanceChangesById.get(entry.employeeId) || 0;
-      employeeBalanceChangesById.set(entry.employeeId, current + change);
+      const current = employeeChangesById.get(entry.employeeId) || { balanceChange: 0, deposits: 0, withdrawals: 0 };
+      employeeChangesById.set(entry.employeeId, {
+        balanceChange: current.balanceChange + balanceChange,
+        deposits: current.deposits + depositChange,
+        withdrawals: current.withdrawals + withdrawalChange
+      });
       continue;
     }
     
@@ -182,96 +193,70 @@ async function syncEmployeeBalancesFromEntries(
     if (entry.ledgerAccountId) {
       const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
       if (employeeAccount) {
-        const current = employeeBalanceChangesByCode.get(employeeAccount.employeeCode) || 0;
-        employeeBalanceChangesByCode.set(employeeAccount.employeeCode, current + change);
+        const current = employeeChangesByCode.get(employeeAccount.employeeCode) || { balanceChange: 0, deposits: 0, withdrawals: 0 };
+        employeeChangesByCode.set(employeeAccount.employeeCode, {
+          balanceChange: current.balanceChange + balanceChange,
+          deposits: current.deposits + depositChange,
+          withdrawals: current.withdrawals + withdrawalChange
+        });
       }
     }
   }
   
   // Apply balance changes for direct employee entries (by ID)
-  // Update currentBalance AND totalDeposits/totalWithdrawals
-  for (const [employeeId, change] of Array.from(employeeBalanceChangesById.entries())) {
-    if (change === 0) continue;
+  for (const [employeeId, changes] of Array.from(employeeChangesById.entries())) {
+    if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
     
     const employee = await storage.getEmployeeById(employeeId);
     if (!employee) continue;
     
     const currentBalance = parseFloat(employee.currentBalance || "0");
-    const newBalance = currentBalance + change;
+    const newBalance = currentBalance + changes.balanceChange;
     
-    // Track deposits/withdrawals correctly for both forward and reverse operations
-    // Forward (reverse=false): positive change = deposit, negative change = withdrawal
-    // Reverse (reverse=true): negative change = undo deposit, positive change = undo withdrawal
-    const updateData: any = { currentBalance: newBalance.toFixed(2) };
+    const currentDeposits = parseFloat(employee.totalDeposits || "0");
+    const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
     
-    if (!reverse) {
-      // Forward operation - add to appropriate total
-      if (change > 0) {
-        const currentDeposits = parseFloat(employee.totalDeposits || "0");
-        updateData.totalDeposits = (currentDeposits + change).toFixed(2);
-      } else {
-        const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-        updateData.totalWithdrawals = (currentWithdrawals - change).toFixed(2);
-      }
-    } else {
-      // Reverse operation - subtract from appropriate total
-      if (change < 0) {
-        // Original was a deposit (positive), now reversing (negative change)
-        const currentDeposits = parseFloat(employee.totalDeposits || "0");
-        updateData.totalDeposits = Math.max(0, currentDeposits + change).toFixed(2);
-      } else {
-        // Original was a withdrawal (negative), now reversing (positive change)
-        const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-        updateData.totalWithdrawals = Math.max(0, currentWithdrawals - change).toFixed(2);
-      }
-    }
+    // Apply changes - use Math.max(0, ...) only to prevent floating point errors from causing negatives
+    const newDeposits = Math.max(0, currentDeposits + changes.deposits);
+    const newWithdrawals = Math.max(0, currentWithdrawals + changes.withdrawals);
+    
+    const updateData: any = { 
+      currentBalance: newBalance.toFixed(2),
+      totalDeposits: newDeposits.toFixed(2),
+      totalWithdrawals: newWithdrawals.toFixed(2)
+    };
     
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
     
-    console.log(`[Payroll Sync] Employee ID ${employeeId} (${employee.code}): balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
+    console.log(`[Payroll Sync] Employee ID ${employeeId} (${employee.code}): balance ${changes.balanceChange >= 0 ? '+' : ''}${changes.balanceChange.toFixed(2)} (new: ${newBalance.toFixed(2)}), deposits ${changes.deposits >= 0 ? '+' : ''}${changes.deposits.toFixed(2)}, withdrawals ${changes.withdrawals >= 0 ? '+' : ''}${changes.withdrawals.toFixed(2)}`);
   }
   
   // Apply balance changes for ledger account entries (by code)
-  // Update currentBalance AND totalDeposits/totalWithdrawals
-  for (const [employeeCode, change] of Array.from(employeeBalanceChangesByCode.entries())) {
-    if (change === 0) continue;
+  for (const [employeeCode, changes] of Array.from(employeeChangesByCode.entries())) {
+    if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
     
     const employee = await storage.getEmployeeByCode(employeeCode);
     if (!employee) continue;
     
     const currentBalance = parseFloat(employee.currentBalance || "0");
-    const newBalance = currentBalance + change;
+    const newBalance = currentBalance + changes.balanceChange;
     
-    // Track deposits/withdrawals correctly for both forward and reverse operations
-    // Forward (reverse=false): positive change = deposit, negative change = withdrawal
-    // Reverse (reverse=true): negative change = undo deposit, positive change = undo withdrawal
-    const updateData: any = { currentBalance: newBalance.toFixed(2) };
+    const currentDeposits = parseFloat(employee.totalDeposits || "0");
+    const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
     
-    if (!reverse) {
-      // Forward operation - add to appropriate total
-      if (change > 0) {
-        const currentDeposits = parseFloat(employee.totalDeposits || "0");
-        updateData.totalDeposits = (currentDeposits + change).toFixed(2);
-      } else {
-        const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-        updateData.totalWithdrawals = (currentWithdrawals - change).toFixed(2);
-      }
-    } else {
-      // Reverse operation - subtract from appropriate total
-      if (change < 0) {
-        // Original was a deposit (positive), now reversing (negative change)
-        const currentDeposits = parseFloat(employee.totalDeposits || "0");
-        updateData.totalDeposits = Math.max(0, currentDeposits + change).toFixed(2);
-      } else {
-        // Original was a withdrawal (negative), now reversing (positive change)
-        const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-        updateData.totalWithdrawals = Math.max(0, currentWithdrawals - change).toFixed(2);
-      }
-    }
+    // Apply changes - use Math.max(0, ...) only to prevent floating point errors from causing negatives
+    const newDeposits = Math.max(0, currentDeposits + changes.deposits);
+    const newWithdrawals = Math.max(0, currentWithdrawals + changes.withdrawals);
+    
+    const updateData: any = { 
+      currentBalance: newBalance.toFixed(2),
+      totalDeposits: newDeposits.toFixed(2),
+      totalWithdrawals: newWithdrawals.toFixed(2)
+    };
     
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
     
-    console.log(`[Payroll Sync] Employee ${employeeCode}: balance changed by ${change.toFixed(2)} (new balance: ${newBalance.toFixed(2)})`);
+    console.log(`[Payroll Sync] Employee ${employeeCode}: balance ${changes.balanceChange >= 0 ? '+' : ''}${changes.balanceChange.toFixed(2)} (new: ${newBalance.toFixed(2)}), deposits ${changes.deposits >= 0 ? '+' : ''}${changes.deposits.toFixed(2)}, withdrawals ${changes.withdrawals >= 0 ? '+' : ''}${changes.withdrawals.toFixed(2)}`);
   }
 }
 
