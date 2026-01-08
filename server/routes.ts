@@ -14658,6 +14658,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let createdEntries = [];
       let oldEntries: any[] = [];
 
+      // SALES VOUCHER INVENTORY HANDLING
+      // If this is a Sales voucher and location is changing, we need to reverse inventory at old location
+      // and apply inventory at new location
+      const oldLocationId = existingVoucher.locationId;
+      const newLocationId = voucher.locationId !== undefined ? voucher.locationId : oldLocationId;
+      const locationChanged = oldLocationId !== newLocationId;
+
+      if (existingVoucher.voucherType === "Sales" && locationChanged) {
+        // Get sales items for this voucher
+        const oldSalesItemsList = await db
+          .select()
+          .from(salesItems)
+          .where(eq(salesItems.voucherId, id));
+
+        // STEP 1: Reverse inventory at old location (add back the quantities)
+        if (oldLocationId && oldSalesItemsList.length > 0) {
+          for (const oldItem of oldSalesItemsList) {
+            const quantity = parseFloat(oldItem.quantity);
+            const costPrice = parseFloat(oldItem.costPrice);
+
+            // Get current inventory at old location
+            const [currentInventory] = await db
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, oldLocationId),
+                  eq(inventory.stockItemId, oldItem.stockItemId),
+                ),
+              );
+
+            if (currentInventory) {
+              // Add back the quantity (reverse the sale)
+              const newQuantity = parseFloat(currentInventory.quantity) + quantity;
+              const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
+              const newTotalValue = currentTotalValue + quantity * costPrice;
+              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+              await db
+                .update(inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(inventory.id, currentInventory.id));
+              
+              console.log(`[Sales Edit] Reversed inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty +${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
+            } else {
+              // Create inventory record if it doesn't exist (restore to positive)
+              await db.insert(inventory).values({
+                companyId: existingVoucher.companyId,
+                locationId: oldLocationId,
+                stockItemId: oldItem.stockItemId,
+                quantity: quantity.toFixed(3),
+                averageRate: costPrice.toFixed(2),
+                totalValue: (quantity * costPrice).toFixed(2),
+              });
+              console.log(`[Sales Edit] Created inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty ${quantity}`);
+            }
+          }
+        }
+
+        // STEP 2: Deduct inventory at new location
+        if (newLocationId && oldSalesItemsList.length > 0) {
+          for (const item of oldSalesItemsList) {
+            const quantity = parseFloat(item.quantity);
+            const costPrice = parseFloat(item.costPrice);
+
+            // Get current inventory at new location
+            const [currentInventory] = await db
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, newLocationId),
+                  eq(inventory.stockItemId, item.stockItemId),
+                ),
+              );
+
+            if (currentInventory) {
+              // Deduct quantity at new location
+              const newQuantity = parseFloat(currentInventory.quantity) - quantity;
+              const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
+              const newTotalValue = currentTotalValue - quantity * costPrice;
+              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+              await db
+                .update(inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: Math.max(0, newAverageRate).toFixed(2),
+                  totalValue: Math.max(0, newTotalValue).toFixed(2),
+                })
+                .where(eq(inventory.id, currentInventory.id));
+              
+              console.log(`[Sales Edit] Deducted inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
+            } else {
+              // Create inventory record with negative quantity if it doesn't exist
+              await db.insert(inventory).values({
+                companyId: existingVoucher.companyId,
+                locationId: newLocationId,
+                stockItemId: item.stockItemId,
+                quantity: (-quantity).toFixed(3),
+                averageRate: costPrice.toFixed(2),
+                totalValue: "0",
+              });
+              console.log(`[Sales Edit] Created negative inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity}`);
+            }
+          }
+        }
+      }
+
       try {
         // Backup old entries before deleting
         oldEntries = await db
@@ -14739,6 +14852,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(result);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fix inventory for Sales vouchers that were edited with location changes
+  // This recalculates inventory based on current voucher locations
+  app.post("/api/admin/fix-sales-inventory", requireAuth, async (req, res) => {
+    try {
+      // Admin only
+      if (req.session.currentRole !== "Admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Get all Sales vouchers for this company
+      const salesVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.voucherType, "Sales"),
+          ),
+        );
+
+      const fixes: any[] = [];
+
+      for (const voucher of salesVouchers) {
+        if (!voucher.locationId) continue;
+
+        // Get sales items for this voucher
+        const items = await db
+          .select()
+          .from(salesItems)
+          .where(eq(salesItems.voucherId, voucher.id));
+
+        for (const item of items) {
+          const quantity = parseFloat(item.quantity);
+          const costPrice = parseFloat(item.costPrice);
+
+          // Check if inventory at this location has this deduction
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.locationId, voucher.locationId),
+                eq(inventory.stockItemId, item.stockItemId),
+              ),
+            );
+
+          fixes.push({
+            voucherId: voucher.id,
+            voucherNumber: voucher.voucherNumber,
+            locationId: voucher.locationId,
+            stockItemId: item.stockItemId,
+            saleQuantity: quantity,
+            currentInventory: inv ? parseFloat(inv.quantity) : null,
+          });
+        }
+      }
+
+      // Find inventory records with negative quantities that shouldn't have them
+      const negativeInventory = await db
+        .select({
+          id: inventory.id,
+          locationId: inventory.locationId,
+          stockItemId: inventory.stockItemId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+          totalValue: inventory.totalValue,
+          locationName: locations.name,
+          stockItemName: stockItems.name,
+        })
+        .from(inventory)
+        .leftJoin(locations, eq(inventory.locationId, locations.id))
+        .leftJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            sql`CAST(${inventory.quantity} AS DECIMAL) < 0`,
+          ),
+        );
+
+      // For each negative inventory, set it to 0 (cleanup orphaned deductions)
+      const cleaned: any[] = [];
+      for (const inv of negativeInventory) {
+        // Check if there's actually a sale at this location that would cause this
+        const salesAtLocation = await db
+          .select()
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.locationId, inv.locationId),
+              eq(salesItems.stockItemId, inv.stockItemId),
+              eq(vouchers.companyId, companyId),
+            ),
+          );
+
+        if (salesAtLocation.length === 0) {
+          // No sales at this location for this item - this is orphaned negative inventory
+          // Reset to 0
+          await db
+            .update(inventory)
+            .set({
+              quantity: "0",
+              totalValue: "0",
+            })
+            .where(eq(inventory.id, inv.id));
+
+          cleaned.push({
+            id: inv.id,
+            locationName: inv.locationName,
+            stockItemName: inv.stockItemName,
+            oldQuantity: inv.quantity,
+            action: "Reset to 0 (orphaned negative inventory)",
+          });
+        }
+      }
+
+      res.json({
+        message: `Fixed ${cleaned.length} orphaned negative inventory records`,
+        cleaned,
+        salesVoucherCount: salesVouchers.length,
+        negativeInventoryFound: negativeInventory.length,
+      });
+    } catch (error: any) {
+      console.error("[Fix Sales Inventory] Error:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -2033,6 +2033,73 @@
                 <Card className="p-6">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
+                      <div className="p-3 bg-teal-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-teal-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-sales-inventory-title">Fix Sales Inventory</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Clean up orphaned negative inventory from POS sales edited with wrong locations
+                        </p>
+                      </div>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button data-testid="button-fix-sales-inventory">
+                          Fix Inventory
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Fix Sales Inventory</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will find and reset orphaned negative inventory records that were caused by editing POS sales with incorrect locations. Are you sure you want to proceed?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={async () => {
+                              try {
+                                const response = await fetch("/api/admin/fix-sales-inventory", {
+                                  method: "POST",
+                                  credentials: "include",
+                                });
+                                const result = await response.json();
+                                if (response.ok) {
+                                  toast({
+                                    title: "Inventory Fixed",
+                                    description: `Fixed ${result.cleaned?.length || 0} orphaned records. ${result.negativeInventoryFound || 0} negative inventory items found total.`,
+                                  });
+                                  // Invalidate inventory queries
+                                  queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+                                } else {
+                                  toast({
+                                    title: "Error",
+                                    description: result.message,
+                                    variant: "destructive",
+                                  });
+                                }
+                              } catch (error: any) {
+                                toast({
+                                  title: "Error",
+                                  description: error.message,
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            Fix Inventory
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </Card>
+
+                                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
                       <div className="p-3 bg-orange-500/10 rounded-lg">
                         <Trash2 className="h-6 w-6 text-orange-500" />
                       </div>
