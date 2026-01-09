@@ -1060,6 +1060,7 @@ export const salaryAdvances = pgTable("salary_advances", {
   voucherId: integer("voucher_id"),
   notes: text("notes"),
   fullyPaid: boolean("fully_paid").notNull().default(false),
+  isOpeningBalance: boolean("is_opening_balance").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -1072,6 +1073,7 @@ export const insertSalaryAdvanceSchema = createInsertSchema(salaryAdvances).omit
   advanceDate: z.string().min(1, "Advance date is required"),
   amount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
   remainingBalance: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Remaining balance must be non-negative"),
+  isOpeningBalance: z.boolean().optional().default(false),
 });
 
 export type InsertSalaryAdvance = z.infer<typeof insertSalaryAdvanceSchema>;

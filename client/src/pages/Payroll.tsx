@@ -105,9 +105,16 @@ const salaryAdvanceSchema = z.object({
   advanceDate: z.date({
     required_error: "Advance date is required",
   }),
-  cashAccountId: z.string().min(1, "Cash account is required"),
+  cashAccountId: z.string().optional(),
   notes: z.string().optional(),
-});
+  isOpeningBalance: z.boolean().default(false),
+}).refine((data) => {
+  // Cash account is required only if NOT an opening balance
+  if (!data.isOpeningBalance && !data.cashAccountId) {
+    return false;
+  }
+  return true;
+}, { message: "Cash account is required", path: ["cashAccountId"] });
 
 const deductionSchema = z.object({
   deductionAmount: z.string().min(1, "Deduction amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Deduction amount must be positive"),
@@ -636,6 +643,7 @@ export default function Payroll() {
       advanceDate: new Date(),
       cashAccountId: "",
       notes: "",
+      isOpeningBalance: false,
     },
   });
 
@@ -897,8 +905,9 @@ export default function Payroll() {
         employeeId: parseInt(data.employeeId),
         amount: data.amount,
         advanceDate: format(data.advanceDate, "yyyy-MM-dd"),
-        cashAccountId: parseInt(data.cashAccountId),
+        cashAccountId: data.isOpeningBalance ? undefined : parseInt(data.cashAccountId || "0"),
         notes: data.notes,
+        isOpeningBalance: data.isOpeningBalance,
       });
     },
     onSuccess: () => {
@@ -2805,6 +2814,29 @@ export default function Payroll() {
 
               <FormField
                 control={advanceForm.control}
+                name="isOpeningBalance"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-muted/50">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-opening-balance"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Opening Balance (from Tally)</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Check this if importing an existing balance from your old system. This will not create any cash transaction.
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {!advanceForm.watch("isOpeningBalance") && (
+              <FormField
+                control={advanceForm.control}
                 name="cashAccountId"
                 render={({ field }) => (
                   <FormItem>
@@ -2833,6 +2865,7 @@ export default function Payroll() {
                   </FormItem>
                 )}
               />
+              )}
 
               <FormField
                 control={advanceForm.control}

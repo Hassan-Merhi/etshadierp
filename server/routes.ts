@@ -4750,6 +4750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...req.body,
           companyId: req.session.currentCompanyId,
           remainingBalance: req.body.amount, // Initially, remaining balance equals full amount
+          isOpeningBalance: req.body.isOpeningBalance || false,
         };
 
         const parsed = insertSalaryAdvanceSchema.parse(dataWithCompany);
@@ -4771,54 +4772,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({ message: "Employee belongs to a different company" });
         }
 
-        // Get default cash account from request or use a default one
-        const cashAccountId =
-          req.body.cashAccountId || req.session.cashAccountId;
-        if (!cashAccountId) {
-          return res.status(400).json({ message: "Cash account is required" });
+        let voucherId: number | null = null;
+
+        // Only create cash voucher if NOT an opening balance
+        if (!parsed.isOpeningBalance) {
+          // Get default cash account from request or use a default one
+          const cashAccountId =
+            req.body.cashAccountId || req.session.cashAccountId;
+          if (!cashAccountId) {
+            return res.status(400).json({ message: "Cash account is required" });
+          }
+
+          // Create voucher for the salary advance
+          const voucherNumber = `SA-${Date.now()}`;
+          const [voucher] = await db
+            .insert(vouchers)
+            .values({
+              companyId: req.session.currentCompanyId,
+              voucherNumber,
+              voucherType: "Payment",
+              voucherDate: parsed.advanceDate,
+              description:
+                parsed.notes ||
+                `Salary advance for ${employee[0].firstName} ${employee[0].lastName}`,
+              totalAmount: parsed.amount,
+              optional: false,
+            })
+            .returning();
+
+          voucherId = voucher.id;
+
+          // Create voucher entries (double-entry)
+          // Debit: Employee (using employeeId field directly - they owe us)
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: null,
+            employeeId: employee[0].id,
+            debitAmount: parsed.amount,
+            creditAmount: "0",
+            narration: `Salary advance - ${voucherNumber}`,
+          });
+
+          // Credit: Cash Account
+          await db.insert(voucherEntries).values({
+            voucherId: voucher.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: "0",
+            creditAmount: parsed.amount,
+            narration: `Salary advance - ${voucherNumber}`,
+          });
         }
-
-        // Create voucher for the salary advance
-        const voucherNumber = `SA-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: parsed.advanceDate,
-            description:
-              parsed.notes ||
-              `Salary advance for ${employee[0].firstName} ${employee[0].lastName}`,
-            totalAmount: parsed.amount,
-            optional: false,
-          })
-          .returning();
-
-        // Create voucher entries (double-entry)
-        // Debit: Employee (using employeeId field directly - they owe us)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: null,
-          employeeId: employee[0].id,
-          debitAmount: parsed.amount,
-          creditAmount: "0",
-          narration: `Salary advance - ${voucherNumber}`,
-        });
-
-        // Credit: Cash Account
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cashAccountId,
-          debitAmount: "0",
-          creditAmount: parsed.amount,
-          narration: `Salary advance - ${voucherNumber}`,
-        });
 
         // Create salary advance record
         const advance = await storage.createSalaryAdvance({
           ...parsed,
-          voucherId: voucher.id,
+          voucherId,
         });
 
         res.status(201).json(advance);
