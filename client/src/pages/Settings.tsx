@@ -887,6 +887,30 @@
       },
     });
 
+    const fixParentPOSupplierMutation = useMutation({
+      mutationFn: async () => {
+        const res = await apiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
+        return await res.json();
+      },
+      onSuccess: (data) => {
+        toast({
+          title: "Success",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/import-cycle-balance"] });
+      },
+      onError: (error: any) => {
+        console.error("Fix parent PO supplier entries error:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fix supplier entries",
+          variant: "destructive",
+        });
+      },
+    });
+
     const resetCompanyDataMutation = useMutation({
       mutationFn: async (companyId: number) => {
         const res = await apiRequest("POST", "/api/admin/reset-company-data", { companyId });
@@ -2026,6 +2050,33 @@
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
                       ) : (
                         "Fix Credits"
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-500/10 rounded-lg">
+                        <RefreshCw className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold" data-testid="text-fix-parent-po-title">Fix Parent Company PO Supplier Entries</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Add missing supplier entries to POs imported directly to the parent company
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => fixParentPOSupplierMutation.mutate()}
+                      disabled={fixParentPOSupplierMutation.isPending}
+                      data-testid="button-fix-parent-po-supplier"
+                    >
+                      {fixParentPOSupplierMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</>
+                      ) : (
+                        "Fix Supplier Entries"
                       )}
                     </Button>
                   </div>

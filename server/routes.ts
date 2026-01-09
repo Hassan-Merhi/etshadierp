@@ -6967,6 +6967,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
           }
+        } else {
+          // === PARENT COMPANY: Create direct supplier entry ===
+          // When importing to the parent company, create standard voucher entries:
+          // DR Purchases (expense), CR Supplier (liability)
+          
+          // Find or create a Purchases account for the parent company
+          let purchasesAccount = await storage.getLedgerAccountByName("Purchases", currentCompanyId);
+          if (!purchasesAccount) {
+            purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", currentCompanyId);
+          }
+          if (!purchasesAccount) {
+            purchasesAccount = await storage.createLedgerAccount({
+              companyId: currentCompanyId,
+              name: "Purchases",
+              code: "PURCHASES",
+              accountType: "Expense",
+              subType: "Direct Expense",
+            });
+          }
+          
+          // DR Purchases (expense increases)
+          await storage.createVoucherEntry({
+            voucherId: voucher.id,
+            ledgerAccountId: purchasesAccount.id,
+            debitAmount: poGrandTotal.toFixed(2),
+            creditAmount: "0",
+            narration: `PO ${poNumber} - Container ${containerNumber}`,
+          });
+          
+          // CR Supplier (liability increases - we owe supplier)
+          // Only create if supplierId is provided
+          if (supplierId) {
+            await storage.createVoucherEntry({
+              voucherId: voucher.id,
+              supplierId: supplierId,
+              debitAmount: "0",
+              creditAmount: poGrandTotal.toFixed(2),
+              narration: `PO ${poNumber} - Container ${containerNumber}`,
+            });
+          }
         }
 
         const po = await storage.createPurchaseOrder({
@@ -29451,6 +29491,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } catch (error: any) {
         console.error("Fix old PO credits error:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ==========================================
+  // Fix Parent Company POs Missing Supplier Entries
+  // ==========================================
+  
+  app.post(
+    "/api/fix-parent-po-supplier-entries",
+    requireAuth,
+    requireRole("Admin"),
+    async (req, res) => {
+      try {
+        const parentCompanyId = await storage.getParentCompanyId();
+        
+        if (!parentCompanyId) {
+          return res.status(400).json({ 
+            message: "No parent company configured. Please set the parent company in Settings first." 
+          });
+        }
+        
+        // Get the parent company
+        const parentCompany = await storage.getCompanyById(parentCompanyId);
+        if (!parentCompany) {
+          return res.status(404).json({ message: "Parent company not found" });
+        }
+        
+        // Find all POs in the parent company
+        const allPOs = await db
+          .select()
+          .from(purchaseOrders)
+          .where(eq(purchaseOrders.companyId, parentCompanyId));
+        
+        let fixed = 0;
+        let skipped = 0;
+        let totalAmount = 0;
+        const details: any[] = [];
+        
+        for (const po of allPOs) {
+          if (!po.voucherId || !po.supplierId) {
+            skipped++;
+            continue;
+          }
+          
+          // Calculate PO total
+          const itemsTotal = parseFloat(po.itemsTotal || "0");
+          const freight = parseFloat(po.freight || "0");
+          const surcharge = parseFloat(po.surcharge || "0");
+          const fumigation = parseFloat(po.fumigation || "0");
+          const documentCharges = parseFloat(po.documentCharges || "0");
+          const discount = parseFloat(po.discount || "0");
+          const otherCharges = parseFloat(po.otherCharges || "0");
+          const poTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+          
+          if (poTotal <= 0) {
+            skipped++;
+            continue;
+          }
+          
+          // Get or create Purchases account
+          let purchasesAccount = await storage.getLedgerAccountByName("Purchases", parentCompanyId);
+          if (!purchasesAccount) {
+            purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", parentCompanyId);
+          }
+          if (!purchasesAccount) {
+            purchasesAccount = await storage.createLedgerAccount({
+              companyId: parentCompanyId,
+              name: "Purchases",
+              code: "PURCHASES",
+              accountType: "Expense",
+              subType: "Direct Expense",
+            });
+          }
+          
+          // Check if voucher already has purchase entry
+          const existingPurchaseEntry = await db
+            .select()
+            .from(voucherEntries)
+            .where(and(
+              eq(voucherEntries.voucherId, po.voucherId),
+              eq(voucherEntries.ledgerAccountId, purchasesAccount.id)
+            ))
+            .limit(1);
+          
+          // Check if this voucher already has a supplier entry
+          const existingSupplierEntry = await db
+            .select()
+            .from(voucherEntries)
+            .where(and(
+              eq(voucherEntries.voucherId, po.voucherId),
+              eq(voucherEntries.supplierId, po.supplierId)
+            ))
+            .limit(1);
+          
+          // Skip if both entries already exist
+          if (existingPurchaseEntry.length > 0 && existingSupplierEntry.length > 0) {
+            skipped++;
+            continue;
+          }
+          
+          let fixedThisPO = false;
+          
+          // Add DR Purchases entry if missing
+          if (existingPurchaseEntry.length === 0) {
+            await db.insert(voucherEntries).values({
+              voucherId: po.voucherId,
+              ledgerAccountId: purchasesAccount.id,
+              debitAmount: poTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `PO ${po.poNumber} - Fix missing entry`,
+            });
+            fixedThisPO = true;
+          }
+          
+          // Add CR Supplier entry if missing
+          if (existingSupplierEntry.length === 0) {
+            await db.insert(voucherEntries).values({
+              voucherId: po.voucherId,
+              supplierId: po.supplierId,
+              debitAmount: "0",
+              creditAmount: poTotal.toFixed(2),
+              narration: `PO ${po.poNumber} - Fix missing supplier entry`,
+            });
+            fixedThisPO = true;
+          }
+          
+          if (fixedThisPO) {
+            fixed++;
+            totalAmount += poTotal;
+            details.push({
+              poNumber: po.poNumber,
+              amount: poTotal.toFixed(2),
+              fixedPurchases: existingPurchaseEntry.length === 0,
+              fixedSupplier: existingSupplierEntry.length === 0,
+            });
+          } else {
+            skipped++;
+          }
+        }
+        
+        res.json({
+          message: `Fixed ${fixed} POs in ${parentCompany.name}. Skipped ${skipped} (already had entries or invalid).`,
+          fixed,
+          skipped,
+          totalAmount: totalAmount.toFixed(2),
+          details,
+        });
+      } catch (error: any) {
+        console.error("Fix parent PO supplier entries error:", error);
         res.status(500).json({ message: error.message });
       }
     }
