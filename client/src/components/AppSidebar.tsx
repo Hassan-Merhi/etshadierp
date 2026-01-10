@@ -135,6 +135,11 @@ const menuItems = [
     icon: Grid3X3,
   },
   {
+    title: "Transfer Order",
+    url: "/stock-transfer-order",
+    icon: ArrowLeftRight,
+  },
+  {
     title: "Sales Report",
     url: "/sales-report",
     icon: PieChart,

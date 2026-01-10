@@ -69,6 +69,7 @@ import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
+import StockTransferOrder from "@/pages/StockTransferOrder";
 import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
@@ -123,6 +124,7 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-query/:id" component={StockItemDetail} />
       <Route path="/stock-query" component={StockQuery} />
       <Route path="/location-summary" component={LocationSummary} />
+      <Route path="/stock-transfer-order" component={StockTransferOrder} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
       <Route path="/stock-items/:stockItemId/monthly-summary" component={LocationMonthlySummary} />
