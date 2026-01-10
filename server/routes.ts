@@ -17652,6 +17652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .where(eq(inventory.id, destInv.id));
             } else {
               await db.insert(inventory).values({
+                companyId,
                 locationId: destinationLocationId,
                 stockItemId: item.stockItemId,
                 quantity: quantity.toFixed(6),

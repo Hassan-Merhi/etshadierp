@@ -89,7 +89,6 @@ interface QuantityPickerState {
   locationId: number;
   locationName: string;
   availableQty: number;
-  orderPane: 1 | 2;
 }
 
 const STORAGE_KEY = "stockTransferOrder_selectedLocations";
@@ -106,8 +105,7 @@ export default function StockTransferOrder() {
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [destinationLocationId, setDestinationLocationId] = useState<number | null>(null);
   
-  const [order1Items, setOrder1Items] = useState<OrderItem[]>([]);
-  const [order2Items, setOrder2Items] = useState<OrderItem[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   
   const [quantityPicker, setQuantityPicker] = useState<QuantityPickerState>({
     open: false,
@@ -115,7 +113,6 @@ export default function StockTransferOrder() {
     locationId: 0,
     locationName: "",
     availableQty: 0,
-    orderPane: 1,
   });
   const [pickerQuantity, setPickerQuantity] = useState("");
   
@@ -176,12 +173,15 @@ export default function StockTransferOrder() {
     );
   };
 
+  const sortOrderItems = (items: OrderItem[]): OrderItem[] => {
+    return [...items].sort((a, b) => a.sourceLocationName.localeCompare(b.sourceLocationName));
+  };
+
   const handleCellClick = (
     item: StockItemData,
     locationId: number,
     locationName: string,
-    availableQty: number,
-    orderPane: 1 | 2
+    availableQty: number
   ) => {
     if (availableQty <= 0) {
       toast({
@@ -198,7 +198,6 @@ export default function StockTransferOrder() {
       locationId,
       locationName,
       availableQty,
-      orderPane,
     });
     setPickerQuantity("");
     
@@ -219,12 +218,9 @@ export default function StockTransferOrder() {
       return;
     }
 
-    const { stockItem, locationId, locationName, availableQty, orderPane } = quantityPicker;
+    const { stockItem, locationId, locationName, availableQty } = quantityPicker;
     
     if (!stockItem) return;
-
-    const orderItems = orderPane === 1 ? order1Items : order2Items;
-    const setOrderItems = orderPane === 1 ? setOrder1Items : setOrder2Items;
 
     const existingIdx = orderItems.findIndex(
       item => item.stockItemId === stockItem.id && item.sourceLocationId === locationId
@@ -242,16 +238,16 @@ export default function StockTransferOrder() {
       return;
     }
 
+    let updatedItems: OrderItem[];
     if (existingIdx >= 0) {
-      const updated = [...orderItems];
-      updated[existingIdx] = {
-        ...updated[existingIdx],
+      updatedItems = [...orderItems];
+      updatedItems[existingIdx] = {
+        ...updatedItems[existingIdx],
         quantity: totalAfterAdd,
       };
-      setOrderItems(updated);
     } else {
       const locationData = stockItem.locationData[locationId];
-      setOrderItems([
+      updatedItems = [
         ...orderItems,
         {
           stockItemId: stockItem.id,
@@ -264,25 +260,22 @@ export default function StockTransferOrder() {
           availableQty,
           rate: locationData?.rate || 0,
         },
-      ]);
+      ];
     }
 
+    setOrderItems(sortOrderItems(updatedItems));
     setQuantityPicker({ ...quantityPicker, open: false });
     toast({
       title: "Added to Order",
-      description: `${formatNumber(qty)} ${stockItem.uom} of ${stockItem.name} added to Order ${orderPane}`,
+      description: `${formatNumber(qty)} ${stockItem.uom} of ${stockItem.name} added`,
     });
   };
 
-  const removeFromOrder = (orderPane: 1 | 2, index: number) => {
-    if (orderPane === 1) {
-      setOrder1Items(order1Items.filter((_, i) => i !== index));
-    } else {
-      setOrder2Items(order2Items.filter((_, i) => i !== index));
-    }
+  const removeFromOrder = (index: number) => {
+    setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
-  const validateOrder = (orderItems: OrderItem[]): string[] => {
+  const validateOrder = (): string[] => {
     const errors: string[] = [];
     
     if (!destinationLocationId) {
@@ -305,15 +298,14 @@ export default function StockTransferOrder() {
     return errors;
   };
 
-  const handleValidate = (orderPane: 1 | 2) => {
-    const orderItems = orderPane === 1 ? order1Items : order2Items;
-    const errors = validateOrder(orderItems);
+  const handleValidate = () => {
+    const errors = validateOrder();
     setValidationErrors(errors);
     
     if (errors.length === 0) {
       toast({
         title: "Validation Passed",
-        description: `Order ${orderPane} is ready to process`,
+        description: "Order is ready to process",
       });
     } else {
       toast({
@@ -369,11 +361,8 @@ export default function StockTransferOrder() {
     },
   });
 
-  const handleProcessOrder = async (orderPane: 1 | 2) => {
-    const orderItems = orderPane === 1 ? order1Items : order2Items;
-    const setOrderItems = orderPane === 1 ? setOrder1Items : setOrder2Items;
-    
-    const errors = validateOrder(orderItems);
+  const handleProcessOrder = async () => {
+    const errors = validateOrder();
     if (errors.length > 0) {
       setValidationErrors(errors);
       toast({
@@ -399,90 +388,7 @@ export default function StockTransferOrder() {
     }
   };
 
-  const getOrderTotal = (orderItems: OrderItem[]) => {
-    return orderItems.reduce((sum, item) => sum + item.quantity, 0);
-  };
-
-  const renderOrderPane = (orderPane: 1 | 2, items: OrderItem[]) => {
-    const total = getOrderTotal(items);
-    
-    return (
-      <Card className="flex-1">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Order {orderPane}</CardTitle>
-            <Badge variant="secondary">{items.length} items</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {items.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Click on quantities in the matrix to add items</p>
-            </div>
-          ) : (
-            <>
-              <ScrollArea className="h-[200px]">
-                <div className="space-y-2">
-                  {items.map((item, index) => (
-                    <div
-                      key={`${item.stockItemId}-${item.sourceLocationId}`}
-                      className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
-                      data-testid={`order-${orderPane}-item-${index}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.stockItemName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          From: {item.sourceLocationName} | {formatNumber(item.quantity)} {item.uom}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeFromOrder(orderPane, index)}
-                        data-testid={`button-remove-order-${orderPane}-item-${index}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-              
-              <div className="pt-2 border-t space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Qty:</span>
-                  <span className="font-mono font-medium">{formatNumber(total)}</span>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleValidate(orderPane)}
-                    className="flex-1"
-                    data-testid={`button-validate-order-${orderPane}`}
-                  >
-                    <Check className="h-4 w-4 mr-1" />
-                    Validate
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleProcessOrder(orderPane)}
-                    disabled={isProcessing || !destinationLocationId}
-                    className="flex-1"
-                    data-testid={`button-process-order-${orderPane}`}
-                  >
-                    {isProcessing ? "Processing..." : "Process"}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
+  const totalBales = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <div className="space-y-4">
@@ -616,20 +522,10 @@ export default function StockTransferOrder() {
                       {selectedLocations.map((loc) => (
                         <TableHead
                           key={loc.id}
-                          className="text-center min-w-[120px]"
-                          colSpan={2}
+                          className="text-center min-w-[100px]"
                         >
                           {loc.name}
                         </TableHead>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableHead className="sticky left-0 bg-background z-20"></TableHead>
-                      {selectedLocations.map((loc) => (
-                        <Fragment key={loc.id}>
-                          <TableHead className="text-center text-xs">Order 1</TableHead>
-                          <TableHead className="text-center text-xs">Order 2</TableHead>
-                        </Fragment>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -658,14 +554,9 @@ export default function StockTransferOrder() {
                             const locData = group.locationData[loc.id];
                             const qty = locData?.quantity || 0;
                             return (
-                              <Fragment key={loc.id}>
-                                <TableCell className="text-center font-mono text-sm">
-                                  {qty > 0 ? formatNumber(qty, 0) : "-"}
-                                </TableCell>
-                                <TableCell className="text-center font-mono text-sm">
-                                  {qty > 0 ? formatNumber(qty, 0) : "-"}
-                                </TableCell>
-                              </Fragment>
+                              <TableCell key={loc.id} className="text-center font-mono text-sm">
+                                {qty > 0 ? formatNumber(qty, 0) : "-"}
+                              </TableCell>
                             );
                           })}
                         </TableRow>
@@ -687,42 +578,23 @@ export default function StockTransferOrder() {
                                   const hasStock = qty > 0;
                                   
                                   return (
-                                    <Fragment key={loc.id}>
-                                      <TableCell className="p-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className={cn(
-                                            "w-full font-mono",
-                                            hasStock && "hover:bg-primary/10 cursor-pointer"
-                                          )}
-                                          disabled={!hasStock}
-                                          onClick={() =>
-                                            handleCellClick(item, loc.id, loc.name, qty, 1)
-                                          }
-                                          data-testid={`cell-item-${item.id}-loc-${loc.id}-order-1`}
-                                        >
-                                          {hasStock ? formatNumber(qty, 0) : "-"}
-                                        </Button>
-                                      </TableCell>
-                                      <TableCell className="p-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className={cn(
-                                            "w-full font-mono",
-                                            hasStock && "hover:bg-secondary/50 cursor-pointer"
-                                          )}
-                                          disabled={!hasStock}
-                                          onClick={() =>
-                                            handleCellClick(item, loc.id, loc.name, qty, 2)
-                                          }
-                                          data-testid={`cell-item-${item.id}-loc-${loc.id}-order-2`}
-                                        >
-                                          {hasStock ? formatNumber(qty, 0) : "-"}
-                                        </Button>
-                                      </TableCell>
-                                    </Fragment>
+                                    <TableCell key={loc.id} className="p-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className={cn(
+                                          "w-full font-mono",
+                                          hasStock && "hover:bg-primary/10 cursor-pointer"
+                                        )}
+                                        disabled={!hasStock}
+                                        onClick={() =>
+                                          handleCellClick(item, loc.id, loc.name, qty)
+                                        }
+                                        data-testid={`cell-item-${item.id}-loc-${loc.id}`}
+                                      >
+                                        {hasStock ? formatNumber(qty, 0) : "-"}
+                                      </Button>
+                                    </TableCell>
                                   );
                                 })}
                               </TableRow>
@@ -751,8 +623,85 @@ export default function StockTransferOrder() {
             </Card>
           )}
           
-          {renderOrderPane(1, order1Items)}
-          {renderOrderPane(2, order2Items)}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">Transfer Order</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{orderItems.length} items</Badge>
+                  <Badge variant="default" className="font-mono">
+                    {formatNumber(totalBales, 0)} bales
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {orderItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Click on quantities in the matrix to add items</p>
+                </div>
+              ) : (
+                <>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-2">
+                      {orderItems.map((item, index) => (
+                        <div
+                          key={`${item.stockItemId}-${item.sourceLocationId}`}
+                          className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                          data-testid={`order-item-${index}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.stockItemName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              From: {item.sourceLocationName} | {formatNumber(item.quantity)} {item.uom}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromOrder(index)}
+                            data-testid={`button-remove-order-item-${index}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  
+                  <div className="pt-2 border-t space-y-3">
+                    <div className="flex justify-between text-sm font-medium">
+                      <span>Total Bales:</span>
+                      <span className="font-mono text-lg">{formatNumber(totalBales, 0)}</span>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleValidate}
+                        className="flex-1"
+                        data-testid="button-validate-order"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Validate
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleProcessOrder}
+                        disabled={isProcessing || !destinationLocationId}
+                        className="flex-1"
+                        data-testid="button-process-order"
+                      >
+                        {isProcessing ? "Processing..." : "Process"}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -762,7 +711,7 @@ export default function StockTransferOrder() {
       >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Add to Order {quantityPicker.orderPane}</DialogTitle>
+            <DialogTitle>Add to Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-3 bg-muted rounded-md">
