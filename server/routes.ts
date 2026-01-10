@@ -30425,7 +30425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.parentAccount, "INVENTORY")
+                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
               )
             )
             .limit(1);
@@ -30466,7 +30466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(
                 and(
                   eq(ledgerAccounts.companyId, companyId),
-                  eq(ledgerAccounts.parentAccount, "INVENTORY")
+                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
                 )
               )
               .limit(1);
@@ -30504,10 +30504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(
             and(
               eq(ledgerAccounts.companyId, companyId),
-              or(
-                eq(ledgerAccounts.parentAccount, "SALES_RETURNS"),
-                ilike(ledgerAccounts.name, "%sales return%")
-              )
+              ilike(ledgerAccounts.name, "%sales return%")
             )
           )
           .limit(1);
@@ -30520,7 +30517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.parentAccount, "INDIRECT_EXPENSES")
+                eq(ledgerAccounts.accountType, "Indirect Expense")
               )
             )
             .limit(1);
@@ -30911,7 +30908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.parentAccount, "INVENTORY")
+                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
               )
             )
             .limit(1);
@@ -30951,7 +30948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .where(
                 and(
                   eq(ledgerAccounts.companyId, companyId),
-                  eq(ledgerAccounts.parentAccount, "INVENTORY")
+                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
                 )
               )
               .limit(1);
@@ -30988,10 +30985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(
             and(
               eq(ledgerAccounts.companyId, companyId),
-              or(
-                eq(ledgerAccounts.parentAccount, "SALES_RETURNS"),
-                ilike(ledgerAccounts.name, "%sales return%")
-              )
+              ilike(ledgerAccounts.name, "%sales return%")
             )
           )
           .limit(1);
@@ -31003,7 +30997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.parentAccount, "INDIRECT_EXPENSES")
+                eq(ledgerAccounts.accountType, "Indirect Expense")
               )
             )
             .limit(1);
