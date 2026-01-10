@@ -402,6 +402,14 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const updateItemInventoryCost = (index: number, newCost: string) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, inventoryCost: newCost } : item
+      )
+    );
+  };
+
   const totalRefund = items.reduce((sum, item) => {
     return sum + parseFloat(item.quantity) * parseFloat(item.refundRate);
   }, 0);
@@ -631,8 +639,15 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                               <TableCell className="text-right font-mono text-primary">
                                 {formatNumber(refundAmt)}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatNumber(parseFloat(item.inventoryCost))}
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={item.inventoryCost}
+                                  onChange={(e) => updateItemInventoryCost(index, e.target.value)}
+                                  className="w-20 h-8 text-right font-mono text-sm"
+                                  data-testid={`input-inv-cost-${index}`}
+                                />
                               </TableCell>
                               <TableCell className="text-right font-mono text-muted-foreground">
                                 {formatNumber(invValue)}

@@ -30637,9 +30637,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch current inventory costs for each item at its location
+      // If not found at original location, look up from any other location
       const itemsWithCosts = await Promise.all(
         noteItems.map(async (item) => {
-          const [inv] = await db
+          // First try to find inventory at the item's location
+          let [inv] = await db
             .select()
             .from(inventory)
             .where(
@@ -30648,6 +30650,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(inventory.locationId, item.locationId)
               )
             );
+          
+          // If not found, try to find from any location
+          if (!inv || !inv.averageRate || parseFloat(inv.averageRate) === 0) {
+            const [anyInv] = await db
+              .select()
+              .from(inventory)
+              .where(eq(inventory.stockItemId, item.stockItemId))
+              .orderBy(desc(inventory.quantity))
+              .limit(1);
+            if (anyInv && anyInv.averageRate && parseFloat(anyInv.averageRate) > 0) {
+              inv = anyInv;
+            }
+          }
+          
           return {
             stockItemId: item.stockItemId,
             stockItemName: item.stockItemName || "",
