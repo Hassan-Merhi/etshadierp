@@ -17507,18 +17507,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Stock Transfers - POST endpoint
+  // Stock Transfers - POST endpoint (supports both creating new and using existing voucher)
   app.post(
     "/api/stock-transfers",
     requireAuth,
     requireNonPOS,
     async (req, res) => {
       try {
-        const { voucherId, destinationLocationId, notes, items } = req.body;
+        const { voucherId, sourceLocationId, destinationLocationId, notes, items } = req.body;
+        const companyId = req.session.currentCompanyId;
 
-        // Validate required fields
+        // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
+        if (sourceLocationId && !voucherId) {
+          if (!companyId) {
+            return res.status(400).json({ message: "No company selected" });
+          }
+          if (!destinationLocationId) {
+            return res.status(400).json({ message: "Destination location is required" });
+          }
+          if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: "Items are required" });
+          }
+          if (sourceLocationId === destinationLocationId) {
+            return res.status(400).json({ message: "Source and destination must be different" });
+          }
+
+          // Validate locations exist
+          const sourceLocation = await storage.getLocationById(sourceLocationId);
+          const destLocation = await storage.getLocationById(destinationLocationId);
+          if (!sourceLocation) {
+            return res.status(404).json({ message: "Source location not found" });
+          }
+          if (!destLocation) {
+            return res.status(404).json({ message: "Destination location not found" });
+          }
+
+          // Create Stock Transfer voucher
+          const voucherNumber = `ST-${Date.now()}`;
+          const [newVoucher] = await db
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Stock Transfer",
+              voucherNumber,
+              voucherDate: format(new Date(), "yyyy-MM-dd"),
+              description: notes || null,
+              totalAmount: "0",
+            })
+            .returning();
+
+          // Create the stock transfer record
+          const [transfer] = await db
+            .insert(stockTransferVouchers)
+            .values({
+              voucherId: newVoucher.id,
+              sourceLocationId,
+              destinationLocationId,
+              notes: notes || null,
+            })
+            .returning();
+
+          let totalAmount = 0;
+          const transferItems = [];
+
+          for (const item of items) {
+            const quantity = parseFloat(item.quantity);
+
+            // Lookup rate from source inventory
+            const [sourceInv] = await db
+              .select({ averageRate: inventory.averageRate, quantity: inventory.quantity })
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, sourceLocationId),
+                  eq(inventory.stockItemId, item.stockItemId)
+                )
+              )
+              .limit(1);
+
+            const rate = parseFloat(sourceInv?.averageRate || "0");
+            const totalItemAmount = quantity * rate;
+            totalAmount += totalItemAmount;
+
+            const [insertedItem] = await db
+              .insert(stockTransferItems)
+              .values({
+                transferId: transfer.id,
+                stockItemId: item.stockItemId,
+                sourceLocationId: sourceLocationId,
+                quantity: quantity.toString(),
+                rate: rate.toFixed(2),
+                totalAmount: totalItemAmount.toFixed(2),
+              })
+              .returning();
+
+            transferItems.push(insertedItem);
+
+            // Deduct from source inventory
+            const sourceQty = parseFloat(sourceInv?.quantity || "0");
+            const newSourceQty = sourceQty - quantity;
+
+            if (sourceInv) {
+              await db
+                .update(inventory)
+                .set({
+                  quantity: newSourceQty.toFixed(6),
+                  totalValue: (newSourceQty * rate).toFixed(2),
+                })
+                .where(
+                  and(
+                    eq(inventory.locationId, sourceLocationId),
+                    eq(inventory.stockItemId, item.stockItemId)
+                  )
+                );
+            }
+
+            // Add to destination inventory (weighted average)
+            const [destInv] = await db
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, destinationLocationId),
+                  eq(inventory.stockItemId, item.stockItemId)
+                )
+              )
+              .limit(1);
+
+            if (destInv) {
+              const destQty = parseFloat(destInv.quantity || "0");
+              const destRate = parseFloat(destInv.averageRate || "0");
+              const destValue = destQty * destRate;
+              const newQty = destQty + quantity;
+              const newValue = destValue + (quantity * rate);
+              const newAvgRate = newQty > 0 ? newValue / newQty : rate;
+
+              await db
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(6),
+                  averageRate: newAvgRate.toFixed(6),
+                  totalValue: newValue.toFixed(2),
+                })
+                .where(eq(inventory.id, destInv.id));
+            } else {
+              await db.insert(inventory).values({
+                locationId: destinationLocationId,
+                stockItemId: item.stockItemId,
+                quantity: quantity.toFixed(6),
+                averageRate: rate.toFixed(6),
+                totalValue: (quantity * rate).toFixed(2),
+              });
+            }
+          }
+
+          // Update voucher total amount
+          await db
+            .update(vouchers)
+            .set({ totalAmount: totalAmount.toFixed(2) })
+            .where(eq(vouchers.id, newVoucher.id));
+
+          return res.status(201).json({
+            transfer,
+            items: transferItems,
+            voucher: newVoucher,
+          });
+        }
+
+        // Original flow: Use existing voucher (voucherId required)
         if (!voucherId) {
-          return res.status(400).json({ message: "Voucher ID is required" });
+          return res.status(400).json({ message: "Either voucherId or sourceLocationId is required" });
         }
         if (!destinationLocationId) {
           return res
