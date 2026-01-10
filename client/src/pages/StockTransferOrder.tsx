@@ -122,10 +122,20 @@ export default function StockTransferOrder() {
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
+  const prevDialogOpen = useRef(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
   }, [selectedLocationIds]);
+
+  useEffect(() => {
+    if (prevDialogOpen.current && !quantityPicker.open) {
+      requestAnimationFrame(() => {
+        matrixRef.current?.focus({ preventScroll: true });
+      });
+    }
+    prevDialogOpen.current = quantityPicker.open;
+  }, [quantityPicker.open]);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -660,9 +670,10 @@ export default function StockTransferOrder() {
                                           isFocused && "ring-2 ring-primary ring-offset-1"
                                         )}
                                         disabled={!hasStock}
-                                        onClick={() =>
-                                          handleCellClick(item, loc.id, loc.name, qty)
-                                        }
+                                        onClick={() => {
+                                          setFocusedCell({ row: flatRowIndex, col: colIndex });
+                                          handleCellClick(item, loc.id, loc.name, qty);
+                                        }}
                                         data-testid={`cell-item-${item.id}-loc-${loc.id}`}
                                       >
                                         {hasStock ? formatNumber(qty, 0) : "-"}
