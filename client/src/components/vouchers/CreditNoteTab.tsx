@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,9 +7,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Form,
   FormControl,
@@ -39,18 +41,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Search, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-interface StockItem {
+interface LocationData {
+  quantity: number;
+  rate: number;
+  value: number;
+}
+
+interface StockItemData {
   id: number;
   code: string;
   name: string;
   uom: string;
+  locationData: Record<number, LocationData>;
+}
+
+interface StockGroupData {
+  id: number;
+  code: string;
+  name: string;
+  items: StockItemData[];
+}
+
+interface LocationSummaryResponse {
+  stockGroups: StockGroupData[];
 }
 
 interface Location {
@@ -65,7 +85,8 @@ interface CreditNoteItem {
   locationId: number;
   locationName: string;
   quantity: string;
-  rate: string;
+  refundRate: string;
+  inventoryCost: string;
   uom: string;
 }
 
@@ -88,10 +109,13 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const [items, setItems] = useState<CreditNoteItem[]>([]);
-  const [selectedStockItemId, setSelectedStockItemId] = useState<number>(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState<number>(0);
+  const [selectedItem, setSelectedItem] = useState<StockItemData | null>(null);
   const [itemQuantity, setItemQuantity] = useState("");
-  const [itemRate, setItemRate] = useState("");
+  const [refundRate, setRefundRate] = useState("");
+  const [inventoryCost, setInventoryCost] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<CreditNoteFormData>({
     resolver: zodResolver(creditNoteSchema),
@@ -105,13 +129,36 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     },
   });
 
-  const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
-  });
-
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
   });
+
+  const locationIds = locations.map((l) => l.id).join(",");
+
+  const { data: summaryData } = useQuery<LocationSummaryResponse>({
+    queryKey: ["/api/location-summary", locationIds],
+    enabled: locationIds.length > 0,
+  });
+
+  const allStockItems: StockItemData[] = summaryData?.stockGroups.flatMap((g) => g.items) || [];
+
+  const filteredItems = searchTerm.length > 0
+    ? allStockItems.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.code.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : [];
+
+  useEffect(() => {
+    if (selectedItem && selectedLocationId > 0) {
+      const locData = selectedItem.locationData[selectedLocationId];
+      if (locData) {
+        setInventoryCost(locData.rate.toFixed(2));
+      } else {
+        setInventoryCost("0.00");
+      }
+    }
+  }, [selectedItem, selectedLocationId]);
 
   const createCreditNoteMutation = useMutation({
     mutationFn: async (data: {
@@ -120,7 +167,13 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
       cashAccountId: number;
       cashAccountType: string;
       description: string;
-      items: Array<{ stockItemId: number; locationId: number; quantity: string; rate: string }>;
+      items: Array<{
+        stockItemId: number;
+        locationId: number;
+        quantity: string;
+        refundRate: string;
+        inventoryCost: string;
+      }>;
     }) => {
       const response = await apiRequest("POST", "/api/credit-notes", data);
       return response.json();
@@ -139,6 +192,12 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
         description: "",
       });
       setItems([]);
+      setSearchTerm("");
+      setSelectedItem(null);
+      setSelectedLocationId(0);
+      setItemQuantity("");
+      setRefundRate("");
+      setInventoryCost("");
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
     },
@@ -151,18 +210,40 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     },
   });
 
+  const handleSelectItem = (item: StockItemData) => {
+    setSelectedItem(item);
+    setSearchTerm(item.name);
+    setItemQuantity("1");
+    if (selectedLocationId > 0) {
+      const locData = item.locationData[selectedLocationId];
+      if (locData) {
+        setInventoryCost(locData.rate.toFixed(2));
+      }
+    }
+  };
+
   const addItem = () => {
-    if (!selectedStockItemId || !selectedLocationId) {
+    if (!selectedItem) {
       toast({
-        title: "Missing fields",
-        description: "Please select a stock item and location",
+        title: "No item selected",
+        description: "Please search and select a stock item",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedLocationId) {
+      toast({
+        title: "No location selected",
+        description: "Please select a location",
         variant: "destructive",
       });
       return;
     }
 
     const qty = parseFloat(itemQuantity);
-    const rate = parseFloat(itemRate);
+    const refund = parseFloat(refundRate);
+    const cost = parseFloat(inventoryCost);
 
     if (isNaN(qty) || qty <= 0) {
       toast({
@@ -173,44 +254,50 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
       return;
     }
 
-    if (isNaN(rate) || rate < 0) {
+    if (isNaN(refund) || refund < 0) {
       toast({
-        title: "Invalid rate",
-        description: "Please enter a valid rate",
+        title: "Invalid refund rate",
+        description: "Please enter a valid refund rate",
         variant: "destructive",
       });
       return;
     }
 
-    const stockItem = stockItems.find((s) => s.id === selectedStockItemId);
     const location = locations.find((l) => l.id === selectedLocationId);
-
-    if (!stockItem || !location) return;
+    if (!location) return;
 
     setItems((prev) => [
       ...prev,
       {
-        stockItemId: selectedStockItemId,
-        stockItemName: stockItem.name,
+        stockItemId: selectedItem.id,
+        stockItemName: selectedItem.name,
         locationId: selectedLocationId,
         locationName: location.name,
         quantity: qty.toString(),
-        rate: rate.toFixed(2),
-        uom: stockItem.uom,
+        refundRate: refund.toFixed(2),
+        inventoryCost: (cost || 0).toFixed(2),
+        uom: selectedItem.uom,
       },
     ]);
 
-    setSelectedStockItemId(0);
+    setSelectedItem(null);
+    setSearchTerm("");
     setItemQuantity("");
-    setItemRate("");
+    setRefundRate("");
+    setInventoryCost("");
+    searchInputRef.current?.focus();
   };
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const totalAmount = items.reduce((sum, item) => {
-    return sum + parseFloat(item.quantity) * parseFloat(item.rate);
+  const totalRefund = items.reduce((sum, item) => {
+    return sum + parseFloat(item.quantity) * parseFloat(item.refundRate);
+  }, 0);
+
+  const totalInventoryValue = items.reduce((sum, item) => {
+    return sum + parseFloat(item.quantity) * parseFloat(item.inventoryCost);
   }, 0);
 
   const onSubmit = (values: CreditNoteFormData) => {
@@ -233,7 +320,8 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
         stockItemId: item.stockItemId,
         locationId: item.locationId,
         quantity: item.quantity,
-        rate: item.rate,
+        refundRate: item.refundRate,
+        inventoryCost: item.inventoryCost,
       })),
     });
   };
@@ -243,22 +331,29 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const cashAccountType = form.watch("cashAccountType");
   const cashAccountName = form.watch("cashAccountName");
 
+  const getStockAtLocation = (item: StockItemData, locId: number) => {
+    return item.locationData[locId]?.quantity || 0;
+  };
+
   return (
     <div className="flex gap-4">
-      <Card className="flex-1">
-        <CardHeader>
-          <CardTitle>Credit / Debit Note</CardTitle>
+      <Card className="flex-[2]">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            {noteType === "Credit Note" ? "Credit Note (Customer Return)" : "Debit Note"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-4 gap-4">
                 <FormField
                   control={form.control}
                   name="noteType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Note Type</FormLabel>
+                      <FormLabel>Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-note-type">
@@ -266,11 +361,10 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Credit Note">Credit Note (Refund)</SelectItem>
+                          <SelectItem value="Credit Note">Credit Note</SelectItem>
                           <SelectItem value="Debit Note">Debit Note</SelectItem>
                         </SelectContent>
                       </Select>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -293,7 +387,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                               data-testid="button-credit-note-date"
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? formatDisplayDate(field.value) : "Pick a date"}
+                              {field.value ? formatDisplayDate(field.value) : "Pick date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -302,15 +396,12 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                             mode="single"
                             selected={field.value ? new Date(field.value) : undefined}
                             onSelect={(date) => {
-                              if (date) {
-                                field.onChange(format(date, "yyyy-MM-dd"));
-                              }
+                              if (date) field.onChange(format(date, "yyyy-MM-dd"));
                             }}
                             initialFocus
                           />
                         </PopoverContent>
                       </Popover>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -318,8 +409,8 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                 <FormField
                   control={form.control}
                   name="cashAccountId"
-                  render={({ field }) => (
-                    <FormItem>
+                  render={() => (
+                    <FormItem className="col-span-2">
                       <FormLabel>
                         {noteType === "Credit Note" ? "Refund From (Cash/Bank)" : "Receive Into"}
                       </FormLabel>
@@ -327,11 +418,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                         <AccountAutocomplete
                           value={
                             cashAccountId > 0
-                              ? {
-                                  type: cashAccountType,
-                                  id: cashAccountId,
-                                  name: cashAccountName || "",
-                                }
+                              ? { type: cashAccountType, id: cashAccountId, name: cashAccountName || "" }
                               : null
                           }
                           onChange={(type, id, name) => {
@@ -341,178 +428,253 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                           }}
                           allAccounts={allAccounts}
                           rowIndex={-1}
-                          placeholder={noteType === "Credit Note" ? "Select cash/bank account..." : "Select account..."}
+                          placeholder="Select cash/bank account..."
                           testId="input-credit-note-account"
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description / Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder="Enter description..."
-                        className="resize-none"
-                        rows={2}
-                        data-testid="input-credit-note-description"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Add Return Items</span>
+                </div>
 
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-base">Add Items</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-5 gap-3 items-end">
-                    <div>
-                      <label className="text-sm font-medium">Stock Item</label>
-                      <Select
-                        value={selectedStockItemId?.toString() || ""}
-                        onValueChange={(v) => setSelectedStockItemId(parseInt(v))}
-                      >
-                        <SelectTrigger data-testid="select-stock-item">
-                          <SelectValue placeholder="Select item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stockItems.map((item) => (
-                            <SelectItem key={item.id} value={item.id.toString()}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="grid grid-cols-6 gap-3">
+                  <div className="col-span-2 relative">
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Search Item
+                    </label>
+                    <Input
+                      ref={searchInputRef}
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setSelectedItem(null);
+                      }}
+                      placeholder="Type item name or code..."
+                      data-testid="input-search-item"
+                    />
+                    {searchTerm.length > 0 && !selectedItem && filteredItems.length > 0 && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredItems.slice(0, 10).map((item) => {
+                          const totalStock = Object.values(item.locationData).reduce(
+                            (sum, loc) => sum + loc.quantity,
+                            0
+                          );
+                          return (
+                            <div
+                              key={item.id}
+                              className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center"
+                              onClick={() => handleSelectItem(item)}
+                              data-testid={`search-result-${item.id}`}
+                            >
+                              <div>
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-xs text-muted-foreground">{item.code}</p>
+                              </div>
+                              <Badge variant={totalStock > 0 ? "default" : "secondary"}>
+                                {formatNumber(totalStock, 0)} {item.uom}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
-                    <div>
-                      <label className="text-sm font-medium">Location</label>
-                      <Select
-                        value={selectedLocationId?.toString() || ""}
-                        onValueChange={(v) => setSelectedLocationId(parseInt(v))}
-                      >
-                        <SelectTrigger data-testid="select-location">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {locations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id.toString()}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Location
+                    </label>
+                    <Select
+                      value={selectedLocationId?.toString() || ""}
+                      onValueChange={(v) => setSelectedLocationId(parseInt(v))}
+                    >
+                      <SelectTrigger data-testid="select-location">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id.toString()}>
+                            {loc.name}
+                            {selectedItem && (
+                              <span className="ml-2 text-muted-foreground">
+                                ({formatNumber(getStockAtLocation(selectedItem, loc.id), 0)})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    <div>
-                      <label className="text-sm font-medium">Quantity</label>
-                      <Input
-                        type="number"
-                        step="0.001"
-                        value={itemQuantity}
-                        onChange={(e) => setItemQuantity(e.target.value)}
-                        placeholder="0"
-                        data-testid="input-item-quantity"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Qty
+                    </label>
+                    <Input
+                      type="number"
+                      step="1"
+                      value={itemQuantity}
+                      onChange={(e) => setItemQuantity(e.target.value)}
+                      placeholder="0"
+                      data-testid="input-item-quantity"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="text-sm font-medium">Rate</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={itemRate}
-                        onChange={(e) => setItemRate(e.target.value)}
-                        placeholder="0.00"
-                        data-testid="input-item-rate"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Refund Rate
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={refundRate}
+                      onChange={(e) => setRefundRate(e.target.value)}
+                      placeholder="0.00"
+                      data-testid="input-refund-rate"
+                    />
+                  </div>
 
-                    <Button type="button" onClick={addItem} data-testid="button-add-item">
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      onClick={addItem}
+                      disabled={!selectedItem}
+                      className="w-full"
+                      data-testid="button-add-item"
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       Add
                     </Button>
                   </div>
+                </div>
 
-                  {items.length > 0 && (
+                {selectedItem && selectedLocationId > 0 && (
+                  <div className="flex gap-4 text-sm bg-background p-2 rounded border">
+                    <span>
+                      <span className="text-muted-foreground">Stock at location:</span>{" "}
+                      <span className="font-mono font-medium">
+                        {formatNumber(getStockAtLocation(selectedItem, selectedLocationId), 0)}{" "}
+                        {selectedItem.uom}
+                      </span>
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground">Inventory Cost:</span>{" "}
+                      <span className="font-mono font-medium">{formatNumber(parseFloat(inventoryCost) || 0)}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {items.length > 0 && (
+                <Card>
+                  <CardContent className="p-0">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead>Location</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right">Refund Rate</TableHead>
+                          <TableHead className="text-right">Refund Amt</TableHead>
+                          <TableHead className="text-right">Inv. Cost</TableHead>
+                          <TableHead className="text-right">Inv. Value</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {items.map((item, index) => (
-                          <TableRow key={index} data-testid={`credit-note-item-${index}`}>
-                            <TableCell>{item.stockItemName}</TableCell>
-                            <TableCell>{item.locationName}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatNumber(parseFloat(item.quantity), 0)} {item.uom}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatNumber(parseFloat(item.rate))}
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-medium">
-                              {formatNumber(parseFloat(item.quantity) * parseFloat(item.rate))}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeItem(index)}
-                                data-testid={`button-remove-item-${index}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/50">
-                          <TableCell colSpan={4} className="font-medium text-right">
-                            Total
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold">
-                            {formatNumber(totalAmount)}
-                          </TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
+                        {items.map((item, index) => {
+                          const qty = parseFloat(item.quantity);
+                          const refundAmt = qty * parseFloat(item.refundRate);
+                          const invValue = qty * parseFloat(item.inventoryCost);
+                          return (
+                            <TableRow key={index} data-testid={`credit-note-item-${index}`}>
+                              <TableCell className="font-medium">{item.stockItemName}</TableCell>
+                              <TableCell>{item.locationName}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatNumber(qty, 0)} {item.uom}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatNumber(parseFloat(item.refundRate))}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-primary">
+                                {formatNumber(refundAmt)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                {formatNumber(parseFloat(item.inventoryCost))}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-muted-foreground">
+                                {formatNumber(invValue)}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeItem(index)}
+                                  data-testid={`button-remove-item-${index}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Enter notes..."
+                        className="resize-none"
+                        rows={2}
+                        data-testid="input-credit-note-description"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-between items-center pt-4 border-t">
-                <div className="text-lg font-semibold">
-                  Total: <span className="font-mono">{formatNumber(totalAmount)}</span>
+                <div className="space-y-1">
+                  <div className="text-lg font-semibold">
+                    Refund Total: <span className="font-mono text-primary">{formatNumber(totalRefund)}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Inventory Value: <span className="font-mono">{formatNumber(totalInventoryValue)}</span>
+                    {Math.abs(totalRefund - totalInventoryValue) > 0.01 && (
+                      <span className="ml-2">
+                        (Variance: {formatNumber(totalRefund - totalInventoryValue)})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Button
                   type="submit"
+                  size="lg"
                   disabled={items.length === 0 || createCreditNoteMutation.isPending}
                   data-testid="button-create-credit-note"
                 >
                   {createCreditNoteMutation.isPending
                     ? "Creating..."
                     : noteType === "Credit Note"
-                    ? "Create Credit Note & Add to Stock"
-                    : "Create Debit Note & Remove from Stock"}
+                    ? "Create Credit Note"
+                    : "Create Debit Note"}
                 </Button>
               </div>
             </form>

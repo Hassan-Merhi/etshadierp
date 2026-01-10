@@ -84,7 +84,7 @@ import {
   systemSettings,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt } from "drizzle-orm";
+import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
 import { format } from "date-fns";
 
 // Configure multer with file size limit (10MB) to prevent memory exhaustion
@@ -30267,6 +30267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Credit/Debit Note - handles customer returns with stock restoration
+  // Separates refund rate (customer refund) from inventory cost (actual cost)
   app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -30280,7 +30281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cashAccountId,
         cashAccountType, // "ledger" or "bank"
         description,
-        items, // Array of { stockItemId, locationId, quantity, rate }
+        items, // Array of { stockItemId, locationId, quantity, refundRate, inventoryCost }
       } = req.body;
 
       if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
@@ -30299,18 +30300,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "At least one item is required" });
       }
 
-      // Calculate total amount from items
-      let totalAmount = 0;
+      // Calculate totals - refund amount (customer gets) and inventory value (goes to stock)
+      let totalRefundAmount = 0;
+      let totalInventoryValue = 0;
       for (const item of items) {
         const qty = parseFloat(item.quantity);
-        const rate = parseFloat(item.rate);
+        const refundRate = parseFloat(item.refundRate || item.rate || "0");
+        const inventoryCost = parseFloat(item.inventoryCost || item.rate || "0");
         if (isNaN(qty) || qty <= 0) {
           return res.status(400).json({ message: "Invalid quantity for item" });
         }
-        if (isNaN(rate) || rate < 0) {
-          return res.status(400).json({ message: "Invalid rate for item" });
+        if (isNaN(refundRate) || refundRate < 0) {
+          return res.status(400).json({ message: "Invalid refund rate for item" });
         }
-        totalAmount += qty * rate;
+        totalRefundAmount += qty * refundRate;
+        totalInventoryValue += qty * inventoryCost;
       }
 
       // Generate voucher number
@@ -30318,7 +30322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prefix = noteType === "Credit Note" ? "CN" : "DN";
       const voucherNumber = `${prefix}-${timestamp}`;
 
-      // Create the voucher
+      // Create the voucher (total is the refund amount)
       const [voucher] = await db
         .insert(vouchers)
         .values({
@@ -30327,37 +30331,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherType: noteType,
           voucherDate,
           description: description || `${noteType} for customer return`,
-          totalAmount: totalAmount.toFixed(2),
+          totalAmount: totalRefundAmount.toFixed(2),
         })
         .returning();
 
-      // Create voucher entries for the cash account
+      // Create voucher entries for the cash account using the REFUND amount
       // For Credit Note (refund): Credit Cash (money going out to customer)
       // For Debit Note: Debit Cash (money coming in from customer)
       if (cashAccountType === "bank") {
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
           bankAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalAmount.toFixed(2) : "0",
+          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
           narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
         });
       } else {
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalAmount.toFixed(2) : "0",
+          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
           narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
         });
       }
 
-      // For each item, add to inventory and create credit note item record
+      // For each item, process inventory (using inventoryCost) and track refund amounts
       for (const item of items) {
-        const { stockItemId, locationId, quantity, rate } = item;
+        const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
         const qty = parseFloat(quantity);
-        const itemRate = parseFloat(rate);
-        const itemTotal = qty * itemRate;
+        const refundRateVal = parseFloat(itemRefundRate || "0");
+        const inventoryCostVal = parseFloat(itemInventoryCost || "0");
+        const inventoryValue = qty * inventoryCostVal;
 
         // Get the location's companyId
         const [location] = await db
@@ -30381,16 +30386,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
         if (noteType === "Credit Note") {
-          // Credit Note: Add items back to inventory
+          // Credit Note: Add items back to inventory at inventoryCost (not refund rate)
           if (existingInventory) {
             const existingQty = parseFloat(existingInventory.quantity);
-            const existingRate = parseFloat(existingInventory.averageRate);
             const existingValue = parseFloat(existingInventory.totalValue || "0");
 
-            // Calculate new weighted average rate
+            // Calculate new weighted average rate using inventory cost
             const newQty = existingQty + qty;
-            const newValue = existingValue + itemTotal;
-            const newRate = newQty > 0 ? newValue / newQty : itemRate;
+            const newValue = existingValue + inventoryValue;
+            const newRate = newQty > 0 ? newValue / newQty : inventoryCostVal;
 
             await db
               .update(inventory)
@@ -30402,20 +30406,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(inventory.id, existingInventory.id));
           } else {
-            // Create new inventory record
+            // Create new inventory record at inventory cost
             await db.insert(inventory).values({
               companyId: location.companyId,
               locationId,
               stockItemId,
               quantity: qty.toFixed(3),
-              averageRate: itemRate.toFixed(2),
-              totalValue: itemTotal.toFixed(2),
+              averageRate: inventoryCostVal.toFixed(2),
+              totalValue: inventoryValue.toFixed(2),
               lastUpdated: new Date(),
             });
           }
 
-          // For balanced accounting: Debit Inventory (asset increase)
-          // Credit is already done on cash account, so we need Debit on Inventory to balance
+          // For balanced accounting: Debit Inventory at INVENTORY COST
           let inventoryAccount = await db
             .select()
             .from(ledgerAccounts)
@@ -30431,7 +30434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db.insert(voucherEntries).values({
               voucherId: voucher.id,
               ledgerAccountId: inventoryAccount[0].id,
-              debitAmount: itemTotal.toFixed(2),
+              debitAmount: inventoryValue.toFixed(2),
               creditAmount: "0",
               narration: `Inventory restored - ${noteType}`,
             });
@@ -30443,7 +30446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const existingValue = parseFloat(existingInventory.totalValue || "0");
 
             const newQty = existingQty - qty;
-            const newValue = Math.max(0, existingValue - itemTotal);
+            const newValue = Math.max(0, existingValue - inventoryValue);
             const newRate = newQty > 0 ? newValue / newQty : 0;
 
             await db
@@ -30456,8 +30459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(inventory.id, existingInventory.id));
 
-            // For balanced accounting: Credit Inventory (asset decrease)
-            // Debit is already done on cash account, so we need Credit on Inventory to balance
+            // For balanced accounting: Credit Inventory at INVENTORY COST
             let inventoryAccount = await db
               .select()
               .from(ledgerAccounts)
@@ -30474,22 +30476,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 voucherId: voucher.id,
                 ledgerAccountId: inventoryAccount[0].id,
                 debitAmount: "0",
-                creditAmount: itemTotal.toFixed(2),
+                creditAmount: inventoryValue.toFixed(2),
                 narration: `Inventory reduced - ${noteType}`,
               });
             }
           }
         }
 
-        // Create credit note item record
+        // Create credit note item record with both rates
         await db.insert(creditNoteItems).values({
           voucherId: voucher.id,
           stockItemId,
           locationId,
           quantity: qty.toFixed(3),
-          rate: itemRate.toFixed(2),
-          totalValue: itemTotal.toFixed(2),
+          rate: refundRateVal.toFixed(2),
+          totalValue: (qty * refundRateVal).toFixed(2),
         });
+      }
+
+      // Handle variance between refund amount and inventory value with Sales Returns/Adjustments account
+      const variance = totalRefundAmount - totalInventoryValue;
+      if (Math.abs(variance) > 0.01) {
+        // Find or create Sales Returns account
+        let salesReturnsAccount = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              or(
+                eq(ledgerAccounts.parentAccount, "SALES_RETURNS"),
+                ilike(ledgerAccounts.name, "%sales return%")
+              )
+            )
+          )
+          .limit(1);
+
+        if (salesReturnsAccount.length === 0) {
+          // Try to find any indirect expense or direct expense account as fallback
+          salesReturnsAccount = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                eq(ledgerAccounts.parentAccount, "INDIRECT_EXPENSES")
+              )
+            )
+            .limit(1);
+        }
+
+        if (salesReturnsAccount.length > 0) {
+          if (noteType === "Credit Note") {
+            // Variance > 0: Refund > Inventory Cost = DR Sales Returns (expense)
+            // Variance < 0: Refund < Inventory Cost = CR Sales Returns (income/offset)
+            await db.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: salesReturnsAccount[0].id,
+              debitAmount: variance > 0 ? variance.toFixed(2) : "0",
+              creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+              narration: `Variance between refund and inventory cost`,
+            });
+          } else {
+            // Debit Note: opposite treatment
+            await db.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: salesReturnsAccount[0].id,
+              debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+              creditAmount: variance > 0 ? variance.toFixed(2) : "0",
+              narration: `Variance between debit note amount and inventory cost`,
+            });
+          }
+        }
       }
 
       res.json({
