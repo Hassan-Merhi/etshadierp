@@ -647,7 +647,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   locationId: z.number().optional(),
   locationName: z.string().optional(),
   voucherNumber: z.string().min(1, "Voucher number is required"),
-  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer"]),
+  voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer", "Credit Note", "Debit Note"]),
   voucherDate: z.string().min(1, "Voucher date is required"),
   totalAmount: z.string().min(1, "Total amount is required"),
   optional: z.boolean().optional().default(false),
@@ -686,6 +686,33 @@ export const insertVoucherEntrySchema = createInsertSchema(voucherEntries).omit(
 
 export type InsertVoucherEntry = z.infer<typeof insertVoucherEntrySchema>;
 export type VoucherEntry = typeof voucherEntries.$inferSelect;
+
+// Credit/Debit Note Items - tracks which stock items are returned with which voucher
+export const creditNoteItems = pgTable("credit_note_items", {
+  id: serial("id").primaryKey(),
+  voucherId: integer("voucher_id").notNull(),
+  stockItemId: integer("stock_item_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
+  rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCreditNoteItemSchema = createInsertSchema(creditNoteItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  voucherId: z.number().min(1, "Voucher is required"),
+  stockItemId: z.number().min(1, "Stock item is required"),
+  locationId: z.number().min(1, "Location is required"),
+  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
+  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+  totalValue: z.string(),
+});
+
+export type InsertCreditNoteItem = z.infer<typeof insertCreditNoteItemSchema>;
+export type CreditNoteItem = typeof creditNoteItems.$inferSelect;
 
 // Fiscal Period Closures
 export const fiscalPeriodClosures = pgTable("fiscal_period_closures", {

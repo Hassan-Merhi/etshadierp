@@ -80,6 +80,7 @@ import {
   companySettings,
   bales,
   fiscalPeriodClosures,
+  creditNoteItems,
   systemSettings,
 } from "@shared/schema";
 import { z } from "zod";
@@ -30264,6 +30265,244 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Credit/Debit Note - handles customer returns with stock restoration
+  app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const {
+        noteType, // "Credit Note" or "Debit Note"
+        voucherDate,
+        cashAccountId,
+        cashAccountType, // "ledger" or "bank"
+        description,
+        items, // Array of { stockItemId, locationId, quantity, rate }
+      } = req.body;
+
+      if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
+        return res.status(400).json({ message: "Invalid note type. Must be 'Credit Note' or 'Debit Note'" });
+      }
+
+      if (!voucherDate) {
+        return res.status(400).json({ message: "Voucher date is required" });
+      }
+
+      if (!cashAccountId || !cashAccountType) {
+        return res.status(400).json({ message: "Cash/Bank account is required" });
+      }
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Calculate total amount from items
+      let totalAmount = 0;
+      for (const item of items) {
+        const qty = parseFloat(item.quantity);
+        const rate = parseFloat(item.rate);
+        if (isNaN(qty) || qty <= 0) {
+          return res.status(400).json({ message: "Invalid quantity for item" });
+        }
+        if (isNaN(rate) || rate < 0) {
+          return res.status(400).json({ message: "Invalid rate for item" });
+        }
+        totalAmount += qty * rate;
+      }
+
+      // Generate voucher number
+      const timestamp = Date.now();
+      const prefix = noteType === "Credit Note" ? "CN" : "DN";
+      const voucherNumber = `${prefix}-${timestamp}`;
+
+      // Create the voucher
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId,
+          voucherNumber,
+          voucherType: noteType,
+          voucherDate,
+          description: description || `${noteType} for customer return`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create voucher entries for the cash account
+      // For Credit Note (refund): Credit Cash (money going out to customer)
+      // For Debit Note: Debit Cash (money coming in from customer)
+      if (cashAccountType === "bank") {
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          bankAccountId: cashAccountId,
+          debitAmount: noteType === "Debit Note" ? totalAmount.toFixed(2) : "0",
+          creditAmount: noteType === "Credit Note" ? totalAmount.toFixed(2) : "0",
+          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+        });
+      } else {
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: cashAccountId,
+          debitAmount: noteType === "Debit Note" ? totalAmount.toFixed(2) : "0",
+          creditAmount: noteType === "Credit Note" ? totalAmount.toFixed(2) : "0",
+          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+        });
+      }
+
+      // For each item, add to inventory and create credit note item record
+      for (const item of items) {
+        const { stockItemId, locationId, quantity, rate } = item;
+        const qty = parseFloat(quantity);
+        const itemRate = parseFloat(rate);
+        const itemTotal = qty * itemRate;
+
+        // Get the location's companyId
+        const [location] = await db
+          .select()
+          .from(locations)
+          .where(eq(locations.id, locationId));
+
+        if (!location) {
+          throw new Error(`Location ${locationId} not found`);
+        }
+
+        // Check if inventory record exists for this item at this location
+        const [existingInventory] = await db
+          .select()
+          .from(inventory)
+          .where(
+            and(
+              eq(inventory.locationId, locationId),
+              eq(inventory.stockItemId, stockItemId)
+            )
+          );
+
+        if (noteType === "Credit Note") {
+          // Credit Note: Add items back to inventory
+          if (existingInventory) {
+            const existingQty = parseFloat(existingInventory.quantity);
+            const existingRate = parseFloat(existingInventory.averageRate);
+            const existingValue = parseFloat(existingInventory.totalValue || "0");
+
+            // Calculate new weighted average rate
+            const newQty = existingQty + qty;
+            const newValue = existingValue + itemTotal;
+            const newRate = newQty > 0 ? newValue / newQty : itemRate;
+
+            await db
+              .update(inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: newRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(inventory.id, existingInventory.id));
+          } else {
+            // Create new inventory record
+            await db.insert(inventory).values({
+              companyId: location.companyId,
+              locationId,
+              stockItemId,
+              quantity: qty.toFixed(3),
+              averageRate: itemRate.toFixed(2),
+              totalValue: itemTotal.toFixed(2),
+              lastUpdated: new Date(),
+            });
+          }
+
+          // For balanced accounting: Debit Inventory (asset increase)
+          // Credit is already done on cash account, so we need Debit on Inventory to balance
+          let inventoryAccount = await db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                eq(ledgerAccounts.parentAccount, "INVENTORY")
+              )
+            )
+            .limit(1);
+
+          if (inventoryAccount.length > 0) {
+            await db.insert(voucherEntries).values({
+              voucherId: voucher.id,
+              ledgerAccountId: inventoryAccount[0].id,
+              debitAmount: itemTotal.toFixed(2),
+              creditAmount: "0",
+              narration: `Inventory restored - ${noteType}`,
+            });
+          }
+        } else {
+          // Debit Note: Remove items from inventory
+          if (existingInventory) {
+            const existingQty = parseFloat(existingInventory.quantity);
+            const existingValue = parseFloat(existingInventory.totalValue || "0");
+
+            const newQty = existingQty - qty;
+            const newValue = Math.max(0, existingValue - itemTotal);
+            const newRate = newQty > 0 ? newValue / newQty : 0;
+
+            await db
+              .update(inventory)
+              .set({
+                quantity: newQty.toFixed(3),
+                averageRate: newRate.toFixed(2),
+                totalValue: newValue.toFixed(2),
+                lastUpdated: new Date(),
+              })
+              .where(eq(inventory.id, existingInventory.id));
+
+            // For balanced accounting: Credit Inventory (asset decrease)
+            // Debit is already done on cash account, so we need Credit on Inventory to balance
+            let inventoryAccount = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  eq(ledgerAccounts.parentAccount, "INVENTORY")
+                )
+              )
+              .limit(1);
+
+            if (inventoryAccount.length > 0) {
+              await db.insert(voucherEntries).values({
+                voucherId: voucher.id,
+                ledgerAccountId: inventoryAccount[0].id,
+                debitAmount: "0",
+                creditAmount: itemTotal.toFixed(2),
+                narration: `Inventory reduced - ${noteType}`,
+              });
+            }
+          }
+        }
+
+        // Create credit note item record
+        await db.insert(creditNoteItems).values({
+          voucherId: voucher.id,
+          stockItemId,
+          locationId,
+          quantity: qty.toFixed(3),
+          rate: itemRate.toFixed(2),
+          totalValue: itemTotal.toFixed(2),
+        });
+      }
+
+      res.json({
+        success: true,
+        voucherId: voucher.id,
+        voucherNumber: voucher.voucherNumber,
+        message: `${noteType} created successfully`,
+      });
+    } catch (error: any) {
+      console.error("Credit/Debit note error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
   const httpServer = createServer(app);
 
   return httpServer;
