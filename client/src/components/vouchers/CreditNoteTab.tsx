@@ -41,36 +41,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Plus, Trash2, Search, Package } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Search, Package, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-interface LocationData {
-  quantity: number;
-  rate: number;
-  value: number;
-}
-
-interface StockItemData {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-  locationData: Record<number, LocationData>;
-}
-
-interface StockGroupData {
-  id: number;
-  code: string;
-  name: string;
-  items: StockItemData[];
-}
-
-interface LocationSummaryResponse {
-  stockGroups: StockGroupData[];
+interface InventoryItem {
+  inventoryId: number;
+  stockItemId: number;
+  stockItemCode: string;
+  stockItemName: string;
+  stockItemUom: string;
+  quantity: string;
+  averageRate: string;
 }
 
 interface Location {
@@ -109,12 +94,11 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const [items, setItems] = useState<CreditNoteItem[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState<number>(0);
-  const [selectedItem, setSelectedItem] = useState<StockItemData | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [itemQuantity, setItemQuantity] = useState("");
   const [refundRate, setRefundRate] = useState("");
-  const [inventoryCost, setInventoryCost] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<CreditNoteFormData>({
@@ -133,32 +117,17 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     queryKey: ["/api/locations"],
   });
 
-  const locationIds = locations.map((l) => l.id).join(",");
-
-  const { data: summaryData } = useQuery<LocationSummaryResponse>({
-    queryKey: ["/api/location-summary", locationIds],
-    enabled: locationIds.length > 0,
+  const { data: locationInventory = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: selectedLocationId ? [`/api/locations/${selectedLocationId}/inventory`] : [],
+    enabled: selectedLocationId > 0,
   });
 
-  const allStockItems: StockItemData[] = summaryData?.stockGroups.flatMap((g) => g.items) || [];
-
-  const filteredItems = searchTerm.length > 0
-    ? allStockItems.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.code.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredInventory = searchTerm.length > 0
+    ? locationInventory.filter((item) =>
+        item.stockItemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.stockItemCode.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : [];
-
-  useEffect(() => {
-    if (selectedItem && selectedLocationId > 0) {
-      const locData = selectedItem.locationData[selectedLocationId];
-      if (locData) {
-        setInventoryCost(locData.rate.toFixed(2));
-      } else {
-        setInventoryCost("0.00");
-      }
-    }
-  }, [selectedItem, selectedLocationId]);
+    : locationInventory;
 
   const createCreditNoteMutation = useMutation({
     mutationFn: async (data: {
@@ -192,14 +161,12 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
         description: "",
       });
       setItems([]);
-      setSearchTerm("");
       setSelectedItem(null);
-      setSelectedLocationId(0);
       setItemQuantity("");
       setRefundRate("");
-      setInventoryCost("");
+      setSearchTerm("");
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationId}/inventory`] });
     },
     onError: (error: any) => {
       toast({
@@ -210,23 +177,17 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     },
   });
 
-  const handleSelectItem = (item: StockItemData) => {
+  const handleSelectItem = (item: InventoryItem) => {
     setSelectedItem(item);
-    setSearchTerm(item.name);
     setItemQuantity("1");
-    if (selectedLocationId > 0) {
-      const locData = item.locationData[selectedLocationId];
-      if (locData) {
-        setInventoryCost(locData.rate.toFixed(2));
-      }
-    }
+    setRefundRate(parseFloat(item.averageRate).toFixed(2));
   };
 
   const addItem = () => {
     if (!selectedItem) {
       toast({
         title: "No item selected",
-        description: "Please search and select a stock item",
+        description: "Please select an item from the list",
         variant: "destructive",
       });
       return;
@@ -235,7 +196,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     if (!selectedLocationId) {
       toast({
         title: "No location selected",
-        description: "Please select a location",
+        description: "Please select a location first",
         variant: "destructive",
       });
       return;
@@ -243,7 +204,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
 
     const qty = parseFloat(itemQuantity);
     const refund = parseFloat(refundRate);
-    const cost = parseFloat(inventoryCost);
+    const inventoryCost = parseFloat(selectedItem.averageRate);
 
     if (isNaN(qty) || qty <= 0) {
       toast({
@@ -269,23 +230,20 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     setItems((prev) => [
       ...prev,
       {
-        stockItemId: selectedItem.id,
-        stockItemName: selectedItem.name,
+        stockItemId: selectedItem.stockItemId,
+        stockItemName: selectedItem.stockItemName,
         locationId: selectedLocationId,
         locationName: location.name,
         quantity: qty.toString(),
         refundRate: refund.toFixed(2),
-        inventoryCost: (cost || 0).toFixed(2),
-        uom: selectedItem.uom,
+        inventoryCost: inventoryCost.toFixed(2),
+        uom: selectedItem.stockItemUom,
       },
     ]);
 
     setSelectedItem(null);
-    setSearchTerm("");
     setItemQuantity("");
     setRefundRate("");
-    setInventoryCost("");
-    searchInputRef.current?.focus();
   };
 
   const removeItem = (index: number) => {
@@ -331,20 +289,112 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const cashAccountType = form.watch("cashAccountType");
   const cashAccountName = form.watch("cashAccountName");
 
-  const getStockAtLocation = (item: StockItemData, locId: number) => {
-    return item.locationData[locId]?.quantity || 0;
-  };
+  const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
   return (
-    <div className="flex gap-4">
-      <Card className="flex-[2]">
-        <CardHeader className="pb-3">
+    <div className="flex gap-4 h-[calc(100vh-200px)]">
+      <Card className="w-80 flex flex-col">
+        <CardHeader className="pb-3 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin className="h-4 w-4" />
+            <span className="font-medium text-sm">Select Location First</span>
+          </div>
+          <Select
+            value={selectedLocationId?.toString() || ""}
+            onValueChange={(v) => {
+              setSelectedLocationId(parseInt(v));
+              setSelectedItem(null);
+              setSearchTerm("");
+            }}
+          >
+            <SelectTrigger data-testid="select-location">
+              <SelectValue placeholder="Choose location..." />
+            </SelectTrigger>
+            <SelectContent>
+              {locations.map((loc) => (
+                <SelectItem key={loc.id} value={loc.id.toString()}>
+                  {loc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {selectedLocationId > 0 && (
+            <div className="mt-3">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search items..."
+                  className="pl-8"
+                  data-testid="input-search-item"
+                />
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="flex-1 overflow-hidden p-0">
+          {selectedLocationId > 0 ? (
+            <ScrollArea className="h-full">
+              <div className="p-2 space-y-1">
+                {inventoryLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">Loading items...</div>
+                ) : filteredInventory.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    {searchTerm ? "No items match your search" : "No items at this location"}
+                  </div>
+                ) : (
+                  filteredInventory.map((item) => {
+                    const stock = parseFloat(item.quantity);
+                    const isSelected = selectedItem?.stockItemId === item.stockItemId;
+                    return (
+                      <div
+                        key={item.stockItemId}
+                        className={cn(
+                          "p-3 rounded-md cursor-pointer border transition-colors",
+                          isSelected
+                            ? "bg-primary/10 border-primary"
+                            : "hover:bg-accent border-transparent"
+                        )}
+                        onClick={() => handleSelectItem(item)}
+                        data-testid={`item-${item.stockItemId}`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{item.stockItemName}</p>
+                            <p className="text-xs text-muted-foreground">{item.stockItemCode}</p>
+                          </div>
+                          <Badge variant={stock > 0 ? "default" : "secondary"} className="ml-2 shrink-0">
+                            {formatNumber(stock, 0)} {item.stockItemUom}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Avg Cost: {formatNumber(parseFloat(item.averageRate))}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              Select a location to see items
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="pb-3 flex-shrink-0">
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
             {noteType === "Credit Note" ? "Credit Note (Customer Return)" : "Debit Note"}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-auto">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-4 gap-4">
@@ -437,139 +487,69 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                 />
               </div>
 
-              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">Add Return Items</span>
-                </div>
-
-                <div className="grid grid-cols-6 gap-3">
-                  <div className="col-span-2 relative">
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Search Item
-                    </label>
-                    <Input
-                      ref={searchInputRef}
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        setSelectedItem(null);
-                      }}
-                      placeholder="Type item name or code..."
-                      data-testid="input-search-item"
-                    />
-                    {searchTerm.length > 0 && !selectedItem && filteredItems.length > 0 && (
-                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredItems.slice(0, 10).map((item) => {
-                          const totalStock = Object.values(item.locationData).reduce(
-                            (sum, loc) => sum + loc.quantity,
-                            0
-                          );
-                          return (
-                            <div
-                              key={item.id}
-                              className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center"
-                              onClick={() => handleSelectItem(item)}
-                              data-testid={`search-result-${item.id}`}
-                            >
-                              <div>
-                                <p className="font-medium">{item.name}</p>
-                                <p className="text-xs text-muted-foreground">{item.code}</p>
-                              </div>
-                              <Badge variant={totalStock > 0 ? "default" : "secondary"}>
-                                {formatNumber(totalStock, 0)} {item.uom}
-                              </Badge>
-                            </div>
-                          );
-                        })}
+              {selectedItem && (
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="h-4 w-4" />
+                      <span className="font-medium">Add: {selectedItem.stockItemName}</span>
+                      <Badge variant="outline" className="ml-auto">
+                        Stock: {formatNumber(parseFloat(selectedItem.quantity), 0)} {selectedItem.stockItemUom}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                          Quantity
+                        </label>
+                        <Input
+                          type="number"
+                          step="1"
+                          value={itemQuantity}
+                          onChange={(e) => setItemQuantity(e.target.value)}
+                          placeholder="0"
+                          data-testid="input-item-quantity"
+                        />
                       </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Location
-                    </label>
-                    <Select
-                      value={selectedLocationId?.toString() || ""}
-                      onValueChange={(v) => setSelectedLocationId(parseInt(v))}
-                    >
-                      <SelectTrigger data-testid="select-location">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id.toString()}>
-                            {loc.name}
-                            {selectedItem && (
-                              <span className="ml-2 text-muted-foreground">
-                                ({formatNumber(getStockAtLocation(selectedItem, loc.id), 0)})
-                              </span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Qty
-                    </label>
-                    <Input
-                      type="number"
-                      step="1"
-                      value={itemQuantity}
-                      onChange={(e) => setItemQuantity(e.target.value)}
-                      placeholder="0"
-                      data-testid="input-item-quantity"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Refund Rate
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={refundRate}
-                      onChange={(e) => setRefundRate(e.target.value)}
-                      placeholder="0.00"
-                      data-testid="input-refund-rate"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      onClick={addItem}
-                      disabled={!selectedItem}
-                      className="w-full"
-                      data-testid="button-add-item"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-                </div>
-
-                {selectedItem && selectedLocationId > 0 && (
-                  <div className="flex gap-4 text-sm bg-background p-2 rounded border">
-                    <span>
-                      <span className="text-muted-foreground">Stock at location:</span>{" "}
-                      <span className="font-mono font-medium">
-                        {formatNumber(getStockAtLocation(selectedItem, selectedLocationId), 0)}{" "}
-                        {selectedItem.uom}
-                      </span>
-                    </span>
-                    <span>
-                      <span className="text-muted-foreground">Inventory Cost:</span>{" "}
-                      <span className="font-mono font-medium">{formatNumber(parseFloat(inventoryCost) || 0)}</span>
-                    </span>
-                  </div>
-                )}
-              </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                          Refund Rate
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={refundRate}
+                          onChange={(e) => setRefundRate(e.target.value)}
+                          placeholder="0.00"
+                          data-testid="input-refund-rate"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                          Inventory Cost
+                        </label>
+                        <Input
+                          type="text"
+                          value={formatNumber(parseFloat(selectedItem.averageRate))}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          onClick={addItem}
+                          className="w-full"
+                          data-testid="button-add-item"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {items.length > 0 && (
                 <Card>
