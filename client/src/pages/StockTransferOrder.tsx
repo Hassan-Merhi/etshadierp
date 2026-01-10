@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useRef } from "react";
+import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -120,6 +120,8 @@ export default function StockTransferOrder() {
   const [isProcessing, setIsProcessing] = useState(false);
   
   const quantityInputRef = useRef<HTMLInputElement>(null);
+  const matrixRef = useRef<HTMLDivElement>(null);
+  const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedLocationIds));
@@ -149,9 +151,7 @@ export default function StockTransferOrder() {
     .map(id => locations.find(loc => loc.id === id))
     .filter((loc): loc is Location => loc !== undefined);
 
-  const availableDestinations = locations.filter(
-    loc => !selectedLocationIds.includes(loc.id)
-  );
+  const availableDestinations = locations;
 
   const toggleGroup = (groupId: number) => {
     setExpandedGroups(prev => {
@@ -177,7 +177,13 @@ export default function StockTransferOrder() {
     return [...items].sort((a, b) => a.sourceLocationName.localeCompare(b.sourceLocationName));
   };
 
-  const handleCellClick = (
+  const flatItems = summaryData?.stockGroups.flatMap((group) => 
+    expandedGroups.has(group.id) 
+      ? [...group.items].sort((a, b) => a.name.localeCompare(b.name))
+      : []
+  ) || [];
+
+  const openQuantityPicker = useCallback((
     item: StockItemData,
     locationId: number,
     locationName: string,
@@ -204,6 +210,64 @@ export default function StockTransferOrder() {
     setTimeout(() => {
       quantityInputRef.current?.focus();
     }, 100);
+  }, [toast]);
+
+  const handleMatrixKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (quantityPicker.open) return;
+    if (flatItems.length === 0 || selectedLocations.length === 0) return;
+
+    const { key } = e;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(key)) return;
+
+    e.preventDefault();
+
+    setFocusedCell((current) => {
+      const maxRow = flatItems.length - 1;
+      const maxCol = selectedLocations.length - 1;
+
+      if (current === null) {
+        return { row: 0, col: 0 };
+      }
+
+      let { row, col } = current;
+
+      switch (key) {
+        case 'ArrowUp':
+          row = Math.max(0, row - 1);
+          break;
+        case 'ArrowDown':
+          row = Math.min(maxRow, row + 1);
+          break;
+        case 'ArrowLeft':
+          col = Math.max(0, col - 1);
+          break;
+        case 'ArrowRight':
+          col = Math.min(maxCol, col + 1);
+          break;
+        case ' ':
+          const item = flatItems[row];
+          const loc = selectedLocations[col];
+          if (item && loc) {
+            const locData = item.locationData[loc.id];
+            const qty = locData?.quantity || 0;
+            if (qty > 0) {
+              openQuantityPicker(item, loc.id, loc.name, qty);
+            }
+          }
+          return current;
+      }
+
+      return { row, col };
+    });
+  }, [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker]);
+
+  const handleCellClick = (
+    item: StockItemData,
+    locationId: number,
+    locationName: string,
+    availableQty: number
+  ) => {
+    openQuantityPicker(item, locationId, locationName, availableQty);
   };
 
   const handleAddToOrder = () => {
@@ -485,11 +549,14 @@ export default function StockTransferOrder() {
       )}
 
       <div className="flex gap-4">
-        <Card className="flex-[2]">
+        <Card className="flex-[3]">
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              <CardTitle className="text-base">Inventory Matrix</CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                <CardTitle className="text-base">Inventory Matrix</CardTitle>
+              </div>
+              <p className="text-xs text-muted-foreground">Click to focus, then use arrow keys + spacebar</p>
             </div>
           </CardHeader>
           <CardContent>
@@ -512,7 +579,12 @@ export default function StockTransferOrder() {
                 ))}
               </div>
             ) : (
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+              <div 
+                ref={matrixRef}
+                tabIndex={0}
+                onKeyDown={handleMatrixKeyDown}
+                className="overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md"
+              >
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
@@ -564,18 +636,18 @@ export default function StockTransferOrder() {
                         {expandedGroups.has(group.id) &&
                           [...group.items]
                             .sort((a, b) => a.name.localeCompare(b.name))
-                            .map((item) => (
+                            .map((item) => {
+                              const flatRowIndex = flatItems.findIndex(fi => fi.id === item.id);
+                              return (
                               <TableRow key={item.id} data-testid={`item-row-${item.id}`}>
                                 <TableCell className="pl-8 sticky left-0 bg-background z-10">
-                                  <div>
-                                    <p className="text-sm">{item.name}</p>
-                                    <p className="text-xs text-muted-foreground">{item.code}</p>
-                                  </div>
+                                  <p className="text-sm">{item.name}</p>
                                 </TableCell>
-                                {selectedLocations.map((loc) => {
+                                {selectedLocations.map((loc, colIndex) => {
                                   const locData = item.locationData[loc.id];
                                   const qty = locData?.quantity || 0;
                                   const hasStock = qty > 0;
+                                  const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
                                   
                                   return (
                                     <TableCell key={loc.id} className="p-1">
@@ -584,7 +656,8 @@ export default function StockTransferOrder() {
                                         size="sm"
                                         className={cn(
                                           "w-full font-mono",
-                                          hasStock && "hover:bg-primary/10 cursor-pointer"
+                                          hasStock && "hover:bg-primary/10 cursor-pointer",
+                                          isFocused && "ring-2 ring-primary ring-offset-1"
                                         )}
                                         disabled={!hasStock}
                                         onClick={() =>
@@ -598,7 +671,8 @@ export default function StockTransferOrder() {
                                   );
                                 })}
                               </TableRow>
-                            ))}
+                            );
+                            })}
                       </Fragment>
                     ))}
                   </TableBody>
@@ -639,7 +713,7 @@ export default function StockTransferOrder() {
               {orderItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Click on quantities in the matrix to add items</p>
+                  <p className="text-sm">Click on quantities or use arrow keys + spacebar</p>
                 </div>
               ) : (
                 <>
