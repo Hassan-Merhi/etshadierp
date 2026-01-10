@@ -695,6 +695,7 @@ export const creditNoteItems = pgTable("credit_note_items", {
   locationId: integer("location_id").notNull(),
   quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
   rate: decimal("rate", { precision: 20, scale: 2 }).notNull(),
+  inventoryCost: decimal("inventory_cost", { precision: 20, scale: 2 }).notNull().default("0"),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -15923,6 +15923,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          // IMPORTANT: Reverse inventory movements for Credit Note / Debit Note vouchers
+          if ((voucher.voucherType === "Credit Note" || voucher.voucherType === "Debit Note") && !voucher.optional) {
+            // Get the credit note items
+            const noteItems = await tx
+              .select()
+              .from(creditNoteItems)
+              .where(eq(creditNoteItems.voucherId, id));
+
+            if (noteItems.length > 0) {
+              console.log(`[Credit/Debit Note Delete] Voucher ${id}: Found ${noteItems.length} items to reverse`);
+
+              for (const item of noteItems) {
+                const qty = parseFloat(item.quantity);
+                // Use inventoryCost (not rate) because inventory was valued at inventoryCost on creation
+                const inventoryCost = parseFloat(item.inventoryCost || item.rate || "0");
+                const itemValue = qty * inventoryCost;
+
+                // Get current inventory at the item's location
+                const [inv] = await tx
+                  .select()
+                  .from(inventory)
+                  .where(
+                    and(
+                      eq(inventory.stockItemId, item.stockItemId),
+                      eq(inventory.locationId, item.locationId),
+                    ),
+                  )
+                  .limit(1);
+
+                if (voucher.voucherType === "Credit Note") {
+                  // Credit Note forward: added qty to inventory
+                  // Reversal: subtract qty from inventory
+                  if (inv) {
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingValue = parseFloat(inv.totalValue || "0");
+                    const newQty = existingQty - qty;
+
+                    if (newQty <= 0) {
+                      // Delete inventory record if nothing left
+                      console.log(`[Credit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: removing inventory record (qty would be ${newQty})`);
+                      await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                    } else {
+                      // Subtract value and recalculate average
+                      const newValue = Math.max(0, existingValue - itemValue);
+                      const newRate = newQty > 0 ? newValue / newQty : 0;
+
+                      console.log(`[Credit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${existingQty} - ${qty} = ${newQty}`);
+                      await tx
+                        .update(inventory)
+                        .set({
+                          quantity: newQty.toString(),
+                          averageRate: newRate.toString(),
+                          totalValue: newValue.toString(),
+                        })
+                        .where(eq(inventory.id, inv.id));
+                    }
+                  }
+                } else {
+                  // Debit Note forward: removed qty from inventory
+                  // Reversal: add qty back to inventory
+                  if (inv) {
+                    const existingQty = parseFloat(inv.quantity);
+                    const existingValue = parseFloat(inv.totalValue || "0");
+                    const newQty = existingQty + qty;
+                    const newValue = existingValue + itemValue;
+                    const newRate = newQty > 0 ? newValue / newQty : inventoryCost;
+
+                    console.log(`[Debit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${existingQty} + ${qty} = ${newQty}`);
+                    await tx
+                      .update(inventory)
+                      .set({
+                        quantity: newQty.toString(),
+                        averageRate: newRate.toString(),
+                        totalValue: newValue.toString(),
+                      })
+                      .where(eq(inventory.id, inv.id));
+                  } else {
+                    // Create new inventory record
+                    console.log(`[Debit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: creating new inventory with qty=${qty}`);
+                    // Get the companyId from the location
+                    const [location] = await tx
+                      .select()
+                      .from(locations)
+                      .where(eq(locations.id, item.locationId))
+                      .limit(1);
+                    
+                    if (location) {
+                      await tx.insert(inventory).values({
+                        companyId: location.companyId,
+                        locationId: item.locationId,
+                        stockItemId: item.stockItemId,
+                        quantity: qty.toString(),
+                        averageRate: inventoryCost.toString(),
+                        totalValue: itemValue.toString(),
+                      });
+                    }
+                  }
+                }
+              }
+
+              // Delete the credit note items
+              console.log(`[Credit/Debit Note Delete] Deleting ${noteItems.length} credit_note_items for voucher ${id}`);
+              await tx
+                .delete(creditNoteItems)
+                .where(eq(creditNoteItems.voucherId, id));
+            }
+          }
+
           if (!voucher.optional) {
             const entries = await tx
               .select()
@@ -16219,6 +16327,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 // Delete sales items regardless of whether inventory was reversed
                 await tx.delete(salesItems).where(eq(salesItems.voucherId, id));
+              }
+            }
+
+            // IMPORTANT: Reverse inventory movements for Credit Note / Debit Note vouchers
+            if ((voucher.voucherType === "Credit Note" || voucher.voucherType === "Debit Note") && !voucher.optional) {
+              const noteItems = await tx
+                .select()
+                .from(creditNoteItems)
+                .where(eq(creditNoteItems.voucherId, id));
+
+              if (noteItems.length > 0) {
+                console.log(`[Bulk Delete Credit/Debit Note] Voucher ${id}: Found ${noteItems.length} items to reverse`);
+
+                for (const item of noteItems) {
+                  const qty = parseFloat(item.quantity);
+                  // Use inventoryCost (not rate) because inventory was valued at inventoryCost on creation
+                  const inventoryCost = parseFloat(item.inventoryCost || item.rate || "0");
+                  const itemValue = qty * inventoryCost;
+
+                  const [inv] = await tx
+                    .select()
+                    .from(inventory)
+                    .where(
+                      and(
+                        eq(inventory.stockItemId, item.stockItemId),
+                        eq(inventory.locationId, item.locationId),
+                      ),
+                    )
+                    .limit(1);
+
+                  if (voucher.voucherType === "Credit Note") {
+                    // Credit Note forward: added qty to inventory
+                    // Reversal: subtract qty from inventory
+                    if (inv) {
+                      const existingQty = parseFloat(inv.quantity);
+                      const existingValue = parseFloat(inv.totalValue || "0");
+                      const newQty = existingQty - qty;
+
+                      if (newQty <= 0) {
+                        await tx.delete(inventory).where(eq(inventory.id, inv.id));
+                      } else {
+                        const newValue = Math.max(0, existingValue - itemValue);
+                        const newRate = newQty > 0 ? newValue / newQty : 0;
+                        await tx.update(inventory).set({
+                          quantity: newQty.toString(),
+                          averageRate: newRate.toString(),
+                          totalValue: newValue.toString(),
+                        }).where(eq(inventory.id, inv.id));
+                      }
+                    }
+                  } else {
+                    // Debit Note forward: removed qty from inventory
+                    // Reversal: add qty back to inventory
+                    if (inv) {
+                      const existingQty = parseFloat(inv.quantity);
+                      const existingValue = parseFloat(inv.totalValue || "0");
+                      const newQty = existingQty + qty;
+                      const newValue = existingValue + itemValue;
+                      const newRate = newQty > 0 ? newValue / newQty : inventoryCost;
+                      await tx.update(inventory).set({
+                        quantity: newQty.toString(),
+                        averageRate: newRate.toString(),
+                        totalValue: newValue.toString(),
+                      }).where(eq(inventory.id, inv.id));
+                    } else {
+                      // Get the companyId from the location
+                      const [location] = await tx
+                        .select()
+                        .from(locations)
+                        .where(eq(locations.id, item.locationId))
+                        .limit(1);
+                      
+                      if (location) {
+                        await tx.insert(inventory).values({
+                          companyId: location.companyId,
+                          locationId: item.locationId,
+                          stockItemId: item.stockItemId,
+                          quantity: qty.toString(),
+                          averageRate: inventoryCost.toString(),
+                          totalValue: itemValue.toString(),
+                        });
+                      }
+                    }
+                  }
+                }
+
+                // Delete the credit note items
+                await tx.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, id));
               }
             }
 
@@ -30490,6 +30686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationId,
           quantity: qty.toFixed(3),
           rate: refundRateVal.toFixed(2),
+          inventoryCost: inventoryCostVal.toFixed(2),
           totalValue: (qty * refundRateVal).toFixed(2),
         });
       }
@@ -30785,7 +30982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Original subtracted from inventory, so add back to reverse
             const newQty = existingQty + qty;
             const newValue = existingValue + itemValue;
-            const newRate = newQty > 0 ? newValue / newQty : rate;
+            const newRate = newQty > 0 ? newValue / newQty : inventoryCost;
 
             await db
               .update(inventory)
@@ -30972,6 +31169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationId,
           quantity: qty.toFixed(3),
           rate: refundRateVal.toFixed(2),
+          inventoryCost: inventoryCostVal.toFixed(2),
           totalValue: (qty * refundRateVal).toFixed(2),
         });
       }
