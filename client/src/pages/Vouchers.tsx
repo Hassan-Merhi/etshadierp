@@ -19,6 +19,7 @@ import { useVoucherEntries } from "@/hooks/useVoucherEntries";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
 import { PaymentVoucherTab } from "@/components/vouchers/PaymentVoucherTab";
 import { ReceiptVoucherTab } from "@/components/vouchers/ReceiptVoucherTab";
+import { CreditNoteTab } from "@/components/vouchers/CreditNoteTab";
 import {
   Card,
   CardContent,
@@ -538,7 +539,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const tabParam = searchParams.get('tab');
   const voucherIdToEdit = editParam ? parseInt(editParam) : null;
   
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment">(
+  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote">(
     (tabParam as any) || "payment"
   );
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
@@ -2864,7 +2865,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         </div>
       )}
 
-      <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment")}>
+      <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote")}>
         {!isPOS && (
           <TabsList>
             <TabsTrigger value="payment" data-testid="tab-payment">
@@ -2881,6 +2882,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             </TabsTrigger>
             <TabsTrigger value="adjustment" data-testid="tab-adjustment">
               Production/Consumption
+            </TabsTrigger>
+            <TabsTrigger value="creditnote" data-testid="tab-creditnote">
+              Credit/Debit Note
             </TabsTrigger>
           </TabsList>
         )}
@@ -4750,6 +4754,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               </Form>
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {!isPOS && (
+          <TabsContent value="creditnote" className="space-y-4">
+            <CreditNoteTab allAccounts={allAccounts} />
           </TabsContent>
         )}
 
