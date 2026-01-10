@@ -30636,6 +30636,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
       res.json({
         voucher: {
           id: voucher.id,
@@ -30647,16 +30673,826 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         cashAccountId,
         cashAccountType,
-        items: noteItems.map((item) => ({
-          stockItemId: item.stockItemId,
-          stockItemName: item.stockItemName || "",
-          stockItemCode: item.stockItemCode || "",
-          locationId: item.locationId,
-          locationName: item.locationName || "",
-          quantity: item.quantity,
-          refundRate: item.rate,
-          uom: item.stockItemUom || "",
-        })),
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
+      });
+      // Fetch current inventory costs for each item at its location
+      const itemsWithCosts = await Promise.all(
+        noteItems.map(async (item) => {
+          const [inv] = await db
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.stockItemId, item.stockItemId),
+                eq(inventory.locationId, item.locationId)
+              )
+            );
+          return {
+            stockItemId: item.stockItemId,
+            stockItemName: item.stockItemName || "",
+            stockItemCode: item.stockItemCode || "",
+            locationId: item.locationId,
+            locationName: item.locationName || "",
+            quantity: item.quantity,
+            refundRate: item.rate,
+            inventoryCost: inv?.averageRate || "0",
+            uom: item.stockItemUom || "",
+          };
+        })
+      );
+
+      res.json({
+        voucher: {
+          id: voucher.id,
+          voucherNumber: voucher.voucherNumber,
+          voucherType: voucher.voucherType,
+          voucherDate: voucher.voucherDate,
+          description: voucher.description,
+          totalAmount: voucher.totalAmount,
+        },
+        cashAccountId,
+        cashAccountType,
+        items: itemsWithCosts,
       });
     } catch (error: any) {
       console.error("Get credit note error:", error);
