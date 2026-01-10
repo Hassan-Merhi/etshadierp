@@ -683,6 +683,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
       "Mixed": "adjustment",
       "StockTransfer": "transfer",
       "Stock Transfer": "transfer",
+      "Credit Note": "credit-note",
+      "Debit Note": "credit-note",
     };
     
     const tabName = voucherTypeMap[voucher.voucherType];

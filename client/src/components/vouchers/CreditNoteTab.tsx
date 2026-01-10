@@ -40,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Plus, Trash2, Search, Package, MapPin } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Search, Package, MapPin, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -77,6 +77,29 @@ interface CreditNoteItem {
   uom: string;
 }
 
+interface CreditNoteData {
+  voucher: {
+    id: number;
+    voucherNumber: string;
+    voucherType: string;
+    voucherDate: string;
+    description: string;
+    totalAmount: string;
+  };
+  cashAccountId: number;
+  cashAccountType: string;
+  items: Array<{
+    stockItemId: number;
+    stockItemName: string;
+    stockItemCode: string;
+    locationId: number;
+    locationName: string;
+    quantity: string;
+    refundRate: string;
+    uom: string;
+  }>;
+}
+
 const creditNoteSchema = z.object({
   noteType: z.enum(["Credit Note", "Debit Note"]),
   voucherDate: z.string().min(1, "Date is required"),
@@ -90,9 +113,10 @@ type CreditNoteFormData = z.infer<typeof creditNoteSchema>;
 
 interface CreditNoteTabProps {
   allAccounts: CombinedAccount[];
+  editVoucherId?: number | null;
 }
 
-export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
+export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps) {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const [items, setItems] = useState<CreditNoteItem[]>([]);
@@ -101,6 +125,8 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [itemQuantity, setItemQuantity] = useState("1");
   const [refundRate, setRefundRate] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState<number | null>(null);
   const itemListRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,6 +154,42 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
     queryKey: selectedLocationId ? [`/api/locations/${selectedLocationId}/inventory`] : [],
     enabled: selectedLocationId > 0,
   });
+
+  const { data: editData, isLoading: editLoading } = useQuery<CreditNoteData>({
+    queryKey: editVoucherId ? [`/api/credit-notes/${editVoucherId}`] : [],
+    enabled: !!editVoucherId,
+  });
+
+  useEffect(() => {
+    if (editData && editVoucherId && !isEditMode) {
+      setIsEditMode(true);
+      setEditingVoucherId(editVoucherId);
+
+      form.reset({
+        noteType: editData.voucher.voucherType as "Credit Note" | "Debit Note",
+        voucherDate: editData.voucher.voucherDate,
+        cashAccountType: editData.cashAccountType,
+        cashAccountId: editData.cashAccountId,
+        cashAccountName: "",
+        description: editData.voucher.description || "",
+      });
+
+      const firstLocationId = editData.items[0]?.locationId || 0;
+      setSelectedLocationId(firstLocationId);
+
+      const loadedItems: CreditNoteItem[] = editData.items.map((item) => ({
+        stockItemId: item.stockItemId,
+        stockItemName: item.stockItemName,
+        locationId: item.locationId,
+        locationName: item.locationName,
+        quantity: item.quantity,
+        refundRate: item.refundRate,
+        inventoryCost: "0",
+        uom: item.uom,
+      }));
+      setItems(loadedItems);
+    }
+  }, [editData, editVoucherId, isEditMode, form]);
 
   const inventoryMap = useMemo(() => {
     const map = new Map<number, { quantity: number; rate: number }>();
@@ -224,18 +286,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
         title: "Success",
         description: data.message || "Credit/Debit note created successfully",
       });
-      form.reset({
-        noteType: "Credit Note",
-        voucherDate: format(new Date(), "yyyy-MM-dd"),
-        cashAccountType: "",
-        cashAccountId: 0,
-        cashAccountName: "",
-        description: "",
-      });
-      setItems([]);
-      setItemQuantity("1");
-      setRefundRate("");
-      setSearchTerm("");
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationId}/inventory`] });
     },
@@ -247,6 +298,60 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
       });
     },
   });
+
+  const updateCreditNoteMutation = useMutation({
+    mutationFn: async (data: {
+      voucherDate: string;
+      cashAccountId: number;
+      cashAccountType: string;
+      description: string;
+      items: Array<{
+        stockItemId: number;
+        locationId: number;
+        quantity: string;
+        refundRate: string;
+        inventoryCost: string;
+      }>;
+    }) => {
+      const response = await apiRequest("PATCH", `/api/credit-notes/${editingVoucherId}`, data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success",
+        description: data.message || "Credit/Debit note updated successfully",
+      });
+      resetForm();
+      window.history.pushState({}, "", "/vouchers?tab=credit-note");
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationId}/inventory`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/credit-notes/${editingVoucherId}`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update credit/debit note",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    form.reset({
+      noteType: "Credit Note",
+      voucherDate: format(new Date(), "yyyy-MM-dd"),
+      cashAccountType: "",
+      cashAccountId: 0,
+      cashAccountName: "",
+      description: "",
+    });
+    setItems([]);
+    setItemQuantity("1");
+    setRefundRate("");
+    setSearchTerm("");
+    setIsEditMode(false);
+    setEditingVoucherId(null);
+  };
 
   const addItemToCart = (item: typeof itemsWithStock[0]) => {
     if (!selectedLocationId) {
@@ -314,8 +419,7 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
       return;
     }
 
-    createCreditNoteMutation.mutate({
-      noteType: values.noteType,
+    const payload = {
       voucherDate: values.voucherDate,
       cashAccountId: values.cashAccountId,
       cashAccountType: values.cashAccountType,
@@ -327,7 +431,16 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
         refundRate: item.refundRate,
         inventoryCost: item.inventoryCost,
       })),
-    });
+    };
+
+    if (isEditMode && editingVoucherId) {
+      updateCreditNoteMutation.mutate(payload);
+    } else {
+      createCreditNoteMutation.mutate({
+        ...payload,
+        noteType: values.noteType,
+      });
+    }
   };
 
   const noteType = form.watch("noteType");
@@ -335,24 +448,55 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
   const cashAccountType = form.watch("cashAccountType");
   const cashAccountName = form.watch("cashAccountName");
 
+  const isPending = createCreditNoteMutation.isPending || updateCreditNoteMutation.isPending;
+
+  if (editLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Loading credit note...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-4 h-[calc(100vh-200px)]">
       <Card className="flex-1 flex flex-col">
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              {noteType === "Credit Note" ? "Credit Note (Customer Return)" : "Debit Note"}
+              {isEditMode ? (
+                <>
+                  <Pencil className="h-5 w-5" />
+                  Edit {noteType}
+                </>
+              ) : (
+                <>
+                  <Package className="h-5 w-5" />
+                  {noteType === "Credit Note" ? "Credit Note (Customer Return)" : "Debit Note"}
+                </>
+              )}
             </CardTitle>
-            <Button
-              type="button"
-              onClick={form.handleSubmit(onSubmit)}
-              disabled={items.length === 0 || createCreditNoteMutation.isPending}
-              data-testid="button-create-credit-note"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {createCreditNoteMutation.isPending ? "Creating..." : "Create Note"}
-            </Button>
+            <div className="flex gap-2">
+              {isEditMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={form.handleSubmit(onSubmit)}
+                disabled={items.length === 0 || isPending}
+                data-testid="button-create-credit-note"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {isPending ? "Saving..." : isEditMode ? "Update Note" : "Create Note"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 overflow-auto">
@@ -365,7 +509,11 @@ export function CreditNoteTab({ allAccounts }: CreditNoteTabProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={isEditMode}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-note-type">
                             <SelectValue placeholder="Select type" />
