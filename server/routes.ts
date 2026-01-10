@@ -9898,7 +9898,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             additionalChargesTotal;
 
           const totalBales = parseFloat(currentOffload.totalBales);
-          const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
+          // Round to 2 decimal places to prevent floating-point accumulation errors
+          const additionalCostPerBale = totalBales > 0 ? Math.round((totalCharges / totalBales) * 100) / 100 : 0;
 
           // Update offload record
           await tx
@@ -13681,11 +13682,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : existingVoucher.locationId;
 
       if (targetLocationId) {
+        // FIXED: Recalculate salesItemsData with ACTUAL inventory rates after restoration
+        // This ensures costPrice matches the real inventory averageRate
+        const updatedSalesItemsData: typeof salesItemsData = [];
+        
         for (const newItem of salesItemsData) {
           const quantity = parseFloat(newItem.quantity);
-          const costPrice = parseFloat(newItem.costPrice);
 
-          // Get current inventory at the target location
+          // Get CURRENT inventory at the target location (after old items were restored)
           const [currentInventory] = await db
             .select()
             .from(inventory)
@@ -13696,19 +13700,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ),
             );
 
+          // Use actual inventory rate, fallback to original if no inventory exists
+          const actualCostPrice = currentInventory 
+            ? parseFloat(currentInventory.averageRate || "0")
+            : parseFloat(newItem.costPrice);
+          
+          // Recalculate totalCost and profit with actual rate
+          const sellingPrice = parseFloat(newItem.sellingPrice);
+          const totalSales = quantity * sellingPrice;
+          const totalCost = quantity * actualCostPrice;
+          const profit = totalSales - totalCost;
+
+          // Update the item with correct costPrice
+          updatedSalesItemsData.push({
+            ...newItem,
+            costPrice: actualCostPrice.toFixed(2),
+            totalCost: totalCost.toFixed(2),
+            profit: profit.toFixed(2),
+          });
+
           if (currentInventory) {
-            // Deduct the new quantity
-            const newQuantity = Math.max(
-              0,
-              parseFloat(currentInventory.quantity) - quantity,
-            );
+            // Deduct the new quantity - ALLOW NEGATIVE to maintain balance
+            const newQuantity = parseFloat(currentInventory.quantity) - quantity;
             const currentTotalValue = parseFloat(currentInventory.totalValue);
-            const newTotalValue = Math.max(
-              0,
-              currentTotalValue - quantity * costPrice,
-            );
-            const newAverageRate =
-              newQuantity > 0 ? newTotalValue / newQuantity : 0;
+            const valueToDeduct = quantity * actualCostPrice;
+            const newTotalValue = currentTotalValue - valueToDeduct;
+            // Preserve averageRate when going negative/zero
+            const newAverageRate = newQuantity > 0 
+              ? newTotalValue / newQuantity 
+              : parseFloat(currentInventory.averageRate || "0");
 
             await db
               .update(inventory)
@@ -13718,8 +13738,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 totalValue: newTotalValue.toFixed(2),
               })
               .where(eq(inventory.id, currentInventory.id));
+          } else {
+            // FIXED: Create inventory record with negative quantity if it doesn't exist
+            // This ensures the deduction is tracked even without prior inventory
+            await db.insert(inventory).values({
+              companyId: existingVoucher.companyId,
+              locationId: targetLocationId,
+              stockItemId: newItem.stockItemId,
+              quantity: (-quantity).toFixed(3),
+              averageRate: actualCostPrice.toFixed(2),
+              totalValue: (-quantity * actualCostPrice).toFixed(2),
+            });
           }
         }
+        
+        // Use the updated data with correct costPrice for insertion
+        salesItemsData.length = 0;
+        salesItemsData.push(...updatedSalesItemsData);
       }
 
       // STEP 4: Insert new sales items

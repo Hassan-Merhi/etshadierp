@@ -2087,7 +2087,8 @@ export class DbStorage implements IStorage {
       poCharges; // Include PO freight/charges in inventory cost
 
     // Calculate additional cost per bale
-    const additionalCostPerBale = totalBales > 0 ? totalCharges / totalBales : 0;
+    // Round to 2 decimal places to prevent floating-point accumulation errors
+    const additionalCostPerBale = totalBales > 0 ? Math.round((totalCharges / totalBales) * 100) / 100 : 0;
 
     // Group line items by stock item and calculate new rates
     const itemsMap = new Map<number, { 
