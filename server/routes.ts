@@ -13880,6 +13880,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only proceed if we have payment account information
       if (finalPaymentAccountId && finalPaymentAccountType) {
+        // EARLY VALIDATION: Check Sales account type BEFORE any destructive operations
+        const allAccountsForValidation = await storage.getAllLedgerAccounts(existingVoucher.companyId);
+        let salesAccountCheck = allAccountsForValidation.find((a: any) => a.code === "SALES");
+        
+        if (salesAccountCheck && salesAccountCheck.accountType !== "Income") {
+          return res.status(400).json({
+            message: `The SALES account is configured with type "${salesAccountCheck.accountType}" but must be type "Income" for POS sales to work correctly.`,
+          });
+        }
+        
         // Delete old voucher entries
         await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
@@ -17027,6 +17037,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           accountType: "Income",
           openingBalance: "0",
           active: true,
+        });
+      } else if (salesAccount.accountType !== "Income") {
+        // Validate that Sales account is of type Income for proper import cycle balance
+        console.warn(`[POS Sale] WARNING: SALES account has type "${salesAccount.accountType}" instead of "Income". This will cause import cycle imbalance!`);
+        return res.status(400).json({
+          message: `The SALES account is configured with type "${salesAccount.accountType}" but must be type "Income" for POS sales to work correctly. Please update the SALES account type in Accounts page.`,
         });
       }
 
