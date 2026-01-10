@@ -30635,13 +30635,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-
       // Fetch current inventory costs for each item at its location
-      // If not found at original location, look up from any other location
+      // Fallback order: 1) Specific location, 2) Any location, 3) Container offload history
       const itemsWithCosts = await Promise.all(
         noteItems.map(async (item) => {
+          let costRate = "0";
+          
           // First try to find inventory at the item's location
-          let [inv] = await db
+          const [inv] = await db
             .select()
             .from(inventory)
             .where(
@@ -30651,16 +30652,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
               )
             );
           
-          // If not found, try to find from any location
-          if (!inv || !inv.averageRate || parseFloat(inv.averageRate) === 0) {
+          if (inv?.averageRate && parseFloat(inv.averageRate) > 0) {
+            costRate = inv.averageRate;
+          } else {
+            // Try to find from any location
             const [anyInv] = await db
               .select()
               .from(inventory)
               .where(eq(inventory.stockItemId, item.stockItemId))
               .orderBy(desc(inventory.quantity))
               .limit(1);
-            if (anyInv && anyInv.averageRate && parseFloat(anyInv.averageRate) > 0) {
-              inv = anyInv;
+            
+            if (anyInv?.averageRate && parseFloat(anyInv.averageRate) > 0) {
+              costRate = anyInv.averageRate;
+            } else {
+              // Final fallback: check container offload history for this item's cost
+              const [offloadItem] = await db
+                .select()
+                .from(containerOffloadItems)
+                .where(eq(containerOffloadItems.stockItemId, item.stockItemId))
+                .orderBy(desc(containerOffloadItems.id))
+                .limit(1);
+              
+              if (offloadItem?.rate && parseFloat(offloadItem.rate) > 0) {
+                costRate = offloadItem.rate;
+              }
             }
           }
           
@@ -30672,7 +30688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             locationName: item.locationName || "",
             quantity: item.quantity,
             refundRate: item.rate,
-            inventoryCost: inv?.averageRate || "0",
+            inventoryCost: costRate,
             uom: item.stockItemUom || "",
           };
         })
