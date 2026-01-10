@@ -96,6 +96,7 @@ interface CreditNoteData {
     locationName: string;
     quantity: string;
     refundRate: string;
+    inventoryCost: string;
     uom: string;
   }>;
 }
@@ -184,7 +185,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
         locationName: item.locationName,
         quantity: item.quantity,
         refundRate: item.refundRate,
-        inventoryCost: "0",
+        inventoryCost: item.inventoryCost || "0",
         uom: item.uom,
       }));
       setItems(loadedItems);
