@@ -1916,7 +1916,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // 6-7. Cash and Bank balances
           const cashBalance = await getAccountTypeBalance("Cash", false);
-          const bankBalance = await getAccountTypeBalance("Bank", false);
+          
+          // Bank balance from ledger accounts (type "Bank") - includes linked bank accounts
+          const ledgerBankBalance = await getAccountTypeBalance("Bank", false);
+          
+          // Bank balance from standalone bankAccounts (no linkedLedgerId)
+          const standaloneBankAccountEntries = await db
+            .select({
+              bankAccountId: voucherEntries.bankAccountId,
+              creditAmount: voucherEntries.creditAmount,
+              debitAmount: voucherEntries.debitAmount,
+            })
+            .from(voucherEntries)
+            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+            .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
+            .where(
+              and(
+                isNotNull(voucherEntries.bankAccountId),
+                isNull(voucherEntries.ledgerAccountId), // Only entries without ledger posting
+                isNull(bankAccounts.linkedLedgerId), // Only standalone bank accounts
+                eq(bankAccounts.companyId, companyId),
+                isNull(bankAccounts.deletedAt),
+                eq(vouchers.companyId, companyId),
+                isNull(vouchers.deletedAt),
+                eq(vouchers.optional, false)
+              )
+            );
+          
+          const standaloneBankAccountsForBalance = await db
+            .select()
+            .from(bankAccounts)
+            .where(
+              and(
+                eq(bankAccounts.companyId, companyId),
+                isNull(bankAccounts.deletedAt),
+                isNull(bankAccounts.linkedLedgerId) // Only standalone
+              )
+            );
+          
+          const standaloneBankOpeningBalance = standaloneBankAccountsForBalance.reduce((sum, account) => {
+            const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+            const openingSide = account.openingBalanceSide || "Dr";
+            return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+          }, 0);
+          
+          const standaloneBankVoucherBalance = standaloneBankAccountEntries.reduce((sum, entry) => {
+            const credit = parseFloat(entry.creditAmount || "0");
+            const debit = parseFloat(entry.debitAmount || "0");
+            return sum + debit - credit;
+          }, 0);
+          
+          const bankBalance = ledgerBankBalance + standaloneBankOpeningBalance + standaloneBankVoucherBalance;
 
           // 8-9. Expense balances
           // Use getImportChargesBalance() instead of generic Direct Expense to match import-cycle-balance calculation
@@ -19194,7 +19244,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cashBalance = await getAccountTypeBalance("Cash", false);
 
       // 7. Bank accounts (asset)
-      const bankBalance = await getAccountTypeBalance("Bank", false);
+      // Part 1: Ledger accounts with type "Bank" (includes linked bank accounts)
+      const ledgerBankBalance = await getAccountTypeBalance("Bank", false);
+      
+      // Part 2: Bank accounts from bankAccounts table WITHOUT linked ledger accounts
+      // These are standalone bank accounts that track entries via bankAccountId only
+      // IMPORTANT: Only include entries where ledgerAccountId is NULL to avoid double-counting
+      const standaloneBankAccountEntries = await db
+        .select({
+          bankAccountId: voucherEntries.bankAccountId,
+          creditAmount: voucherEntries.creditAmount,
+          debitAmount: voucherEntries.debitAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
+        .where(
+          and(
+            isNotNull(voucherEntries.bankAccountId),
+            isNull(voucherEntries.ledgerAccountId), // Only entries that don't also hit a ledger account
+            isNull(bankAccounts.linkedLedgerId), // Only standalone bank accounts
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
+      
+      // Get opening balances only from bank accounts NOT linked to a ledger account
+      const standaloneBankAccounts = await db
+        .select()
+        .from(bankAccounts)
+        .where(
+          and(
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            isNull(bankAccounts.linkedLedgerId) // Only standalone bank accounts
+          )
+        );
+      
+      // Calculate opening balance total for standalone bank accounts only
+      const standaloneBankOpeningBalance = standaloneBankAccounts.reduce((sum, account) => {
+        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+        const openingSide = account.openingBalanceSide || "Dr";
+        return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+      }, 0);
+      
+      // Bank accounts are assets: Debits increase (positive), Credits decrease (negative)
+      const standaloneBankVoucherBalance = standaloneBankAccountEntries.reduce((sum, entry) => {
+        const credit = parseFloat(entry.creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        return sum + debit - credit;
+      }, 0);
+      
+      // Total bank balance = ledger bank accounts + standalone bank account entries
+      const bankBalance = ledgerBankBalance + standaloneBankOpeningBalance + standaloneBankVoucherBalance;
 
       // 8. Import Charges (only accounts under IMPORT_CHARGES parent - for import cycle tracking)
       // This is more specific than "Direct Expense" to avoid including unrelated expenses
@@ -21780,7 +21885,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stockOtwValue = otwContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
 
       const cashBalance = await getAccountTypeBalance("Cash", false);
-      const bankBalance = await getAccountTypeBalance("Bank", false);
+      
+      // Bank balance from ledger accounts (type "Bank") - includes linked bank accounts
+      const ledgerBankBalance2 = await getAccountTypeBalance("Bank", false);
+      
+      // Bank balance from standalone bankAccounts (no linkedLedgerId)
+      const standaloneBankEntries2 = await db
+        .select({
+          bankAccountId: voucherEntries.bankAccountId,
+          creditAmount: voucherEntries.creditAmount,
+          debitAmount: voucherEntries.debitAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
+        .where(
+          and(
+            isNotNull(voucherEntries.bankAccountId),
+            isNull(voucherEntries.ledgerAccountId), // Only entries without ledger posting
+            isNull(bankAccounts.linkedLedgerId), // Only standalone bank accounts
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
+      
+      const standaloneBankAccounts2 = await db
+        .select()
+        .from(bankAccounts)
+        .where(
+          and(
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            isNull(bankAccounts.linkedLedgerId) // Only standalone
+          )
+        );
+      
+      const standaloneBankOpening2 = standaloneBankAccounts2.reduce((sum, account) => {
+        const openingBalanceRaw = parseFloat(account.openingBalance || "0");
+        const openingSide = account.openingBalanceSide || "Dr";
+        return sum + (openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw);
+      }, 0);
+      
+      const standaloneBankVoucher2 = standaloneBankEntries2.reduce((sum, entry) => {
+        const credit = parseFloat(entry.creditAmount || "0");
+        const debit = parseFloat(entry.debitAmount || "0");
+        return sum + debit - credit;
+      }, 0);
+      
+      const bankBalance = ledgerBankBalance2 + standaloneBankOpening2 + standaloneBankVoucher2;
       const assetBalance = await getAccountTypeBalance("Asset", false);
       const dutyAgentBalance = await getAccountTypeBalance("Duty Agent", true);
       const transporterAgentBalance = await getAccountTypeBalance("Transporter Agent", true);
