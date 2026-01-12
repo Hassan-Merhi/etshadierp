@@ -2111,10 +2111,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           // In edit mode, add back the original quantity for this item from this source location
           // This accounts for the fact that the original transfer is already reflected in inventory
           if (isEditMode) {
-            const originalItem = originalItems.find((orig: any) => 
+            // First try to find by both stockItemId and sourceLocationId (new records)
+            let originalItem = originalItems.find((orig: any) => 
               orig.stockItemId === entry.stockItemId && 
               orig.sourceLocationId === entry.sourceLocationId
             );
+            // Fall back to stockItemId only for legacy records where sourceLocationId is NULL
+            if (!originalItem) {
+              originalItem = originalItems.find((orig: any) => 
+                orig.stockItemId === entry.stockItemId && 
+                (orig.sourceLocationId === null || orig.sourceLocationId === undefined)
+              );
+            }
             if (originalItem) {
               availableQty += parseFloat(originalItem.quantity || "0");
             }
