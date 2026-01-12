@@ -26163,6 +26163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .select({
             id: stockTransferItems.id,
             stockItemId: stockTransferItems.stockItemId,
+            sourceLocationId: stockTransferItems.sourceLocationId,
             quantity: stockTransferItems.quantity,
             rate: stockTransferItems.rate,
             totalAmount: stockTransferItems.totalAmount,
@@ -26207,6 +26208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           id: stockTransferItems.id,
           stockItemId: stockTransferItems.stockItemId,
+          sourceLocationId: stockTransferItems.sourceLocationId,
           quantity: stockTransferItems.quantity,
           rate: stockTransferItems.rate,
           totalAmount: stockTransferItems.totalAmount,
