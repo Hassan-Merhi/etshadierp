@@ -1,19 +1,21 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins } from "lucide-react";
+import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AddContainerDialog } from "../components/AddContainerDialog";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import * as XLSX from "xlsx";
 import type { Container, Supplier } from "@shared/schema";
 
@@ -37,14 +39,21 @@ interface SoldContainer {
   notes: string | null;
 }
 
+interface TrackingEdit {
+  [key: number]: Partial<Container>;
+}
+
 export default function Containers() {
   const [activeTab, setActiveTab] = useState("active");
   const [searchTerm, setSearchTerm] = useState("");
   const [soldSearchTerm, setSoldSearchTerm] = useState("");
+  const [otwSearchTerm, setOtwSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("OTW");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [trackingEdits, setTrackingEdits] = useState<TrackingEdit>({});
+  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   
@@ -62,7 +71,46 @@ export default function Containers() {
     queryKey: ["/api/suppliers"],
   });
 
-  // Filter sold containers
+  const updateTrackingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Container> }) => {
+      const res = await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
+      return res.json();
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
+      setTrackingEdits((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast({ title: "Saved", description: "Tracking info updated" });
+    },
+    onError: (error: any, { id }) => {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const otwContainers = allContainers.filter((c) => c.status === "OTW");
+  const filteredOtwContainers = otwContainers.filter((c) => {
+    if (!otwSearchTerm) return true;
+    const search = otwSearchTerm.toLowerCase();
+    return (
+      c.containerNumber.toLowerCase().includes(search) ||
+      (c.shopName?.toLowerCase() || "").includes(search) ||
+      (c.agent?.toLowerCase() || "").includes(search)
+    );
+  });
+
   const filteredSoldContainers = soldContainers.filter((sale) => {
     if (!soldSearchTerm) return true;
     const searchLower = soldSearchTerm.toLowerCase();
@@ -72,18 +120,14 @@ export default function Containers() {
     );
   });
 
-  // Apply all filters
   const containers = allContainers
     .filter((c) => {
-      // Search filter
       if (searchTerm && !c.containerNumber.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
-      // Status filter
       if (statusFilter !== "ALL" && c.status !== statusFilter) {
         return false;
       }
-      // Supplier filter
       if (supplierFilter !== "ALL" && c.supplierId.toString() !== supplierFilter) {
         return false;
       }
@@ -135,6 +179,59 @@ export default function Containers() {
     } catch (error: any) {
       toast({ title: "Export failed", description: error.message, variant: "destructive" });
     }
+  };
+
+  const exportOtwToExcel = () => {
+    const data = filteredOtwContainers.map((c) => ({
+      "Container #": c.containerNumber,
+      Supplier: getSupplierName(c.supplierId),
+      Amount: parseFloat(c.grandTotal || "0"),
+      Shop: c.shopName || "",
+      ETA: c.eta || "",
+      "Transport Fee": c.transportFee || "",
+      "Number Plate": c.numberPlate || "",
+      Location: c.trackingLocation || "",
+      "Border Date": c.borderDate || "",
+      "Offload Date": c.offloadDate || "",
+      Agent: c.agent || "",
+      "Duty Fee": c.dutyFee || "",
+      "Doc Received": c.docReceived ? "Yes" : "No",
+      Description: c.trackingDescription || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "OTW Containers");
+    XLSX.writeFile(workbook, "otw_containers.xlsx");
+  };
+
+  const getEditValue = (container: Container, field: keyof Container) => {
+    if (trackingEdits[container.id] && trackingEdits[container.id][field] !== undefined) {
+      return trackingEdits[container.id][field];
+    }
+    return container[field];
+  };
+
+  const setEditValue = (containerId: number, field: keyof Container, value: any) => {
+    setTrackingEdits((prev) => ({
+      ...prev,
+      [containerId]: {
+        ...prev[containerId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const hasChanges = (containerId: number) => {
+    return trackingEdits[containerId] && Object.keys(trackingEdits[containerId]).length > 0;
+  };
+
+  const saveTracking = (containerId: number) => {
+    const data = trackingEdits[containerId];
+    if (!data) return;
+    
+    setSavingIds((prev) => new Set(prev).add(containerId));
+    updateTrackingMutation.mutate({ id: containerId, data });
   };
 
   if (isLoading) {
@@ -196,6 +293,17 @@ export default function Containers() {
             </Link>
           </div>
         )}
+        {activeTab === "otw" && (
+          <Button
+            onClick={exportOtwToExcel}
+            variant="outline"
+            className="gap-2"
+            data-testid="button-export-otw"
+          >
+            <Download className="h-4 w-4" />
+            Export OTW
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -204,6 +312,11 @@ export default function Containers() {
             <Package className="h-4 w-4 mr-2" />
             Active Containers
             <Badge variant="secondary" className="ml-2">{allContainers.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="otw" data-testid="tab-otw-tracking">
+            <Truck className="h-4 w-4 mr-2" />
+            OTW Tracking
+            <Badge variant="secondary" className="ml-2">{otwContainers.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="sold" data-testid="tab-sold-containers">
             <HandCoins className="h-4 w-4 mr-2" />
@@ -378,6 +491,192 @@ export default function Containers() {
                 </CardContent>
               </Card>
             </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="otw" className="space-y-4 mt-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by container, shop, or agent..."
+                value={otwSearchTerm}
+                onChange={(e) => setOtwSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-otw"
+              />
+            </div>
+          </div>
+
+          {filteredOtwContainers.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Truck className="w-16 h-16 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-semibold mb-2">No OTW containers</h2>
+                <p className="text-muted-foreground">
+                  {otwContainers.length === 0 
+                    ? "All containers have arrived or been offloaded"
+                    : "No containers match your search"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[120px]">Container #</TableHead>
+                      <TableHead className="min-w-[100px]">Supplier</TableHead>
+                      <TableHead className="min-w-[100px]">Amount</TableHead>
+                      <TableHead className="min-w-[100px]">Shop</TableHead>
+                      <TableHead className="min-w-[100px]">ETA</TableHead>
+                      <TableHead className="min-w-[100px]">Transport Fee</TableHead>
+                      <TableHead className="min-w-[80px]">Plate</TableHead>
+                      <TableHead className="min-w-[100px]">Location</TableHead>
+                      <TableHead className="min-w-[100px]">Border Date</TableHead>
+                      <TableHead className="min-w-[100px]">Offload Date</TableHead>
+                      <TableHead className="min-w-[80px]">Agent</TableHead>
+                      <TableHead className="min-w-[100px]">Duty Fee</TableHead>
+                      <TableHead className="min-w-[60px]">Doc</TableHead>
+                      <TableHead className="min-w-[150px]">Description</TableHead>
+                      <TableHead className="min-w-[60px]">Save</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredOtwContainers.map((container) => (
+                      <TableRow key={container.id} data-testid={`row-otw-${container.id}`}>
+                        <TableCell className="font-mono font-medium">
+                          <Link href={`/containers/${container.id}`} className="text-primary hover:underline">
+                            {container.containerNumber}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm">{getSupplierName(container.supplierId)}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          ${parseFloat(container.grandTotal || "0").toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={getEditValue(container, "shopName") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
+                            className="h-8 text-sm min-w-[80px]"
+                            placeholder="Shop"
+                            data-testid={`input-shop-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={getEditValue(container, "eta") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
+                            className="h-8 text-sm min-w-[110px]"
+                            data-testid={`input-eta-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={getEditValue(container, "transportFee") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
+                            className="h-8 text-sm min-w-[80px]"
+                            placeholder="0.00"
+                            data-testid={`input-transport-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={getEditValue(container, "numberPlate") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
+                            className="h-8 text-sm min-w-[60px]"
+                            placeholder="Plate"
+                            data-testid={`input-plate-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={getEditValue(container, "trackingLocation") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
+                            className="h-8 text-sm min-w-[80px]"
+                            placeholder="Location"
+                            data-testid={`input-location-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={getEditValue(container, "borderDate") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
+                            className="h-8 text-sm min-w-[110px]"
+                            data-testid={`input-border-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={getEditValue(container, "offloadDate") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
+                            className="h-8 text-sm min-w-[110px]"
+                            data-testid={`input-offload-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={getEditValue(container, "agent") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
+                            className="h-8 text-sm min-w-[60px]"
+                            placeholder="Agent"
+                            data-testid={`input-agent-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={getEditValue(container, "dutyFee") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
+                            className="h-8 text-sm min-w-[80px]"
+                            placeholder="0.00"
+                            data-testid={`input-duty-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={!!getEditValue(container, "docReceived")}
+                            onCheckedChange={(checked) => setEditValue(container.id, "docReceived", !!checked)}
+                            data-testid={`checkbox-doc-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={getEditValue(container, "trackingDescription") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
+                            className="h-8 text-sm min-w-[120px]"
+                            placeholder="Notes..."
+                            data-testid={`input-desc-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {hasChanges(container.id) && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => saveTracking(container.id)}
+                              disabled={savingIds.has(container.id)}
+                              data-testid={`button-save-${container.id}`}
+                            >
+                              {savingIds.has(container.id) ? (
+                                <span className="animate-spin">...</span>
+                              ) : (
+                                <Check className="h-4 w-4 text-green-600" />
+                              )}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 

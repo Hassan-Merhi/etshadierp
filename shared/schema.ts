@@ -413,6 +413,19 @@ export const containers = pgTable("containers", {
   itemName: text("item_name"),
   ratePerKg: decimal("rate_per_kg", { precision: 10, scale: 2 }),
   totalKg: decimal("total_kg", { precision: 15, scale: 2 }),
+  // OTW Tracking fields
+  shopName: text("shop_name"),
+  eta: date("eta"),
+  etaSource: text("eta_source").default("manual"), // 'manual' or 'api'
+  transportFee: decimal("transport_fee", { precision: 15, scale: 2 }),
+  numberPlate: varchar("number_plate", { length: 50 }),
+  trackingLocation: text("tracking_location"),
+  borderDate: date("border_date"),
+  offloadDate: date("offload_date"),
+  agent: varchar("agent", { length: 100 }),
+  dutyFee: decimal("duty_fee", { precision: 15, scale: 2 }),
+  docReceived: boolean("doc_received").default(false),
+  trackingDescription: text("tracking_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -13,7 +13,7 @@ import {
   requireRole,
   canDelete,
   checkPOSLocation,
-  requireNonPOS,
+  requireNonPOS, transporter, 
 } from "./auth";
 import {
   insertLocationSchema,
@@ -9100,6 +9100,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update container tracking fields (OTW tracking)
+  app.patch("/api/containers/:id/tracking", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+      
+      const {
+        shopName,
+        eta,
+        etaSource,
+        transportFee,
+        numberPlate,
+        trackingLocation,
+        borderDate,
+        offloadDate,
+        agent,
+        dutyFee,
+        docReceived,
+        trackingDescription,
+      } = req.body;
+      
+      const updateData: any = {};
+      if (shopName !== undefined) updateData.shopName = shopName;
+      if (eta !== undefined) updateData.eta = eta || null;
+      if (etaSource !== undefined) updateData.etaSource = etaSource;
+      if (transportFee !== undefined) updateData.transportFee = transportFee || null;
+      if (numberPlate !== undefined) updateData.numberPlate = numberPlate;
+      if (trackingLocation !== undefined) updateData.trackingLocation = trackingLocation;
+      if (borderDate !== undefined) updateData.borderDate = borderDate || null;
+      if (offloadDate !== undefined) updateData.offloadDate = offloadDate || null;
+      if (agent !== undefined) updateData.agent = agent;
+      if (dutyFee !== undefined) updateData.dutyFee = dutyFee || null;
+      if (docReceived !== undefined) updateData.docReceived = docReceived;
+      if (trackingDescription !== undefined) updateData.trackingDescription = trackingDescription;
+      
+      await db
+        .update(containers)
+        .set(updateData)
+        .where(and(
+          eq(containers.id, id),
+          eq(containers.companyId, req.session.currentCompanyId)
+        ));
+      
+      const [updated] = await db
+        .select()
+        .from(containers)
+        .where(eq(containers.id, id))
+        .limit(1);
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Export single container with all details (JSON)
   app.get("/api/containers/:id/export", requireAuth, requireNonPOS, async (req, res) => {
