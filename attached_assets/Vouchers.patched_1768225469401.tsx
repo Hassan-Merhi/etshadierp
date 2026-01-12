@@ -2099,13 +2099,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     // When editing, we need to add back the original transfer quantities to available stock
     const isEditMode = !!voucherIdToEdit;
 
-    console.log('[STOCK_TRANSFER_DEBUG] Starting validation:', {
-      voucherIdToEdit,
-      isEditMode,
-      stockTransferToEditExists: !!stockTransferToEdit,
-      stockTransferToEditItems: stockTransferToEdit?.items?.length || 0
-    });
-
     // IMPORTANT: in edit mode, make sure we actually have the original stock transfer loaded.
     // If it's not in cache yet (common when you only change destination and submit quickly),
     // fetch it so the "add back original qty" logic works reliably.
@@ -2113,25 +2106,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (isEditMode && voucherIdToEdit) {
       let st = stockTransferToEdit as any | undefined;
 
-      console.log('[STOCK_TRANSFER_DEBUG] Edit mode - stockTransferToEdit:', st);
-
       if (!st) {
-        console.log('[STOCK_TRANSFER_DEBUG] stockTransferToEdit not cached, fetching...');
         try {
           const res = await fetch(`/api/stock-transfers?voucherId=${voucherIdToEdit}`);
           if (res.ok) {
             const data = await res.json();
             st = Array.isArray(data) ? data[0] : data;
-            console.log('[STOCK_TRANSFER_DEBUG] Fetched stock transfer:', st);
           }
         } catch (e) {
-          console.log('[STOCK_TRANSFER_DEBUG] Fetch error:', e);
+          // ignore here; we'll handle empty originalItems below
         }
       }
 
       originalItems = st?.items || [];
-      console.log('[STOCK_TRANSFER_DEBUG] Original items:', originalItems);
-      
       if (!originalItems.length) {
         toast({
           title: "Loading",
@@ -2151,14 +2138,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const stockItemId = Number(orig.stockItemId);
       const sourceLocId = orig.sourceLocationId != null ? Number(orig.sourceLocationId) : null;
       
-      console.log('[STOCK_TRANSFER_DEBUG] Processing original item:', {
-        rawStockItemId: orig.stockItemId,
-        rawSourceLocationId: orig.sourceLocationId,
-        convertedStockItemId: stockItemId,
-        convertedSourceLocId: sourceLocId,
-        qty
-      });
-      
       // Always aggregate by stockItemId alone (for fallback matching)
       originalQtyByStockItemOnly.set(
         stockItemId, 
@@ -2172,22 +2151,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     });
     
-    console.log('[STOCK_TRANSFER_DEBUG] Maps built:', {
-      originalQtyMap: Object.fromEntries(originalQtyMap),
-      originalQtyByStockItemOnly: Object.fromEntries(originalQtyByStockItemOnly)
-    });
-    
     const inventoryValidationPromises = validEntries.map(entry => {
       const entryStockItemId = Number(entry.stockItemId);
       const entrySourceLocId = Number(entry.sourceLocationId);
-      
-      console.log('[STOCK_TRANSFER_DEBUG] Validating entry:', {
-        rawEntryStockItemId: entry.stockItemId,
-        rawEntrySourceLocId: entry.sourceLocationId,
-        entryStockItemId,
-        entrySourceLocId,
-        quantity: entry.quantity
-      });
       
       return fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
         .then(res => res.json())
@@ -2196,48 +2162,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           let availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           const requestedQty = parseFloat(entry.quantity);
           
-          console.log('[STOCK_TRANSFER_DEBUG] Inventory lookup:', {
-            entryStockItemId,
-            foundItem: !!availableItem,
-            inventoryQty: availableQty,
-            requestedQty
-          });
-          
           // In edit mode, add back the original quantity for this item
           // This accounts for the fact that the original transfer is already reflected in inventory
           if (isEditMode) {
             const preciseKey = `${entryStockItemId}-${entrySourceLocId}`;
-            const hasPreciseKey = originalQtyMap.has(preciseKey);
-            const preciseQty = originalQtyMap.get(preciseKey);
-            const fallbackQty = originalQtyByStockItemOnly.get(entryStockItemId);
-            
-            console.log('[STOCK_TRANSFER_DEBUG] Edit mode lookup:', {
-              preciseKey,
-              hasPreciseKey,
-              preciseQty,
-              fallbackQty,
-              availableQtyBefore: availableQty
-            });
             
             // First try precise match (stockItemId + sourceLocationId)
-            if (hasPreciseKey) {
-              availableQty += preciseQty!;
-              console.log('[STOCK_TRANSFER_DEBUG] Added precise qty:', preciseQty, 'new availableQty:', availableQty);
+            if (originalQtyMap.has(preciseKey)) {
+              availableQty += originalQtyMap.get(preciseKey)!;
             } else {
               // Fallback: use total original qty for this stockItemId (legacy records with null sourceLocationId)
+              const fallbackQty = originalQtyByStockItemOnly.get(entryStockItemId);
               if (fallbackQty) {
                 availableQty += fallbackQty;
-                console.log('[STOCK_TRANSFER_DEBUG] Added fallback qty:', fallbackQty, 'new availableQty:', availableQty);
-              } else {
-                console.log('[STOCK_TRANSFER_DEBUG] NO MATCH FOUND - original qty NOT added back!');
               }
             }
-            
-            console.log('[STOCK_TRANSFER_DEBUG] Final comparison:', {
-              availableQty,
-              requestedQty,
-              willPass: requestedQty <= availableQty
-            });
           }
           
           if (requestedQty > availableQty) {
