@@ -2107,8 +2107,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     
     originalItems.forEach((orig: any) => {
       const qty = parseFloat(orig.quantity || "0");
-      const stockItemId = orig.stockItemId;
-      const sourceLocId = orig.sourceLocationId;
+      const stockItemId = Number(orig.stockItemId);
+      const sourceLocId = orig.sourceLocationId != null ? Number(orig.sourceLocationId) : null;
       
       // Always aggregate by stockItemId alone (for fallback matching)
       originalQtyByStockItemOnly.set(
@@ -2134,14 +2134,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           // In edit mode, add back the original quantity for this item
           // This accounts for the fact that the original transfer is already reflected in inventory
           if (isEditMode) {
-            const preciseKey = `${entry.stockItemId}-${entry.sourceLocationId}`;
+            const entryStockItemId = Number(entry.stockItemId);
+            const entrySourceLocId = Number(entry.sourceLocationId);
+            const preciseKey = `${entryStockItemId}-${entrySourceLocId}`;
             
             // First try precise match (stockItemId + sourceLocationId)
             if (originalQtyMap.has(preciseKey)) {
               availableQty += originalQtyMap.get(preciseKey)!;
             } else {
               // Fallback: use total original qty for this stockItemId (legacy records with null sourceLocationId)
-              const fallbackQty = originalQtyByStockItemOnly.get(entry.stockItemId);
+              const fallbackQty = originalQtyByStockItemOnly.get(entryStockItemId);
               if (fallbackQty) {
                 availableQty += fallbackQty;
               }
