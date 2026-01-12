@@ -897,7 +897,7 @@ export default function Containers() {
                             value={getEditValue(container, "shopName") as string || ""}
                             onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 0)}
-                            className="h-8 text-sm min-w-[120px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Shop"
                             data-testid={`input-shop-${container.id}`}
                           />
@@ -909,7 +909,7 @@ export default function Containers() {
                             value={getEditValue(container, "eta") as string || ""}
                             onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 1)}
-                            className="h-8 text-sm min-w-[140px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-eta-${container.id}`}
                           />
                         </TableCell>
@@ -919,7 +919,7 @@ export default function Containers() {
                             value={getEditValue(container, "transporter") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transporter", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
-                            className="h-8 text-sm min-w-[140px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Transporter"
                             data-testid={`input-transporter-${container.id}`}
                           />
@@ -931,7 +931,7 @@ export default function Containers() {
                             value={getEditValue(container, "transportFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
-                            className="h-8 text-sm min-w-[100px]"
+                            className="h-8 text-sm w-full"
                             placeholder="0.00"
                             data-testid={`input-transport-${container.id}`}
                           />
@@ -942,7 +942,7 @@ export default function Containers() {
                             value={getEditValue(container, "numberPlate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
-                            className="h-8 text-sm min-w-[120px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Plate"
                             data-testid={`input-plate-${container.id}`}
                           />
@@ -953,7 +953,7 @@ export default function Containers() {
                             value={getEditValue(container, "trackingLocation") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
-                            className="h-8 text-sm min-w-[140px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Location"
                             data-testid={`input-location-${container.id}`}
                           />
@@ -965,7 +965,7 @@ export default function Containers() {
                             value={getEditValue(container, "borderDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
-                            className="h-8 text-sm min-w-[140px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-border-${container.id}`}
                           />
                         </TableCell>
@@ -976,7 +976,7 @@ export default function Containers() {
                             value={getEditValue(container, "offloadDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
-                            className="h-8 text-sm min-w-[140px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-offload-${container.id}`}
                           />
                         </TableCell>
@@ -986,7 +986,7 @@ export default function Containers() {
                             value={getEditValue(container, "agent") as string || ""}
                             onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
-                            className="h-8 text-sm min-w-[120px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Agent"
                             data-testid={`input-agent-${container.id}`}
                           />
@@ -998,7 +998,7 @@ export default function Containers() {
                             value={getEditValue(container, "dutyFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 9)}
-                            className="h-8 text-sm min-w-[100px]"
+                            className="h-8 text-sm w-full"
                             placeholder="0.00"
                             data-testid={`input-duty-${container.id}`}
                           />
@@ -1017,7 +1017,7 @@ export default function Containers() {
                             value={getEditValue(container, "trackingDescription") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 11)}
-                            className="h-8 text-sm min-w-[180px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
                           />
