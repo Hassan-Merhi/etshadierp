@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin } from "lucide-react";
+import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,11 +55,13 @@ export default function Containers() {
   const [trackingEdits, setTrackingEdits] = useState<TrackingEdit>({});
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const tableRef = useRef<HTMLTableElement>(null);
   
-  const trackingFields = ["shopName", "eta", "transportFee", "numberPlate", "trackingLocation", "borderDate", "offloadDate", "agent", "dutyFee", "docReceived", "trackingDescription"] as const;
+  const trackingFields = ["shopName", "eta", "transporter", "transportFee", "numberPlate", "trackingLocation", "borderDate", "offloadDate", "agent", "dutyFee", "docReceived", "trackingDescription"] as const;
   
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers/active", selectedCompany?.id],
@@ -192,6 +194,7 @@ export default function Containers() {
       Amount: parseFloat(c.grandTotal || "0"),
       Shop: c.shopName || "",
       ETA: c.eta || "",
+      Transporter: c.transporter || "",
       "Transport Fee": c.transportFee || "",
       "Number Plate": c.numberPlate || "",
       Location: c.trackingLocation || "",
@@ -207,6 +210,69 @@ export default function Containers() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "OTW Containers");
     XLSX.writeFile(workbook, "otw_containers.xlsx");
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(sheet);
+      
+      // Map Excel columns to API fields
+      const rows = jsonData.map((row: any) => ({
+        containerNumber: row["Container #"] || row["Container Number"] || row["containerNumber"] || "",
+        shopName: row["Shop"] || row["Shop Name"] || row["shopName"] || "",
+        eta: row["ETA"] || row["eta"] || "",
+        transporter: row["Transporter"] || row["transporter"] || "",
+        transportFee: row["Transport Fee"] || row["transportFee"] || "",
+        numberPlate: row["Number Plate"] || row["Plate"] || row["numberPlate"] || "",
+        trackingLocation: row["Location"] || row["trackingLocation"] || "",
+        borderDate: row["Border Date"] || row["borderDate"] || "",
+        offloadDate: row["Offload Date"] || row["offloadDate"] || "",
+        agent: row["Agent"] || row["agent"] || "",
+        dutyFee: row["Duty Fee"] || row["dutyFee"] || "",
+        docReceived: row["Doc Received"] || row["docReceived"] || "",
+        trackingDescription: row["Description"] || row["trackingDescription"] || "",
+      }));
+      
+      const response = await apiRequest("POST", "/api/containers/tracking/import", { rows });
+      const result = await response.json();
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
+      
+      if (result.errors && result.errors.length > 0) {
+        toast({
+          title: `Import completed with issues`,
+          description: `${result.updated} updated, ${result.notFound} not found. ${result.errors[0]}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Import successful",
+          description: `${result.updated} container(s) updated`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const getEditValue = (container: Container, field: keyof Container) => {
@@ -405,6 +471,24 @@ export default function Containers() {
               <Download className="h-4 w-4" />
               Export OTW
             </Button>
+            <Button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-import-otw"
+            >
+              <Upload className="h-4 w-4" />
+              {isImporting ? "Importing..." : "Import Excel"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileImport}
+              className="hidden"
+              data-testid="input-import-file"
+            />
           </div>
         )}
       </div>
@@ -634,6 +718,7 @@ export default function Containers() {
                       <TableHead className="min-w-[100px]">Amount</TableHead>
                       <TableHead className="min-w-[100px]">Shop</TableHead>
                       <TableHead className="min-w-[100px]">ETA</TableHead>
+                      <TableHead className="min-w-[100px]">Transporter</TableHead>
                       <TableHead className="min-w-[100px]">Transport Fee</TableHead>
                       <TableHead className="min-w-[80px]">Plate</TableHead>
                       <TableHead className="min-w-[100px]">Location</TableHead>
@@ -682,11 +767,22 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-transporter`}
+                            value={getEditValue(container, "transporter") as string || ""}
+                            onChange={(e) => setEditValue(container.id, "transporter", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
+                            className="h-8 text-sm min-w-[80px]"
+                            placeholder="Transporter"
+                            data-testid={`input-transporter-${container.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
                             id={`tracking-${container.id}-transportFee`}
                             type="number"
                             value={getEditValue(container, "transportFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="0.00"
                             data-testid={`input-transport-${container.id}`}
@@ -697,7 +793,7 @@ export default function Containers() {
                             id={`tracking-${container.id}-numberPlate`}
                             value={getEditValue(container, "numberPlate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
                             className="h-8 text-sm min-w-[60px]"
                             placeholder="Plate"
                             data-testid={`input-plate-${container.id}`}
@@ -708,7 +804,7 @@ export default function Containers() {
                             id={`tracking-${container.id}-trackingLocation`}
                             value={getEditValue(container, "trackingLocation") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="Location"
                             data-testid={`input-location-${container.id}`}
@@ -720,7 +816,7 @@ export default function Containers() {
                             type="date"
                             value={getEditValue(container, "borderDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
                             className="h-8 text-sm min-w-[110px]"
                             data-testid={`input-border-${container.id}`}
                           />
@@ -731,7 +827,7 @@ export default function Containers() {
                             type="date"
                             value={getEditValue(container, "offloadDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
                             className="h-8 text-sm min-w-[110px]"
                             data-testid={`input-offload-${container.id}`}
                           />
@@ -741,7 +837,7 @@ export default function Containers() {
                             id={`tracking-${container.id}-agent`}
                             value={getEditValue(container, "agent") as string || ""}
                             onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
                             className="h-8 text-sm min-w-[60px]"
                             placeholder="Agent"
                             data-testid={`input-agent-${container.id}`}
@@ -753,7 +849,7 @@ export default function Containers() {
                             type="number"
                             value={getEditValue(container, "dutyFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 9)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="0.00"
                             data-testid={`input-duty-${container.id}`}
@@ -772,7 +868,7 @@ export default function Containers() {
                             id={`tracking-${container.id}-trackingDescription`}
                             value={getEditValue(container, "trackingDescription") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 10)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 11)}
                             className="h-8 text-sm min-w-[120px]"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
