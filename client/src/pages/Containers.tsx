@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin, Upload } from "lucide-react";
+import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin, Upload, FileSpreadsheet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -210,6 +210,29 @@ export default function Containers() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "OTW Containers");
     XLSX.writeFile(workbook, "otw_containers.xlsx");
+  };
+
+  const downloadImportTemplate = () => {
+    const templateData = [{
+      "Container #": "",
+      "Shop": "",
+      "ETA": "",
+      "Transporter": "",
+      "Transport Fee": "",
+      "Number Plate": "",
+      "Location": "",
+      "Border Date": "",
+      "Offload Date": "",
+      "Agent": "",
+      "Duty Fee": "",
+      "Doc Received": "",
+      "Description": "",
+    }];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Import Template");
+    XLSX.writeFile(workbook, "container_import_template.xlsx");
   };
 
   const handleImportClick = () => {
@@ -470,6 +493,15 @@ export default function Containers() {
             >
               <Download className="h-4 w-4" />
               Export OTW
+            </Button>
+            <Button
+              onClick={downloadImportTemplate}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-download-template"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Template
             </Button>
             <Button
               onClick={handleImportClick}
