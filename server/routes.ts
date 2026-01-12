@@ -83,6 +83,7 @@ import {
   creditNoteItems,
   systemSettings,
   updateContainerTrackingSchema,
+  containerTrackingImportRowSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -9125,6 +9126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopName,
         eta,
         etaSource,
+        transporter,
         transportFee,
         numberPlate,
         trackingLocation,
@@ -9140,6 +9142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (shopName !== undefined) updateData.shopName = shopName;
       if (eta !== undefined) updateData.eta = eta || null;
       if (etaSource !== undefined) updateData.etaSource = etaSource;
+      if (transporter !== undefined) updateData.transporter = transporter;
       if (transportFee !== undefined) updateData.transportFee = transportFee || null;
       if (numberPlate !== undefined) updateData.numberPlate = numberPlate;
       if (trackingLocation !== undefined) updateData.trackingLocation = trackingLocation;
@@ -9172,6 +9175,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Bulk import container tracking from Excel data
+  app.post("/api/containers/tracking/import", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      
+      const { rows } = req.body;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No data provided" });
+      }
+      
+      let updated = 0;
+      let notFound = 0;
+      const errors: string[] = [];
+      
+      for (const row of rows) {
+        try {
+          const parseResult = containerTrackingImportRowSchema.safeParse(row);
+          if (!parseResult.success) {
+            errors.push(`Invalid row data for ${row.containerNumber || 'unknown'}`);
+            continue;
+          }
+          
+          const data = parseResult.data;
+          const containerNumber = data.containerNumber?.trim();
+          if (!containerNumber) {
+            errors.push("Missing container number in row");
+            continue;
+          }
+          
+          // Find container by number
+          const [container] = await db
+            .select()
+            .from(containers)
+            .where(and(
+              eq(containers.containerNumber, containerNumber),
+              eq(containers.companyId, req.session.currentCompanyId!)
+            ))
+            .limit(1);
+          
+          if (!container) {
+            notFound++;
+            errors.push(`Container not found: ${containerNumber}`);
+            continue;
+          }
+          
+          // Build update object
+          const updateData: any = {};
+          if (data.shopName) updateData.shopName = data.shopName;
+          if (data.eta) updateData.eta = data.eta;
+          if (data.transporter) updateData.transporter = data.transporter;
+          if (data.transportFee) updateData.transportFee = data.transportFee;
+          if (data.numberPlate) updateData.numberPlate = data.numberPlate;
+          if (data.trackingLocation) updateData.trackingLocation = data.trackingLocation;
+          if (data.borderDate) updateData.borderDate = data.borderDate;
+          if (data.offloadDate) updateData.offloadDate = data.offloadDate;
+          if (data.agent) updateData.agent = data.agent;
+          if (data.dutyFee) updateData.dutyFee = data.dutyFee;
+          if (data.docReceived !== undefined) {
+            updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "TRUE" || data.docReceived === "true";
+          }
+          if (data.trackingDescription) updateData.trackingDescription = data.trackingDescription;
+          
+          if (Object.keys(updateData).length > 0) {
+            await db
+              .update(containers)
+              .set(updateData)
+              .where(eq(containers.id, container.id));
+            updated++;
+          }
+        } catch (rowError: any) {
+          errors.push(`Error processing ${row.containerNumber || 'unknown'}: ${rowError.message}`);
+        }
+      }
+      
+      res.json({
+        success: true,
+        updated,
+        notFound,
+        total: rows.length,
+        errors: errors.slice(0, 10), // Return first 10 errors
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
