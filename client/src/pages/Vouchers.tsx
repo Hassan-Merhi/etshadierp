@@ -2100,6 +2100,29 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     const isEditMode = !!voucherIdToEdit;
     const originalItems = isEditMode && stockTransferToEdit?.items ? stockTransferToEdit.items : [];
     
+    // Build a map of original quantities: key = "stockItemId" or "stockItemId-sourceLocationId"
+    // This aggregates ALL original quantities per stockItemId for proper restoration
+    const originalQtyMap = new Map<string, number>();
+    const originalQtyByStockItemOnly = new Map<number, number>();
+    
+    originalItems.forEach((orig: any) => {
+      const qty = parseFloat(orig.quantity || "0");
+      const stockItemId = orig.stockItemId;
+      const sourceLocId = orig.sourceLocationId;
+      
+      // Always aggregate by stockItemId alone (for fallback matching)
+      originalQtyByStockItemOnly.set(
+        stockItemId, 
+        (originalQtyByStockItemOnly.get(stockItemId) || 0) + qty
+      );
+      
+      // Also aggregate by stockItemId + sourceLocationId (for precise matching)
+      if (sourceLocId && sourceLocId > 0) {
+        const key = `${stockItemId}-${sourceLocId}`;
+        originalQtyMap.set(key, (originalQtyMap.get(key) || 0) + qty);
+      }
+    });
+    
     const inventoryValidationPromises = validEntries.map(entry =>
       fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
         .then(res => res.json())
@@ -2108,23 +2131,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           let availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           const requestedQty = parseFloat(entry.quantity);
           
-          // In edit mode, add back the original quantity for this item from this source location
+          // In edit mode, add back the original quantity for this item
           // This accounts for the fact that the original transfer is already reflected in inventory
           if (isEditMode) {
-            // First try to find by both stockItemId and sourceLocationId (new records)
-            let originalItem = originalItems.find((orig: any) => 
-              orig.stockItemId === entry.stockItemId && 
-              orig.sourceLocationId === entry.sourceLocationId
-            );
-            // Fall back to stockItemId only for legacy records where sourceLocationId is NULL
-            if (!originalItem) {
-              originalItem = originalItems.find((orig: any) => 
-                orig.stockItemId === entry.stockItemId && 
-                (orig.sourceLocationId === null || orig.sourceLocationId === undefined)
-              );
-            }
-            if (originalItem) {
-              availableQty += parseFloat(originalItem.quantity || "0");
+            const preciseKey = `${entry.stockItemId}-${entry.sourceLocationId}`;
+            
+            // First try precise match (stockItemId + sourceLocationId)
+            if (originalQtyMap.has(preciseKey)) {
+              availableQty += originalQtyMap.get(preciseKey)!;
+            } else {
+              // Fallback: use total original qty for this stockItemId (legacy records with null sourceLocationId)
+              const fallbackQty = originalQtyByStockItemOnly.get(entry.stockItemId);
+              if (fallbackQty) {
+                availableQty += fallbackQty;
+              }
             }
           }
           
