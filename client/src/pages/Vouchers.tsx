@@ -2123,19 +2123,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     });
     
-    const inventoryValidationPromises = validEntries.map(entry =>
-      fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
+    const inventoryValidationPromises = validEntries.map(entry => {
+      const entryStockItemId = Number(entry.stockItemId);
+      const entrySourceLocId = Number(entry.sourceLocationId);
+      
+      return fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
         .then(res => res.json())
         .then(inventory => {
-          const availableItem = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
+          const availableItem = inventory.find((item: any) => Number(item.stockItemId) === entryStockItemId);
           let availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           const requestedQty = parseFloat(entry.quantity);
           
           // In edit mode, add back the original quantity for this item
           // This accounts for the fact that the original transfer is already reflected in inventory
           if (isEditMode) {
-            const entryStockItemId = Number(entry.stockItemId);
-            const entrySourceLocId = Number(entry.sourceLocationId);
             const preciseKey = `${entryStockItemId}-${entrySourceLocId}`;
             
             // First try precise match (stockItemId + sourceLocationId)
@@ -2151,8 +2152,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           }
           
           if (requestedQty > availableQty) {
-            const item = stockItems.find(s => s.id === entry.stockItemId);
-            const sourceLocation = locations.find(l => l.id === entry.sourceLocationId);
+            const item = stockItems.find(s => s.id === entryStockItemId);
+            const sourceLocation = locations.find(l => l.id === entrySourceLocId);
             return {
               success: false,
               error: `${item?.name} has only ${formatNumber(availableQty)} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
@@ -2163,8 +2164,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         .catch(err => ({
           success: false,
           error: `Failed to validate inventory: ${err.message}`
-        }))
-    );
+        }));
+    });
 
     const results = await Promise.all(inventoryValidationPromises);
     const failedValidation = results.find(r => !r.success);
