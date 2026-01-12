@@ -9240,7 +9240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (data.agent) updateData.agent = data.agent;
           if (data.dutyFee) updateData.dutyFee = data.dutyFee;
           if (data.docReceived !== undefined) {
-            updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "TRUE" || data.docReceived === "true";
+            updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "YES" || data.docReceived === "TRUE" || data.docReceived === "true";
           }
           if (data.trackingDescription) updateData.trackingDescription = data.trackingDescription;
           

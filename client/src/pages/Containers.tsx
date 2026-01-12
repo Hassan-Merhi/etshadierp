@@ -51,6 +51,12 @@ export default function Containers() {
   const [statusFilter, setStatusFilter] = useState("OTW");
   const [supplierFilter, setSupplierFilter] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
+  // OTW Tracking filters
+  const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
+  const [otwSupplierFilter, setOtwSupplierFilter] = useState("ALL");
+  const [otwAgentFilter, setOtwAgentFilter] = useState("ALL");
+  const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
+  const [otwDocReceivedFilter, setOtwDocReceivedFilter] = useState("ALL");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [trackingEdits, setTrackingEdits] = useState<TrackingEdit>({});
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
@@ -107,14 +113,46 @@ export default function Containers() {
   });
 
   const otwContainers = allContainers.filter((c) => c.status === "OTW");
+  
+  // Extract unique values for OTW filters
+  const uniqueOtwLocations = Array.from(new Set(otwContainers.map(c => c.trackingLocation).filter(Boolean) as string[])).sort();
+  const uniqueOtwAgents = Array.from(new Set(otwContainers.map(c => c.agent).filter(Boolean) as string[])).sort();
+  const uniqueOtwTransporters = Array.from(new Set(otwContainers.map(c => c.transporter).filter(Boolean) as string[])).sort();
+  const uniqueOtwSuppliers = Array.from(new Set(otwContainers.map(c => c.supplierId))).sort((a, b) => a - b);
+  
   const filteredOtwContainers = otwContainers.filter((c) => {
-    if (!otwSearchTerm) return true;
-    const search = otwSearchTerm.toLowerCase();
-    return (
-      c.containerNumber.toLowerCase().includes(search) ||
-      (c.shopName?.toLowerCase() || "").includes(search) ||
-      (c.agent?.toLowerCase() || "").includes(search)
-    );
+    // Search filter
+    if (otwSearchTerm) {
+      const search = otwSearchTerm.toLowerCase();
+      if (!(c.containerNumber.toLowerCase().includes(search) ||
+          (c.shopName?.toLowerCase() || "").includes(search) ||
+          (c.agent?.toLowerCase() || "").includes(search))) {
+        return false;
+      }
+    }
+    // Location filter
+    if (otwLocationFilter !== "ALL" && (c.trackingLocation || "") !== otwLocationFilter) {
+      return false;
+    }
+    // Supplier filter
+    if (otwSupplierFilter !== "ALL" && c.supplierId.toString() !== otwSupplierFilter) {
+      return false;
+    }
+    // Agent filter
+    if (otwAgentFilter !== "ALL" && (c.agent || "") !== otwAgentFilter) {
+      return false;
+    }
+    // Transporter filter
+    if (otwTransporterFilter !== "ALL" && (c.transporter || "") !== otwTransporterFilter) {
+      return false;
+    }
+    // Doc Received filter
+    if (otwDocReceivedFilter !== "ALL") {
+      const docValue = c.docReceived === true;
+      if (otwDocReceivedFilter === "YES" && !docValue) return false;
+      if (otwDocReceivedFilter === "NO" && docValue) return false;
+    }
+    return true;
   });
 
   const filteredSoldContainers = soldContainers.filter((sale) => {
@@ -738,8 +776,8 @@ export default function Containers() {
         </TabsContent>
 
         <TabsContent value="otw" className="space-y-4 mt-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by container, shop, or agent..."
@@ -749,6 +787,60 @@ export default function Containers() {
                 data-testid="input-search-otw"
               />
             </div>
+            <Select value={otwSupplierFilter} onValueChange={setOtwSupplierFilter}>
+              <SelectTrigger className="w-[130px]" data-testid="select-otw-supplier">
+                <SelectValue placeholder="Supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Suppliers</SelectItem>
+                {uniqueOtwSuppliers.map(id => (
+                  <SelectItem key={id} value={id.toString()}>{getSupplierName(id)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={otwLocationFilter} onValueChange={setOtwLocationFilter}>
+              <SelectTrigger className="w-[130px]" data-testid="select-otw-location">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Locations</SelectItem>
+                {uniqueOtwLocations.map(loc => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={otwAgentFilter} onValueChange={setOtwAgentFilter}>
+              <SelectTrigger className="w-[100px]" data-testid="select-otw-agent">
+                <SelectValue placeholder="Agent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Agents</SelectItem>
+                {uniqueOtwAgents.map(agent => (
+                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={otwTransporterFilter} onValueChange={setOtwTransporterFilter}>
+              <SelectTrigger className="w-[120px]" data-testid="select-otw-transporter">
+                <SelectValue placeholder="Transporter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Transporters</SelectItem>
+                {uniqueOtwTransporters.map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={otwDocReceivedFilter} onValueChange={setOtwDocReceivedFilter}>
+              <SelectTrigger className="w-[100px]" data-testid="select-otw-doc">
+                <SelectValue placeholder="Doc" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Docs</SelectItem>
+                <SelectItem value="YES">Doc Received</SelectItem>
+                <SelectItem value="NO">No Doc</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {filteredOtwContainers.length === 0 ? (
@@ -765,26 +857,26 @@ export default function Containers() {
             </Card>
           ) : (
             <Card>
-              <CardContent className="p-0 overflow-x-auto">
-                <Table>
+              <CardContent className="p-0">
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[120px]">Container #</TableHead>
-                      <TableHead className="min-w-[100px]">Supplier</TableHead>
-                      <TableHead className="min-w-[100px]">Amount</TableHead>
-                      <TableHead className="min-w-[100px]">Shop</TableHead>
-                      <TableHead className="min-w-[100px]">ETA</TableHead>
-                      <TableHead className="min-w-[100px]">Transporter</TableHead>
-                      <TableHead className="min-w-[100px]">Transport Fee</TableHead>
-                      <TableHead className="min-w-[80px]">Plate</TableHead>
-                      <TableHead className="min-w-[100px]">Location</TableHead>
-                      <TableHead className="min-w-[100px]">Border Date</TableHead>
-                      <TableHead className="min-w-[100px]">Offload Date</TableHead>
-                      <TableHead className="min-w-[80px]">Agent</TableHead>
-                      <TableHead className="min-w-[100px]">Duty Fee</TableHead>
-                      <TableHead className="min-w-[60px]">Doc</TableHead>
-                      <TableHead className="min-w-[150px]">Description</TableHead>
-                      <TableHead className="min-w-[60px]">Save</TableHead>
+                      <TableHead className="w-[100px]">Container #</TableHead>
+                      <TableHead className="w-[80px]">Supplier</TableHead>
+                      <TableHead className="w-[70px]">Amount</TableHead>
+                      <TableHead className="w-[70px]">Shop</TableHead>
+                      <TableHead className="w-[95px]">ETA</TableHead>
+                      <TableHead className="w-[85px]">Transporter</TableHead>
+                      <TableHead className="w-[70px]">Fee</TableHead>
+                      <TableHead className="w-[70px]">Plate</TableHead>
+                      <TableHead className="w-[85px]">Location</TableHead>
+                      <TableHead className="w-[95px]">Border</TableHead>
+                      <TableHead className="w-[95px]">Offload</TableHead>
+                      <TableHead className="w-[55px]">Agent</TableHead>
+                      <TableHead className="w-[60px]">Duty</TableHead>
+                      <TableHead className="w-[40px]">Doc</TableHead>
+                      <TableHead className="w-[100px]">Description</TableHead>
+                      <TableHead className="w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -805,7 +897,7 @@ export default function Containers() {
                             value={getEditValue(container, "shopName") as string || ""}
                             onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 0)}
-                            className="h-8 text-sm min-w-[80px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Shop"
                             data-testid={`input-shop-${container.id}`}
                           />
@@ -817,7 +909,7 @@ export default function Containers() {
                             value={getEditValue(container, "eta") as string || ""}
                             onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 1)}
-                            className="h-8 text-sm min-w-[110px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-eta-${container.id}`}
                           />
                         </TableCell>
@@ -827,7 +919,7 @@ export default function Containers() {
                             value={getEditValue(container, "transporter") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transporter", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
-                            className="h-8 text-sm min-w-[80px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Transporter"
                             data-testid={`input-transporter-${container.id}`}
                           />
@@ -839,7 +931,7 @@ export default function Containers() {
                             value={getEditValue(container, "transportFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
-                            className="h-8 text-sm min-w-[80px]"
+                            className="h-8 text-sm w-full"
                             placeholder="0.00"
                             data-testid={`input-transport-${container.id}`}
                           />
@@ -850,7 +942,7 @@ export default function Containers() {
                             value={getEditValue(container, "numberPlate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
-                            className="h-8 text-sm min-w-[60px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Plate"
                             data-testid={`input-plate-${container.id}`}
                           />
@@ -861,7 +953,7 @@ export default function Containers() {
                             value={getEditValue(container, "trackingLocation") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
-                            className="h-8 text-sm min-w-[80px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Location"
                             data-testid={`input-location-${container.id}`}
                           />
@@ -873,7 +965,7 @@ export default function Containers() {
                             value={getEditValue(container, "borderDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
-                            className="h-8 text-sm min-w-[110px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-border-${container.id}`}
                           />
                         </TableCell>
@@ -884,7 +976,7 @@ export default function Containers() {
                             value={getEditValue(container, "offloadDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
-                            className="h-8 text-sm min-w-[110px]"
+                            className="h-8 text-sm w-full"
                             data-testid={`input-offload-${container.id}`}
                           />
                         </TableCell>
@@ -894,7 +986,7 @@ export default function Containers() {
                             value={getEditValue(container, "agent") as string || ""}
                             onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
-                            className="h-8 text-sm min-w-[60px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Agent"
                             data-testid={`input-agent-${container.id}`}
                           />
@@ -906,7 +998,7 @@ export default function Containers() {
                             value={getEditValue(container, "dutyFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 9)}
-                            className="h-8 text-sm min-w-[80px]"
+                            className="h-8 text-sm w-full"
                             placeholder="0.00"
                             data-testid={`input-duty-${container.id}`}
                           />
@@ -925,7 +1017,7 @@ export default function Containers() {
                             value={getEditValue(container, "trackingDescription") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 11)}
-                            className="h-8 text-sm min-w-[120px]"
+                            className="h-8 text-sm w-full"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
                           />
