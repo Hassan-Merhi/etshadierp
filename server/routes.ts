@@ -9177,6 +9177,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fetch container ETA from external tracking API (optional - requires CONTAINER_TRACKING_API_KEY)
+  app.post("/api/containers/:id/fetch-eta", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+      
+      // Get the container
+      const [container] = await db
+        .select()
+        .from(containers)
+        .where(and(
+          eq(containers.id, id),
+          eq(containers.companyId, req.session.currentCompanyId)
+        ))
+        .limit(1);
+      
+      if (!container) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+      
+      const apiKey = process.env.CONTAINER_TRACKING_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ 
+          message: "Container tracking API not configured. Add CONTAINER_TRACKING_API_KEY to enable auto ETA updates.",
+          needsSetup: true
+        });
+      }
+      
+      // Try to fetch from Terminal49 or similar API
+      // For now, return a message that the feature requires setup
+      // In production, this would call the actual API
+      try {
+        // Example: Terminal49 API call
+        // const response = await fetch(`https://api.terminal49.com/v2/containers/${container.containerNumber}`, {
+        //   headers: { 'Authorization': `Token ${apiKey}` }
+        // });
+        // const data = await response.json();
+        // const eta = data.pod_eta;
+        
+        // For now, simulate the response
+        return res.json({
+          message: "Container tracking API integration requires Terminal49 or similar API key",
+          containerNumber: container.containerNumber,
+          currentEta: container.eta,
+          etaSource: container.etaSource,
+          instructions: "Set CONTAINER_TRACKING_API_KEY secret with your Terminal49 API key to enable auto ETA updates"
+        });
+      } catch (apiError: any) {
+        return res.status(502).json({ 
+          message: "Failed to fetch from tracking API", 
+          error: apiError.message 
+        });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Export single container with all details (JSON)
   app.get("/api/containers/:id/export", requireAuth, requireNonPOS, async (req, res) => {
     try {

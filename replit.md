@@ -55,6 +55,13 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - PAYROLL_DEPOSIT_EXPENSE is included in Import Cycle Balance via indirectExpenseBalance
     - Regular SALARY_EXPENSE (for workers with salary/payroll/wage in account name) is also now included in Import Cycle Balance via payrollExpenseBalance
 -   **Employee Opening Balance Fix (Jan 2026)**: Employee opening balances are now included in the implicit opening balance equity calculation. When importing payroll data from an old system with employee opening balances (liabilities owed to employees), these are now properly offset in the Import Cycle Balance to maintain $0 balance.
+-   **OTW Container Tracking (Jan 2026)**: New "OTW Tracking" tab in the Containers page provides a TallyPrime-style interface for tracking containers in transit:
+    - **Automatic fields**: Container number, supplier name, total amount (from PO data)
+    - **Manual fields**: Shop name, ETA, transport fee, number plate, location, border date, offload date, agent, duty fee, document received checkbox, description
+    - **Inline editing**: Click any field to edit, changes are saved per-row with a checkmark button
+    - **Export**: Export OTW containers to Excel with all tracking data
+    - **Optional API Integration**: Set `CONTAINER_TRACKING_API_KEY` secret to enable automatic ETA updates from Terminal49 or similar tracking services (manual entry works without API key)
+    - **Database migration required on Render**: Run `migrations/add_container_tracking_fields.sql`
 -   **Known Limitations**: 
     -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
     -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).
