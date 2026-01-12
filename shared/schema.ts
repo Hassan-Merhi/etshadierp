@@ -1778,19 +1778,19 @@ export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSche
 
 // Container tracking Excel import schema
 export const containerTrackingImportRowSchema = z.object({
-  containerNumber: z.string(),
-  shopName: z.string().optional(),
-  eta: z.string().optional(),
-  transporter: z.string().optional(),
-  transportFee: z.string().optional(),
-  numberPlate: z.string().optional(),
-  trackingLocation: z.string().optional(),
-  borderDate: z.string().optional(),
-  offloadDate: z.string().optional(),
-  agent: z.string().optional(),
-  dutyFee: z.string().optional(),
-  docReceived: z.union([z.boolean(), z.string()]).optional(),
-  trackingDescription: z.string().optional(),
+  containerNumber: z.coerce.string(),
+  shopName: z.coerce.string().optional(),
+  eta: z.coerce.string().optional(),
+  transporter: z.coerce.string().optional(),
+  transportFee: z.coerce.string().optional(),
+  numberPlate: z.coerce.string().optional(),
+  trackingLocation: z.coerce.string().optional(),
+  borderDate: z.coerce.string().optional(),
+  offloadDate: z.coerce.string().optional(),
+  agent: z.coerce.string().optional(),
+  dutyFee: z.coerce.string().optional(),
+  docReceived: z.union([z.boolean(), z.coerce.string()]).optional(),
+  trackingDescription: z.coerce.string().optional(),
 });
 
 export type ContainerTrackingImportRow = z.infer<typeof containerTrackingImportRowSchema>;
