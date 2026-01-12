@@ -857,26 +857,26 @@ export default function Containers() {
             </Card>
           ) : (
             <Card>
-              <CardContent className="p-0">
-                <Table className="table-fixed w-full">
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">Container #</TableHead>
-                      <TableHead className="w-[80px]">Supplier</TableHead>
-                      <TableHead className="w-[70px]">Amount</TableHead>
-                      <TableHead className="w-[70px]">Shop</TableHead>
-                      <TableHead className="w-[95px]">ETA</TableHead>
-                      <TableHead className="w-[85px]">Transporter</TableHead>
-                      <TableHead className="w-[70px]">Fee</TableHead>
-                      <TableHead className="w-[70px]">Plate</TableHead>
-                      <TableHead className="w-[85px]">Location</TableHead>
-                      <TableHead className="w-[95px]">Border</TableHead>
-                      <TableHead className="w-[95px]">Offload</TableHead>
-                      <TableHead className="w-[55px]">Agent</TableHead>
-                      <TableHead className="w-[60px]">Duty</TableHead>
-                      <TableHead className="w-[40px]">Doc</TableHead>
-                      <TableHead className="w-[100px]">Description</TableHead>
-                      <TableHead className="w-[40px]"></TableHead>
+                      <TableHead className="whitespace-nowrap">Container #</TableHead>
+                      <TableHead className="whitespace-nowrap">Supplier</TableHead>
+                      <TableHead className="whitespace-nowrap">Amount</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[100px]">Shop</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">ETA</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[120px]">Transporter</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Fee</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[100px]">Plate</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[120px]">Location</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">Border</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">Offload</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Agent</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Duty</TableHead>
+                      <TableHead className="whitespace-nowrap">Doc</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[150px]">Description</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
