@@ -82,6 +82,7 @@ import {
   fiscalPeriodClosures,
   creditNoteItems,
   systemSettings,
+  updateContainerTrackingSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -9111,6 +9112,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid container ID" });
       }
       
+      // Validate request body with Zod schema
+      const parseResult = updateContainerTrackingSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid tracking data", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
       const {
         shopName,
         eta,
@@ -9124,7 +9134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dutyFee,
         docReceived,
         trackingDescription,
-      } = req.body;
+      } = parseResult.data;
       
       const updateData: any = {};
       if (shopName !== undefined) updateData.shopName = shopName;
@@ -9151,8 +9161,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [updated] = await db
         .select()
         .from(containers)
-        .where(eq(containers.id, id))
+        .where(and(
+          eq(containers.id, id),
+          eq(containers.companyId, req.session.currentCompanyId)
+        ))
         .limit(1);
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Container not found" });
+      }
       
       res.json(updated);
     } catch (error: any) {

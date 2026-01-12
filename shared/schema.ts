@@ -1755,3 +1755,21 @@ export const FEATURE_ROUTES: Record<FeatureKey, string> = {
 export const ROUTE_TO_FEATURE: Record<string, FeatureKey> = Object.fromEntries(
   Object.entries(FEATURE_ROUTES).map(([key, route]) => [route, key as FeatureKey])
 ) as Record<string, FeatureKey>;
+
+// Container tracking update schema for OTW tracking
+export const updateContainerTrackingSchema = z.object({
+  shopName: z.string().optional(),
+  eta: z.string().nullable().optional(),
+  etaSource: z.enum(["manual", "api"]).optional(),
+  transportFee: z.string().nullable().optional(),
+  numberPlate: z.string().optional(),
+  trackingLocation: z.string().optional(),
+  borderDate: z.string().nullable().optional(),
+  offloadDate: z.string().nullable().optional(),
+  agent: z.string().optional(),
+  dutyFee: z.string().nullable().optional(),
+  docReceived: z.boolean().optional(),
+  trackingDescription: z.string().optional(),
+});
+
+export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSchema>;
