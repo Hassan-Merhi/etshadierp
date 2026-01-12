@@ -417,6 +417,7 @@ export const containers = pgTable("containers", {
   shopName: text("shop_name"),
   eta: date("eta"),
   etaSource: text("eta_source").default("manual"), // 'manual' or 'api'
+  transporter: varchar("transporter", { length: 100 }),
   transportFee: decimal("transport_fee", { precision: 15, scale: 2 }),
   numberPlate: varchar("number_plate", { length: 50 }),
   trackingLocation: text("tracking_location"),
@@ -1761,6 +1762,7 @@ export const updateContainerTrackingSchema = z.object({
   shopName: z.string().optional(),
   eta: z.string().nullable().optional(),
   etaSource: z.enum(["manual", "api"]).optional(),
+  transporter: z.string().optional(),
   transportFee: z.string().nullable().optional(),
   numberPlate: z.string().optional(),
   trackingLocation: z.string().optional(),
@@ -1773,3 +1775,22 @@ export const updateContainerTrackingSchema = z.object({
 });
 
 export type UpdateContainerTracking = z.infer<typeof updateContainerTrackingSchema>;
+
+// Container tracking Excel import schema
+export const containerTrackingImportRowSchema = z.object({
+  containerNumber: z.string(),
+  shopName: z.string().optional(),
+  eta: z.string().optional(),
+  transporter: z.string().optional(),
+  transportFee: z.string().optional(),
+  numberPlate: z.string().optional(),
+  trackingLocation: z.string().optional(),
+  borderDate: z.string().optional(),
+  offloadDate: z.string().optional(),
+  agent: z.string().optional(),
+  dutyFee: z.string().optional(),
+  docReceived: z.union([z.boolean(), z.string()]).optional(),
+  trackingDescription: z.string().optional(),
+});
+
+export type ContainerTrackingImportRow = z.infer<typeof containerTrackingImportRowSchema>;
