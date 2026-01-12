@@ -891,7 +891,7 @@ export default function Containers() {
                         <TableCell className="font-mono text-sm">
                           ${parseFloat(container.grandTotal || "0").toLocaleString()}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[120px]">
                           <Input
                             id={`tracking-${container.id}-shopName`}
                             value={getEditValue(container, "shopName") as string || ""}
@@ -902,7 +902,7 @@ export default function Containers() {
                             data-testid={`input-shop-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <Input
                             id={`tracking-${container.id}-eta`}
                             type="date"
@@ -913,7 +913,7 @@ export default function Containers() {
                             data-testid={`input-eta-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <Input
                             id={`tracking-${container.id}-transporter`}
                             value={getEditValue(container, "transporter") as string || ""}
@@ -924,7 +924,7 @@ export default function Containers() {
                             data-testid={`input-transporter-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[100px]">
                           <Input
                             id={`tracking-${container.id}-transportFee`}
                             type="number"
@@ -936,7 +936,7 @@ export default function Containers() {
                             data-testid={`input-transport-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[120px]">
                           <Input
                             id={`tracking-${container.id}-numberPlate`}
                             value={getEditValue(container, "numberPlate") as string || ""}
@@ -947,7 +947,7 @@ export default function Containers() {
                             data-testid={`input-plate-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <Input
                             id={`tracking-${container.id}-trackingLocation`}
                             value={getEditValue(container, "trackingLocation") as string || ""}
@@ -958,7 +958,7 @@ export default function Containers() {
                             data-testid={`input-location-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <Input
                             id={`tracking-${container.id}-borderDate`}
                             type="date"
@@ -969,7 +969,7 @@ export default function Containers() {
                             data-testid={`input-border-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[140px]">
                           <Input
                             id={`tracking-${container.id}-offloadDate`}
                             type="date"
@@ -980,7 +980,7 @@ export default function Containers() {
                             data-testid={`input-offload-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[120px]">
                           <Input
                             id={`tracking-${container.id}-agent`}
                             value={getEditValue(container, "agent") as string || ""}
@@ -991,7 +991,7 @@ export default function Containers() {
                             data-testid={`input-agent-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[100px]">
                           <Input
                             id={`tracking-${container.id}-dutyFee`}
                             type="number"
@@ -1003,7 +1003,7 @@ export default function Containers() {
                             data-testid={`input-duty-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center min-w-[50px]">
                           <Checkbox
                             id={`tracking-${container.id}-docReceived`}
                             checked={!!getEditValue(container, "docReceived")}
@@ -1011,7 +1011,7 @@ export default function Containers() {
                             data-testid={`checkbox-doc-${container.id}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="min-w-[180px]">
                           <Input
                             id={`tracking-${container.id}-trackingDescription`}
                             value={getEditValue(container, "trackingDescription") as string || ""}
