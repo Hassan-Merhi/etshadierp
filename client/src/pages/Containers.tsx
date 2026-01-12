@@ -212,21 +212,45 @@ export default function Containers() {
     XLSX.writeFile(workbook, "otw_containers.xlsx");
   };
 
+  // Helper function to convert Excel date serial numbers to date strings
+  const excelDateToString = (value: any): string => {
+    if (!value) return "";
+    // If it's already a string that looks like a date, return as-is
+    if (typeof value === "string") {
+      // Check if it contains any date-like characters
+      if (value.includes("/") || value.includes("-") || isNaN(Number(value))) {
+        return value;
+      }
+    }
+    // If it's a number, it might be an Excel serial date
+    const num = Number(value);
+    if (!isNaN(num) && num > 40000 && num < 60000) {
+      // Excel serial date: days since 1900-01-01 (with a bug for 1900 leap year)
+      const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+      const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
+      const month = (date.getMonth() + 1).toString().padStart(2, "0");
+      const day = date.getDate().toString().padStart(2, "0");
+      const year = date.getFullYear().toString().slice(-2);
+      return `${month}/${day}/${year}`;
+    }
+    return String(value);
+  };
+
   const downloadImportTemplate = () => {
     const templateData = [{
-      "Container #": "",
-      "Shop": "",
-      "ETA": "",
-      "Transporter": "",
-      "Transport Fee": "",
-      "Number Plate": "",
-      "Location": "",
-      "Border Date": "",
-      "Offload Date": "",
-      "Agent": "",
-      "Duty Fee": "",
-      "Doc Received": "",
-      "Description": "",
+      "Container #": "EXAMPLE123456",
+      "Shop": "Hadi #1",
+      "ETA": "01/15/26",
+      "Transporter": "FARHAT",
+      "Transport Fee": "8500",
+      "Number Plate": "T123 ABC",
+      "Location": "KASUMBALESA",
+      "Border Date": "01/20/26",
+      "Offload Date": "01/22/26",
+      "Agent": "NCA",
+      "Duty Fee": "5000",
+      "Doc Received": "YES",
+      "Description": "Sample description",
     }];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -250,21 +274,21 @@ export default function Containers() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(sheet);
       
-      // Map Excel columns to API fields
+      // Map Excel columns to API fields (convert Excel date serials to strings)
       const rows = jsonData.map((row: any) => ({
-        containerNumber: row["Container #"] || row["Container Number"] || row["containerNumber"] || "",
-        shopName: row["Shop"] || row["Shop Name"] || row["shopName"] || "",
-        eta: row["ETA"] || row["eta"] || "",
-        transporter: row["Transporter"] || row["transporter"] || "",
-        transportFee: row["Transport Fee"] || row["transportFee"] || "",
-        numberPlate: row["Number Plate"] || row["Plate"] || row["numberPlate"] || "",
-        trackingLocation: row["Location"] || row["trackingLocation"] || "",
-        borderDate: row["Border Date"] || row["borderDate"] || "",
-        offloadDate: row["Offload Date"] || row["offloadDate"] || "",
-        agent: row["Agent"] || row["agent"] || "",
-        dutyFee: row["Duty Fee"] || row["dutyFee"] || "",
-        docReceived: row["Doc Received"] || row["docReceived"] || "",
-        trackingDescription: row["Description"] || row["trackingDescription"] || "",
+        containerNumber: String(row["Container #"] || row["Container Number"] || row["containerNumber"] || ""),
+        shopName: String(row["Shop"] || row["Shop Name"] || row["shopName"] || ""),
+        eta: excelDateToString(row["ETA"] || row["eta"]),
+        transporter: String(row["Transporter"] || row["transporter"] || ""),
+        transportFee: String(row["Transport Fee"] || row["transportFee"] || ""),
+        numberPlate: String(row["Number Plate"] || row["Plate"] || row["numberPlate"] || ""),
+        trackingLocation: String(row["Location"] || row["trackingLocation"] || ""),
+        borderDate: excelDateToString(row["Border Date"] || row["borderDate"]),
+        offloadDate: excelDateToString(row["Offload Date"] || row["offloadDate"]),
+        agent: String(row["Agent"] || row["agent"] || ""),
+        dutyFee: String(row["Duty Fee"] || row["dutyFee"] || ""),
+        docReceived: String(row["Doc Received"] || row["docReceived"] || ""),
+        trackingDescription: String(row["Description"] || row["trackingDescription"] || ""),
       }));
       
       const response = await apiRequest("POST", "/api/containers/tracking/import", { rows });
