@@ -2099,13 +2099,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     // When editing, we need to add back the original transfer quantities to available stock
     const isEditMode = !!voucherIdToEdit;
 
-    console.log('[STOCK_TRANSFER_DEBUG] Starting validation:', {
-      voucherIdToEdit,
-      isEditMode,
-      stockTransferToEditExists: !!stockTransferToEdit,
-      stockTransferToEditItems: stockTransferToEdit?.items?.length || 0
-    });
-
     // IMPORTANT: in edit mode, make sure we actually have the original stock transfer loaded.
     // If it's not in cache yet (common when you only change destination and submit quickly),
     // fetch it so the "add back original qty" logic works reliably.
@@ -2113,24 +2106,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (isEditMode && voucherIdToEdit) {
       let st = stockTransferToEdit as any | undefined;
 
-      console.log('[STOCK_TRANSFER_DEBUG] Edit mode - stockTransferToEdit:', st);
-
       if (!st) {
-        console.log('[STOCK_TRANSFER_DEBUG] stockTransferToEdit not cached, fetching...');
         try {
           const res = await fetch(`/api/stock-transfers?voucherId=${voucherIdToEdit}`);
           if (res.ok) {
             const data = await res.json();
             st = Array.isArray(data) ? data[0] : data;
-            console.log('[STOCK_TRANSFER_DEBUG] Fetched stock transfer:', st);
           }
         } catch (e) {
-          console.log('[STOCK_TRANSFER_DEBUG] Fetch error:', e);
+          // ignore - we'll handle empty originalItems below
         }
       }
 
       originalItems = st?.items || [];
-      console.log('[STOCK_TRANSFER_DEBUG] Original items:', originalItems);
       
       if (!originalItems.length) {
         toast({
@@ -2151,14 +2139,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const stockItemId = Number(orig.stockItemId);
       const sourceLocId = orig.sourceLocationId != null ? Number(orig.sourceLocationId) : null;
       
-      console.log('[STOCK_TRANSFER_DEBUG] Processing original item:', {
-        rawStockItemId: orig.stockItemId,
-        rawSourceLocationId: orig.sourceLocationId,
-        convertedStockItemId: stockItemId,
-        convertedSourceLocId: sourceLocId,
-        qty
-      });
-      
       // Always aggregate by stockItemId alone (for fallback matching)
       originalQtyByStockItemOnly.set(
         stockItemId, 
@@ -2172,100 +2152,94 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       }
     });
     
-    console.log('[STOCK_TRANSFER_DEBUG] Maps built:', {
-      originalQtyMap: Object.fromEntries(originalQtyMap),
-      originalQtyByStockItemOnly: Object.fromEntries(originalQtyByStockItemOnly)
-    });
-    
+    // Use DELTA-based validation: only check for the NET INCREASE over original quantity
+    // This allows edits without increasing quantity to always succeed, even with negative inventory
+    // IMPORTANT: Only use original qty if source location matches exactly (precise key match)
+    // If source location changed, treat as a new transfer requiring full inventory check
     const inventoryValidationPromises = validEntries.map(entry => {
       const entryStockItemId = Number(entry.stockItemId);
       const entrySourceLocId = Number(entry.sourceLocationId);
+      const requestedQty = parseFloat(entry.quantity);
       
-      console.log('[STOCK_TRANSFER_DEBUG] Validating entry:', {
-        rawEntryStockItemId: entry.stockItemId,
-        rawEntrySourceLocId: entry.sourceLocationId,
-        entryStockItemId,
-        entrySourceLocId,
-        quantity: entry.quantity
-      });
+      // Get the original quantity for this EXACT item + source location combination
+      // Only use precise match - if source location changed, treat as new (delta = full qty)
+      let originalQtyForItem = 0;
+      if (isEditMode) {
+        const preciseKey = `${entryStockItemId}-${entrySourceLocId}`;
+        if (originalQtyMap.has(preciseKey)) {
+          // Same source location as original - use that qty for delta
+          originalQtyForItem = originalQtyMap.get(preciseKey)!;
+        }
+        // If no precise match (source location changed or new item), originalQtyForItem stays 0
+        // This means delta = requestedQty, requiring full inventory check
+      }
+      
+      // Calculate delta: how much MORE are we requesting than the original?
+      const delta = requestedQty - originalQtyForItem;
       
       return fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
         .then(res => res.json())
         .then(inventory => {
           const availableItem = inventory.find((item: any) => Number(item.stockItemId) === entryStockItemId);
-          let availableQty = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
-          const requestedQty = parseFloat(entry.quantity);
+          const currentInventory = availableItem ? parseFloat(availableItem.quantity || "0") : 0;
           
-          console.log('[STOCK_TRANSFER_DEBUG] Inventory lookup:', {
-            entryStockItemId,
-            foundItem: !!availableItem,
-            inventoryQty: availableQty,
-            requestedQty
-          });
-          
-          // In edit mode, add back the original quantity for this item
-          // This accounts for the fact that the original transfer is already reflected in inventory
-          if (isEditMode) {
-            const preciseKey = `${entryStockItemId}-${entrySourceLocId}`;
-            const hasPreciseKey = originalQtyMap.has(preciseKey);
-            const preciseQty = originalQtyMap.get(preciseKey);
-            const fallbackQty = originalQtyByStockItemOnly.get(entryStockItemId);
-            
-            console.log('[STOCK_TRANSFER_DEBUG] Edit mode lookup:', {
-              preciseKey,
-              hasPreciseKey,
-              preciseQty,
-              fallbackQty,
-              availableQtyBefore: availableQty
-            });
-            
-            // First try precise match (stockItemId + sourceLocationId)
-            if (hasPreciseKey) {
-              availableQty += preciseQty!;
-              console.log('[STOCK_TRANSFER_DEBUG] Added precise qty:', preciseQty, 'new availableQty:', availableQty);
-            } else {
-              // Fallback: use total original qty for this stockItemId (legacy records with null sourceLocationId)
-              if (fallbackQty) {
-                availableQty += fallbackQty;
-                console.log('[STOCK_TRANSFER_DEBUG] Added fallback qty:', fallbackQty, 'new availableQty:', availableQty);
-              } else {
-                console.log('[STOCK_TRANSFER_DEBUG] NO MATCH FOUND - original qty NOT added back!');
-              }
-            }
-            
-            console.log('[STOCK_TRANSFER_DEBUG] Final comparison:', {
-              availableQty,
-              requestedQty,
-              willPass: requestedQty <= availableQty
-            });
+          // If delta <= 0, we're requesting same or less than original - ALWAYS allow
+          if (delta <= 0) {
+            return { success: true };
           }
           
-          if (requestedQty > availableQty) {
-            const item = stockItems.find(s => s.id === entryStockItemId);
-            const sourceLocation = locations.find(l => l.id === entrySourceLocId);
-            return {
-              success: false,
-              error: `${item?.name} has only ${formatNumber(availableQty)} available in ${sourceLocation?.name}, but you're trying to transfer ${requestedQty}`
-            };
+          // If delta > 0, we need additional inventory for the increase
+          // Check if we have enough for the delta
+          if (currentInventory >= delta) {
+            return { success: true };
           }
-          return { success: true };
+          
+          // Not enough inventory for the increase - but allow with warning
+          // Calculate what the resulting inventory would be
+          const resultingInventory = currentInventory - delta;
+          const item = stockItems.find(s => s.id === entryStockItemId);
+          const sourceLocation = locations.find(l => l.id === entrySourceLocId);
+          
+          return {
+            success: false,
+            warning: true,
+            itemName: item?.name || 'Unknown Item',
+            locationName: sourceLocation?.name || 'Unknown Location',
+            currentInventory,
+            delta,
+            resultingInventory,
+            error: `${item?.name} will have ${formatNumber(resultingInventory)} in ${sourceLocation?.name} after this transfer (currently ${formatNumber(currentInventory)}, need ${formatNumber(delta)} more)`
+          };
         })
         .catch(err => ({
           success: false,
+          warning: false,
           error: `Failed to validate inventory: ${err.message}`
         }));
     });
 
     const results = await Promise.all(inventoryValidationPromises);
-    const failedValidation = results.find(r => !r.success);
+    const failedValidation = results.find(r => !r.success && !(r as any).warning);
+    const warningValidation = results.find(r => !r.success && (r as any).warning);
     
+    // Hard failures (not warnings) - block the transfer
     if (failedValidation) {
       toast({
-        title: "Insufficient Stock",
+        title: "Validation Error",
         description: failedValidation.error,
         variant: "destructive",
       });
       return;
+    }
+    
+    // Warnings - ask user to confirm
+    if (warningValidation) {
+      const confirmProceed = window.confirm(
+        `Warning: ${warningValidation.error}\n\nThis will result in negative inventory. Do you want to proceed anyway?`
+      );
+      if (!confirmProceed) {
+        return;
+      }
     }
 
     // Validate that each row's sourceLocationId !== destinationLocationId
