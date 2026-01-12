@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,8 +54,12 @@ export default function Containers() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [trackingEdits, setTrackingEdits] = useState<TrackingEdit>({});
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
+  const [savingAll, setSavingAll] = useState(false);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const tableRef = useRef<HTMLTableElement>(null);
+  
+  const trackingFields = ["shopName", "eta", "transportFee", "numberPlate", "trackingLocation", "borderDate", "offloadDate", "agent", "dutyFee", "docReceived", "trackingDescription"] as const;
   
   const { data: allContainers = [], isLoading } = useQuery<Container[]>({
     queryKey: ["/api/containers/active", selectedCompany?.id],
@@ -234,6 +238,92 @@ export default function Containers() {
     updateTrackingMutation.mutate({ id: containerId, data });
   };
 
+  const hasAnyChanges = Object.keys(trackingEdits).length > 0;
+
+  const saveAllTracking = async () => {
+    const containerIds = Object.keys(trackingEdits).map(Number);
+    if (containerIds.length === 0) return;
+    
+    setSavingAll(true);
+    let savedCount = 0;
+    let errorCount = 0;
+    
+    for (const id of containerIds) {
+      const data = trackingEdits[id];
+      if (!data || Object.keys(data).length === 0) continue;
+      
+      try {
+        await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
+        savedCount++;
+      } catch (e) {
+        errorCount++;
+      }
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
+    setTrackingEdits({});
+    setSavingAll(false);
+    
+    if (errorCount === 0) {
+      toast({ title: "Saved", description: `${savedCount} container(s) updated` });
+    } else {
+      toast({ 
+        title: "Partial save", 
+        description: `${savedCount} saved, ${errorCount} failed`, 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, containerId: number, fieldIndex: number) => {
+    const containerIndex = filteredOtwContainers.findIndex(c => c.id === containerId);
+    if (containerIndex === -1) return;
+    
+    const getInputId = (cIdx: number, fIdx: number) => {
+      const container = filteredOtwContainers[cIdx];
+      if (!container) return null;
+      const field = trackingFields[fIdx];
+      if (!field) return null;
+      return `tracking-${container.id}-${field}`;
+    };
+    
+    const focusInput = (inputId: string | null) => {
+      if (!inputId) return false;
+      const el = document.getElementById(inputId) as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        el.select?.();
+        return true;
+      }
+      return false;
+    };
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (hasChanges(containerId)) {
+        saveTracking(containerId);
+      }
+      const nextId = getInputId(containerIndex + 1, fieldIndex);
+      if (nextId) focusInput(nextId);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextId = getInputId(containerIndex + 1, fieldIndex);
+      focusInput(nextId);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevId = getInputId(containerIndex - 1, fieldIndex);
+      focusInput(prevId);
+    } else if (e.key === "ArrowRight" && e.altKey) {
+      e.preventDefault();
+      const nextId = getInputId(containerIndex, fieldIndex + 1);
+      focusInput(nextId);
+    } else if (e.key === "ArrowLeft" && e.altKey) {
+      e.preventDefault();
+      const prevId = getInputId(containerIndex, fieldIndex - 1);
+      focusInput(prevId);
+    }
+  }, [filteredOtwContainers, trackingFields, hasChanges, saveTracking]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -294,15 +384,28 @@ export default function Containers() {
           </div>
         )}
         {activeTab === "otw" && (
-          <Button
-            onClick={exportOtwToExcel}
-            variant="outline"
-            className="gap-2"
-            data-testid="button-export-otw"
-          >
-            <Download className="h-4 w-4" />
-            Export OTW
-          </Button>
+          <div className="flex gap-2">
+            {hasAnyChanges && (
+              <Button
+                onClick={saveAllTracking}
+                disabled={savingAll}
+                className="gap-2"
+                data-testid="button-save-all"
+              >
+                <Save className="h-4 w-4" />
+                {savingAll ? "Saving..." : `Save All (${Object.keys(trackingEdits).length})`}
+              </Button>
+            )}
+            <Button
+              onClick={exportOtwToExcel}
+              variant="outline"
+              className="gap-2"
+              data-testid="button-export-otw"
+            >
+              <Download className="h-4 w-4" />
+              Export OTW
+            </Button>
+          </div>
         )}
       </div>
 
@@ -557,8 +660,10 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-shopName`}
                             value={getEditValue(container, "shopName") as string || ""}
                             onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 0)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="Shop"
                             data-testid={`input-shop-${container.id}`}
@@ -566,18 +671,22 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-eta`}
                             type="date"
                             value={getEditValue(container, "eta") as string || ""}
                             onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 1)}
                             className="h-8 text-sm min-w-[110px]"
                             data-testid={`input-eta-${container.id}`}
                           />
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-transportFee`}
                             type="number"
                             value={getEditValue(container, "transportFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="0.00"
                             data-testid={`input-transport-${container.id}`}
@@ -585,8 +694,10 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-numberPlate`}
                             value={getEditValue(container, "numberPlate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
                             className="h-8 text-sm min-w-[60px]"
                             placeholder="Plate"
                             data-testid={`input-plate-${container.id}`}
@@ -594,8 +705,10 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-trackingLocation`}
                             value={getEditValue(container, "trackingLocation") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="Location"
                             data-testid={`input-location-${container.id}`}
@@ -603,26 +716,32 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-borderDate`}
                             type="date"
                             value={getEditValue(container, "borderDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
                             className="h-8 text-sm min-w-[110px]"
                             data-testid={`input-border-${container.id}`}
                           />
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-offloadDate`}
                             type="date"
                             value={getEditValue(container, "offloadDate") as string || ""}
                             onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
                             className="h-8 text-sm min-w-[110px]"
                             data-testid={`input-offload-${container.id}`}
                           />
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-agent`}
                             value={getEditValue(container, "agent") as string || ""}
                             onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
                             className="h-8 text-sm min-w-[60px]"
                             placeholder="Agent"
                             data-testid={`input-agent-${container.id}`}
@@ -630,9 +749,11 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-dutyFee`}
                             type="number"
                             value={getEditValue(container, "dutyFee") as string || ""}
                             onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
                             className="h-8 text-sm min-w-[80px]"
                             placeholder="0.00"
                             data-testid={`input-duty-${container.id}`}
@@ -640,6 +761,7 @@ export default function Containers() {
                         </TableCell>
                         <TableCell className="text-center">
                           <Checkbox
+                            id={`tracking-${container.id}-docReceived`}
                             checked={!!getEditValue(container, "docReceived")}
                             onCheckedChange={(checked) => setEditValue(container.id, "docReceived", !!checked)}
                             data-testid={`checkbox-doc-${container.id}`}
@@ -647,8 +769,10 @@ export default function Containers() {
                         </TableCell>
                         <TableCell>
                           <Input
+                            id={`tracking-${container.id}-trackingDescription`}
                             value={getEditValue(container, "trackingDescription") as string || ""}
                             onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 10)}
                             className="h-8 text-sm min-w-[120px]"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
