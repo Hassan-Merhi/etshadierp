@@ -4853,7 +4853,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {!isPOS && (
           <TabsContent value="creditnote" className="space-y-4">
-            <CreditNoteTab allAccounts={allAccounts} editVoucherId={activeTab === "credit-note" ? editVoucherId : null} />
+            <CreditNoteTab allAccounts={allAccounts} editVoucherId={activeTab === "creditnote" ? editVoucherId : null} />
           </TabsContent>
         )}
 

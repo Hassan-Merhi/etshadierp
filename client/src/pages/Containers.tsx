@@ -313,6 +313,28 @@ export default function Containers() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(sheet);
       
+      // Validate file has data
+      if (jsonData.length === 0) {
+        throw new Error("The Excel file is empty. Please add data rows and try again.");
+      }
+      
+      // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
+      const headerRow = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] || [];
+      const columns = headerRow.map(h => String(h || "").trim());
+      
+      // Check for Container # column (required for matching)
+      const containerColAliases = ["Container #", "Container Number", "containerNumber"];
+      const hasContainerCol = containerColAliases.some(alias => columns.includes(alias));
+      
+      if (!hasContainerCol) {
+        throw new Error(
+          `Missing required column: "Container #"\n\n` +
+          `Expected columns: Container #, Shop, ETA, Transporter, etc.\n` +
+          `Found columns: ${columns.slice(0, 5).join(", ")}${columns.length > 5 ? "..." : ""}\n\n` +
+          `Tip: Download the template to see the expected format.`
+        );
+      }
+      
       // Map Excel columns to API fields (convert Excel date serials to strings)
       const rows = jsonData.map((row: any) => ({
         containerNumber: String(row["Container #"] || row["Container Number"] || row["containerNumber"] || ""),

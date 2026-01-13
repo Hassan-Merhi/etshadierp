@@ -66,6 +66,31 @@ export default function ImportStockItems() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
+      // Validate file has data
+      if (jsonData.length === 0) {
+        toast({
+          title: "Empty File",
+          description: "The Excel file is empty. Please add data rows and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
+      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const requiredCols = ["code", "name"];
+      const missingCols = requiredCols.filter(col => !columns.includes(col));
+      
+      if (missingCols.length > 0) {
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected columns: ${requiredCols.join(", ")}. Found: ${columns.slice(0, 5).join(", ")}${columns.length > 5 ? "..." : ""}. Download the template to see expected format.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       const validationErrors: ValidationError[] = [];
       const rows: ImportRow[] = [];
 
