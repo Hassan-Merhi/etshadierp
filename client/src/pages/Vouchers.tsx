@@ -1963,8 +1963,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
-    mutationFn: async (formData: StockTransferFormData) => {
-      const data = formData;
+    mutationFn: async (formData: StockTransferFormData & { allowNegativeInventory?: boolean }) => {
+      const { allowNegativeInventory, ...data } = formData;
       const isEditMode = !!voucherIdToEdit;
       
       // Get unique source locations for description
@@ -2014,6 +2014,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           voucherId: voucher.id,
           destinationLocationId: data.destinationLocationId,
           notes: data.notes || "",
+          allowNegativeInventory: allowNegativeInventory || false,
           items: data.entries.map(entry => ({
             sourceLocationId: entry.sourceLocationId,
             stockItemId: entry.stockItemId,
@@ -2234,6 +2235,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
     
     // Warnings - ask user to confirm
+    let userConfirmedNegativeInventory = false;
     if (warningValidation) {
       const confirmProceed = window.confirm(
         `Warning: ${warningValidation.error}\n\nThis will result in negative inventory. Do you want to proceed anyway?`
@@ -2241,6 +2243,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       if (!confirmProceed) {
         return;
       }
+      userConfirmedNegativeInventory = true;
     }
 
     // Validate that each row's sourceLocationId !== destinationLocationId
@@ -2254,7 +2257,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
 
-    stockTransferMutation.mutate(data);
+    stockTransferMutation.mutate({ ...data, allowNegativeInventory: userConfirmedNegativeInventory });
   };
 
   // Stock Adjustment form

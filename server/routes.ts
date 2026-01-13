@@ -18007,7 +18007,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireNonPOS,
     async (req, res) => {
       try {
-        const { voucherId, sourceLocationId, destinationLocationId, notes, items } = req.body;
+        const { voucherId, sourceLocationId, destinationLocationId, notes, items, allowNegativeInventory } = req.body;
+        
+        // Log if user confirmed negative inventory override
+        if (allowNegativeInventory) {
+          console.log(`[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`);
+        }
         const companyId = req.session.currentCompanyId;
 
         // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
