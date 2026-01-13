@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle } from "lucide-react";
@@ -274,13 +275,10 @@ export default function StockItems() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Stock Items</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage all stock items in your company
-          </p>
-        </div>
+      <PageHeader 
+        title="Stock Items" 
+        subtitle="Manage all stock items in your company"
+      >
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
             <Button 
@@ -338,7 +336,7 @@ export default function StockItems() {
             Add Item
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       <Card className="p-4">
         <div className="flex gap-4 mb-4">

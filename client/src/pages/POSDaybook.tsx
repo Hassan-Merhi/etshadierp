@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Table,
   TableBody,
@@ -298,16 +299,10 @@ export default function POSDaybook() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
-            POS Daybook
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Sales transactions - {formatDisplayDate(targetDate)}
-          </p>
-        </div>
-      </div>
+      <PageHeader 
+        title="POS Daybook" 
+        subtitle={`Sales transactions - ${formatDisplayDate(targetDate)}`}
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

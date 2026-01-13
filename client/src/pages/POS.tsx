@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useLocation, Redirect, Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -975,29 +976,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {editVoucherId && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate("/pos-daybook")}
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {editVoucherId ? "Edit Sale" : "Point of Sale"}
-            </h1>
-            {editVoucherId && editVoucher && (
-              <p className="text-sm text-muted-foreground">
-                Voucher #{editVoucher.voucherNumber}
-              </p>
-            )}
-          </div>
-        </div>
+      <PageHeader 
+        title={editVoucherId ? "Edit Sale" : "Point of Sale"}
+        subtitle={editVoucherId && editVoucher ? `Voucher #${editVoucher.voucherNumber}` : undefined}
+      >
         <div className="flex gap-2">
           {!posUser && !editVoucherId && (
             <Link href="/pos-import">
@@ -1037,7 +1019,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             {!saveMutation.isPending && <Check className="h-4 w-4" />}
           </Button>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="flex gap-4">
         <div className="flex items-center gap-2">

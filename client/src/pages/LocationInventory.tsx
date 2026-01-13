@@ -4,6 +4,7 @@ import { useLocation } from "@/contexts/LocationContext";
 import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive } from "lucide-react";
 import { LocationCreateDialog } from "@/components/LocationCreateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -620,6 +621,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <PageHeader 
+        title="Location Inventory" 
+        subtitle="Manage inventory across all locations"
+      />
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
         {!selectedLocationLocal && <span>Select Location</span>}

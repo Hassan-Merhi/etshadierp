@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Package, Eye, Search, Filter, X, Download, HandCoins, Truck, Save, Check, MapPin, Upload, FileSpreadsheet } from "lucide-react";
@@ -490,13 +491,10 @@ export default function Containers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Container Tracking</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track containers and manage offloading
-          </p>
-        </div>
+      <PageHeader 
+        title="Container Tracking" 
+        subtitle="Track containers and manage offloading"
+      >
         {activeTab === "active" && (
           <div className="flex gap-2">
             <Button
@@ -585,7 +583,7 @@ export default function Containers() {
             />
           </div>
         )}
-      </div>
+      </PageHeader>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

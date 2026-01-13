@@ -20,6 +20,7 @@ import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
 import { PaymentVoucherTab } from "@/components/vouchers/PaymentVoucherTab";
 import { ReceiptVoucherTab } from "@/components/vouchers/ReceiptVoucherTab";
 import { CreditNoteTab } from "@/components/vouchers/CreditNoteTab";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
   CardContent,
@@ -2933,14 +2934,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">
-          {isPOS ? "Stock Transfer" : "Vouchers"}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
-        </p>
-      </div>
+      <PageHeader 
+        title={isPOS ? "Stock Transfer" : "Vouchers"}
+        subtitle={isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
+      />
 
       {/* Hidden print template */}
       {!isPOS && (

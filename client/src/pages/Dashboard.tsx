@@ -1,6 +1,7 @@
 import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -301,12 +302,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Overview of your business performance
-        </p>
-      </div>
+      <PageHeader 
+        title="Dashboard" 
+        subtitle="Overview of your business performance"
+        showHomeButton={false}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPICard
