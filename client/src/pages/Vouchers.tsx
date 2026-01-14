@@ -1029,20 +1029,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Invalidate all affected data - use full query keys including company ID for proper cache invalidation
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"], refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id], refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id], refetchType: 'all' }),
-      ]);
+      // Invalidate only essential queries for faster saves
+      // Balances are updated via voucher-sidebar, full account lists don't change
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
       
       // Clear edit mode and navigate back to daybook
       if (isEditMode) {
@@ -1471,20 +1462,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
       
-      // Invalidate all affected data - use full query keys including company ID for proper cache invalidation
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/daybook"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees"], refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id], refetchType: 'all' }),
-        queryClient.invalidateQueries({ queryKey: ["/api/fixed-assets"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id], refetchType: 'all' }),
-      ]);
+      // Invalidate only essential queries for faster saves
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar"] });
       
       // Clear edit mode and navigate back to daybook or reset form
       if (isEditMode) {

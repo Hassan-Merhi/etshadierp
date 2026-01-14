@@ -174,7 +174,7 @@ export default function AccountSidebar({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{account.name}</div>
+                      <div className="text-sm font-medium truncate">{account.name || account.code || `${account.type}-${account.id}`}</div>
                     </div>
                     <div className="flex flex-col items-end gap-0.5">
                       {hasProjection && (
