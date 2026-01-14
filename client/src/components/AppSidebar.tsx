@@ -72,6 +72,7 @@ const menuGroups: MenuGroup[] = [
     title: "Inventory",
     icon: Boxes,
     items: [
+      { title: "Daybook", url: "/daybook", icon: Book },
       { title: "Location Inventory", url: "/location-inventory", icon: MapPin },
       { title: "Stock OTW", url: "/stock-otw", icon: Ship },
       { title: "Containers", url: "/containers", icon: Container },
