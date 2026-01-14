@@ -933,11 +933,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
               )}
             </div>
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="sticky left-0 bg-muted z-10">Date</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
@@ -950,7 +950,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       key={voucher.id}
                       data-testid={`row-voucher-${voucher.id}`}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium sticky left-0 bg-background z-10">
                         {formatDisplayDate(parseISO(voucher.voucherDate))}
                       </TableCell>
                       <TableCell>

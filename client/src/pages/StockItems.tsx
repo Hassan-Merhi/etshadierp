@@ -374,7 +374,7 @@ export default function StockItems() {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : (
-          <div className="rounded-md border overflow-hidden">
+          <div className="rounded-md border overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="h-12">
@@ -385,7 +385,7 @@ export default function StockItems() {
                       data-testid="checkbox-select-all"
                     />
                   </th>
-                  <th className="text-left px-3 font-medium">Name</th>
+                  <th className="text-left px-3 font-medium sticky left-0 bg-muted z-10">Name</th>
                   <th className="text-left px-3 font-medium">Stock Group</th>
                   <th className="text-left px-3 font-medium">Status</th>
                   <th className="text-center px-3 font-medium">Actions</th>
@@ -417,7 +417,7 @@ export default function StockItems() {
                           />
                         </td>
                         <td 
-                          className="px-3 font-medium cursor-pointer" 
+                          className="px-3 font-medium cursor-pointer sticky left-0 bg-background z-10" 
                           onClick={() => handleStockItemClick(item.id, item.name)}
                           data-testid={`name-${item.id}`}
                         >

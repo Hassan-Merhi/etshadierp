@@ -1356,7 +1356,7 @@ export default function Payroll() {
                   <p className="text-sm mt-2">Create employees from the Create Master Data page</p>
                 </div>
               ) : (
-                <div className="border rounded-md">
+                <div className="border rounded-md overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1367,7 +1367,7 @@ export default function Payroll() {
                             data-testid="checkbox-select-all-employees"
                           />
                         </TableHead>
-                        <TableHead data-testid="header-name">Name</TableHead>
+                        <TableHead data-testid="header-name" className="sticky left-0 bg-muted z-10">Name</TableHead>
                         <TableHead data-testid="header-salary" className="text-right">Monthly Salary</TableHead>
                         <TableHead data-testid="header-balance" className="text-right">Balance</TableHead>
                         <TableHead data-testid="header-total-deposits" className="text-right">Total Deposits</TableHead>
@@ -1394,7 +1394,7 @@ export default function Payroll() {
                               data-testid={`checkbox-employee-${employee.id}`}
                             />
                           </TableCell>
-                          <TableCell data-testid={`cell-name-${employee.id}`}>
+                          <TableCell data-testid={`cell-name-${employee.id}`} className="sticky left-0 bg-background z-10">
                             <button
                               onClick={() => setStatementEmployee(employee)}
                               className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"

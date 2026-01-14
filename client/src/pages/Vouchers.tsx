@@ -5011,11 +5011,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 <div className="p-3 border-b bg-muted/50">
                   <p className="font-medium">Preview ({importPreview.items.length} items)</p>
                 </div>
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-60 overflow-y-auto overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Source Location</TableHead>
+                        <TableHead className="sticky left-0 bg-muted z-10">Source Location</TableHead>
                         <TableHead>Barcode</TableHead>
                         <TableHead>Item Name</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
@@ -5030,7 +5030,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
                         return (
                           <TableRow key={index} className={hasError ? "bg-destructive/10" : ""} data-testid={`import-preview-row-${index}`}>
-                            <TableCell>{item.sourceLocation || "-"}</TableCell>
+                            <TableCell className="sticky left-0 bg-background z-10">{item.sourceLocation || "-"}</TableCell>
                             <TableCell className="font-mono">{item.barcode}</TableCell>
                             <TableCell>
                               {validation?.stockItemName || (

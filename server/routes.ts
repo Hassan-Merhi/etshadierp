@@ -86,6 +86,7 @@ import {
   containerTrackingImportRowSchema,
   userPresence,
   updatePresenceSchema,
+  auditLog,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -448,6 +449,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ success: true });
       } catch (error: any) {
         console.error("Error clearing presence on leave:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+
+  // Audit Log endpoints
+  // GET: Fetch audit logs (Admin/Owner only)
+  app.get(
+    "/api/audit-log",
+    requireAuth,
+    async (req, res) => {
+      try {
+        // Check if user has admin/owner role
+        const userRole = req.session.currentRole;
+        if (!userRole || !["Admin", "Owner"].includes(userRole)) {
+          return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
+        }
+
+        const companyId = req.session.currentCompanyId;
+        const { limit = "100", offset = "0", tableName, userId } = req.query;
+
+        // Build query conditions
+        let conditions = companyId ? [eq(auditLog.companyId, companyId)] : [];
+        if (tableName && typeof tableName === "string") {
+          conditions.push(eq(auditLog.tableName, tableName));
+        }
+        if (userId && typeof userId === "string") {
+          conditions.push(eq(auditLog.userId, userId));
+        }
+
+        const logs = await db.select()
+          .from(auditLog)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .orderBy(desc(auditLog.createdAt))
+          .limit(parseInt(limit as string))
+          .offset(parseInt(offset as string));
+
+        res.json(logs);
+      } catch (error: any) {
+        console.error("Error fetching audit logs:", error);
         res.status(500).json({ message: error.message });
       }
     }
@@ -13985,7 +14027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } else {
           // POS users can edit if they have daybookEditDays permission > 0
-          const daybookEditDays = req.user?.daybookEditDays || 0;
+          const daybookEditDays = req.session.daybookEditDays || 0;
           if (daybookEditDays <= 0) {
             return res
               .status(403)

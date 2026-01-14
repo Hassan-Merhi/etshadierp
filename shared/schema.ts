@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -68,6 +68,22 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Audit Log table - tracks all changes to records
+export const auditLog = pgTable("audit_log", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  username: text("username").notNull(),
+  companyId: integer("company_id"),
+  action: text("action").notNull(), // 'create', 'update', 'delete'
+  tableName: text("table_name").notNull(),
+  recordId: integer("record_id"),
+  recordIdentifier: text("record_identifier"), // human-readable identifier (e.g., voucher number)
+  changes: jsonb("changes"), // { field: { old: value, new: value } }
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AuditLog = typeof auditLog.$inferSelect;
 
 export const locations = pgTable("locations", {
   id: serial("id").primaryKey(),

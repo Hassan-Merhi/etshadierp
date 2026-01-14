@@ -1316,7 +1316,7 @@ export default function Accounts() {
                               data-testid="checkbox-select-all"
                             />
                           </TableHead>
-                          <TableHead className="w-[100px] py-2">Date</TableHead>
+                          <TableHead className="w-[100px] py-2 sticky left-0 bg-muted z-10">Date</TableHead>
                           <TableHead className="w-[100px] py-2">Type</TableHead>
                           <TableHead className="py-2">Particulars</TableHead>
                           <TableHead className="text-right w-[120px] py-2">Debit</TableHead>
@@ -1374,7 +1374,7 @@ export default function Accounts() {
                                   data-testid={`checkbox-voucher-${voucher.voucherId}`}
                                 />
                               </TableCell>
-                              <TableCell className="font-mono text-sm py-2">
+                              <TableCell className="font-mono text-sm py-2 sticky left-0 bg-background z-10">
                                 {voucher.voucherDate
                                   ? formatDisplayDate(new Date(voucher.voucherDate))
                                   : "-"}

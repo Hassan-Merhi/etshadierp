@@ -747,11 +747,11 @@ export default function Containers() {
               </div>
 
               <Card>
-                <CardContent className="p-0">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Container Number</TableHead>
+                        <TableHead className="sticky left-0 bg-muted z-10 min-w-[140px]">Container Number</TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Grand Total</TableHead>
@@ -762,7 +762,7 @@ export default function Containers() {
                     <TableBody>
                       {containers.map((container) => (
                         <TableRow key={container.id} data-testid={`row-container-${container.id}`}>
-                          <TableCell className="font-mono font-medium">
+                          <TableCell className="font-mono font-medium sticky left-0 bg-background z-10">
                             {container.containerNumber}
                           </TableCell>
                           <TableCell>{getSupplierName(container.supplierId)}</TableCell>

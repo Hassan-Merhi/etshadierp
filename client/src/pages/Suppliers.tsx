@@ -273,7 +273,7 @@ export default function Suppliers() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead className="sticky left-0 bg-muted z-10">Name</TableHead>
                     <TableHead className="text-right">Containers</TableHead>
                     <TableHead className="text-right">Balance</TableHead>
                     <TableHead>Status</TableHead>
@@ -286,7 +286,7 @@ export default function Suppliers() {
                       key={supplier.id}
                       data-testid={`row-supplier-${supplier.id}`}
                     >
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium sticky left-0 bg-background z-10">
                         <Button
                           variant="ghost"
                           className="p-0 h-auto font-medium hover:underline text-left"

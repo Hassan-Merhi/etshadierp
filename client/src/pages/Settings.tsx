@@ -54,7 +54,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -466,6 +466,82 @@
     );
   }
   
+
+// Edit Log Table component
+function EditLogTable({ companyId }: { companyId?: number }) {
+  const { data: auditLogs = [], isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/audit-log", companyId],
+    enabled: !!companyId,
+  });
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleString();
+  };
+
+  const formatChanges = (changes: any) => {
+    if (!changes) return null;
+    return Object.entries(changes).map(([field, values]: [string, any]) => (
+      <div key={field} className="text-xs">
+        <span className="font-medium">{field}:</span>{" "}
+        <span className="text-red-500 line-through">{values?.old ?? "null"}</span>
+        {" → "}
+        <span className="text-green-500">{values?.new ?? "null"}</span>
+      </div>
+    ));
+  };
+
+  if (!companyId) {
+    return <p className="text-muted-foreground">Select a company to view edit logs.</p>;
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</div>;
+  }
+
+  if (error) {
+    return <p className="text-red-500">Error loading audit logs</p>;
+  }
+
+  if (auditLogs.length === 0) {
+    return <p className="text-muted-foreground">No edit logs found. Changes will appear here when records are modified.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="sticky left-0 bg-muted z-10">Date</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead>Action</TableHead>
+            <TableHead>Table</TableHead>
+            <TableHead>Record</TableHead>
+            <TableHead>Changes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {auditLogs.map((log: any) => (
+            <TableRow key={log.id}>
+              <TableCell className="sticky left-0 bg-background z-10 text-xs whitespace-nowrap">
+                {formatDate(log.createdAt)}
+              </TableCell>
+              <TableCell>{log.username}</TableCell>
+              <TableCell>
+                <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"}>
+                  {log.action}
+                </Badge>
+              </TableCell>
+              <TableCell>{log.tableName}</TableCell>
+              <TableCell>{log.recordIdentifier || log.recordId}</TableCell>
+              <TableCell className="max-w-xs">{formatChanges(log.changes)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
   export default function Settings() {
     const { toast } = useToast();
     const { selectedCompany } = useCompany();
@@ -1245,6 +1321,10 @@
             <TabsTrigger value="role-permissions" data-testid="tab-role-permissions">
               <Shield className="h-4 w-4 mr-2" />
               Role Permissions
+            </TabsTrigger>
+            <TabsTrigger value="edit-log" data-testid="tab-edit-log">
+              <History className="h-4 w-4 mr-2" />
+              Edit Log
             </TabsTrigger>
           </TabsList>
   
@@ -2941,6 +3021,30 @@
                   </div>
                 </Card>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="edit-log" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">Edit Log</h2>
+              </div>
+              <p className="text-muted-foreground">
+                Track all changes made to records across the system with before/after values.
+              </p>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Recent Changes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EditLogTable companyId={selectedCompany?.id} />
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>

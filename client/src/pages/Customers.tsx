@@ -299,11 +299,11 @@ export default function Customers() {
         </div>
       </div>
 
-      <Card>
+      <Card className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Legal Name</TableHead>
+              <TableHead className="sticky left-0 bg-muted z-10">Legal Name</TableHead>
               <TableHead className="text-right">Current Balance</TableHead>
               <TableHead>Balance Side</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -319,7 +319,7 @@ export default function Customers() {
             ) : (
               filteredCustomers.map((customer) => (
                 <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                  <TableCell>
+                  <TableCell className="sticky left-0 bg-background z-10">
                     <button
                       onClick={() => setStatementCustomer(customer)}
                       className="flex items-center gap-2 text-primary hover:underline cursor-pointer"
