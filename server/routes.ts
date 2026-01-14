@@ -114,7 +114,7 @@ function isLegacySHA256Hash(hash: string): boolean {
 // Normalize case since some hashes may be stored uppercase
 function verifyLegacyPassword(password: string, hash: string): boolean {
   const sha256Hash = CryptoJS.SHA256(password).toString().toLowerCase();
-  return sha256Hash === hash.toLowerCase();
+  return sha256Hash === (hash || "").toLowerCase();
 }
 
 // Helper function to verify password against hash
@@ -1255,7 +1255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ) {
                 const stockGroup = allStockGroups.find(
                   (sg) =>
-                    sg.code.toLowerCase() === item.stockGroupCode.toLowerCase(),
+                    (sg.code || "").toLowerCase() === (item.stockGroupCode || "").toLowerCase(),
                 );
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
@@ -5175,7 +5175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsById = new Map(allItems.map(i => [i.id, i]));
       for (const item of allItems) {
         if (item.code && typeof item.code === 'string') {
-          itemsByCode.set(item.code.toLowerCase(), item);
+          itemsByCode.set((item.code || "").toLowerCase(), item);
         }
       }
       
@@ -5186,7 +5186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (alias.aliasCode && typeof alias.aliasCode === 'string') {
           const item = itemsById.get(alias.stockItemId);
           if (item) {
-            itemsByAlias.set(alias.aliasCode.toLowerCase(), item);
+            itemsByAlias.set((alias.aliasCode || "").toLowerCase(), item);
           }
         }
       }
@@ -5196,7 +5196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!barcode || typeof barcode !== 'string') continue;
 
         // Find item by primary code first, then by alias (case-insensitive)
-        const barcodeLC = barcode.toLowerCase();
+        const barcodeLC = (barcode || "").toLowerCase();
         const item = itemsByCode.get(barcodeLC) || itemsByAlias.get(barcodeLC);
 
         if (item) {
@@ -6485,7 +6485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           if (containerCharges.length > 0) {
             containerCharges.forEach((charge) => {
-              const chargeType = charge.chargeType
+              const chargeType = (charge.chargeType || "")
                 .toLowerCase()
                 .replace(/[_\s]/g, "");
               if (chargeType === "freight") charges.freight = charge.amount;
@@ -8697,7 +8697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allLocations = await storage.getAllLocations(req.session.currentCompanyId!);
       const locationsByName: Record<string, number> = {};
       allLocations.forEach(loc => {
-        locationsByName[loc.name.toLowerCase().trim()] = loc.id;
+        locationsByName[(loc.name || "").toLowerCase().trim()] = loc.id;
       });
 
       // Validate each item
@@ -10011,7 +10011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(vouchers.companyId, req.session.currentCompanyId!),
-                like(sql`LOWER(${vouchers.description})`, `%container ${container.containerNumber.toLowerCase()}%`),
+                like(sql`LOWER(${vouchers.description})`, `%container ${(container.containerNumber || "").toLowerCase()}%`),
                 sql`(
                   ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
                   ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
@@ -18721,7 +18721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (stockInventoryPatterns.some(pattern => nameLower.includes(pattern))) {
             return true;
           }
-          if (stockInventoryCodes.some(code => codeLower === code.toLowerCase() || codeLower.startsWith(code.toLowerCase() + "_"))) {
+          if (stockInventoryCodes.some(code => codeLower === (code || "").toLowerCase() || codeLower.startsWith((code || "").toLowerCase() + "_"))) {
             return true;
           }
           
