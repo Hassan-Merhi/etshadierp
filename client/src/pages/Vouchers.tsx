@@ -849,14 +849,19 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Compute filtered accounts based on search (lifted from AccountSidebar)
   // Also exclude the currently selected payment account to prevent duplicate entries
   const filteredSidebarAccounts = useMemo(() => {
+    const searchLower = sidebarSearchValue.toLowerCase().trim();
     return sidebarAccounts
       .filter((acc) => {
         // Exclude the currently selected payment account from the entries list
         if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
           return false;
         }
-        return (acc.name || '').toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
-          (acc.code || '').toLowerCase().includes(sidebarSearchValue.toLowerCase());
+        // Only show employees when user is actively searching for them
+        if (acc.type === "employee" && !searchLower) {
+          return false;
+        }
+        return (acc.name || '').toLowerCase().includes(searchLower) ||
+          (acc.code || '').toLowerCase().includes(searchLower);
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType]);

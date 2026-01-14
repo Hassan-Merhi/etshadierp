@@ -11871,18 +11871,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             balance,
           };
         }),
-        // Employees
-        ...employeesData.map((employee) => {
-          const balance = parseFloat(employee.currentBalance || "0");
-
-          return {
-            id: employee.id,
-            type: "employee",
-            name: `${employee.firstName} ${employee.lastName}`,
-            code: employee.code,
-            balance,
-          };
-        }),
         // Fixed Assets
         ...assets.map((asset) => {
           const movements = assetBalances.get(asset.id) || { debits: 0, credits: 0 };
