@@ -105,13 +105,16 @@ export default function ContainerDashboard() {
     const byRoute: Record<string, Container[]> = {};
     const byAgent: Record<string, { containers: Container[]; total: number; balance: number }> = {};
     const byLocation: Record<string, { count: number; total: number }> = {};
+    const byTransporter: Record<string, TransporterData> = {};
     let totalAmount = 0;
 
     for (const container of containers) {
       const route = container.shopName || "Unassigned";
       const agent = container.agent || "Unassigned";
       const location = container.trackingLocation || "Unknown";
-      const amount = parseFloat(container.grandTotal || "0");
+      const transporter = container.transporter || "Unassigned";
+      const amount = parseFloat(String(container.grandTotal || "0"));
+      const transportFee = parseFloat(String(container.transportFee || "0"));
 
       if (!byRoute[route]) byRoute[route] = [];
       byRoute[route].push(container);
@@ -128,7 +131,35 @@ export default function ContainerDashboard() {
       byLocation[location].count++;
       byLocation[location].total += amount;
 
+      // Build filtered transporter data from OTW containers
+      if (!byTransporter[transporter]) {
+        byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+      }
+      byTransporter[transporter].otw.push(container);
+      byTransporter[transporter].otwTotal += transportFee;
+
       totalAmount += amount;
+    }
+
+    // Add offloaded containers from API (these are not affected by filters)
+    if (data.byTransporter) {
+      for (const [transporter, tData] of Object.entries(data.byTransporter)) {
+        if (!byTransporter[transporter]) {
+          byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+        }
+        // Filter offloaded containers by company if filter is applied
+        let offloaded = tData.offloaded;
+        if (filterCompany !== "all") {
+          offloaded = offloaded.filter(c => c.companyCode === filterCompany);
+        }
+        if (filterAgent !== "all") {
+          offloaded = offloaded.filter(c => c.agent === filterAgent);
+        }
+        byTransporter[transporter].offloaded = offloaded;
+        byTransporter[transporter].offloadedTotal = offloaded.reduce(
+          (sum, c) => sum + parseFloat(String(c.transportFee || "0")), 0
+        );
+      }
     }
 
     return {
@@ -136,7 +167,7 @@ export default function ContainerDashboard() {
       byRoute,
       byAgent,
       byLocation,
-      byTransporter: data.byTransporter,
+      byTransporter,
       totals: { count: containers.length, amount: totalAmount },
     };
   }, [data, filterAgent, filterCompany, filterTransporter]);
@@ -538,14 +569,14 @@ export default function ContainerDashboard() {
                                       <td className="p-1">{c.numberPlate || "-"}</td>
                                       <td className="p-1">{formatDate(c.borderDate)}</td>
                                       <td className="p-1">{c.trackingLocation || "-"}</td>
-                                      <td className="p-1 text-right">${formatNumber(parseFloat(c.transportFee || "0"))}</td>
+                                      <td className="p-1 text-right">${formatNumber(parseFloat(String(c.transportFee || "0")))}</td>
                                     </tr>
                                   ))}
                                 </tbody>
                                 <tfoot>
                                   <tr className="border-t-2 border-yellow-500/50 font-medium">
                                     <td colSpan={5} className="p-1 text-right">Total:</td>
-                                    <td className="p-1 text-right">${formatNumber(transporterData.offloadedTotal)}</td>
+                                    <td className="p-1 text-right">${formatNumber(transporterData.offloadedTotal || 0)}</td>
                                   </tr>
                                 </tfoot>
                               </table>
@@ -578,14 +609,14 @@ export default function ContainerDashboard() {
                                       <td className="p-1">{c.numberPlate || "-"}</td>
                                       <td className="p-1">{formatDate(c.borderDate)}</td>
                                       <td className="p-1">{c.trackingLocation || "-"}</td>
-                                      <td className="p-1 text-right">${formatNumber(parseFloat(c.transportFee || "0"))}</td>
+                                      <td className="p-1 text-right">${formatNumber(parseFloat(String(c.transportFee || "0")))}</td>
                                     </tr>
                                   ))}
                                 </tbody>
                                 <tfoot>
                                   <tr className="border-t-2 font-medium">
                                     <td colSpan={5} className="p-1 text-right">Total:</td>
-                                    <td className="p-1 text-right">${formatNumber(transporterData.otwTotal)}</td>
+                                    <td className="p-1 text-right">${formatNumber(transporterData.otwTotal || 0)}</td>
                                   </tr>
                                 </tfoot>
                               </table>
@@ -595,7 +626,7 @@ export default function ContainerDashboard() {
 
                         <div className="flex justify-between pt-2 border-t font-medium text-sm">
                           <span>Grand Total:</span>
-                          <span>${formatNumber(transporterData.offloadedTotal + transporterData.otwTotal)}</span>
+                          <span>${formatNumber((transporterData.offloadedTotal || 0) + (transporterData.otwTotal || 0))}</span>
                         </div>
                       </CardContent>
                     </Card>
