@@ -84,6 +84,8 @@ import {
   systemSettings,
   updateContainerTrackingSchema,
   containerTrackingImportRowSchema,
+  userPresence,
+  updatePresenceSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
@@ -334,6 +336,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
+
+  // User Presence tracking endpoints
+  // GET: Fetch all active users (Admin/Owner/Manager only)
+  app.get(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        // Check if user has admin/owner/manager role
+        const userRole = req.session.currentRole;
+        if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
+          return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
+        }
+
+        // Clean up stale records (older than 2 minutes)
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        await db.delete(userPresence).where(lt(userPresence.lastSeen, twoMinutesAgo));
+
+        // Fetch active users
+        const activeUsers = await db.select().from(userPresence).orderBy(desc(userPresence.lastSeen));
+        res.json(activeUsers);
+      } catch (error: any) {
+        console.error("Error fetching active users:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // PATCH: Update user presence (heartbeat)
+  app.patch(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const parseResult = updatePresenceSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({ message: "Invalid request body" });
+        }
+
+        const { route } = parseResult.data;
+        const sessionId = req.sessionID;
+        const userId = req.user!.id;
+        const username = req.user!.username;
+        const companyId = req.session.currentCompanyId || null;
+        const companyName = req.session.currentCompanyName || null;
+        const role = req.session.currentRole || null;
+
+        // Upsert presence record
+        const existing = await db.select().from(userPresence).where(eq(userPresence.sessionId, sessionId)).limit(1);
+        
+        if (existing.length > 0) {
+          await db.update(userPresence)
+            .set({
+              currentRoute: route,
+              companyId,
+              companyName,
+              role,
+              lastSeen: sql`now()`,
+            })
+            .where(eq(userPresence.sessionId, sessionId));
+        } else {
+          await db.insert(userPresence).values({
+            sessionId,
+            userId,
+            username,
+            currentRoute: route,
+            companyId,
+            companyName,
+            role,
+            lastSeen: sql`now()`,
+          });
+        }
+
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error updating presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // DELETE: Clear user presence on logout
+  app.delete(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const sessionId = req.sessionID;
+        await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error clearing presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -355,6 +453,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const { password: _, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
+
+  // User Presence tracking endpoints
+  // GET: Fetch all active users (Admin/Owner/Manager only)
+  app.get(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        // Check if user has admin/owner/manager role
+        const userRole = req.session.currentRole;
+        if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
+          return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
+        }
+
+        // Clean up stale records (older than 2 minutes)
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        await db.delete(userPresence).where(lt(userPresence.lastSeen, twoMinutesAgo));
+
+        // Fetch active users
+        const activeUsers = await db.select().from(userPresence).orderBy(desc(userPresence.lastSeen));
+        res.json(activeUsers);
+      } catch (error: any) {
+        console.error("Error fetching active users:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // PATCH: Update user presence (heartbeat)
+  app.patch(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const parseResult = updatePresenceSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({ message: "Invalid request body" });
+        }
+
+        const { route } = parseResult.data;
+        const sessionId = req.sessionID;
+        const userId = req.user!.id;
+        const username = req.user!.username;
+        const companyId = req.session.currentCompanyId || null;
+        const companyName = req.session.currentCompanyName || null;
+        const role = req.session.currentRole || null;
+
+        // Upsert presence record
+        const existing = await db.select().from(userPresence).where(eq(userPresence.sessionId, sessionId)).limit(1);
+        
+        if (existing.length > 0) {
+          await db.update(userPresence)
+            .set({
+              currentRoute: route,
+              companyId,
+              companyName,
+              role,
+              lastSeen: sql`now()`,
+            })
+            .where(eq(userPresence.sessionId, sessionId));
+        } else {
+          await db.insert(userPresence).values({
+            sessionId,
+            userId,
+            username,
+            currentRoute: route,
+            companyId,
+            companyName,
+            role,
+            lastSeen: sql`now()`,
+          });
+        }
+
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error updating presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // DELETE: Clear user presence on logout
+  app.delete(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const sessionId = req.sessionID;
+        await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error clearing presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
   });
 
   // User management routes (Admin only)
@@ -422,6 +616,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const user = await storage.updateUser(id, updates);
         const { password: _, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
+
+  // User Presence tracking endpoints
+  // GET: Fetch all active users (Admin/Owner/Manager only)
+  app.get(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        // Check if user has admin/owner/manager role
+        const userRole = req.session.currentRole;
+        if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
+          return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
+        }
+
+        // Clean up stale records (older than 2 minutes)
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        await db.delete(userPresence).where(lt(userPresence.lastSeen, twoMinutesAgo));
+
+        // Fetch active users
+        const activeUsers = await db.select().from(userPresence).orderBy(desc(userPresence.lastSeen));
+        res.json(activeUsers);
+      } catch (error: any) {
+        console.error("Error fetching active users:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // PATCH: Update user presence (heartbeat)
+  app.patch(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const parseResult = updatePresenceSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({ message: "Invalid request body" });
+        }
+
+        const { route } = parseResult.data;
+        const sessionId = req.sessionID;
+        const userId = req.user!.id;
+        const username = req.user!.username;
+        const companyId = req.session.currentCompanyId || null;
+        const companyName = req.session.currentCompanyName || null;
+        const role = req.session.currentRole || null;
+
+        // Upsert presence record
+        const existing = await db.select().from(userPresence).where(eq(userPresence.sessionId, sessionId)).limit(1);
+        
+        if (existing.length > 0) {
+          await db.update(userPresence)
+            .set({
+              currentRoute: route,
+              companyId,
+              companyName,
+              role,
+              lastSeen: sql`now()`,
+            })
+            .where(eq(userPresence.sessionId, sessionId));
+        } else {
+          await db.insert(userPresence).values({
+            sessionId,
+            userId,
+            username,
+            currentRoute: route,
+            companyId,
+            companyName,
+            role,
+            lastSeen: sql`now()`,
+          });
+        }
+
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error updating presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // DELETE: Clear user presence on logout
+  app.delete(
+    "/api/user-presence",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const sessionId = req.sessionID;
+        await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error clearing presence:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
       } catch (error: any) {
         res.status(400).json({ message: error.message });
       }

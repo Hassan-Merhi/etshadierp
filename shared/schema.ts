@@ -1796,18 +1796,26 @@ export const containerTrackingImportRowSchema = z.object({
 export type ContainerTrackingImportRow = z.infer<typeof containerTrackingImportRowSchema>;
 
 // User Presence tracking for active users monitoring
-export const userPresenceSchema = z.object({
-  sessionId: z.string(),
-  userId: z.string(),
-  username: z.string(),
-  currentRoute: z.string(),
-  companyId: z.number().nullable(),
-  companyName: z.string().nullable(),
-  role: z.string().nullable(),
-  lastSeen: z.date(),
+export const userPresence = pgTable("user_presence", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id", { length: 255 }).notNull(),
+  userId: varchar("user_id").notNull(),
+  username: text("username").notNull(),
+  currentRoute: text("current_route").notNull().default("/"),
+  companyId: integer("company_id"),
+  companyName: text("company_name"),
+  role: text("role"),
+  lastSeen: timestamp("last_seen").notNull().defaultNow(),
+}, (t) => ({
+  uniqueSession: uniqueIndex("user_presence_session_unique").on(t.sessionId),
+}));
+
+export const insertUserPresenceSchema = createInsertSchema(userPresence).omit({
+  id: true,
 });
 
-export type UserPresence = z.infer<typeof userPresenceSchema>;
+export type InsertUserPresence = z.infer<typeof insertUserPresenceSchema>;
+export type UserPresence = typeof userPresence.$inferSelect;
 
 export const updatePresenceSchema = z.object({
   route: z.string(),
