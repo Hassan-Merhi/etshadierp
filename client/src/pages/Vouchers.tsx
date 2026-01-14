@@ -578,25 +578,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
-  // Fetch data
+  // Fetch data - include selectedCompany?.id in query keys for proper cache invalidation on company switch
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
-    queryKey: ["/api/bank-accounts"],
+    queryKey: ["/api/bank-accounts", selectedCompany?.id],
   });
 
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/suppliers", selectedCompany?.id],
   });
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
+    queryKey: ["/api/stock-items", selectedCompany?.id],
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
+    queryKey: ["/api/locations", selectedCompany?.id],
   });
 
   // Get POS user's location name for auto-populating source location
@@ -604,16 +604,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const posLocationName = posLocation?.name || "";
 
   const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ["/api/employees"],
+    queryKey: ["/api/employees", selectedCompany?.id],
   });
 
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
-    queryKey: ["/api/fixed-assets"],
+    queryKey: ["/api/fixed-assets", selectedCompany?.id],
   });
 
   // Fetch accounts for sidebar (with balances)
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
-    queryKey: ["/api/accounts/voucher-sidebar"],
+    queryKey: ["/api/accounts/voucher-sidebar", selectedCompany?.id],
   });
 
   // Fetch voucher data for editing if voucherIdToEdit is present
