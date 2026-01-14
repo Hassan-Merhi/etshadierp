@@ -2,175 +2,136 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Package,
-  DollarSign,
   FileText,
   Settings,
   Container,
   BarChart3,
   FolderPlus,
-  Upload,
   MapPin,
   Wallet,
   Users,
   Receipt,
   Book,
-  TrendingUp,
   UserCheck,
-  FileSpreadsheet,
   Search,
   PieChart,
   Ship,
-  HandCoins,
   ArrowLeftRight,
   Factory,
   Grid3X3,
-  FlaskConical,
+  ChevronRight,
+  Eye,
+  Boxes,
+  Calculator,
+  Store,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
+import { useState } from "react";
 
-const menuItems = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: any;
+}
+
+interface MenuGroup {
+  title: string;
+  icon: any;
+  items: MenuItem[];
+}
+
+const menuGroups: MenuGroup[] = [
   {
-    title: "Container Tracking",
-    url: "/",
-    icon: Ship,
+    title: "Overview",
+    icon: Eye,
+    items: [
+      { title: "Tracking", url: "/", icon: Ship },
+      { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
+    ],
   },
   {
-    title: "Dashboard",
-    url: "/financial-overview",
-    icon: LayoutDashboard,
+    title: "Inventory",
+    icon: Boxes,
+    items: [
+      { title: "Location Inventory", url: "/location-inventory", icon: MapPin },
+      { title: "Stock OTW", url: "/stock-otw", icon: Ship },
+      { title: "Containers", url: "/containers", icon: Container },
+      { title: "Stock Items", url: "/stock-items", icon: Package },
+      { title: "Stock Query", url: "/stock-query", icon: Search },
+      { title: "Location Summary", url: "/location-summary", icon: Grid3X3 },
+    ],
   },
   {
-    title: "Point of Sale",
-    url: "/pos",
-    icon: ShoppingCart,
+    title: "Accounting",
+    icon: Calculator,
+    items: [
+      { title: "Accounts", url: "/accounts", icon: Wallet },
+      { title: "Suppliers", url: "/suppliers", icon: Users },
+      { title: "Customers", url: "/customers", icon: Users },
+      { title: "Daybook", url: "/daybook", icon: Book },
+      { title: "Payroll", url: "/payroll", icon: UserCheck },
+    ],
   },
   {
-    title: "POS Daybook",
-    url: "/pos-daybook",
-    icon: Book,
-  },
-  {
-    title: "Stock Items",
-    url: "/stock-items",
-    icon: Package,
-  },
-  {
-    title: "Location Inventory",
-    url: "/location-inventory",
-    icon: MapPin,
-  },
-  {
-    title: "Containers",
-    url: "/containers",
-    icon: Container,
-  },
-  {
-    title: "Stock OTW",
-    url: "/stock-otw",
-    icon: Ship,
-  },
-  {
-    title: "Factory Production",
-    url: "/factory-production",
-    icon: Factory,
+    title: "Sales & POS",
+    icon: Store,
+    items: [
+      { title: "POS", url: "/pos", icon: ShoppingCart },
+      { title: "POS Daybook", url: "/pos-daybook", icon: Book },
+    ],
   },
   {
     title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
-  },
-  {
-    title: "Accounts",
-    url: "/accounts",
-    icon: Wallet,
-  },
-  {
-    title: "Suppliers",
-    url: "/suppliers",
-    icon: Users,
-  },
-  {
-    title: "Customers",
-    url: "/customers",
-    icon: Users,
+    icon: TrendingUp,
+    items: [
+      { title: "Sales Report", url: "/sales-report", icon: PieChart },
+      { title: "Analytics", url: "/analytics", icon: BarChart3 },
+      { title: "Factory Production", url: "/factory-production", icon: Factory },
+    ],
   },
   {
     title: "Vouchers",
-    url: "/vouchers",
     icon: Receipt,
+    items: [
+      { title: "Vouchers", url: "/vouchers", icon: Receipt },
+      { title: "Transfer Order", url: "/stock-transfer-order", icon: ArrowLeftRight },
+    ],
   },
-  {
-    title: "Daybook",
-    url: "/daybook",
-    icon: Book,
-  },
-  {
-    title: "Payroll",
-    url: "/payroll",
-    icon: UserCheck,
-  },
-  {
-    title: "Create",
-    url: "/create",
-    icon: FolderPlus,
-  },
-  {
-    title: "Stock Query",
-    url: "/stock-query",
-    icon: Search,
-  },
-  {
-    title: "Location Summary",
-    url: "/location-summary",
-    icon: Grid3X3,
-  },
-  {
-    title: "Transfer Order",
-    url: "/stock-transfer-order",
-    icon: ArrowLeftRight,
-  },
-  {
-    title: "Sales Report",
-    url: "/sales-report",
-    icon: PieChart,
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
-  {
-    title: "Test Data Import",
-    url: "/test-data-import",
-    icon: FlaskConical,
-  },
+];
+
+const standaloneItems: MenuItem[] = [
+  { title: "Create", url: "/create", icon: FolderPlus },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
+  const [openGroups, setOpenGroups] = useState<string[]>(["Overview", "Inventory"]);
 
-  // Fetch user's permissions from the API
   const { data: myPermissions = [] } = useQuery<any[]>({
     queryKey: ["/api/my-permissions"],
     enabled: !!user,
   });
 
-  // Build a set of allowed feature keys for the current user
   const allowedFeatures = new Set<string>();
   myPermissions.forEach((p: any) => {
     if (p.enabled) {
@@ -178,46 +139,39 @@ export function AppSidebar({ user }: { user?: any }) {
     }
   });
 
-  // Filter menu items based on user role and permissions
-  const visibleMenuItems = menuItems.filter((item) => {
+  const isItemVisible = (item: MenuItem) => {
     const isPOSUser = user?.role?.startsWith("POS");
     const isAdmin = user?.role === "Admin";
-    
-    // Get the feature key for this route
     const featureKey = ROUTE_TO_FEATURE[item.url];
-    
-    // Admin always has all permissions
-    if (isAdmin) {
-      return true;
-    }
 
-    // If we have permissions data from the API, use it exclusively
+    if (isAdmin) return true;
+
     if (myPermissions.length > 0 && featureKey) {
       const permissionEntry = myPermissions.find((p: any) => p.featureKey === featureKey);
-      // If permission exists, use its enabled value; if not found, default to false (disabled)
       return permissionEntry ? permissionEntry.enabled : false;
     }
-    
-    // Fallback to old behavior only if no permissions are configured at all
-    // POS users only see: POS, POS Daybook, and Location Inventory
+
     if (isPOSUser) {
       return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
     }
-    
-    // For non-POS users:
-    // Settings and Test Data Import are Admin only (already handled above)
-    if (item.url === "/settings" || item.url === "/test-data-import") {
-      return false;
-    }
-    
-    // POS Daybook is only for POS users (hide from others)
-    if (item.url === "/pos-daybook") {
-      return isPOSUser;
-    }
-    
-    // All other items are visible to non-POS users
+
+    if (item.url === "/settings") return false;
+    if (item.url === "/pos-daybook") return isPOSUser;
+
     return true;
-  });
+  };
+
+  const toggleGroup = (groupTitle: string) => {
+    setOpenGroups((prev) =>
+      prev.includes(groupTitle)
+        ? prev.filter((g) => g !== groupTitle)
+        : [...prev, groupTitle]
+    );
+  };
+
+  const isGroupActive = (group: MenuGroup) => {
+    return group.items.some((item) => location === item.url);
+  };
 
   const initials = user?.username
     ? user.username.substring(0, 2).toUpperCase()
@@ -240,16 +194,69 @@ export function AppSidebar({ user }: { user?: any }) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleMenuItems.map((item) => {
+              {menuGroups.map((group) => {
+                const visibleItems = group.items.filter(isItemVisible);
+                if (visibleItems.length === 0) return null;
+
+                const isOpen = openGroups.includes(group.title);
+                const hasActiveItem = isGroupActive(group);
+
+                return (
+                  <Collapsible
+                    key={group.title}
+                    open={isOpen || hasActiveItem}
+                    onOpenChange={() => toggleGroup(group.title)}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="w-full justify-between"
+                          isActive={hasActiveItem && !isOpen}
+                        >
+                          <div className="flex items-center gap-2">
+                            <group.icon className="h-4 w-4" />
+                            <span>{group.title}</span>
+                          </div>
+                          <ChevronRight
+                            className={`h-4 w-4 transition-transform duration-200 ${
+                              isOpen || hasActiveItem ? "rotate-90" : ""
+                            }`}
+                          />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {visibleItems.map((item) => {
+                            const isActive = location === item.url;
+                            return (
+                              <SidebarMenuSubItem key={item.title}>
+                                <SidebarMenuSubButton asChild isActive={isActive}>
+                                  <a href={item.url} data-testid={`link-${item.url}`}>
+                                    <item.icon className="h-4 w-4" />
+                                    <span>{item.title}</span>
+                                  </a>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
+
+              {standaloneItems.map((item) => {
+                if (!isItemVisible(item)) return null;
                 const isActive = location === item.url;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
                       <a href={item.url} data-testid={`link-${item.url}`}>
-                        <item.icon className="h-5 w-5" />
+                        <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </a>
                     </SidebarMenuButton>
