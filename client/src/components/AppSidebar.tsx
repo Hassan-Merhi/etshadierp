@@ -45,7 +45,7 @@ import { useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface MenuItem {
   title: string;
@@ -125,7 +125,17 @@ const standaloneItems: MenuItem[] = [
 
 export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
-  const [openGroups, setOpenGroups] = useState<string[]>(["Overview", "Inventory"]);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  // Auto-collapse: only keep the group containing current route open
+  useEffect(() => {
+    const activeGroup = menuGroups.find(group => 
+      group.items.some(item => location === item.url)
+    );
+    if (activeGroup) {
+      setOpenGroups([activeGroup.title]);
+    }
+  }, [location]);
 
   const { data: myPermissions = [] } = useQuery<any[]>({
     queryKey: ["/api/my-permissions"],
