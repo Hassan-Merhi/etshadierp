@@ -183,7 +183,7 @@ async function syncEmployeeBalancesFromEntries(
   // Find employee accounts (code starts with EMP-)
   const employeeAccountMap = new Map<number, { code: string; employeeCode: string }>();
   for (const account of allAccounts) {
-    if (account.code.startsWith("EMP-")) {
+    if (account.code && account.code.startsWith("EMP-")) {
       const employeeCode = account.code.replace("EMP-", "");
       employeeAccountMap.set(account.id, { code: account.code, employeeCode });
     }
@@ -29814,7 +29814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
-      if (!account.code.startsWith("EMP-")) {
+      if (!account.code || !account.code.startsWith("EMP-")) {
         return res.status(400).json({ message: "Not an EMP-* legacy account" });
       }
       if (account.companyId !== companyId) {
