@@ -24901,8 +24901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const agent of uniqueAgents) {
           // Match agent name to ledger account (case-insensitive, partial match)
           const agentAccount = ledgerAccounts.find(acc => 
-            acc.name.toLowerCase().includes(agent.toLowerCase()) ||
-            agent.toLowerCase().includes(acc.name.toLowerCase())
+            (acc.name || '').toLowerCase().includes((agent || '').toLowerCase()) ||
+            (agent || '').toLowerCase().includes((acc.name || '').toLowerCase())
           );
           if (agentAccount) {
             // Calculate balance from voucher entries
