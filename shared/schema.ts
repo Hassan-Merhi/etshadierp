@@ -1794,3 +1794,23 @@ export const containerTrackingImportRowSchema = z.object({
 });
 
 export type ContainerTrackingImportRow = z.infer<typeof containerTrackingImportRowSchema>;
+
+// User Presence tracking for active users monitoring
+export const userPresenceSchema = z.object({
+  sessionId: z.string(),
+  userId: z.string(),
+  username: z.string(),
+  currentRoute: z.string(),
+  companyId: z.number().nullable(),
+  companyName: z.string().nullable(),
+  role: z.string().nullable(),
+  lastSeen: z.date(),
+});
+
+export type UserPresence = z.infer<typeof userPresenceSchema>;
+
+export const updatePresenceSchema = z.object({
+  route: z.string(),
+});
+
+export type UpdatePresence = z.infer<typeof updatePresenceSchema>;
