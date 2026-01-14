@@ -17910,6 +17910,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get last sold prices for all stock items in the company
+  // Get last sold prices for all stock items (based on location's company)
+  app.get("/api/pos/last-sold-prices", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.query.locationId as string);
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
+      }
+      // Get the location to find its company
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      const prices = await storage.getLastSoldPrices(location.companyId);
+      res.json(prices);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+
   // Draft POS Sales Routes
   // Get all drafts for current user
   app.get("/api/pos/drafts", requireAuth, async (req, res) => {

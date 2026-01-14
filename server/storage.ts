@@ -253,6 +253,7 @@ export interface IStorage {
   // Stock Query
   getLastPurchaseOrderForItem(stockItemId: number, companyId: number): Promise<any | null>;
   getLastSaleForItem(stockItemId: number, companyId: number): Promise<any | null>;
+  getLastSoldPrices(companyId: number): Promise<Record<number, string>>;
   getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]>;
   getAllSalesForItem(stockItemId: number, companyId: number): Promise<any[]>;
   getInventoryLocationsByItem(stockItemId: number, companyId: number): Promise<any[]>;
@@ -4765,6 +4766,29 @@ export class DbStorage implements IStorage {
       .limit(1);
 
     return result.length > 0 ? result[0] : null;
+  }
+
+  async getLastSoldPrices(companyId: number): Promise<Record<number, string>> {
+    // Get the latest selling price for each stock item from sales_items
+    // Uses a subquery to get the most recent sale for each stock item
+    const result = await db.execute(sql`
+      WITH latest_sales AS (
+        SELECT DISTINCT ON (si.stock_item_id)
+          si.stock_item_id,
+          si.selling_price
+        FROM sales_items si
+        INNER JOIN vouchers v ON si.voucher_id = v.id
+        WHERE v.company_id = ${companyId}
+        ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC
+      )
+      SELECT stock_item_id, selling_price FROM latest_sales
+    `);
+
+    const priceMap: Record<number, string> = {};
+    for (const row of result.rows as any[]) {
+      priceMap[row.stock_item_id] = row.selling_price;
+    }
+    return priceMap;
   }
 
   async getAllPurchasesForItem(stockItemId: number, companyId: number): Promise<any[]> {

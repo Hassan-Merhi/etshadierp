@@ -137,6 +137,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!activeLocation,
   });
 
+  // Fetch last sold prices for stock items (from any location in the company)
+  const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
+    queryKey: activeLocation ? [`/api/pos/last-sold-prices`, { locationId: activeLocation.id }] : [],
+    queryFn: async () => {
+      if (!activeLocation) return {};
+      const response = await fetch(`/api/pos/last-sold-prices?locationId=${activeLocation.id}`, {
+        credentials: "include",
+      });
+      if (!response.ok) return {};
+      return await response.json();
+    },
+    enabled: !!activeLocation,
+  });
+
   // Fetch customer accounts (Asset-type ledger accounts for receivables)
   const customerAccounts = allLedgerAccounts.filter((acc: any) => acc.accountType === "Asset");
 
@@ -695,15 +709,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
     if (activeRow === null) return;
 
+    // Use last sold price from any location if available, otherwise use configured price
+    const lastSoldPrice = lastSoldPrices[item.stockItemId];
+    const rate = lastSoldPrice ? parseFloat(lastSoldPrice) : item.price;
+
     const newRows = [...rows];
     newRows[activeRow] = {
       ...newRows[activeRow],
       itemName: item.name,
-      rate: item.price,
+      rate: rate,
       quantity: newRows[activeRow].quantity || 1,
       stockItemId: item.stockItemId,
     };
-    newRows[activeRow].amount = (newRows[activeRow].quantity || 1) * item.price;
+    newRows[activeRow].amount = (newRows[activeRow].quantity || 1) * rate;
     
     setRows(newRows);
     setSearchTerm("");
