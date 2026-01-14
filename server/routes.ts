@@ -24897,7 +24897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For each company, get ledger accounts and calculate balances for agents
       for (const companyId of companyIds) {
-        const ledgerAccounts = await storage.getLedgerAccounts(companyId);
+        const ledgerAccounts = await storage.getAllLedgerAccounts(companyId);
         for (const agent of uniqueAgents) {
           // Match agent name to ledger account (case-insensitive, partial match)
           const agentAccount = ledgerAccounts.find(acc => 
