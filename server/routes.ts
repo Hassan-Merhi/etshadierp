@@ -6872,7 +6872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherNumber: `PO-${poNumber}-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: importDate,
-          description: `Purchase Order ${poNumber} - Container ${containerNumber} (Pending Offload)`,
+          description: `${containerNumber} ${supplier.legalName}`,
           totalAmount: poGrandTotal.toString(),
           optional: false, // Creates real voucher entries immediately at import
         });
@@ -6997,7 +6997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherNumber: `IC-${poNumber}-${Date.now()}`,
               voucherType: "Journal",
               voucherDate: importDate,
-              description: `Inter-company credit: ${subsidiaryName} - PO ${poNumber}`,
+              description: `${containerNumber} ${supplier.legalName}`,
               totalAmount: poGrandTotal.toString(),
               optional: false,
             });
@@ -10931,6 +10931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const po of posWithoutVouchers) {
         const container = containerMap.get(po.containerId);
         if (!container) continue;
+        const backfillSupplier = po.supplierId ? await storage.getSupplierById(po.supplierId) : null;
 
         // Create voucher for this PO with double-entry bookkeeping
         const voucher = await storage.createVoucher({
@@ -10938,7 +10939,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherNumber: `PO-${po.poNumber}-BACKFILL-${Date.now()}`,
           voucherType: "Purchase",
           voucherDate: container.importDate,
-          description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Backfilled)`,
+          description: `${container.containerNumber} ${backfillSupplier?.legalName || 'Unknown Supplier'}`,
           totalAmount: po.itemsTotal || "0",
           optional: false,
         });
@@ -30158,6 +30159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const poOtherCharges = parseFloat(po.otherCharges || "0");
             const poTotal = poItemsTotal + poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
             
+            const poSupplier = po.supplierId ? await db.query.suppliers.findFirst({ where: eq(suppliers.id, po.supplierId) }) : null;
             if (poTotal <= 0) {
               continue; // Skip zero or negative amounts
             }
@@ -30246,7 +30248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherNumber: parentVoucherNumber,
               voucherType: "Journal",
               voucherDate,
-              description: `Inter-company credit for PO ${po.poNumber} - ${company.name}`,
+              description: `${container.containerNumber} ${poSupplier?.legalName || 'Unknown Supplier'}`,
               totalAmount: poTotal.toFixed(2),
               optional: false,
             }).returning();
@@ -30346,6 +30348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const otherCharges = parseFloat(po.otherCharges || "0");
           const poTotal = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
           
+            const poSupplier = po.supplierId ? await db.query.suppliers.findFirst({ where: eq(suppliers.id, po.supplierId) }) : null;
           if (poTotal <= 0) {
             skipped++;
             continue;
