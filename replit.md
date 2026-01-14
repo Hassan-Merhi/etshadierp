@@ -55,6 +55,12 @@ The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui
     - PAYROLL_DEPOSIT_EXPENSE is included in Import Cycle Balance via indirectExpenseBalance
     - Regular SALARY_EXPENSE (for workers with salary/payroll/wage in account name) is also now included in Import Cycle Balance via payrollExpenseBalance
 -   **Employee Opening Balance Fix (Jan 2026)**: Employee opening balances are now included in the implicit opening balance equity calculation. When importing payroll data from an old system with employee opening balances (liabilities owed to employees), these are now properly offset in the Import Cycle Balance to maintain $0 balance.
+-   **Active Users Monitoring (Jan 2026)**: New "Active Users" tab in Settings page allows admins/owners/managers to monitor currently active users:
+    - Displays all logged-in users grouped by company
+    - Shows username, role, current page, and last active time
+    - Real-time updates every 30 seconds
+    - Uses database-backed presence tracking with automatic cleanup of stale records (2 minute timeout)
+    - **Database migration required on Render**: Run `migrations/add_user_presence.sql`
 -   **OTW Container Tracking (Jan 2026)**: New "OTW Tracking" tab in the Containers page provides a TallyPrime-style interface for tracking containers in transit:
     - **Automatic fields**: Container number, supplier name, total amount (from PO data)
     - **Manual fields**: Shop name, ETA, transport fee, number plate, location, border date, offload date, agent, duty fee, document received checkbox, description

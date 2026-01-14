@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 
 const HEARTBEAT_INTERVAL = 30000;
@@ -6,37 +6,60 @@ const HEARTBEAT_INTERVAL = 30000;
 export function usePresence() {
   const [location] = useLocation();
   const lastRouteRef = useRef(location);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  const sendHeartbeat = useCallback(async (route: string) => {
+    try {
+      await fetch("/api/user-presence", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ route }),
+      });
+    } catch {
+    }
+  }, []);
 
   useEffect(() => {
-    const sendHeartbeat = async () => {
-      try {
-        await fetch("/api/user-presence", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ route: location }),
-        });
-        lastRouteRef.current = location;
-      } catch (error) {
+    lastRouteRef.current = location;
+    sendHeartbeat(location);
+  }, [location, sendHeartbeat]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    intervalRef.current = setInterval(() => {
+      if (isMountedRef.current) {
+        sendHeartbeat(lastRouteRef.current);
+      }
+    }, HEARTBEAT_INTERVAL);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isMountedRef.current) {
+        sendHeartbeat(lastRouteRef.current);
       }
     };
 
-    sendHeartbeat();
-
-    const interval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
-
-    const handleBeforeUnload = async () => {
-      try {
-        navigator.sendBeacon("/api/user-presence", JSON.stringify({ action: "leave" }));
-      } catch {
-      }
+    const handleBeforeUnload = () => {
+      const data = new Blob([JSON.stringify({ action: "leave" })], { type: "application/json" });
+      navigator.sendBeacon("/api/user-presence/leave", data);
     };
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      clearInterval(interval);
+      isMountedRef.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      fetch("/api/user-presence", {
+        method: "DELETE",
+        credentials: "include",
+      }).catch(() => {});
     };
-  }, [location]);
+  }, [sendHeartbeat]);
 }

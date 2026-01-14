@@ -434,6 +434,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error clearing presence:", error);
         res.status(500).json({ message: error.message });
       }
+    });
+
+  // POST: Handle sendBeacon leave request (no auth required as session may be ending)
+  app.post(
+    "/api/user-presence/leave",
+    async (req, res) => {
+      try {
+        const sessionId = req.sessionID;
+        if (sessionId) {
+          await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
+        }
+        res.json({ success: true });
+      } catch (error: any) {
+        console.error("Error clearing presence on leave:", error);
+        res.status(500).json({ message: error.message });
+      }
     }
   );
 
