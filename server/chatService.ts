@@ -26,6 +26,12 @@ interface ERPContext {
   inventoryValueByLocation: any[];
   topSellingItems: any[];
   recentTransactions: any[];
+  // New smart data
+  slowMovingStock: any[];
+  overdueContainers: any[];
+  employeeBalances: any[];
+  itemsToMarkdown: any[];
+  containersInTransit: any[];
 }
 
 interface UserPreferences {
@@ -379,6 +385,113 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     description: v.description,
   }));
 
+  // Slow-moving stock: items that exist in inventory but haven't been sold in 60+ days
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  
+  const recentlySoldItemIds = new Set(
+    (await db
+      .select({ stockItemId: schema.salesItems.stockItemId })
+      .from(schema.salesItems)
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .where(and(
+        eq(schema.vouchers.companyId, companyId),
+        gt(schema.vouchers.voucherDate, sixtyDaysAgo.toISOString().split('T')[0]),
+        isNull(schema.vouchers.deletedAt)
+      ))
+    ).map(r => r.stockItemId)
+  );
+
+  const slowMovingStock = stockItems
+    .filter(item => {
+      const qty = inventoryMap.get(item.id) || 0;
+      return qty > 0 && !recentlySoldItemIds.has(item.id);
+    })
+    .map(item => {
+      const qty = inventoryMap.get(item.id) || 0;
+      const invRecord = inventory.find(i => i.stockItemId === item.id);
+      const value = invRecord ? parseFloat(invRecord.totalValue || '0') : 0;
+      return {
+        itemId: item.id,
+        itemCode: item.code,
+        itemName: item.name,
+        quantity: qty,
+        value: value,
+        daysSinceLastSale: '60+',
+        recommendation: value > 500 ? 'Consider markdown/promotion' : 'Monitor',
+      };
+    })
+    .slice(0, 20);
+
+  // Items to markdown: slow-moving with high value
+  const itemsToMarkdown = slowMovingStock
+    .filter(item => item.value > 100)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  // Overdue containers: OTW status for more than 90 days
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  
+  const overdueContainers = purchaseOrders
+    .filter(po => po.status === 'OTW')
+    .filter(po => {
+      const createdDate = new Date(po.createdAt);
+      return createdDate < ninetyDaysAgo;
+    })
+    .map(po => {
+      const supplier = suppliers.find(s => s.id === po.supplierId);
+      const daysInTransit = Math.floor((Date.now() - new Date(po.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        poNumber: po.poNumber,
+        supplierName: supplier?.legalName || 'Unknown',
+        amount: parseFloat(po.itemsTotal || '0') + parseFloat(po.freight || '0'),
+        daysInTransit,
+        status: 'OVERDUE',
+      };
+    });
+
+  // Containers in transit (all OTW)
+  const containersInTransit = purchaseOrders
+    .filter(po => po.status === 'OTW')
+    .map(po => {
+      const supplier = suppliers.find(s => s.id === po.supplierId);
+      const daysInTransit = Math.floor((Date.now() - new Date(po.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        poNumber: po.poNumber,
+        supplierName: supplier?.legalName || 'Unknown',
+        amount: parseFloat(po.itemsTotal || '0') + parseFloat(po.freight || '0'),
+        daysInTransit,
+        isOverdue: daysInTransit > 90,
+      };
+    });
+
+  // Employee balances
+  const employees = await db
+    .select({
+      id: schema.employees.id,
+      code: schema.employees.code,
+      firstName: schema.employees.firstName,
+      lastName: schema.employees.lastName,
+      currentBalance: schema.employees.currentBalance,
+      openingBalance: schema.employees.openingBalance,
+    })
+    .from(schema.employees)
+    .where(and(
+      eq(schema.employees.companyId, companyId),
+      eq(schema.employees.active, true)
+    ));
+
+  const employeeBalancesList = employees
+    .map(emp => ({
+      employeeId: emp.id,
+      employeeCode: emp.code,
+      employeeName: `${emp.firstName} ${emp.lastName}`,
+      balance: parseFloat(emp.currentBalance || '0'),
+      openingBalance: parseFloat(emp.openingBalance || '0'),
+    }))
+    .filter(e => Math.abs(e.balance) > 0.01);
+
   return {
     dataFetchedAt, // Real-time timestamp
     inventory,
@@ -400,6 +513,12 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     inventoryValueByLocation: inventoryByLocationWithNames,
     topSellingItems: topSellingWithNames,
     recentTransactions,
+    // New smart data
+    slowMovingStock,
+    overdueContainers,
+    employeeBalances: employeeBalancesList,
+    itemsToMarkdown,
+    containersInTransit,
   };
 }
 
@@ -459,6 +578,32 @@ ${context.lowStockAlerts.slice(0, 10).map(a => `- ${a.itemName} (${a.itemCode}):
 ${context.supplierBalances.filter(s => s.balance > 1000).length > 0 ? `
 SIGNIFICANT SUPPLIER BALANCES:
 ${context.supplierBalances.filter(s => s.balance > 1000).slice(0, 5).map(s => `- ${s.supplierName}: $${s.balance.toLocaleString()} ${s.status}`).join('\n')}
+` : ''}
+
+${context.slowMovingStock.length > 0 ? `
+🐌 SLOW-MOVING STOCK (Not sold in 60+ days):
+${context.slowMovingStock.slice(0, 10).map(item => `- ${item.itemName} (${item.itemCode}): ${item.quantity} units, Value: $${item.value.toLocaleString()} - ${item.recommendation}`).join('\n')}
+` : ''}
+
+${context.itemsToMarkdown.length > 0 ? `
+💸 ITEMS TO CONSIDER FOR MARKDOWN (High-value slow movers):
+${context.itemsToMarkdown.map(item => `- ${item.itemName}: $${item.value.toLocaleString()} stuck value`).join('\n')}
+` : ''}
+
+${context.overdueContainers.length > 0 ? `
+🚨 OVERDUE CONTAINERS (In transit 90+ days):
+${context.overdueContainers.map(c => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} - ${c.daysInTransit} days in transit`).join('\n')}
+` : ''}
+
+${context.containersInTransit.length > 0 ? `
+🚢 CONTAINERS IN TRANSIT:
+${context.containersInTransit.map(c => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} (${c.daysInTransit} days)${c.isOverdue ? ' ⚠️ OVERDUE' : ''}`).join('\n')}
+` : 'No containers currently in transit.'}
+
+${context.employeeBalances.length > 0 ? `
+👷 EMPLOYEE BALANCES:
+${context.employeeBalances.map(e => `- ${e.employeeName} (${e.employeeCode}): $${e.balance.toLocaleString()}`).join('\n')}
+Total Employee Deposits: $${context.employeeBalances.reduce((sum, e) => sum + e.balance, 0).toLocaleString()}
 ` : ''}
 
 ### 📈 TOP SELLING ITEMS:
@@ -540,12 +685,33 @@ Remember: You're talking to business owners who need actionable insights, not ra
 function generateQuickSuggestions(context: ERPContext): string[] {
   const suggestions: string[] = [];
   
+  // Priority: Show alerts first
+  if (context.overdueContainers.length > 0) {
+    suggestions.push(`⚠️ ${context.overdueContainers.length} containers are overdue - show me details`);
+  }
+  
   if (context.lowStockAlerts.length > 0) {
     suggestions.push(`Show me the ${context.lowStockAlerts.length} items that are low on stock`);
   }
   
+  if (context.slowMovingStock.length > 0) {
+    suggestions.push(`What items haven't sold in 60+ days?`);
+  }
+  
+  if (context.itemsToMarkdown.length > 0) {
+    suggestions.push(`Which items should I consider marking down?`);
+  }
+  
   if (context.supplierBalances.filter(s => s.balance > 0).length > 0) {
     suggestions.push("What are my outstanding supplier payments?");
+  }
+  
+  if (context.employeeBalances.length > 0) {
+    suggestions.push("Show me employee deposit balances");
+  }
+  
+  if (context.containersInTransit.length > 0) {
+    suggestions.push(`What containers are currently in transit?`);
   }
   
   if (context.topSellingItems.length > 0) {
@@ -556,7 +722,7 @@ function generateQuickSuggestions(context: ERPContext): string[] {
   suggestions.push("Which items have the highest profit margin?");
   suggestions.push("How is my inventory distributed across locations?");
   
-  return suggestions.slice(0, 4);
+  return suggestions.slice(0, 6);
 }
 
 export async function chat(
