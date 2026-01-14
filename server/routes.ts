@@ -92,6 +92,35 @@ import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
 import { format } from "date-fns";
 
+
+// Audit logging helper function
+async function logAudit(params: {
+  userId: string;
+  username: string;
+  companyId?: number | null;
+  action: "create" | "update" | "delete";
+  tableName: string;
+  recordId?: number | null;
+  recordIdentifier?: string | null;
+  changes?: Record<string, { old: any; new: any }> | null;
+}) {
+  try {
+    await db.insert(auditLog).values({
+      userId: params.userId,
+      username: params.username,
+      companyId: params.companyId,
+      action: params.action,
+      tableName: params.tableName,
+      recordId: params.recordId,
+      recordIdentifier: params.recordIdentifier,
+      changes: params.changes,
+    });
+  } catch (error) {
+    console.error("Error logging audit:", error);
+    throw error; // Rethrow to ensure audit failures are not silently ignored
+  }
+}
+
 // Configure multer with file size limit (10MB) to prevent memory exhaustion
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -12330,6 +12359,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const result = { voucher: createdVoucher, entries: createdEntries };
 
+        // Log the creation to audit log
+        await logAudit({
+          userId: req.session.userId!,
+          username: req.session.username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "create",
+          tableName: "vouchers",
+          recordId: createdVoucher.id,
+          recordIdentifier: createdVoucher.voucherNumber,
+          changes: null,
+        });
+
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -13916,6 +13957,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .set({ optional })
             .where(eq(vouchers.id, id));
         });
+        // Log the optional status change to audit log
+        await logAudit({
+          userId: req.session.userId!,
+          username: req.session.username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "update",
+          tableName: "vouchers",
+          recordId: id,
+          recordIdentifier: voucher.voucherNumber,
+          changes: { optional: { old: wasOptional, new: willBeOptional } },
+        });
 
         // Sync employee balances when optional status changes
         if (wasOptional !== willBeOptional && req.session.currentCompanyId) {
@@ -15478,6 +15530,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw error;
       }
 
+      // Log the update to audit log
+      await logAudit({
+        userId: req.session.userId!,
+        username: req.session.username || "unknown",
+        companyId: req.session.currentCompanyId!,
+        action: "update",
+        tableName: "vouchers",
+        recordId: id,
+        recordIdentifier: updatedVoucher.voucherNumber,
+        changes: {
+          voucherNumber: { old: existingVoucher.voucherNumber, new: updatedVoucher.voucherNumber },
+          voucherType: { old: existingVoucher.voucherType, new: updatedVoucher.voucherType },
+        },
+      });
+
       const result = { voucher: updatedVoucher, entries: createdEntries };
 
       res.json(result);
@@ -16569,6 +16636,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(vouchers.id, id));
         });
 
+        // Log the deletion to audit log
+        await logAudit({
+          userId: req.session.userId!,
+          username: req.session.username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "delete",
+          tableName: "vouchers",
+          recordId: id,
+          recordIdentifier: voucher.voucherNumber,
+          changes: null,
+        });
+
         res.json({ message: "Voucher deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -16950,6 +17029,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Soft delete: Set deletedAt instead of hard delete
             await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, id));
           });
+
+        // Log the deletion to audit log
+        await logAudit({
+          userId: req.session.userId!,
+          username: req.session.username || "unknown",
+          companyId: req.session.currentCompanyId!,
+          action: "delete",
+          tableName: "vouchers",
+          recordId: id,
+          recordIdentifier: voucher.voucherNumber,
+          changes: null,
+        });
 
           deletedCount++;
         } catch (err: any) {
