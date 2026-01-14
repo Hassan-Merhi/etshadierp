@@ -153,7 +153,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     row: 0,
     col: 0,
   });
-  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("bank");
+  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("cash");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -848,6 +848,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         if (!isItemNameField || filteredItems.length === 0) {
           e.preventDefault();
           
+          // If on qty field, move to rate field (same row)
+          const isQtyField = columns[colIndex].key === "quantity";
+          if (isQtyField) {
+            setSelectedCell({ row: rowIndex, col: colIndex + 1 });
+            focusCell(rowIndex, colIndex + 1);
+            return;
+          }
+          
           // If on rate field, immediately create a new row
           const isRateField = columns[colIndex].key === "rate";
           if (isRateField) {
@@ -893,6 +901,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         }
         break;
       case "Tab":
+        // If on item name field with filtered items, Tab selects the highlighted item
+        if (isItemNameField && activeRow === rowIndex && filteredItems.length > 0 && !e.shiftKey) {
+          e.preventDefault();
+          if (filteredItems[highlightedIndex]) {
+            selectItem(filteredItems[highlightedIndex]);
+          }
+          return;
+        }
         if (!e.shiftKey && colIndex < maxCol) {
           e.preventDefault();
           setSelectedCell({ row: rowIndex, col: colIndex + 1 });
