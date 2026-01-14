@@ -449,7 +449,7 @@
                           <Badge variant="outline">{presence.role || "—"}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {presence.currentPage || "/"}
+                          {presence.currentRoute || "/"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatTimeAgo(presence.lastSeen)}
