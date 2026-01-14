@@ -45,8 +45,13 @@ import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
 
 const menuItems = [
   {
-    title: "Dashboard",
+    title: "Container Tracking",
     url: "/",
+    icon: Ship,
+  },
+  {
+    title: "Dashboard",
+    url: "/financial-overview",
     icon: LayoutDashboard,
   },
   {
