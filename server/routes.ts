@@ -24856,7 +24856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyIds = userCompanyRoles.map(r => r.companyId);
 
       if (companyIds.length === 0) {
-        return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, totals: { count: 0, amount: 0 } });
+        return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, byTransporter: {}, totals: { count: 0, amount: 0 } });
       }
 
       // Get all companies for names
@@ -24867,29 +24867,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allSuppliers = await storage.getAllSuppliers();
       const supplierMap = new Map(allSuppliers.map(s => [s.id, s]));
 
-      // Fetch OTW containers from all accessible companies
-      const allContainers: any[] = [];
+      // Fetch ALL containers (OTW and Offloaded) from all accessible companies
+      const otwContainers: any[] = [];
+      const offloadedContainers: any[] = [];
+      
       for (const companyId of companyIds) {
         const containers = await storage.getAllContainers(companyId);
-        const otwContainers = containers.filter(c => c.status === "OTW");
-        otwContainers.forEach(c => {
-          allContainers.push({
+        containers.forEach(c => {
+          const enrichedContainer = {
             ...c,
             companyName: companyMap.get(c.companyId)?.name || "Unknown",
             companyCode: companyMap.get(c.companyId)?.code || "",
             supplierName: supplierMap.get(c.supplierId)?.name || "Unknown",
-          });
+          };
+          if (c.status === "OTW") {
+            otwContainers.push(enrichedContainer);
+          } else if (c.status === "Offloaded") {
+            offloadedContainers.push(enrichedContainer);
+          }
         });
       }
 
-      // Group by shopName (route)
+      // Fetch agent ledger account balances from all companies
+      const agentBalances: Record<string, number> = {};
+      const uniqueAgents = new Set<string>();
+      otwContainers.forEach(c => {
+        if (c.agent) uniqueAgents.add(c.agent);
+      });
+
+      // For each company, get ledger accounts and calculate balances for agents
+      for (const companyId of companyIds) {
+        const ledgerAccounts = await storage.getLedgerAccounts(companyId);
+        for (const agent of uniqueAgents) {
+          // Match agent name to ledger account (case-insensitive, partial match)
+          const agentAccount = ledgerAccounts.find(acc => 
+            acc.name.toLowerCase().includes(agent.toLowerCase()) ||
+            agent.toLowerCase().includes(acc.name.toLowerCase())
+          );
+          if (agentAccount) {
+            // Calculate balance from voucher entries
+            const entries = await db
+              .select({
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(voucherEntries.ledgerAccountId, agentAccount.id),
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false)
+                )
+              );
+            
+            let balance = parseFloat(agentAccount.openingBalance || "0");
+            if (agentAccount.openingBalanceSide === "Cr") balance = -balance;
+            
+            for (const entry of entries) {
+              balance += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
+            }
+            
+            agentBalances[agent] = (agentBalances[agent] || 0) + balance;
+          }
+        }
+      }
+
+      // Group OTW containers by shopName (route)
       const byRoute: Record<string, any[]> = {};
-      const byAgent: Record<string, { containers: any[], total: number }> = {};
+      const byAgent: Record<string, { containers: any[], total: number, balance: number }> = {};
       const byLocation: Record<string, { count: number, total: number }> = {};
 
       let totalAmount = 0;
 
-      for (const container of allContainers) {
+      for (const container of otwContainers) {
         const route = container.shopName || "Unassigned";
         const agent = container.agent || "Unassigned";
         const location = container.trackingLocation || "Unknown";
@@ -24899,8 +24950,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!byRoute[route]) byRoute[route] = [];
         byRoute[route].push(container);
 
-        // Group by agent
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], total: 0 };
+        // Group by agent with balance
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], total: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].containers.push(container);
         byAgent[agent].total += amount;
 
@@ -24912,18 +24963,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalAmount += amount;
       }
 
+      // Group by transporter (both OTW and offloaded)
+      const byTransporter: Record<string, { otw: any[], offloaded: any[], otwTotal: number, offloadedTotal: number }> = {};
+      
+      for (const container of otwContainers) {
+        const transporter = container.transporter || "Unassigned";
+        if (!byTransporter[transporter]) {
+          byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+        }
+        byTransporter[transporter].otw.push(container);
+        byTransporter[transporter].otwTotal += parseFloat(container.transportFee || "0");
+      }
+      
+      for (const container of offloadedContainers) {
+        const transporter = container.transporter || "Unassigned";
+        if (!byTransporter[transporter]) {
+          byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
+        }
+        byTransporter[transporter].offloaded.push(container);
+        byTransporter[transporter].offloadedTotal += parseFloat(container.transportFee || "0");
+      }
+
       res.json({
-        containers: allContainers,
+        containers: otwContainers,
         byRoute,
         byAgent,
         byLocation,
-        totals: { count: allContainers.length, amount: totalAmount },
+        byTransporter,
+        totals: { count: otwContainers.length, amount: totalAmount },
       });
     } catch (error: any) {
       console.error("Dashboard container tracking error:", error);
       res.status(500).json({ message: error.message });
     }
   });
+
   // Dashboard Cash Accounts - user-selected accounts for dashboard display
   app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
     try {
