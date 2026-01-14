@@ -446,20 +446,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-
     const { password: _, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
   });
-
-  });
-
   // User management routes (Admin only)
   app.get(
     "/api/users",
@@ -530,12 +524,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  );
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
-      }
-    },
-  );
 
   app.delete(
     "/api/users/:id",

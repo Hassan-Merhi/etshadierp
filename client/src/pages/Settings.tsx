@@ -54,7 +54,7 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye } from "lucide-react";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -355,6 +355,114 @@
           </div>
         </div>
       </Card>
+    );
+  }
+
+  function ActiveUsersSection() {
+    const { data: presenceData, isLoading } = useQuery<any[]>({
+      queryKey: ["/api/user-presence"],
+      refetchInterval: 30000, // Refresh every 30 seconds
+    });
+
+    const { data: companies } = useQuery<any[]>({
+      queryKey: ["/api/companies"],
+    });
+
+    const formatTimeAgo = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return "Just now";
+      if (diffMins === 1) return "1 min ago";
+      if (diffMins < 60) return `${diffMins} mins ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours === 1) return "1 hour ago";
+      return `${diffHours} hours ago`;
+    };
+
+    const getCompanyName = (companyId: number | null) => {
+      if (!companyId || !companies) return "—";
+      const company = companies.find((c: any) => c.id === companyId);
+      return company?.name || "Unknown";
+    };
+
+    // Group users by company
+    const groupedUsers = presenceData?.reduce((acc: any, presence: any) => {
+      const companyId = presence.companyId || "unassigned";
+      if (!acc[companyId]) {
+        acc[companyId] = [];
+      }
+      acc[companyId].push(presence);
+      return acc;
+    }, {} as Record<string, any[]>) || {};
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Eye className="h-5 w-5" />
+          <h2 className="text-2xl font-semibold">Active Users</h2>
+        </div>
+        <p className="text-muted-foreground">
+          Monitor currently active users and their location in the application.
+        </p>
+
+        {isLoading ? (
+          <Card className="p-6">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading active users...</span>
+            </div>
+          </Card>
+        ) : !presenceData || presenceData.length === 0 ? (
+          <Card className="p-6">
+            <p className="text-muted-foreground">No active users at the moment.</p>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {Object.entries(groupedUsers).map(([companyId, users]: [string, any]) => (
+              <Card key={companyId} className="overflow-hidden">
+                <div className="px-4 py-3 bg-muted/50 border-b">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    <h3 className="font-medium">
+                      {companyId === "unassigned" ? "No Company Selected" : getCompanyName(Number(companyId))}
+                    </h3>
+                    <Badge variant="secondary" className="ml-2">{users.length}</Badge>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Current Page</TableHead>
+                      <TableHead>Last Active</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((presence: any) => (
+                      <TableRow key={presence.id} data-testid={`row-presence-${presence.id}`}>
+                        <TableCell className="font-medium">{presence.username}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{presence.role || "—"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {presence.currentPage || "/"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatTimeAgo(presence.lastSeen)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
   
@@ -1120,6 +1228,10 @@
             <TabsTrigger value="system" data-testid="tab-system">
               <Wrench className="h-4 w-4 mr-2" />
               System
+            </TabsTrigger>
+            <TabsTrigger value="active-users" data-testid="tab-active-users">
+              <Eye className="h-4 w-4 mr-2" />
+              Active Users
             </TabsTrigger>
             <TabsTrigger value="role-permissions" data-testid="tab-role-permissions">
               <Shield className="h-4 w-4 mr-2" />
@@ -2735,6 +2847,11 @@
                 <NetPositionAdjustmentCard />
               </div>
             </div>
+          </TabsContent>
+
+          {/* Active Users Tab */}
+          <TabsContent value="active-users" className="space-y-4">
+            <ActiveUsersSection />
           </TabsContent>
 
           {/* Role Permissions Tab */}

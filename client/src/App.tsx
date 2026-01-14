@@ -14,6 +14,7 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
+import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
@@ -162,6 +163,7 @@ function Router({ user }: { user: any }) {
 }
 
 function AuthenticatedApp() {
+  usePresence(); // Track user presence
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
   
