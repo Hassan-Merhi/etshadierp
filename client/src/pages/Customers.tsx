@@ -6,7 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plus, Search, Building2, Pencil, ExternalLink } from "lucide-react";
+import { Plus, Search, Building2, Pencil, ExternalLink, DollarSign } from "lucide-react";
+import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import {
@@ -43,6 +46,13 @@ export default function Customers() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statementCustomer, setStatementCustomer] = useState<(Customer & { balance: number; balanceSide: string }) | null>(null);
+
+  // Fetch customer sales/transactions when a customer is selected for statement
+  const { data: customerSales = [], isLoading: salesLoading } = useQuery<any[]>({
+    queryKey: [`/api/container-sales/customer/${statementCustomer?.id}`],
+    enabled: !!statementCustomer?.id,
+  });
 
   const { data: customers = [], isLoading } = useQuery<(Customer & { balance: number; balanceSide: string })[]>({
     queryKey: ["/api/customers/stats", selectedCompany?.id],
@@ -311,13 +321,13 @@ export default function Customers() {
                 <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                   <TableCell>
                     <button
-                      onClick={() => navigate(`/accounts?accountId=${customer.id}&accountType=customer`)}
+                      onClick={() => setStatementCustomer(customer)}
                       className="flex items-center gap-2 text-primary hover:underline cursor-pointer"
                       data-testid={`link-customer-statement-${customer.id}`}
                     >
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                       {customer.legalName}
-                      <ExternalLink className="h-3 w-3" />
+                      <DollarSign className="h-3 w-3" />
                     </button>
                   </TableCell>
                   <TableCell className="text-right font-mono">
@@ -446,6 +456,97 @@ export default function Customers() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer Statement Dialog */}
+      <Dialog open={!!statementCustomer} onOpenChange={(open) => !open && setStatementCustomer(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              {statementCustomer?.legalName} - Statement
+            </DialogTitle>
+            <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+              <span>Current Balance: <span className="font-mono font-semibold text-foreground">${formatNumber(statementCustomer?.balance || 0)}</span></span>
+              <Badge variant={statementCustomer?.balanceSide === "Cr" ? "default" : "secondary"}>
+                {statementCustomer?.balanceSide || "Dr"}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto mt-4">
+            {salesLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : customerSales.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No transactions found for this customer
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {customerSales.length} transaction{customerSales.length !== 1 ? "s" : ""}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...customerSales]
+                      .sort((a: any, b: any) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime())
+                      .map((sale: any, idx: number) => (
+                        <TableRow key={sale.id}>
+                          <TableCell className="font-mono text-sm">
+                            {sale.saleDate ? format(new Date(sale.saleDate), "yyyy-MM-dd") : "-"}
+                          </TableCell>
+                          <TableCell className="font-mono font-medium">
+                            {sale.containerNumber || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {sale.invoiceNumber || "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(sale.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            ${parseFloat(sale.paidAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
+                              {sale.paymentStatus || "PENDING"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+
+                {/* Summary */}
+                <div className="border-t pt-4 flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    Total: {customerSales.length} container sale{customerSales.length !== 1 ? "s" : ""}
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Outstanding: </span>
+                    <span className="font-mono font-semibold text-lg">
+                      ${formatNumber(statementCustomer?.balance || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
