@@ -555,7 +555,7 @@ export default function ContainerDetail() {
                 </TableHeader>
                 <TableBody>
                   {charges.map((charge: any) => (
-                    <TableRow key={charge.id} data-testid={`row-charge-${charge.chargeType.toLowerCase().replace(/\s/g, "-")}`}>
+                    <TableRow key={charge.id} data-testid={`row-charge-${(charge.chargeType || "").toLowerCase().replace(/\s/g, "-")}`}>
                       <TableCell className="font-medium">{charge.chargeType}</TableCell>
                       <TableCell className={`text-right font-semibold ${parseFloat(charge.amount) < 0 ? "text-red-500" : ""}`}>
                         ${formatCurrency(parseFloat(charge.amount))}

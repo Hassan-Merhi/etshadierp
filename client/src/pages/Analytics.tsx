@@ -680,8 +680,8 @@ export default function Analytics() {
     (acc) => 
       (acc.type === "ledger" && acc.accountType === "Cash") ||
       (acc.type === "bank" && (
-        acc.name.toLowerCase().includes("cash") || 
-        acc.code.toLowerCase().includes("cash")
+        (acc.name || "").toLowerCase().includes("cash") || 
+        (acc.code || "").toLowerCase().includes("cash")
       ))
   );
 

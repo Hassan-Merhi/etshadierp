@@ -185,10 +185,10 @@ export default function Bales() {
 
   const filteredBales = bales.filter(
     (bale) =>
-      bale.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bale.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bale.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bale.origin.toLowerCase().includes(searchTerm.toLowerCase())
+      (bale.barcode || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (bale.category || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (bale.grade || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (bale.origin || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   if (!selectedCompany) {

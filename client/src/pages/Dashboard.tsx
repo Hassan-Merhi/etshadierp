@@ -261,7 +261,7 @@ export default function Dashboard() {
   // Get available cash accounts (excluding ones already added)
   const availableCashAccounts = allAccounts.filter(acc => {
     const alreadyAdded = dashboardCashAccounts.some(
-      dca => dca.accountType === acc.type.toLowerCase() && dca.accountId === acc.accountId
+      dca => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId
     );
     return !alreadyAdded;
   }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));

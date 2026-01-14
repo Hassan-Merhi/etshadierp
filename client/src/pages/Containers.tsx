@@ -124,8 +124,8 @@ export default function Containers() {
   const filteredOtwContainers = otwContainers.filter((c) => {
     // Search filter
     if (otwSearchTerm) {
-      const search = otwSearchTerm.toLowerCase();
-      if (!(c.containerNumber.toLowerCase().includes(search) ||
+      const search = (otwSearchTerm || "").toLowerCase();
+      if (!((c.containerNumber || "").toLowerCase().includes(search) ||
           (c.shopName?.toLowerCase() || "").includes(search) ||
           (c.agent?.toLowerCase() || "").includes(search))) {
         return false;
@@ -158,16 +158,16 @@ export default function Containers() {
 
   const filteredSoldContainers = soldContainers.filter((sale) => {
     if (!soldSearchTerm) return true;
-    const searchLower = soldSearchTerm.toLowerCase();
+    const searchLower = (soldSearchTerm || "").toLowerCase();
     return (
-      sale.containerNumber.toLowerCase().includes(searchLower) ||
-      sale.customerName.toLowerCase().includes(searchLower)
+      (sale.containerNumber || "").toLowerCase().includes(searchLower) ||
+      (sale.customerName || "").toLowerCase().includes(searchLower)
     );
   });
 
   const containers = allContainers
     .filter((c) => {
-      if (searchTerm && !c.containerNumber.toLowerCase().includes(searchTerm.toLowerCase())) {
+      if (searchTerm && !(c.containerNumber || "").toLowerCase().includes((searchTerm || "").toLowerCase())) {
         return false;
       }
       if (statusFilter !== "ALL" && c.status !== statusFilter) {

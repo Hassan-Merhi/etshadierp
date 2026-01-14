@@ -679,7 +679,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const getFilteredInventory = () => {
     if (!searchTerm) return inventory;
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = (searchTerm || "").toLowerCase();
     return inventory.filter((item) =>
       (item.name || "").toLowerCase().includes(searchLower) ||
       (item.code || "").toLowerCase().includes(searchLower)

@@ -221,7 +221,7 @@ export default function PurchaseOrderEdit() {
 
   const filteredStockItems = useMemo(() => {
     if (!searchTerm.trim()) return stockItemsList.slice(0, 100);
-    const term = searchTerm.toLowerCase();
+    const term = (searchTerm || "").toLowerCase();
     return stockItemsList
       .filter(si => 
         (si.name || '').toLowerCase().includes(term) || 

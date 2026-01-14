@@ -90,7 +90,7 @@ export default function LocationVouchers() {
   const getTransactionEditUrl = (txn: Transaction): string | null => {
     if (txn.isOpeningBalance) return null;
     
-    const vchType = txn.vchType.toLowerCase();
+    const vchType = (txn.vchType || "").toLowerCase();
     
     if (vchType === 'production' || vchType === 'consumption') {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;

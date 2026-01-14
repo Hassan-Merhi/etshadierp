@@ -516,11 +516,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
       // Search query filter
       if (filters.searchQuery) {
-        const query = filters.searchQuery.toLowerCase();
+        const query = (filters.searchQuery || "").toLowerCase();
         return (
-          voucher.voucherNumber.toLowerCase().includes(query) ||
-          voucher.description?.toLowerCase().includes(query) ||
-          voucher.voucherType.toLowerCase().includes(query)
+          (voucher.voucherNumber || "").toLowerCase().includes(query) ||
+          (voucher.description || "").toLowerCase().includes(query) ||
+          (voucher.voucherType || "").toLowerCase().includes(query)
         );
       }
 
