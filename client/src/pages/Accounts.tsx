@@ -186,7 +186,7 @@ export default function Accounts() {
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: selectedAccount
       ? [
-          `/api/accounts/${selectedAccount.type.toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
+          `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
           { startDate, endDate },
         ]
       : [],
@@ -197,7 +197,7 @@ export default function Accounts() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
       
-      let accountType = selectedAccount.type.toLowerCase();
+      let accountType = (selectedAccount.type || "").toLowerCase();
       if (accountType === "fixed asset") {
         accountType = "fixed-asset";
       } else if (accountType === "supplier") {
@@ -219,7 +219,7 @@ export default function Accounts() {
   useEffect(() => {
     if (accounts.length > 0 && urlAccountId && urlAccountType && !selectedAccount) {
       const account = accounts.find(
-        (a) => a.accountId === parseInt(urlAccountId) && a.type.toLowerCase() === urlAccountType.toLowerCase()
+        (a) => a.accountId === parseInt(urlAccountId) && (a.type || "").toLowerCase() === (urlAccountType || "").toLowerCase()
       );
       if (account) {
         setSelectedAccount(account);
@@ -235,7 +235,7 @@ export default function Accounts() {
     if (account) {
       updateUrlParams({
         accountId: account.accountId.toString(),
-        accountType: account.type.toLowerCase(),
+        accountType: (account.type || "").toLowerCase(),
       });
     } else {
       updateUrlParams({ accountId: null, accountType: null });
@@ -343,12 +343,12 @@ export default function Accounts() {
   const accountHierarchy = buildAccountHierarchy();
 
   const filteredAccounts = accountHierarchy.filter((account) => {
-    const searchLower = searchTerm.toLowerCase();
+    const searchLower = (searchTerm || "").toLowerCase();
     const matchesSearch = (acc: Account): boolean => {
       return (
-        acc.name.toLowerCase().includes(searchLower) ||
-        acc.code.toLowerCase().includes(searchLower) ||
-        acc.type.toLowerCase().includes(searchLower)
+        (acc.name || "").toLowerCase().includes(searchLower) ||
+        (acc.code || "").toLowerCase().includes(searchLower) ||
+        (acc.type || "").toLowerCase().includes(searchLower)
       );
     };
     
@@ -676,7 +676,7 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       if (selectedAccount) {
         queryClient.invalidateQueries({ 
-          queryKey: [`/api/accounts/${selectedAccount.type.toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`] 
+          queryKey: [`/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`] 
         });
       }
     },
@@ -741,11 +741,11 @@ export default function Accounts() {
   };
 
   const filteredAccountsForEdit = accounts.filter((account) => {
-    const searchLower = editSearchTerm.toLowerCase();
+    const searchLower = (editSearchTerm || "").toLowerCase();
     return (
-      account.name.toLowerCase().includes(searchLower) ||
-      account.code.toLowerCase().includes(searchLower) ||
-      account.type.toLowerCase().includes(searchLower)
+      (account.name || "").toLowerCase().includes(searchLower) ||
+      (account.code || "").toLowerCase().includes(searchLower) ||
+      (account.type || "").toLowerCase().includes(searchLower)
     );
   });
 

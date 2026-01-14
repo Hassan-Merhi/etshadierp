@@ -153,7 +153,7 @@ export default function Customers() {
   };
 
   const filteredCustomers = customers.filter((customer) =>
-    customer.legalName.toLowerCase().includes(searchQuery.toLowerCase())
+    (customer.legalName || "").toLowerCase().includes((searchQuery || "").toLowerCase())
   );
 
   if (isLoading) {
