@@ -855,8 +855,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
           return false;
         }
-        return acc.name.toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
-          acc.code.toLowerCase().includes(sidebarSearchValue.toLowerCase());
+        return (acc.name || '').toLowerCase().includes(sidebarSearchValue.toLowerCase()) ||
+          (acc.code || '').toLowerCase().includes(sidebarSearchValue.toLowerCase());
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType]);
@@ -1277,8 +1277,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (!journalAccountSearchTerm.trim()) return allAccounts;
     const term = journalAccountSearchTerm.toLowerCase();
     return allAccounts.filter((acc) =>
-      acc.name.toLowerCase().includes(term) ||
-      acc.code.toLowerCase().includes(term)
+      (acc.name || '').toLowerCase().includes(term) ||
+      (acc.code || '').toLowerCase().includes(term)
     );
   }, [allAccounts, journalAccountSearchTerm]);
 
@@ -1908,7 +1908,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     
     // Search ledger accounts by code
     const ledgerAccount = ledgerAccounts.find(
-      (a) => a.code.toLowerCase() === searchCode
+      (a) => a.code && a.code.toLowerCase() === searchCode
     );
     if (ledgerAccount) {
       return {
@@ -1920,7 +1920,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     
     // Search bank accounts by accountNumber
     const bankAccount = bankAccounts.find(
-      (a) => a.accountNumber.toLowerCase() === searchCode
+      (a) => a.accountNumber && a.accountNumber.toLowerCase() === searchCode
     );
     if (bankAccount) {
       return {
@@ -1932,7 +1932,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     
     // Search suppliers by code
     const supplier = suppliers.find(
-      (s) => s.code.toLowerCase() === searchCode
+      (s) => s.code && s.code.toLowerCase() === searchCode
     );
     if (supplier) {
       return {
@@ -1956,7 +1956,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Helper function to lookup stock item by code
   const lookupStockItemByCode = (code: string) => {
     const item = stockItems.find(
-      (s) => s.code.toLowerCase() === code.toLowerCase()
+      (s) => s.code && s.code.toLowerCase() === code.toLowerCase()
     );
     return item;
   };
