@@ -75,7 +75,7 @@ export default function ContainerDashboard() {
     data.containers.forEach(c => {
       uniqueCompanies.set(c.companyCode, c.companyName);
     });
-    return Array.from(uniqueCompanies.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return Array.from(uniqueCompanies.entries()).sort((a, b) => (a[0] || '').localeCompare(b[0] || ''));
   }, [data]);
 
   const transporters = useMemo(() => {
@@ -326,7 +326,7 @@ export default function ContainerDashboard() {
           <ScrollArea className="h-[calc(100vh-320px)]">
             <div className="space-y-3">
               {filteredData && Object.entries(filteredData.byRoute)
-                .sort(([a], [b]) => a.localeCompare(b))
+                .sort(([a], [b]) => (a || '').localeCompare(b || ''))
                 .map(([route, containers]) => {
                   const routeTotal = containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
                   const isExpanded = expandedRoutes.has(route);
@@ -529,7 +529,7 @@ export default function ContainerDashboard() {
               <div className="space-y-4">
                 {filteredData?.byTransporter && Object.entries(filteredData.byTransporter)
                   .filter(([name]) => name !== "Unassigned")
-                  .sort(([a], [b]) => a.localeCompare(b))
+                  .sort(([a], [b]) => (a || '').localeCompare(b || ''))
                   .map(([transporterName, transporterData]) => (
                     <Card key={transporterName}>
                       <CardHeader className="pb-2">

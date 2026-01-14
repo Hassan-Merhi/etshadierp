@@ -264,7 +264,7 @@ export default function Dashboard() {
       dca => dca.accountType === acc.type.toLowerCase() && dca.accountId === acc.accountId
     );
     return !alreadyAdded;
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   // Show all added cash accounts (regardless of balance)
   const displayedCashAccounts = dashboardCashAccounts;
@@ -273,7 +273,7 @@ export default function Dashboard() {
   const availablePayableAccounts = allPayableAccounts.filter(acc => {
     const alreadyAdded = dashboardPayableAccounts.some(dpa => dpa.accountId === acc.accountId);
     return !alreadyAdded;
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   // Filter payable accounts with non-zero balance from dashboard payable accounts
   const displayedPayableAccounts = dashboardPayableAccounts.filter(acc => {
