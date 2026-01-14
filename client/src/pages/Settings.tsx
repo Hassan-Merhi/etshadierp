@@ -1202,6 +1202,15 @@
         data: { [field]: value },
       });
     };
+
+    const handleDaybookDaysChange = (roleId: number, userId: string, companyId: number, days: number) => {
+      updatePermissionMutation.mutate({
+        roleId,
+        userId,
+        companyId,
+        data: { daybookEditDays: days },
+      });
+    };
   
     const isPOSRole = selectedRole?.startsWith("POS");
   
@@ -1795,15 +1804,27 @@
                                               <Label className="text-sm cursor-pointer">Can Sell</Label>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                              <Switch
-                                                checked={role.canEditDaybook}
-                                                onCheckedChange={(checked) =>
-                                                  handlePermissionToggle(role.id, user.id, role.companyId, "canEditDaybook", checked)
+                                              <Label className="text-sm">Edit Daybook:</Label>
+                                              <Select
+                                                value={String(role.daybookEditDays || 0)}
+                                                onValueChange={(value) =>
+                                                  handleDaybookDaysChange(role.id, user.id, role.companyId, parseInt(value))
                                                 }
                                                 disabled={updatePermissionMutation.isPending}
-                                                data-testid={`toggle-can-edit-daybook-${role.id}`}
-                                              />
-                                              <Label className="text-sm cursor-pointer">Can Edit Daybook</Label>
+                                              >
+                                                <SelectTrigger className="w-24" data-testid={`select-daybook-days-${role.id}`}>
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="0">None</SelectItem>
+                                                  <SelectItem value="1">1 day</SelectItem>
+                                                  <SelectItem value="2">2 days</SelectItem>
+                                                  <SelectItem value="3">3 days</SelectItem>
+                                                  <SelectItem value="5">5 days</SelectItem>
+                                                  <SelectItem value="7">7 days</SelectItem>
+                                                  <SelectItem value="10">10 days</SelectItem>
+                                                </SelectContent>
+                                              </Select>
                                             </div>
                                           </div>
                                         </div>

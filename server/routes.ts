@@ -878,7 +878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.currentPOSStation = userRole.posStation;
       req.session.cashAccountId = userRole.cashAccountId;
       req.session.canSellNegativeStock = userRole.canSellNegativeStock;
-      req.session.canEditDaybook = userRole.canEditDaybook;
+      req.session.daybookEditDays = userRole.daybookEditDays;
 
       // Explicitly save session to ensure it's persisted before responding
       req.session.save((err) => {
@@ -13984,24 +13984,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .json({ message: "Managers can only edit today's vouchers" });
           }
         } else {
-          // POS users can edit if they have canEditDaybook permission
-          const canEditDaybook = req.user?.canEditDaybook || false;
-          if (!canEditDaybook) {
+          // POS users can edit if they have daybookEditDays permission > 0
+          const daybookEditDays = req.user?.daybookEditDays || 0;
+          if (daybookEditDays <= 0) {
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
           }
-          // POS users can only edit today's vouchers
+          // Check if voucher date is within allowed days
           const today = new Date();
           today.setHours(0, 0, 0, 0);
 
           const voucherDate = new Date(existingVoucher.voucherDate);
           voucherDate.setHours(0, 0, 0, 0);
 
-          if (voucherDate.getTime() !== today.getTime()) {
+          const daysDiff = Math.floor((today.getTime() - voucherDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff >= daybookEditDays) {
             return res
               .status(403)
-              .json({ message: "You can only edit today's vouchers" });
+              .json({ message: `You can only edit vouchers from the last ${daybookEditDays} day(s)` });
           }
         }
       }
