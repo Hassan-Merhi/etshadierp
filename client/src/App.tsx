@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import ContainerDashboard from "@/pages/ContainerDashboard";
 import POS from "@/pages/POS";
 import StockItems from "@/pages/StockItems";
 import Containers from "@/pages/Containers";
@@ -100,7 +101,8 @@ function Router({ user }: { user: any }) {
   // All other users see full interface
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/" component={ContainerDashboard} />
+      <Route path="/financial-overview" component={Dashboard} />
       <Route path="/pos">{() => <POS />}</Route>
       <Route path="/pos/edit/:id">{(params) => <POS editVoucherId={params.id} />}</Route>
       <Route path="/stock-items" component={StockItems} />

@@ -24842,6 +24842,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // Dashboard Container Tracking - cross-company OTW container view
+  app.get("/api/dashboard/container-tracking", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Get all companies the user has access to
+      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
+      const companyIds = userCompanyRoles.map(r => r.companyId);
+
+      if (companyIds.length === 0) {
+        return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, totals: { count: 0, amount: 0 } });
+      }
+
+      // Get all companies for names
+      const allCompanies = await storage.getAllCompanies();
+      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+
+      // Get all suppliers for names
+      const allSuppliers = await storage.getAllSuppliers();
+      const supplierMap = new Map(allSuppliers.map(s => [s.id, s]));
+
+      // Fetch OTW containers from all accessible companies
+      const allContainers: any[] = [];
+      for (const companyId of companyIds) {
+        const containers = await storage.getAllContainers(companyId);
+        const otwContainers = containers.filter(c => c.status === "OTW");
+        otwContainers.forEach(c => {
+          allContainers.push({
+            ...c,
+            companyName: companyMap.get(c.companyId)?.name || "Unknown",
+            companyCode: companyMap.get(c.companyId)?.code || "",
+            supplierName: supplierMap.get(c.supplierId)?.name || "Unknown",
+          });
+        });
+      }
+
+      // Group by shopName (route)
+      const byRoute: Record<string, any[]> = {};
+      const byAgent: Record<string, { containers: any[], total: number }> = {};
+      const byLocation: Record<string, { count: number, total: number }> = {};
+
+      let totalAmount = 0;
+
+      for (const container of allContainers) {
+        const route = container.shopName || "Unassigned";
+        const agent = container.agent || "Unassigned";
+        const location = container.trackingLocation || "Unknown";
+        const amount = parseFloat(container.grandTotal || "0");
+
+        // Group by route
+        if (!byRoute[route]) byRoute[route] = [];
+        byRoute[route].push(container);
+
+        // Group by agent
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], total: 0 };
+        byAgent[agent].containers.push(container);
+        byAgent[agent].total += amount;
+
+        // Group by location
+        if (!byLocation[location]) byLocation[location] = { count: 0, total: 0 };
+        byLocation[location].count++;
+        byLocation[location].total += amount;
+
+        totalAmount += amount;
+      }
+
+      res.json({
+        containers: allContainers,
+        byRoute,
+        byAgent,
+        byLocation,
+        totals: { count: allContainers.length, amount: totalAmount },
+      });
+    } catch (error: any) {
+      console.error("Dashboard container tracking error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
   // Dashboard Cash Accounts - user-selected accounts for dashboard display
   app.get("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
     try {
