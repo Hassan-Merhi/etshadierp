@@ -11718,6 +11718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bankBalances = new Map<number, { debits: number; credits: number }>();
       const assetBalances = new Map<number, { debits: number; credits: number }>();
       const supplierBalances = new Map<number, number>();
+      const employeeBalances = new Map<number, { debits: number; credits: number }>();
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");
@@ -11755,6 +11756,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else if (debit > 0 && credit === 0) {
             supplierBalances.set(entry.supplierId, existing - debit); // Decrease payable
           }
+        }
+
+        if (entry.employeeId) {
+          const existing = employeeBalances.get(entry.employeeId) || { debits: 0, credits: 0 };
+          employeeBalances.set(entry.employeeId, {
+            debits: existing.debits + debit,
+            credits: existing.credits + credit,
+          });
         }
       }
 
