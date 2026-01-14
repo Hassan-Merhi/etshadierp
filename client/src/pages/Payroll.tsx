@@ -66,7 +66,7 @@ import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink, User } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -189,6 +189,7 @@ export default function Payroll() {
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [deleteConflict, setDeleteConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
   const [deleteWorkerConflict, setDeleteWorkerConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
+  const [statementEmployee, setStatementEmployee] = useState<(Employee & { calculatedBalance?: string }) | null>(null);
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -224,6 +225,12 @@ export default function Payroll() {
   const { data: salaryAdvances, isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
     queryKey: ["/api/salary-advances", selectedCompany?.id],
     enabled: !!selectedCompany,
+  });
+
+  // Fetch employee transactions when a statement employee is selected
+  const { data: employeeTransactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/accounts/employee", statementEmployee?.id, "transactions"],
+    enabled: !!statementEmployee?.id,
   });
 
   const { data: employeeGroups = [] } = useQuery<any[]>({
@@ -1389,12 +1396,12 @@ export default function Payroll() {
                           </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
                             <button
-                              onClick={() => navigate(`/accounts?accountId=${employee.id}&accountType=employee`)}
-                              className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                              onClick={() => setStatementEmployee(employee)}
+                              className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
                               data-testid={`link-employee-statement-${employee.id}`}
                             >
                               {employee.firstName} {employee.lastName}
-                              <ExternalLink className="h-3 w-3" />
+                              <DollarSign className="h-3 w-3" />
                             </button>
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
@@ -1684,12 +1691,12 @@ export default function Payroll() {
                                         </TableCell>
                                         <TableCell data-testid={`cell-name-${worker.id}`}>
                                           <button
-                                            onClick={() => navigate(`/accounts?accountId=${worker.id}&accountType=employee`)}
-                                            className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                                            onClick={() => setStatementEmployee(worker)}
+                                            className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
                                             data-testid={`link-worker-statement-${worker.id}`}
                                           >
                                             {worker.firstName} {worker.lastName}
-                                            <ExternalLink className="h-3 w-3" />
+                                            <DollarSign className="h-3 w-3" />
                                           </button>
                                         </TableCell>
                                         <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
@@ -1817,12 +1824,12 @@ export default function Payroll() {
                                   </TableCell>
                                   <TableCell data-testid={`cell-name-${worker.id}`}>
                                     <button
-                                      onClick={() => navigate(`/accounts?accountId=${worker.id}&accountType=employee`)}
-                                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                                      onClick={() => setStatementEmployee(worker)}
+                                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
                                       data-testid={`link-worker-statement-${worker.id}`}
                                     >
                                       {worker.firstName} {worker.lastName}
-                                      <ExternalLink className="h-3 w-3" />
+                                      <DollarSign className="h-3 w-3" />
                                     </button>
                                   </TableCell>
                                   <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
@@ -3921,6 +3928,97 @@ export default function Payroll() {
                 </Button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Statement Dialog */}
+      <Dialog open={!!statementEmployee} onOpenChange={(open) => !open && setStatementEmployee(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {statementEmployee?.firstName} {statementEmployee?.lastName} - Statement
+            </DialogTitle>
+            <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
+              <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatNumber(parseFloat(statementEmployee?.calculatedBalance || "0"))}</span></span>
+              <Badge variant="secondary">
+                {parseFloat(statementEmployee?.calculatedBalance || "0") >= 0 ? "Cr (Owed to employee)" : "Dr"}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto mt-4">
+            {transactionsLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : employeeTransactions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No transactions found for this employee
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {employeeTransactions.length} transaction{employeeTransactions.length !== 1 ? "s" : ""}
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Voucher #</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Dr/Cr</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...employeeTransactions]
+                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((txn: any) => (
+                        <TableRow key={txn.id || `${txn.voucherId}-${txn.date}`}>
+                          <TableCell className="font-mono text-sm">
+                            {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                          </TableCell>
+                          <TableCell className="font-mono font-medium">
+                            {txn.voucherNumber || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <Badge variant="outline">{txn.voucherType || "-"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">
+                            {txn.narration || txn.description || "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatNumber(parseFloat(txn.amount || "0"))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={txn.isDebit ? "secondary" : "default"}>
+                              {txn.isDebit ? "Dr" : "Cr"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+
+                {/* Summary */}
+                <div className="border-t pt-4 flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    Total: {employeeTransactions.length} transaction{employeeTransactions.length !== 1 ? "s" : ""}
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Balance: </span>
+                    <span className="font-mono font-semibold text-lg">
+                      {formatNumber(parseFloat(statementEmployee?.calculatedBalance || "0"))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
