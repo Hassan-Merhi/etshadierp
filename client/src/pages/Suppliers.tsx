@@ -489,44 +489,54 @@ export default function Suppliers() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Container</TableHead>
                         <TableHead>PO Number</TableHead>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Import Date</TableHead>
                         <TableHead>Company</TableHead>
-                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Total Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {[...purchaseOrders]
-                        .sort((a: any, b: any) => new Date(b.orderDate || b.createdAt).getTime() - new Date(a.orderDate || a.createdAt).getTime())
-                        .map((po: any, idx: number) => (
-                          <TableRow key={po.id}>
-                            <TableCell>
-                              <button
-                                onClick={() => handlePOClick(po)}
-                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
-                                data-testid={`link-po-${idx}`}
-                              >
-                                {po.poNumber || `PO-${po.id}`}
-                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                              </button>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {po.orderDate ? format(new Date(po.orderDate), "yyyy-MM-dd") : "-"}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge variant="secondary">{po.companyName}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={po.status === "completed" ? "default" : po.status === "pending" ? "secondary" : "outline"}>
-                                {po.status || "Draft"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-semibold">
-                              ${parseFloat(po.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        .sort((a: any, b: any) => new Date(b.importDate || b.createdAt).getTime() - new Date(a.importDate || a.createdAt).getTime())
+                        .map((po: any, idx: number) => {
+                          // Calculate total: items + charges - discount
+                          const itemsTotal = parseFloat(po.itemsTotal || "0");
+                          const freight = parseFloat(po.freight || "0");
+                          const surcharge = parseFloat(po.surcharge || "0");
+                          const fumigation = parseFloat(po.fumigation || "0");
+                          const documentCharges = parseFloat(po.documentCharges || "0");
+                          const discount = parseFloat(po.discount || "0");
+                          const otherCharges = parseFloat(po.otherCharges || "0");
+                          const totalAmount = itemsTotal + freight + surcharge + fumigation + documentCharges - discount + otherCharges;
+                          
+                          return (
+                            <TableRow key={po.id}>
+                              <TableCell className="font-mono font-semibold">
+                                {po.containerNumber || "-"}
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  onClick={() => handlePOClick(po)}
+                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
+                                  data-testid={`link-po-${idx}`}
+                                >
+                                  {po.poNumber || `PO-${po.id}`}
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </button>
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {po.importDate ? format(new Date(po.importDate), "yyyy-MM-dd") : "-"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <Badge variant="secondary">{po.companyName}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>
