@@ -6,7 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plus, Search, Building2, Pencil } from "lucide-react";
+import { Plus, Search, Building2, Pencil, ExternalLink } from "lucide-react";
+import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -37,6 +38,7 @@ const formSchema = insertCustomerSchema.extend({
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -308,10 +310,15 @@ export default function Customers() {
               filteredCustomers.map((customer) => (
                 <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/accounts?accountId=${customer.id}&accountType=customer`)}
+                      className="flex items-center gap-2 text-primary hover:underline cursor-pointer"
+                      data-testid={`link-customer-statement-${customer.id}`}
+                    >
                       <Building2 className="h-4 w-4 text-muted-foreground" />
                       {customer.legalName}
-                    </div>
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     ${formatNumber(customer.balance || 0)}

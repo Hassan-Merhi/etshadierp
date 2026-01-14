@@ -28,10 +28,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink } from "lucide-react";
+import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink, FileText } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -55,6 +61,7 @@ export default function Suppliers() {
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
+  const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const { selectedCompany, selectCompany } = useCompany();
   const [_location, navigate] = useLocation();
 
@@ -95,6 +102,16 @@ export default function Suppliers() {
     enabled: !!selectedSupplier,
   });
 
+  // Fetch purchase orders for the selected supplier (with optional company filter)
+  const purchaseOrdersUrl = companyFilter !== "all" 
+    ? `/api/suppliers/${selectedSupplier?.id}/purchase-orders?companyId=${companyFilter}`
+    : `/api/suppliers/${selectedSupplier?.id}/purchase-orders`;
+  
+  const { data: purchaseOrders = [], isLoading: posLoading } = useQuery<any[]>({
+    queryKey: [purchaseOrdersUrl],
+    enabled: !!selectedSupplier,
+  });
+
   const activeSuppliers = suppliers.filter((s) => s.active);
   const totalContainers = suppliers.reduce((sum, s) => sum + Number(s.containerCount || 0), 0);
   const totalBalance = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0);
@@ -109,11 +126,29 @@ export default function Suppliers() {
   const handleSupplierClick = (supplier: SupplierWithStats) => {
     setSelectedSupplier(supplier);
     setCompanyFilter("all"); // Reset filter when opening
+    setDialogTab("transactions"); // Reset to transactions tab
   };
   
   const handleCloseDialog = () => {
     setSelectedSupplier(null);
     setCompanyFilter("all");
+    setDialogTab("transactions");
+  };
+
+  // Handle clicking on a PO to navigate to its details
+  const handlePOClick = async (po: any) => {
+    // First switch to the correct company if different
+    const targetCompany = companies.find((c: any) => c.id === po.companyId);
+    if (targetCompany && (!selectedCompany || selectedCompany.id !== po.companyId)) {
+      await apiRequest("POST", "/api/companies/switch", { companyId: po.companyId });
+      selectCompany(targetCompany);
+    }
+
+    // Close the dialog
+    setSelectedSupplier(null);
+
+    // Navigate to PO edit page
+    navigate(`/purchase-orders/${po.id}/edit`);
   };
 
   const handleExportToExcel = () => {
@@ -296,12 +331,12 @@ export default function Suppliers() {
         </CardContent>
       </Card>
 
-      {/* Supplier Unified Ledger Dialog */}
+      {/* Supplier Details Dialog */}
       <Dialog open={!!selectedSupplier} onOpenChange={handleCloseDialog}>
         <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              {selectedSupplier?.legalName} - Unified Ledger (All Companies)
+              {selectedSupplier?.legalName}
             </DialogTitle>
             <div className="flex items-center gap-4 pt-2">
               <div className="flex items-center gap-2">
@@ -333,89 +368,171 @@ export default function Suppliers() {
             </div>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto">
-            {ledgerLoading ? (
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : unifiedLedger.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions found for this supplier
-                {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                  ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                  : ""}.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {unifiedLedger.length} transaction{unifiedLedger.length !== 1 ? "s" : ""}
-                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
-                    ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
-                    : " from all companies"}
+          <Tabs value={dialogTab} onValueChange={(v) => setDialogTab(v as "transactions" | "purchase-orders")} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="w-fit">
+              <TabsTrigger value="transactions" data-testid="tab-transactions">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Transactions
+              </TabsTrigger>
+              <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">
+                <FileText className="h-4 w-4 mr-2" />
+                Purchase Orders ({purchaseOrders.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="transactions" className="flex-1 overflow-y-auto mt-4">
+              {ledgerLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...unifiedLedger]
-                      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                      .map((txn: any, idx: number) => {
-                        const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
-                        return (
-                          <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
-                            <TableCell className="font-mono text-sm">
-                              {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              <Badge variant="secondary">{txn.companyName}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={isPayment ? "default" : "outline"}>
-                                {isPayment ? "Payment" : txn.voucherType}
-                              </Badge>
-                            </TableCell>
+              ) : unifiedLedger.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No transactions found for this supplier
+                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                    ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                    : ""}.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {unifiedLedger.length} transaction{unifiedLedger.length !== 1 ? "s" : ""}
+                    {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                      ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                      : " from all companies"}
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...unifiedLedger]
+                        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((txn: any, idx: number) => {
+                          const isPayment = txn.voucherType === "Payment" || txn.debit > 0;
+                          return (
+                            <TableRow key={`${txn.type}-${txn.docNumber}-${idx}`}>
+                              <TableCell className="font-mono text-sm">
+                                {txn.date ? format(new Date(txn.date), "yyyy-MM-dd") : "-"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <Badge variant="secondary">{txn.companyName}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={isPayment ? "default" : "outline"}>
+                                  {isPayment ? "Payment" : txn.voucherType}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <button
+                                  onClick={() => handleTransactionClick(txn)}
+                                  className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
+                                  data-testid={`link-transaction-${idx}`}
+                                >
+                                  <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
+                                  <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold">
+                                ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                  
+                  {/* Summary */}
+                  <div className="border-t pt-4 flex justify-end">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Total Balance: </span>
+                      <span className="font-mono font-semibold text-lg">
+                        ${(unifiedLedger.length > 0 
+                          ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
+                          : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="purchase-orders" className="flex-1 overflow-y-auto mt-4">
+              {posLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : purchaseOrders.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No purchase orders found for this supplier
+                  {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                    ? ` in ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                    : ""}.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {purchaseOrders.length} purchase order{purchaseOrders.length !== 1 ? "s" : ""}
+                    {companyFilter !== "all" && companies.find((c: any) => c.id === parseInt(companyFilter)) 
+                      ? ` from ${companies.find((c: any) => c.id === parseInt(companyFilter))?.name}`
+                      : " from all companies"}
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>PO Number</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Total Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...purchaseOrders]
+                        .sort((a: any, b: any) => new Date(b.orderDate || b.createdAt).getTime() - new Date(a.orderDate || a.createdAt).getTime())
+                        .map((po: any, idx: number) => (
+                          <TableRow key={po.id}>
                             <TableCell>
                               <button
-                                onClick={() => handleTransactionClick(txn)}
-                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer text-sm"
-                                data-testid={`link-transaction-${idx}`}
+                                onClick={() => handlePOClick(po)}
+                                className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
+                                data-testid={`link-po-${idx}`}
                               >
-                                <span className="truncate max-w-xs">{txn.description || txn.docNumber || "-"}</span>
+                                {po.poNumber || `PO-${po.id}`}
                                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
                               </button>
                             </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {po.orderDate ? format(new Date(po.orderDate), "yyyy-MM-dd") : "-"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <Badge variant="secondary">{po.companyName}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={po.status === "completed" ? "default" : po.status === "pending" ? "secondary" : "outline"}>
+                                {po.status || "Draft"}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right font-mono font-semibold">
-                              ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ${parseFloat(po.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </TableCell>
                           </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-                
-                {/* Summary */}
-                <div className="border-t pt-4 flex justify-end">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Balance: </span>
-                    <span className="font-mono font-semibold text-lg">
-                      ${(unifiedLedger.length > 0 
-                        ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
-                        : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>

@@ -66,7 +66,7 @@ import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Employee } from "@shared/schema";
 import { insertEmployeeSchema } from "@shared/schema";
-import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Users, AlertCircle, CalendarIcon, Plus, Pencil, Trash2, ChevronDown, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -1388,7 +1388,14 @@ export default function Payroll() {
                             />
                           </TableCell>
                           <TableCell data-testid={`cell-name-${employee.id}`}>
-                            {employee.firstName} {employee.lastName}
+                            <button
+                              onClick={() => navigate(`/accounts?accountId=${employee.id}&accountType=employee`)}
+                              className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                              data-testid={`link-employee-statement-${employee.id}`}
+                            >
+                              {employee.firstName} {employee.lastName}
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
                             {formatNumber(parseFloat(employee.monthlySalary))}
@@ -1676,7 +1683,14 @@ export default function Payroll() {
                                           />
                                         </TableCell>
                                         <TableCell data-testid={`cell-name-${worker.id}`}>
-                                          {worker.firstName} {worker.lastName}
+                                          <button
+                                            onClick={() => navigate(`/accounts?accountId=${worker.id}&accountType=employee`)}
+                                            className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                                            data-testid={`link-worker-statement-${worker.id}`}
+                                          >
+                                            {worker.firstName} {worker.lastName}
+                                            <ExternalLink className="h-3 w-3" />
+                                          </button>
                                         </TableCell>
                                         <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
                                           {formatNumber(monthlySalary)}
@@ -1802,7 +1816,14 @@ export default function Payroll() {
                                     />
                                   </TableCell>
                                   <TableCell data-testid={`cell-name-${worker.id}`}>
-                                    {worker.firstName} {worker.lastName}
+                                    <button
+                                      onClick={() => navigate(`/accounts?accountId=${worker.id}&accountType=employee`)}
+                                      className="flex items-center gap-1 text-primary hover:underline cursor-pointer"
+                                      data-testid={`link-worker-statement-${worker.id}`}
+                                    >
+                                      {worker.firstName} {worker.lastName}
+                                      <ExternalLink className="h-3 w-3" />
+                                    </button>
                                   </TableCell>
                                   <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
                                     {formatNumber(monthlySalary)}

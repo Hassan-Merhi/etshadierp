@@ -37,7 +37,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect, useRef } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle } from "lucide-react";
+import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle, FileDown } from "lucide-react";
+import { utils, writeFile } from "xlsx";
 import { Link } from "wouter";
 
 interface StockTransferPageProps {
@@ -410,6 +411,36 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     }
   };
 
+  const handleExportToExcel = () => {
+    if (stockTransferVouchers.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no stock transfers to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const exportData = stockTransferVouchers.map((voucher: any) => ({
+      "Voucher Number": voucher.voucherNumber,
+      "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+      "Description": voucher.description || "",
+      "Total Amount": voucher.totalAmount,
+    }));
+
+    const worksheet = utils.json_to_sheet(exportData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Stock Transfers");
+
+    const fileName = `Stock_Transfers_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    writeFile(workbook, fileName);
+
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${stockTransferVouchers.length} records.`,
+    });
+  };
+
   const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
   const filteredItems = getFilteredInventory();
 
@@ -666,8 +697,18 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle className="text-base">Recent Transfers</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportToExcel}
+            disabled={stockTransferVouchers.length === 0}
+            data-testid="button-export-transfers-excel"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Export
+          </Button>
         </CardHeader>
         <CardContent>
           {stockTransferVouchers.length === 0 ? (
