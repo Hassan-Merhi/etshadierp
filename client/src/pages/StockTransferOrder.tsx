@@ -629,18 +629,18 @@ export default function StockTransferOrder() {
                 ref={matrixRef}
                 tabIndex={0}
                 onKeyDown={handleMatrixKeyDown}
-                className="overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md"
+                className="overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
               >
                 <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableHeader className="sticky top-0 z-30 bg-muted">
                     <TableRow>
-                      <TableHead className="min-w-[200px] sticky left-0 bg-background z-20">
+                      <TableHead className="min-w-[200px] sticky left-0 bg-muted z-40 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                         Item
                       </TableHead>
                       {selectedLocations.map((loc) => (
                         <TableHead
                           key={loc.id}
-                          className="text-center min-w-[100px]"
+                          className="text-center min-w-[100px] bg-muted"
                         >
                           {loc.name}
                         </TableHead>
@@ -651,11 +651,11 @@ export default function StockTransferOrder() {
                     {summaryData?.stockGroups.map((group) => (
                       <Fragment key={group.id}>
                         <TableRow
-                          className="cursor-pointer hover-elevate bg-muted/30"
+                          className="cursor-pointer hover-elevate bg-muted/50"
                           onClick={() => toggleGroup(group.id)}
                           data-testid={`group-row-${group.id}`}
                         >
-                          <TableCell className="font-medium sticky left-0 bg-muted/30 z-10">
+                          <TableCell className="font-medium sticky left-0 bg-muted/50 z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                             <div className="flex items-center gap-2">
                               {expandedGroups.has(group.id) ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -685,8 +685,8 @@ export default function StockTransferOrder() {
                             .map((item) => {
                               const flatRowIndex = flatItems.findIndex(fi => fi.id === item.id);
                               return (
-                              <TableRow key={item.id} data-testid={`item-row-${item.id}`}>
-                                <TableCell className="pl-8 sticky left-0 bg-background z-10">
+                              <TableRow key={item.id} data-testid={`item-row-${item.id}`} className="bg-background">
+                                <TableCell className="pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                                   <p className="text-sm">{item.name}</p>
                                 </TableCell>
                                 {selectedLocations.map((loc, colIndex) => {
