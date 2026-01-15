@@ -18353,7 +18353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create Stock Transfer voucher
           const voucherNumber = `ST-${Date.now()}`;
-      const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
+          const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
           const [newVoucher] = await db
             .insert(vouchers)
             .values({
@@ -18363,7 +18363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherDate: effectiveDate,
               description: notes || null,
               totalAmount: "0",
-          })
+              optional: optional === true,
             })
             .returning();
 
@@ -26728,6 +26728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           voucherDate: effectiveDate,
           description: notes || null,
           totalAmount: "0",
+          optional: optional === true,
         })
         .returning();
       
