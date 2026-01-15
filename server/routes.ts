@@ -2989,7 +2989,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes ||
               `Salary deposit for ${employee.firstName} ${employee.lastName}`,
             totalAmount: depositAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3113,7 +3112,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description:
               notes || `Bulk salary deposit for ${deposits.length} employees`,
             totalAmount: totalAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3270,7 +3268,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description:
               notes || `Bulk bonus deposit for ${validBonuses.length} employees`,
             totalAmount: totalAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3443,7 +3440,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: date,
             description: notes || `Bulk withdrawal for ${validWithdrawals.length} employees`,
             totalAmount: totalAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3611,7 +3607,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes ||
               `Bonus for ${employee.firstName} ${employee.lastName}`,
             totalAmount: bonusAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3736,7 +3731,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes ||
               `Salary withdrawal for ${employee.firstName} ${employee.lastName}`,
             totalAmount: withdrawalAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3865,7 +3859,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes ||
               `Salary payment for ${employee.firstName} ${employee.lastName}`,
             totalAmount: paymentAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -3981,7 +3974,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             description:
               notes || `Bulk salary payment for ${payments.length} workers`,
             totalAmount: totalAmount.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -4688,7 +4680,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 parsed.notes ||
                 `Container sale - ${container.containerNumber} to ${customer.legalName}`,
               totalAmount: parsed.totalAmount,
-              optional: false,
             })
             .returning();
 
@@ -4860,7 +4851,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               parsed.description ||
               `Inter-company transfer to ${toCompany.name}`,
             totalAmount: parsed.amount,
-            optional: false,
           })
           .returning();
 
@@ -4896,7 +4886,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               parsed.description ||
               `Inter-company transfer from ${fromCompany.name}`,
             totalAmount: parsed.amount,
-            optional: false,
           })
           .returning();
 
@@ -5033,7 +5022,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 parsed.notes ||
                 `Salary advance for ${employee[0].firstName} ${employee[0].lastName}`,
               totalAmount: parsed.amount,
-              optional: false,
             })
             .returning();
 
@@ -7183,7 +7171,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherDate: importDate,
               description: `${containerNumber} ${supplier.legalName}`,
               totalAmount: poGrandTotal.toString(),
-              optional: false,
             });
             
             // DR: Subsidiary receivable (Asset increases - they owe us)
@@ -7710,7 +7697,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: saleDate,
             description: `POS Import - ${items.length} items`,
             totalAmount: "0", // Will be updated with actual total
-            optional: false,
           })
           .returning();
 
@@ -8132,7 +8118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: saleDate,
             description: `Credit Sale Import - ${items.length} items - Customer: ${customer.legalName}`,
             totalAmount: "0",
-            optional: false,
           })
           .returning();
 
@@ -8567,6 +8552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.transaction(async (tx) => {
         // Create stock transfer voucher
         const voucherNumber = `ST-${Date.now()}`;
+      const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
 
         const [voucher] = await tx
           .insert(vouchers)
@@ -8579,7 +8565,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: transferDate,
             description: notes || `Excel Import - ${items.length} items from ${sourceLocation.name} to ${destLocation.name}`,
             totalAmount: totalValue.toString(),
-            optional: false,
           })
           .returning();
 
@@ -9113,7 +9098,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: transferDate || new Date().toISOString().split("T")[0],
             description: notes || `Multi-source Stock Transfer Import (${processedItems.length} items)`,
             totalAmount: totalValue.toString(),
-            optional: false,
             locationId: destinationLocationId,
             locationName: destLocation.name,
           })
@@ -9798,7 +9782,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate: voucherDate,
             description: `Container ${container.containerNumber} - ${itemName}`,
             totalAmount: totalAmount.toFixed(2),
-            optional: false,
           });
 
           // Debit: Purchases account (Expense increases)
@@ -17661,7 +17644,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             voucherDate,
             description: notes || `POS Sale at ${location.name}`,
             totalAmount: grandTotal.toFixed(2),
-            optional: false,
           })
           .returning();
 
@@ -18336,7 +18318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireNonPOS,
     async (req, res) => {
       try {
-        const { voucherId, sourceLocationId, destinationLocationId, notes, items, allowNegativeInventory } = req.body;
+        const { voucherId, sourceLocationId, destinationLocationId, notes, items, allowNegativeInventory, voucherDate, optional } = req.body;
         
         // Log if user confirmed negative inventory override
         if (allowNegativeInventory) {
@@ -18371,15 +18353,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Create Stock Transfer voucher
           const voucherNumber = `ST-${Date.now()}`;
+      const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
           const [newVoucher] = await db
             .insert(vouchers)
             .values({
               companyId,
               voucherType: "Stock Transfer",
               voucherNumber,
-              voucherDate: format(new Date(), "yyyy-MM-dd"),
+              voucherDate: effectiveDate,
               description: notes || null,
               totalAmount: "0",
+          })
             })
             .returning();
 
@@ -26726,7 +26710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       
-      const { sourceLocationId, destinationLocationId, items, notes } = req.body;
+      const { sourceLocationId, destinationLocationId, items, notes, voucherDate, optional } = req.body;
       
       if (!sourceLocationId || !destinationLocationId || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -26734,13 +26718,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create Stock Transfer voucher
       const voucherNumber = `ST-${Date.now()}`;
+      const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
       const [voucher] = await db
         .insert(vouchers)
         .values({
           companyId,
           voucherType: "Stock Transfer",
           voucherNumber,
-          voucherDate: format(new Date(), "yyyy-MM-dd"),
+          voucherDate: effectiveDate,
           description: notes || null,
           totalAmount: "0",
         })
@@ -30676,7 +30661,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherDate,
               description: `Transfer supplier liability to ${parentCompany.name} Credit - PO ${po.poNumber} - Container ${container.containerNumber}`,
               totalAmount: poTotal.toFixed(2),
-              optional: false,
             }).returning();
             
             // Debit: Supplier account (reduce payable - they got paid by parent company)
@@ -30740,7 +30724,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               voucherDate,
               description: `${container.containerNumber} ${poSupplier?.legalName || 'Unknown Supplier'}`,
               totalAmount: poTotal.toFixed(2),
-              optional: false,
             }).returning();
             
             // DR [Subsidiary] Credit (they owe us)
