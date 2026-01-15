@@ -2701,6 +2701,75 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
+  // Export current Stock Transfer voucher to Excel
+  const handleExportStockTransfer = (detailed: boolean) => {
+    const formData = stockTransferForm.getValues();
+    const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    
+    if (validEntries.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add at least one entry before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const destLocation = locations?.find((l: any) => l.id === formData.destinationLocationId);
+    const destLocationName = destLocation?.name || "";
+    
+    if (detailed) {
+      const exportData = validEntries.map((entry: any) => ({
+        "Date": voucherDate,
+        "Source Location": entry.sourceLocationName || "",
+        "Destination Location": destLocationName,
+        "Stock Item": entry.stockItemName || "",
+        "Quantity": parseFloat(entry.quantity).toFixed(2),
+        "Rate": parseFloat(entry.rate || "0").toFixed(2),
+        "Amount": (parseFloat(entry.quantity) * parseFloat(entry.rate || "0")).toFixed(2),
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Stock Transfer Detailed");
+      const fileName = `Stock_Transfer_Detailed_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${validEntries.length} items.`,
+      });
+    } else {
+      const totalQty = validEntries.reduce((sum: number, e: any) => sum + parseFloat(e.quantity), 0);
+      const totalAmount = validEntries.reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
+      
+      const exportData = [{
+        "Voucher Type": "Stock Transfer",
+        "Date": voucherDate,
+        "Destination Location": destLocationName,
+        "Total Items": validEntries.length,
+        "Total Quantity": totalQty.toFixed(2),
+        "Total Amount": totalAmount.toFixed(2),
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Stock Transfer Summary");
+      const fileName = `Stock_Transfer_Summary_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
+
   const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
     // Validate entries
     const validEntries = data.entries.filter(
@@ -4530,6 +4599,29 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     </FormItem>
                   )}
                 />
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={transferEntries.filter(e => e.stockItemId > 0).length === 0}
+                      data-testid="button-export-stock-transfer"
+                    >
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Export
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleExportStockTransfer(false)} data-testid="export-transfer-summary">
+                      Summary Export
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportStockTransfer(true)} data-testid="export-transfer-detailed">
+                      Detailed Export
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Button
                   type="submit"
