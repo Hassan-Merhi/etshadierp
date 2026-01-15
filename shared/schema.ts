@@ -790,7 +790,7 @@ export type FiscalPeriodClosure = typeof fiscalPeriodClosures.$inferSelect;
 export const stockTransferVouchers = pgTable("stock_transfer_vouchers", {
   id: serial("id").primaryKey(),
   voucherId: integer("voucher_id").notNull(),
-  sourceLocationId: integer("source_location_id").notNull(),
+  sourceLocationId: integer("source_location_id"), // Nullable for multi-source transfers
   destinationLocationId: integer("destination_location_id").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -801,7 +801,7 @@ export const insertStockTransferVoucherSchema = createInsertSchema(stockTransfer
   createdAt: true,
 }).extend({
   voucherId: z.number().min(1, "Voucher is required"),
-  sourceLocationId: z.number().min(1, "Source location is required"),
+  sourceLocationId: z.number().optional(), // Optional for multi-source transfers
   destinationLocationId: z.number().min(1, "Destination location is required"),
 });
 

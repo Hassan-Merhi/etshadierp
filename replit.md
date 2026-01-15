@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is a comprehensive ERP and POS system designed for multi-company warehouse management. It provides robust inventory tracking across multiple locations, streamlines purchase order management, enables container tracking, and offers full financial accounting and reporting capabilities. Built as a full-stack TypeScript application, its primary purpose is to optimize operations and provide strong financial oversight for businesses managing bulk inventory with complex supply chains, including international container shipments. The system is designed to support multi-entity businesses by ensuring isolated data for each company while providing a unified platform. It now includes an AI Chatbot powered by Google Gemini for intelligent assistance with ERP data.
+This project is a comprehensive ERP and POS system for multi-company warehouse management. It provides robust inventory tracking across multiple locations, streamlines purchase order management, enables container tracking, and offers full financial accounting and reporting capabilities. Built as a full-stack TypeScript application, its primary purpose is to optimize operations and provide strong financial oversight for businesses managing bulk inventory with complex supply chains, including international container shipments. The system supports multi-entity businesses with isolated data and includes an AI Chatbot powered by Google Gemini for intelligent assistance with ERP data.
 
 ## User Preferences
 
@@ -12,78 +12,42 @@ Preferred communication style: Simple, everyday language.
 
 ### UI/UX Decisions
 
-The frontend utilizes React with TypeScript and Vite, implementing the shadcn/ui design system (New York style) built on Radix UI primitives and styled with Tailwind CSS. This combination prioritizes clarity, efficiency, and scannable layouts essential for data-intensive interfaces. Typography features Inter and JetBrains Mono for numerical displays, and the application supports both light and dark themes.
+The frontend uses React with TypeScript and Vite, implementing the shadcn/ui design system (New York style) built on Radix UI primitives and styled with Tailwind CSS. It prioritizes clarity and efficiency for data-intensive interfaces, using Inter and JetBrains Mono fonts, and supports light/dark themes.
 
 ### Technical Implementations
 
--   **Frontend**: Built with React, TypeScript, and Vite. State management relies on TanStack Query for server state, React hooks/context for local UI state, and `react-hook-form` with Zod for form management. Routing is handled by `wouter`.
--   **Backend**: An Express.js server developed with TypeScript. It features RESTful API design with Zod for shared validation schemas. Development uses a custom Vite integration with HMR, while production builds utilize `esbuild` for the server and Vite for client assets.
--   **Data Storage**: PostgreSQL is the chosen database, utilizing the native `pg` driver with connection pooling. Drizzle ORM provides type-safe queries and a schema-first approach, integrated with Zod. The database schema supports users, locations, ledger accounts, employees, suppliers, stock items/groups, bank accounts, fixed assets, purchase orders, and vouchers, including multi-currency and opening balance features. Drizzle Kit is used for schema migrations. Production sessions are managed via `connect-pg-simple` with PostgreSQL-backed storage and SSL.
--   **Multi-Tenancy**: The system fully supports multiple companies with isolated data for inventory, financials, and locations, while allowing shared global suppliers. Users can have different roles across companies.
--   **Inventory Management**: Stock items are identified by a single `code` and can be assigned to stock groups. All stock operations, including multi-source location transfers and production/consumption adjustments, are wrapped in Drizzle ORM transactions to ensure atomicity and maintain accurate weighted average cost calculations. Recent updates include accurate PO freight costing and comprehensive voucher-based inventory reversal on deletion. **Stock Adjustments**: Production/Consumption/Mixed vouchers now create balancing voucher entries to maintain import cycle balance: Production items credit PRODUCTION_ADJUSTMENT (Liability), consumption items debit CONSUMPTION_EXPENSE (Indirect Expense). Consumption amounts use actual inventory average cost (not user-provided rate) for accurate tracking.
--   **Financial Accounting**: Includes automatic voucher creation for purchase orders and container offload charges. It handles auto-generation of ledger account codes and employee codes. The system supports comprehensive account pages with filters, ensuring all financial calculations (e.g., net profit, sales trends, balances) correctly handle hierarchical accounts and exclude optional (draft) vouchers. A Net Profit (P&L) report provides Tally Prime-style insights. Opening balances for ledger accounts are now correctly signed based on `openingBalanceSide` (Dr/Cr) and account type (asset/liability). The Import Cycle Balance calculation uses IMPORT_CHARGES parent account for isolated expense tracking, and properly handles both consumption (expense on inventory reduction) and production (offset on inventory increase) to maintain balance at $0. **Critical**: IMPORT_CHARGES accounts are excluded from all net profit/P&L calculations - these import costs (freight, duties, clearing) are product costs that get capitalized into inventory and only hit P&L through COGS when goods are sold.
--   **Location Management**: Supports location creation with optional auto-creation of linked CASH ledger accounts. It includes mechanisms for preserving location names on vouchers and managing orphaned records after location deletion.
--   **Supplier Management**: Suppliers are global entities, with transactions filtered by the selected company. Note: Supplier opening balances are currently global and not company-scoped. A future enhancement is needed to add per-company supplier opening balances for accurate multi-company balance reporting.
--   **Role-Based Access Control**: Granular roles (Admin, Owner, Manager, POS 1-6) are implemented per company, with location-based authentication for POS users.
--   **Voucher System**: Comprehensive support for creating, editing, and managing all voucher types (Payment, Receipt, Journal, Stock Transfer, Production, Consumption). An "optional" voucher system allows for drafts/templates that are excluded from all inventory movements and financial calculations, with a toggle mechanism that atomically applies or reverses inventory changes.
--   **Soft Delete System**: Implemented across key tables (locations, ledger accounts, stock items, suppliers, employees, customers, bank accounts) with a `deletedAt` timestamp. Includes admin-only UI for viewing, restoring, and permanently deleting items.
--   **AI Chatbot**: Integrated Google Gemini for ERP context-aware responses. Features multi-language support, real-time chat with history, and admin controls for user access and chat history viewing.
--   **Purchase Order Enhancements**: POs now include editable freight and other charges, which are correctly factored into container offload inventory costs and supplier account balances. **Critical Fix (Dec 2025)**: PO import voucher entries now correctly use company-specific Purchases ledger accounts. Previously, entries were incorrectly posting to a single Purchases account regardless of company, causing inflated balances. Existing data was corrected via SQL migration. **Stock Item Swap Prevention (Dec 2025)**: Editing stock items on offloaded containers is now blocked with a clear error message - users must first reverse the offload, edit the PO, then re-offload.
--   **Inter-Company Credit System (Dec 2025)**: Automated inter-company accounting where a configurable parent company pays all suppliers. When a PO is imported to a subsidiary company:
-    - **In subsidiary books**: DR Purchases, CR [Parent] Credit (liability - we owe parent company)
-    - **In parent company books**: DR [Subsidiary] Credit (receivable), CR Supplier (payable)
-    This creates matching entries in both companies' books at PO import time (not offload). A "Fix Old PO Credits" button in Settings handles existing POs by creating transfer vouchers. **Updated Dec 2025**: Parent company is now configurable via system settings (not hardcoded), voucher numbering uses `INTERCO-PARENT-*` format, and all account names dynamically reflect the configured parent company name.
--   **Net Position with Parent Company Setting (Dec 2025)**: Pure sign-based Net Position calculation:
-    - **Formula**: Net Position = Sum(positive balances) - Sum(negative balances) = Assets - Liabilities
-    - **Sign-based logic**: Positive balance = Asset (what we have), Negative balance = Liability (what we owe)
-    - **Suppliers**: Only included for designated parent company (pays all suppliers). Subsidiaries use "[Parent] Credit" liability instead
-    - **Parent Company Setting**: Stored in global `system_settings` table, Admin-only access in Settings > System Tools. This setting is used for both Net Position calculations AND inter-company credit accounting.
-    - **Stock OTW**: Containers in transit (OTW status) are included as assets in Net Position - this correctly balances the Parent Credit liability created when a subsidiary imports a PO
-    - **Dashboard**: Shows breakdown of Assets vs Liabilities with Net Position calculation
+-   **Frontend**: React, TypeScript, Vite, TanStack Query for server state, React hooks/context for local UI state, `react-hook-form` with Zod for forms, and `wouter` for routing.
+-   **Backend**: Express.js server with TypeScript, RESTful API design using Zod for shared validation.
+-   **Data Storage**: PostgreSQL with the native `pg` driver and Drizzle ORM for type-safe queries and schema management. Supports multi-currency, opening balances, and Drizzle Kit for migrations.
+-   **Multi-Tenancy**: Full support for multiple companies with isolated data (inventory, financials, locations) while allowing shared global suppliers. Role-based access control is implemented per company with location-based authentication for POS users.
+-   **Inventory Management**: Stock items with unique codes, grouped for tracking. All stock operations, including multi-source location transfers, production/consumption adjustments, are wrapped in Drizzle ORM transactions to ensure atomicity and accurate weighted average cost calculations. Includes accurate PO freight costing and comprehensive voucher-based inventory reversal on deletion. Consumption amounts use actual inventory average cost.
+-   **Financial Accounting**: Automatic voucher creation for purchase orders and container offload. Supports auto-generation of ledger and employee codes. Comprehensive account pages with filters, ensuring accurate financial calculations (e.g., net profit, sales trends) for hierarchical accounts, excluding draft vouchers. Net Profit (P&L) report provides Tally Prime-style insights. Opening balances are correctly signed. `IMPORT_CHARGES` and `PURCHASES` accounts are excluded from P&L calculations as they are capitalized into inventory.
+-   **Location Management**: Supports creation of locations with optional linked CASH ledger accounts, preservation of location names on vouchers, and management of orphaned records.
+-   **Voucher System**: Comprehensive support for all voucher types (Payment, Receipt, Journal, Stock Transfer, Production, Consumption) with an "optional" draft system that can atomically apply or reverse inventory changes.
+-   **Stock Transfer Order Enhancements**: Allows date selection, optional status, and multi-source transfers where items from various locations can be consolidated into a single transfer voucher.
+-   **Soft Delete System**: Implemented across key tables (`deletedAt` timestamp), with admin UI for viewing, restoring, and permanently deleting items.
+-   **AI Chatbot**: Integrated Google Gemini for ERP context-aware responses, multi-language support, real-time chat with history, and admin controls.
+-   **Purchase Order Enhancements**: POs include editable freight and charges factored into container offload costs and supplier balances. Blocks stock item swaps on offloaded containers without prior reversal.
+-   **Inter-Company Credit System**: Automated accounting where a configurable parent company pays all suppliers. Creates matching entries in subsidiary and parent books at PO import time, representing a liability for the subsidiary and a receivable for the parent.
+-   **Net Position Calculation**: Pure sign-based calculation (Assets - Liabilities), including containers in transit (OTW) as assets. Suppliers are included only for the designated parent company; subsidiaries use a "[Parent] Credit" liability. Configurable parent company setting used for both Net Position and inter-company credit.
 -   **Barcode Generation**: Backend API for server-side PNG barcode generation.
--   **Import Cycle Diagnostics (Dec 2025)**: Debug tool at `/import-cycle-diagnostics` to identify issues causing import cycle imbalance. Detects: negative inventory, orphaned inventory at deleted locations, unbalanced vouchers (debits ≠ credits), stale OTW containers (>90 days), and duplicate inventory records. Provides severity levels, impact amounts, and fix guidance for each issue.
--   **P&L Accounting for Imports (Dec 2025)**: PURCHASES accounts are excluded from all P&L/expense calculations because:
-    - Purchases represent inventory cost (asset), not operating expense
-    - Cost only hits P&L when goods are sold (as COGS - Cost of Goods Sold)
-    - This is consistent with how IMPORT_CHARGES accounts are handled
-    - Result: Net Profit stays $0 when you have stock OTW balanced by a liability
--   **Employee Deposit Accounting (Dec 2025)**: Employee deposits use PAYROLL_DEPOSIT_EXPENSE (Indirect Expense) because deposit and payroll are the same event:
-    - When an employee receives wages and deposits part with the company, it happens during payroll as ONE event
-    - Entry: DR PAYROLL_DEPOSIT_EXPENSE (Expense), CR Employee Balance (Liability)
-    - This correctly hits Net Profit once (at deposit/payroll time)
-    - Withdrawals just reduce the liability (DR Employee Balance, CR Cash) - no Net Profit impact
-    - PAYROLL_DEPOSIT_EXPENSE is included in Import Cycle Balance via indirectExpenseBalance
-    - Regular SALARY_EXPENSE (for workers with salary/payroll/wage in account name) is also now included in Import Cycle Balance via payrollExpenseBalance
--   **Employee Opening Balance Fix (Jan 2026)**: Employee opening balances are now included in the implicit opening balance equity calculation. When importing payroll data from an old system with employee opening balances (liabilities owed to employees), these are now properly offset in the Import Cycle Balance to maintain $0 balance.
--   **Active Users Monitoring (Jan 2026)**: New "Active Users" tab in Settings page allows admins/owners/managers to monitor currently active users:
-    - Displays all logged-in users grouped by company
-    - Shows username, role, current page, and last active time
-    - Real-time updates every 30 seconds
-    - Uses database-backed presence tracking with automatic cleanup of stale records (2 minute timeout)
-    - **Database migration required on Render**: Run `migrations/add_user_presence.sql`
--   **OTW Container Tracking (Jan 2026)**: New "OTW Tracking" tab in the Containers page provides a TallyPrime-style interface for tracking containers in transit:
-    - **Automatic fields**: Container number, supplier name, total amount (from PO data)
-    - **Manual fields**: Shop name, ETA, transport fee, number plate, location, border date, offload date, agent, duty fee, document received checkbox, description
-    - **Inline editing**: Click any field to edit, changes are saved per-row with a checkmark button
-    - **Export**: Export OTW containers to Excel with all tracking data
-    - **Optional API Integration**: Set `CONTAINER_TRACKING_API_KEY` secret to enable automatic ETA updates from Terminal49 or similar tracking services (manual entry works without API key)
-    - **Database migration required on Render**: Run `migrations/add_container_tracking_fields.sql`
--   **Known Limitations**: 
-    -   Reverse offload may show small value discrepancies due to weighted average rate calculations - the math is correct but not perfectly reversible when other transactions occurred between offload and reversal.
-    -   Consumption vouchers require existing inventory - they cannot be created for items that don't exist at the specified location (this is intentional to prevent import cycle imbalances from using user-input rates instead of actual inventory rates).
+-   **Import Cycle Diagnostics**: Debug tool to identify and guide fixes for issues like negative inventory, orphaned inventory, unbalanced vouchers, stale OTW containers, and duplicate inventory records.
+-   **Employee Deposit Accounting**: Employee deposits are accounted for as `PAYROLL_DEPOSIT_EXPENSE` (Indirect Expense), hitting Net Profit at deposit/payroll time. Withdrawals reduce liability without Net Profit impact. Employee opening balances are included in the implicit opening balance equity calculation.
+-   **Active Users Monitoring**: Admin-only feature displaying logged-in users, grouped by company, with role, current page, and last active time, updated in real-time.
+-   **OTW Container Tracking**: A TallyPrime-style interface for tracking containers in transit, including automatic fields from PO data and manual, inline-editable fields (e.g., shop name, ETA, transport fee). Supports export to Excel and optional API integration for automatic ETA updates.
 
 ### System Design Choices
 
--   **Shared Schemas**: `shared/schema.ts` ensures type safety across the entire stack.
--   **Path Aliases**: Configured for clean imports (`@/`, `@shared/`, `@assets/`).
--   **Separation of Concerns**: Codebase is organized with client-side code in `/client`, server-side code in `/server`, and shared types in `/shared`.
--   **Environment Configuration**: Supports distinct development and production build targets.
--   **Design System**: Features comprehensive typography and spacing primitives for consistent UI.
+-   **Shared Schemas**: `shared/schema.ts` for type safety across the stack.
+-   **Path Aliases**: For clean imports (`@/`, `@shared/`, `@assets/`).
+-   **Separation of Concerns**: Code organized into `/client`, `/server`, and `/shared`.
+-   **Environment Configuration**: Distinct development and production build targets.
+-   **Design System**: Comprehensive typography and spacing primitives for UI consistency.
 
 ## External Dependencies
 
 -   **AI/ML**: Google Gemini API
 -   **UI Component Libraries**: Radix UI, Tailwind CSS, `shadcn/ui`, `class-variance-authority`, `clsx`, `cmdk`, `embla-carousel-react`, `recharts`, `date-fns`, `react-day-picker`.
--   **Database & Backend**: `pg` (node-postgres driver), `drizzle-orm`, `connect-pg-simple` (PostgreSQL session store with SSL).
+-   **Database & Backend**: `pg` (node-postgres driver), `drizzle-orm`, `connect-pg-simple`.
 -   **Form Handling**: `react-hook-form`, `@hookform/resolvers`, `zod`, `drizzle-zod`.
 -   **Build Tools**: Vite, `esbuild`, PostCSS with Autoprefixer.

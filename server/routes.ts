@@ -8438,7 +8438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(inventory.stockItemId, stockItem.id),
-                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
               ),
             )
             .limit(1);
@@ -8529,7 +8529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(
             and(
               eq(inventory.stockItemId, stockItem.id),
-              eq(inventory.locationId, sourceLocationId),
+              eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
             ),
           )
           .limit(1);
@@ -8571,7 +8571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create stock transfer record
         const [transferRecord] = await tx.insert(stockTransferVouchers).values({
           voucherId: voucher.id,
-          sourceLocationId,
+          sourceLocationId: headerSourceLocationId,
           destinationLocationId,
         }).returning();
 
@@ -8595,7 +8595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(inventory.stockItemId, item.stockItemId),
-                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
               ),
             )
             .limit(1);
@@ -8919,7 +8919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(inventory.companyId, req.session.currentCompanyId!),
-                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
                 eq(inventory.stockItemId, stockItem.id),
               ),
             )
@@ -9122,7 +9122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await tx.insert(stockTransferItems).values({
             transferId: transferRecord.id,
             stockItemId: item.stockItemId,
-            sourceLocationId: sourceLocationId,
+            sourceLocationId: item.sourceLocationId || sourceLocationId,
             quantity: qty.toString(),
             rate: rate.toString(),
             totalAmount: itemTotal.toString(),
@@ -9135,7 +9135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(
               and(
                 eq(inventory.companyId, req.session.currentCompanyId!),
-                eq(inventory.locationId, sourceLocationId),
+                eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
                 eq(inventory.stockItemId, item.stockItemId),
               ),
             )
@@ -18390,7 +18390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(inventory)
               .where(
                 and(
-                  eq(inventory.locationId, sourceLocationId),
+                  eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
                   eq(inventory.stockItemId, item.stockItemId)
                 )
               )
@@ -18405,7 +18405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .values({
                 transferId: transfer.id,
                 stockItemId: item.stockItemId,
-                sourceLocationId: sourceLocationId,
+                sourceLocationId: item.sourceLocationId || sourceLocationId,
                 quantity: quantity.toString(),
                 rate: rate.toFixed(2),
                 totalAmount: totalItemAmount.toFixed(2),
@@ -18427,7 +18427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 })
                 .where(
                   and(
-                    eq(inventory.locationId, sourceLocationId),
+                    eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
                     eq(inventory.stockItemId, item.stockItemId)
                   )
                 );
@@ -26712,10 +26712,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { sourceLocationId, destinationLocationId, items, notes, voucherDate, optional } = req.body;
       
-      if (!sourceLocationId || !destinationLocationId || !items || items.length === 0) {
+      if (!destinationLocationId || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
       }
       
+      // Validate all items have sourceLocationId (either from item or request level)
+      for (const item of items) {
+        const effectiveSourceId = item.sourceLocationId || sourceLocationId;
+        if (!effectiveSourceId) {
+          return res.status(400).json({ message: "Each item must have a source location" });
+        }
+      }
+      
+      // Detect multi-source transfers
+      const uniqueSourceLocations = [...new Set(items.map((item: any) => item.sourceLocationId || sourceLocationId))];
+      const headerSourceLocationId = uniqueSourceLocations.length === 1 ? uniqueSourceLocations[0] : null;
+
       // Create Stock Transfer voucher
       const voucherNumber = `ST-${Date.now()}`;
       const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
@@ -26745,7 +26757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(inventory)
           .where(
             and(
-              eq(inventory.locationId, sourceLocationId),
+              eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
               eq(inventory.stockItemId, item.stockItemId)
             )
           )
@@ -26760,7 +26772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values({
             transferId: 0, // Will set after creating transfer record
             stockItemId: item.stockItemId,
-            sourceLocationId: sourceLocationId,
+            sourceLocationId: item.sourceLocationId || sourceLocationId,
             quantity: quantity.toString(),
             rate: rate.toFixed(2),
             totalAmount: totalItemAmount.toFixed(2),
@@ -26775,7 +26787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .insert(stockTransferVouchers)
         .values({
           voucherId: voucher.id,
-          sourceLocationId,
+          sourceLocationId: headerSourceLocationId,
           destinationLocationId,
           notes: notes || null,
         })
@@ -26806,7 +26818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .from(inventory)
           .where(
             and(
-              eq(inventory.locationId, sourceLocationId),
+              eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
               eq(inventory.stockItemId, item.stockItemId)
             )
           )
