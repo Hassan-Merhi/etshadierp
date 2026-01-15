@@ -8389,7 +8389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      if (sourceLocationId === destinationLocationId) {
+      if (sourceLocationId && sourceLocationId === destinationLocationId) {
         return res.status(400).json({ message: "Source and destination must be different" });
       }
 
@@ -8890,7 +8890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        if (sourceLocationId === destinationLocationId) {
+        if (sourceLocationId && sourceLocationId === destinationLocationId) {
           validatedItem.error = "Source and destination cannot be the same";
           errors.push(`Row ${item.rowNum}: Source and destination cannot be the same`);
           validatedItems.push(validatedItem);
@@ -18327,7 +18327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const companyId = req.session.currentCompanyId;
 
         // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
-        if (sourceLocationId && !voucherId) {
+        if (!voucherId && (sourceLocationId || (items && items.length > 0 && items.every((i: any) => i.sourceLocationId)))) {
           if (!companyId) {
             return res.status(400).json({ message: "No company selected" });
           }
@@ -18337,20 +18337,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: "Items are required" });
           }
-          if (sourceLocationId === destinationLocationId) {
+          // Compute multi-source detection
+          const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
+          const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? [...uniqueSourceIds][0] : null;
+
+          // Validate source/dest not the same (only for single-source mode)
+          if (resolvedHeaderSourceId && resolvedHeaderSourceId === destinationLocationId) {
             return res.status(400).json({ message: "Source and destination must be different" });
           }
 
-          // Validate locations exist
-          const sourceLocation = await storage.getLocationById(sourceLocationId);
+          // Validate destination location exists
           const destLocation = await storage.getLocationById(destinationLocationId);
-          if (!sourceLocation) {
-            return res.status(404).json({ message: "Source location not found" });
-          }
           if (!destLocation) {
             return res.status(404).json({ message: "Destination location not found" });
           }
 
+          // Validate each item has a valid source location
+          for (const item of items) {
+            const itemSourceId = item.sourceLocationId || sourceLocationId;
+            if (!itemSourceId) {
+              return res.status(400).json({ message: "Each item must have a source location" });
+            }
+            if (itemSourceId === destinationLocationId) {
+              return res.status(400).json({ message: `Item ${item.stockItemId}: Source and destination cannot be the same` });
+            }
+          }
           // Create Stock Transfer voucher
           const voucherNumber = `ST-${Date.now()}`;
           const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
@@ -18372,7 +18383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .insert(stockTransferVouchers)
             .values({
               voucherId: newVoucher.id,
-              sourceLocationId,
+              sourceLocationId: resolvedHeaderSourceId,
               destinationLocationId,
               notes: notes || null,
             })
