@@ -149,7 +149,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(salesItems.locationId, locationId),
         eq(vouchers.optional, false),
-        sql`${vouchers.voucherDate} > ${asOfDate}`
+        gt(vouchers.voucherDate, asOfDate)
       )
     )
     .execute();
@@ -182,7 +182,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockAdjustmentVouchers.locationId, locationId),
         eq(vouchers.optional, false),
-        sql`${vouchers.voucherDate} > ${asOfDate}`
+        gt(vouchers.voucherDate, asOfDate)
       )
     )
     .execute();
@@ -222,7 +222,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferVouchers.destinationLocationId, locationId),
         eq(vouchers.optional, false),
-        sql`${vouchers.voucherDate} > ${asOfDate}`
+        gt(vouchers.voucherDate, asOfDate)
       )
     )
     .execute();
@@ -253,7 +253,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferItems.sourceLocationId, locationId),
         eq(vouchers.optional, false),
-        sql`${vouchers.voucherDate} > ${asOfDate}`
+        gt(vouchers.voucherDate, asOfDate)
       )
     )
     .execute();
@@ -283,7 +283,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(containerOffloads.locationId, locationId),
         eq(vouchers.optional, false),
-        sql`${vouchers.voucherDate} > ${asOfDate}`
+        gt(vouchers.voucherDate, asOfDate)
       )
     )
     .execute();
@@ -21361,7 +21361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get vouchers up to asOfDate
         const conditions = [eq(vouchers.companyId, companyId)];
         if (asOfDate) {
-          conditions.push(sql`${vouchers.voucherDate} <= ${asOfDate}`);
+          conditions.push(lte(vouchers.voucherDate, asOfDate));
         }
 
         const companyVouchers = await db
