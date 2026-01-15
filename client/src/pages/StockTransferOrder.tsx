@@ -39,7 +39,14 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { utils, writeFile } from "xlsx";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -400,6 +407,67 @@ export default function StockTransferOrder() {
     }
   };
 
+  const handleExportOrder = (detailed: boolean) => {
+    if (orderItems.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add items to the order before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const destLocation = locations.find(l => l.id === destinationLocationId);
+    const exportDate = format(transferDate, "yyyy-MM-dd");
+    
+    if (detailed) {
+      const exportData = orderItems.map((item) => ({
+        "Date": exportDate,
+        "Source Location": item.sourceLocationName,
+        "Destination Location": destLocation?.name || "",
+        "Stock Item Code": item.stockItemCode,
+        "Stock Item Name": item.stockItemName,
+        "UOM": item.uom,
+        "Quantity": item.quantity,
+        "Available Qty": item.availableQty,
+        "Rate": item.rate.toFixed(2),
+        "Amount": (item.quantity * item.rate).toFixed(2),
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Transfer Order Detailed");
+      const fileName = `Stock_Transfer_Order_Detailed_${exportDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${orderItems.length} items.`,
+      });
+    } else {
+      const totalAmount = orderItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+      const exportData = [{
+        "Date": exportDate,
+        "Destination Location": destLocation?.name || "",
+        "Total Items": orderItems.length,
+        "Total Quantity": totalBales,
+        "Total Amount": totalAmount.toFixed(2),
+        "Optional": isOptional ? "Yes" : "No",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Transfer Order Summary");
+      const fileName = `Stock_Transfer_Order_Summary_${exportDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
+
   const processOrderMutation = useMutation({
     mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number; voucherDate: string; optional: boolean }) => {
       const response = await apiRequest("POST", "/api/stock-transfers", {
@@ -749,6 +817,28 @@ export default function StockTransferOrder() {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Transfer Order</CardTitle>
                 <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={orderItems.length === 0}
+                        data-testid="button-export-order"
+                      >
+                        <FileDown className="h-4 w-4 mr-1" />
+                        Export
+                        <ChevronDown className="h-4 w-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExportOrder(false)} data-testid="export-order-summary">
+                        Summary Export
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportOrder(true)} data-testid="export-order-detailed">
+                        Detailed Export
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Badge variant="secondary">{orderItems.length} items</Badge>
                   <Badge variant="default" className="font-mono">
                     {formatNumber(totalBales, 0)} bales
