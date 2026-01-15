@@ -93,6 +93,253 @@ import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not
 import { format } from "date-fns";
 
 
+
+// Helper function to calculate historical inventory for a specific location as of a given date
+async function calculateHistoricalLocationInventory(
+  locationId: number,
+  companyId: number,
+  asOfDate: string
+): Promise<any[]> {
+  // Get current inventory for this location
+  const currentInventory = await db
+    .select({
+      inventoryId: inventory.id,
+      locationId: inventory.locationId,
+      stockItemId: inventory.stockItemId,
+      quantity: inventory.quantity,
+      averageRate: inventory.averageRate,
+      stockItemCode: stockItems.code,
+      stockItemName: stockItems.name,
+      stockItemUom: stockItems.uom,
+      stockGroupId: stockItems.stockGroupId,
+      stockGroupName: stockGroups.name,
+      stockGroupCode: stockGroups.code,
+    })
+    .from(inventory)
+    .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+    .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+    .where(
+      and(
+        eq(inventory.locationId, locationId),
+        eq(inventory.companyId, companyId)
+      )
+    )
+    .execute();
+
+  // Create a map to track inventory adjustments
+  const inventoryMap = new Map<number, { quantity: number; totalValue: number; rate: number }>();
+  
+  for (const inv of currentInventory) {
+    const qty = parseFloat(inv.quantity) || 0;
+    const rate = parseFloat(inv.averageRate) || 0;
+    inventoryMap.set(inv.stockItemId, { quantity: qty, totalValue: qty * rate, rate });
+  }
+
+  // Add back sales that occurred AFTER the target date (sales reduce inventory)
+  const salesAfterDate = await db
+    .select({
+      stockItemId: salesItems.stockItemId,
+      quantity: salesItems.quantity,
+      costPrice: salesItems.costPrice,
+    })
+    .from(salesItems)
+    .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(salesItems.locationId, locationId),
+        eq(vouchers.optional, false),
+        gt(vouchers.voucherDate, asOfDate)
+      )
+    )
+    .execute();
+
+  for (const sale of salesAfterDate) {
+    const qty = parseFloat(sale.quantity) || 0;
+    const cost = parseFloat(sale.costPrice) || 0;
+    const existing = inventoryMap.get(sale.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    existing.quantity += qty;
+    existing.totalValue += qty * cost;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(sale.stockItemId, existing);
+  }
+
+  // Reverse stock adjustments (production/consumption) that occurred AFTER the target date
+  // Production adds inventory, so to reverse we subtract
+  // Consumption removes inventory, so to reverse we add back
+  const adjustmentsAfterDate = await db
+    .select({
+      stockItemId: stockAdjustmentItems.stockItemId,
+      quantity: stockAdjustmentItems.quantity,
+      rate: stockAdjustmentItems.rate,
+      adjustmentType: stockAdjustmentVouchers.adjustmentType,
+    })
+    .from(stockAdjustmentItems)
+    .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+    .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockAdjustmentVouchers.locationId, locationId),
+        eq(vouchers.optional, false),
+        gt(vouchers.voucherDate, asOfDate)
+      )
+    )
+    .execute();
+
+  for (const adj of adjustmentsAfterDate) {
+    const qty = parseFloat(adj.quantity) || 0;
+    const rate = parseFloat(adj.rate) || 0;
+    const existing = inventoryMap.get(adj.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    const adjType = (adj.adjustmentType || '').toLowerCase().trim();
+    
+    if (adjType === 'production' || adjType === 'produce') {
+      // Production added inventory, reverse by subtracting
+      existing.quantity -= qty;
+      existing.totalValue -= qty * rate;
+    } else {
+      // Consumption removed inventory, reverse by adding back
+      existing.quantity += qty;
+      existing.totalValue += qty * rate;
+    }
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(adj.stockItemId, existing);
+  }
+
+  // Reverse stock transfers AFTER the target date
+  // Transfers INTO this location should be subtracted (to reverse them)
+  const transfersInAfterDate = await db
+    .select({
+      stockItemId: stockTransferItems.stockItemId,
+      quantity: stockTransferItems.quantity,
+      rate: stockTransferItems.rate,
+    })
+    .from(stockTransferItems)
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+    .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockTransferVouchers.destinationLocationId, locationId),
+        eq(vouchers.optional, false),
+        gt(vouchers.voucherDate, asOfDate)
+      )
+    )
+    .execute();
+
+  for (const transfer of transfersInAfterDate) {
+    const qty = parseFloat(transfer.quantity) || 0;
+    const rate = parseFloat(transfer.rate) || 0;
+    const existing = inventoryMap.get(transfer.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    existing.quantity -= qty;
+    existing.totalValue -= qty * rate;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(transfer.stockItemId, existing);
+  }
+
+  // Transfers OUT of this location should be added back (to reverse them)
+  // Items have sourceLocationId on the item level for multi-source transfers
+  const transfersOutAfterDate = await db
+    .select({
+      stockItemId: stockTransferItems.stockItemId,
+      quantity: stockTransferItems.quantity,
+      rate: stockTransferItems.rate,
+    })
+    .from(stockTransferItems)
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+    .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockTransferItems.sourceLocationId, locationId),
+        eq(vouchers.optional, false),
+        gt(vouchers.voucherDate, asOfDate)
+      )
+    )
+    .execute();
+
+  for (const transfer of transfersOutAfterDate) {
+    const qty = parseFloat(transfer.quantity) || 0;
+    const rate = parseFloat(transfer.rate) || 0;
+    const existing = inventoryMap.get(transfer.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    existing.quantity += qty;
+    existing.totalValue += qty * rate;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(transfer.stockItemId, existing);
+  }
+
+  // Reverse container offloads AFTER the target date (offloads add inventory)
+  const offloadsAfterDate = await db
+    .select({
+      stockItemId: containerOffloadItems.stockItemId,
+      quantity: containerOffloadItems.quantity,
+      costPrice: containerOffloadItems.costPrice,
+    })
+    .from(containerOffloadItems)
+    .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
+    .innerJoin(vouchers, eq(containerOffloads.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(containerOffloads.locationId, locationId),
+        eq(vouchers.optional, false),
+        gt(vouchers.voucherDate, asOfDate)
+      )
+    )
+    .execute();
+
+  for (const offload of offloadsAfterDate) {
+    const qty = parseFloat(offload.quantity) || 0;
+    const cost = parseFloat(offload.costPrice) || 0;
+    const existing = inventoryMap.get(offload.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    existing.quantity -= qty;
+    existing.totalValue -= qty * cost;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(offload.stockItemId, existing);
+  }
+
+  // Build the result array with stock item details
+  const stockItemDetails = await db
+    .select({
+      id: stockItems.id,
+      code: stockItems.code,
+      name: stockItems.name,
+      uom: stockItems.uom,
+      stockGroupId: stockItems.stockGroupId,
+      stockGroupName: stockGroups.name,
+      stockGroupCode: stockGroups.code,
+    })
+    .from(stockItems)
+    .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+    .where(eq(stockItems.companyId, companyId))
+    .execute();
+
+  const stockItemMap = new Map(stockItemDetails.map(item => [item.id, item]));
+
+  const result: any[] = [];
+  for (const [stockItemId, data] of inventoryMap) {
+    const itemDetails = stockItemMap.get(stockItemId);
+    if (itemDetails && data.quantity !== 0) {
+      result.push({
+        inventoryId: 0,
+        locationId,
+        stockItemId,
+        quantity: data.quantity.toFixed(3),
+        averageRate: data.rate.toFixed(2),
+        totalValue: data.totalValue.toFixed(2),
+        stockItemCode: itemDetails.code,
+        stockItemName: itemDetails.name,
+        stockItemUom: itemDetails.uom,
+        stockGroupId: itemDetails.stockGroupId,
+        stockGroupName: itemDetails.stockGroupName,
+        stockGroupCode: itemDetails.stockGroupCode,
+      });
+    }
+  }
+
+  return result;
+}
+
 // Audit logging helper function
 async function logAudit(params: {
   userId: string;
@@ -1149,7 +1396,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
         }
 
-        const inventory = await storage.getLocationInventory(locationId);
+        // Check for asOfDate query parameter for historical inventory
+        const asOfDate = req.query.asOfDate as string | undefined;
+        
+        let inventory;
+        if (asOfDate) {
+          const companyId = req.session.currentCompanyId!;
+          inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
+        } else {
+          inventory = await storage.getLocationInventory(locationId);
+        }
 
         // Filter sensitive data for POS users (they should only see quantity)
         const isPOS = req.user?.role?.startsWith("POS");

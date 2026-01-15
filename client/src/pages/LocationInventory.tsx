@@ -5,7 +5,9 @@ import { useLocation as useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive } from "lucide-react";
+import { ChevronRight, Package, MapPin, Layers, ShoppingCart, List, Printer, Upload, Download, Trash2, Search, AlertCircle, CheckCircle2, Archive, Calendar, X } from "lucide-react";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { format } from "date-fns";
 import { LocationCreateDialog } from "@/components/LocationCreateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -88,6 +90,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [itemSearchTerm, setItemSearchTerm] = useState("");
+  const [asOfDate, setAsOfDate] = useState<string>("");
   const tableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const { setSelectedLocation } = useLocation();
@@ -161,9 +164,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   }, [posUser, posLocation, selectedLocationLocal]);
 
-  // Fetch inventory for selected location
+  // Fetch inventory for selected location (with optional historical date)
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal ? [`/api/locations/${selectedLocationLocal.id}/inventory`] : [],
+    queryKey: selectedLocationLocal 
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, asOfDate || null] 
+      : [],
+    queryFn: async () => {
+      const url = asOfDate 
+        ? `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`
+        : `/api/locations/${selectedLocationLocal!.id}/inventory`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      return response.json();
+    },
     enabled: !!selectedLocationLocal,
   });
 
@@ -674,7 +687,27 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       <PageHeader 
         title="Location Inventory" 
         subtitle="Manage inventory across all locations"
-      />
+      >
+        <div className="flex items-center gap-2">
+          <Label className="text-sm text-muted-foreground">As of Date:</Label>
+          <DatePickerInput
+            value={asOfDate}
+            onChange={setAsOfDate}
+            placeholder="Current (Today)"
+            data-testid="input-as-of-date"
+          />
+          {asOfDate && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setAsOfDate("")}
+              data-testid="button-clear-date"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </PageHeader>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <MapPin className="w-4 h-4" />
         {!selectedLocationLocal && <span>Select Location</span>}
