@@ -54,7 +54,8 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database } from "lucide-react";
+import * as XLSX from "xlsx";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -465,7 +466,592 @@
       </div>
     );
   }
+
+// Data Tools Tab component - consolidates administrative utilities
+function DataToolsTab() {
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   
+  // Separate location selection for each import operation
+  const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
+  const [stockLocationId, setStockLocationId] = useState<string>("");
+  
+  // Cost price import state
+  const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
+  const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
+  const [costPricePreview, setCostPricePreview] = useState<Array<{ barcode: string; costPrice: number }>>([]);
+  const [costPriceErrors, setCostPriceErrors] = useState<string[]>([]);
+  const [isImportingCostPrice, setIsImportingCostPrice] = useState(false);
+  const [costPriceImportComplete, setCostPriceImportComplete] = useState(false);
+
+  // Stock import state
+  const [stockImportOpen, setStockImportOpen] = useState(false);
+  const [stockFile, setStockFile] = useState<File | null>(null);
+  const [stockPreview, setStockPreview] = useState<Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }>>([]);
+  const [stockErrors, setStockErrors] = useState<string[]>([]);
+  const [isImportingStock, setIsImportingStock] = useState(false);
+  const [stockImportComplete, setStockImportComplete] = useState(false);
+
+  // Fetch locations (filtered by company context - locations are already company-scoped by the API)
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations"],
+    enabled: !!selectedCompany,
+  });
+
+  // Convert Bale to BL mutation
+  const updateUOMMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/stock-items/bulk-update-uom", {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      toast({
+        title: "Success",
+        description: data.message || "UOM updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update UOM",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Fix Cost Prices mutation
+  const recalculateCostsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/sales-report/recalculate-costs", {});
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Cost Prices Updated",
+        description: `Updated ${data.updatedCount} of ${data.totalChecked} sales items`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cost price import functions
+  const downloadCostPriceTemplate = () => {
+    const template = [
+      { barcode: "ITEM001", costPrice: "125.50" },
+      { barcode: "ITEM002", costPrice: "95.75" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cost Price Import");
+    XLSX.writeFile(wb, "cost_price_import_template.xlsx");
+    toast({
+      title: "Template Downloaded",
+      description: "Use this template to update cost prices",
+    });
+  };
+
+  const handleCostPriceFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setCostPriceFile(selectedFile);
+    setCostPriceErrors([]);
+    setCostPricePreview([]);
+    setCostPriceImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
+        return;
+      }
+
+      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const requiredCols = ["barcode", "costPrice"];
+      const missingCols = requiredCols.filter(col => !columns.includes(col));
+      
+      if (missingCols.length > 0) {
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected: ${requiredCols.join(", ")}. Download template for format.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const errors: string[] = [];
+      const rows: Array<{ barcode: string; costPrice: number }> = [];
+
+      jsonData.forEach((row: any, index: number) => {
+        const rowNumber = index + 2;
+        if (!row.barcode || String(row.barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Barcode is required`);
+          return;
+        }
+        const costPrice = parseFloat(row.costPrice || "0");
+        if (isNaN(costPrice) || costPrice <= 0) {
+          errors.push(`Row ${rowNumber}: Cost price must be > 0`);
+          return;
+        }
+        rows.push({ barcode: String(row.barcode).trim(), costPrice });
+      });
+
+      setCostPricePreview(rows);
+      setCostPriceErrors(errors);
+    } catch (error) {
+      toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
+    }
+  };
+
+  const handleCostPriceImport = async () => {
+    if (!costPriceLocationId) {
+      toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
+      return;
+    }
+    if (costPriceErrors.length > 0) {
+      toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
+      return;
+    }
+
+    setIsImportingCostPrice(true);
+    try {
+      const res = await apiRequest("POST", `/api/locations/${costPriceLocationId}/import-cost-prices`, {
+        updates: costPricePreview,
+      });
+      const response = await res.json();
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${costPriceLocationId}/inventory`] });
+      setCostPriceImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Updated ${response.updated} cost prices.`,
+      });
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } finally {
+      setIsImportingCostPrice(false);
+    }
+  };
+
+  const handleCostPriceDialogClose = () => {
+    setCostPriceImportOpen(false);
+    setCostPriceFile(null);
+    setCostPricePreview([]);
+    setCostPriceErrors([]);
+    setCostPriceImportComplete(false);
+  };
+
+  // Stock import functions
+  const downloadStockTemplate = () => {
+    const template = [
+      { Item_barcode: "ITEM-001", stockGroupCode: "GRP01", quantity: "100", rate: "50.00", value: "5000.00" },
+      { Item_barcode: "ITEM-002", stockGroupCode: "GRP02", quantity: "50", rate: "100.00", value: "5000.00" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock Import");
+    XLSX.writeFile(wb, "stock_import_template.xlsx");
+    toast({ title: "Template Downloaded", description: "Use this template to import stock" });
+  };
+
+  const handleStockFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setStockFile(selectedFile);
+    setStockErrors([]);
+    setStockPreview([]);
+    setStockImportComplete(false);
+
+    try {
+      const data = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
+        return;
+      }
+
+      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const columns = headerRow.map((h: any) => String(h || "").trim());
+      const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
+      const missingCols = requiredCols.filter(col => !columns.includes(col));
+      
+      if (missingCols.length > 0) {
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected: ${requiredCols.join(", ")}. Download template for format.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const errors: string[] = [];
+      const rows: Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }> = [];
+
+      jsonData.forEach((row: any, index: number) => {
+        const rowNumber = index + 2;
+        if (!row.Item_barcode || String(row.Item_barcode).trim() === "") {
+          errors.push(`Row ${rowNumber}: Item_barcode is required`);
+          return;
+        }
+        const quantity = parseFloat(row.quantity || "0");
+        const rate = parseFloat(row.rate || "0");
+        const value = parseFloat(row.value || "0");
+        if (isNaN(quantity) || quantity < 0) {
+          errors.push(`Row ${rowNumber}: Quantity must be >= 0`);
+          return;
+        }
+        if (isNaN(rate) || rate < 0) {
+          errors.push(`Row ${rowNumber}: Rate must be >= 0`);
+          return;
+        }
+        rows.push({
+          Item_barcode: String(row.Item_barcode).trim(),
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
+          quantity: String(quantity),
+          rate: String(rate),
+          value: String(value),
+        });
+      });
+
+      setStockPreview(rows);
+      setStockErrors(errors);
+    } catch (error) {
+      toast({ title: "Error Reading File", description: "Please ensure valid Excel file.", variant: "destructive" });
+    }
+  };
+
+  const handleStockImport = async () => {
+    if (!stockLocationId) {
+      toast({ title: "No Location Selected", description: "Please select a location first", variant: "destructive" });
+      return;
+    }
+    if (stockErrors.length > 0) {
+      toast({ title: "Cannot Import", description: "Please fix validation errors first", variant: "destructive" });
+      return;
+    }
+
+    setIsImportingStock(true);
+    try {
+      const res = await apiRequest("POST", `/api/locations/${stockLocationId}/import-inventory`, {
+        items: stockPreview,
+      });
+      const response = await res.json();
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${stockLocationId}/inventory`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      setStockImportComplete(true);
+      toast({
+        title: "Import Successful",
+        description: `Imported ${response.imported || stockPreview.length} inventory items`,
+      });
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message || "Failed to import", variant: "destructive" });
+    } finally {
+      setIsImportingStock(false);
+    }
+  };
+
+  const handleStockDialogClose = () => {
+    setStockImportOpen(false);
+    setStockFile(null);
+    setStockPreview([]);
+    setStockErrors([]);
+    setStockImportComplete(false);
+  };
+
+  if (!selectedCompany) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5" />
+          <h2 className="text-2xl font-semibold">Data Tools</h2>
+        </div>
+        <p className="text-muted-foreground">
+          Please select a company to access data tools.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Database className="h-5 w-5" />
+        <h2 className="text-2xl font-semibold">Data Tools</h2>
+      </div>
+      <p className="text-muted-foreground">
+        Administrative utilities for bulk data operations and maintenance tasks.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Import Cost Prices Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Import Cost Prices
+            </CardTitle>
+            <CardDescription>
+              Bulk update inventory cost prices from Excel file
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Location</Label>
+              <Select value={costPriceLocationId} onValueChange={setCostPriceLocationId}>
+                <SelectTrigger data-testid="select-location-cost-price">
+                  <SelectValue placeholder="Choose location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc: any) => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setCostPriceImportOpen(true)}
+              disabled={!costPriceLocationId}
+              data-testid="button-open-cost-price-import"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Cost Prices
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Import Stock Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Import Stock
+            </CardTitle>
+            <CardDescription>
+              Bulk import inventory quantities from Excel file
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Location</Label>
+              <Select value={stockLocationId} onValueChange={setStockLocationId}>
+                <SelectTrigger data-testid="select-location-stock-import">
+                  <SelectValue placeholder="Choose location..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc: any) => (
+                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setStockImportOpen(true)}
+              disabled={!stockLocationId}
+              data-testid="button-open-stock-import"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import Stock
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Convert Bale to BL Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Convert Bale to BL
+            </CardTitle>
+            <CardDescription>
+              Update all stock items with "Bale" UOM to "BL"
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => updateUOMMutation.mutate()}
+              disabled={updateUOMMutation.isPending}
+              data-testid="button-convert-bale-bl"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${updateUOMMutation.isPending ? "animate-spin" : ""}`} />
+              {updateUOMMutation.isPending ? "Converting..." : "Convert Bale to BL"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Fix Cost Prices Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              Fix Cost Prices
+            </CardTitle>
+            <CardDescription>
+              Recalculate sales cost prices based on inventory records
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => recalculateCostsMutation.mutate()}
+              disabled={recalculateCostsMutation.isPending}
+              data-testid="button-fix-cost-prices"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${recalculateCostsMutation.isPending ? "animate-spin" : ""}`} />
+              {recalculateCostsMutation.isPending ? "Updating..." : "Fix Cost Prices"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Cost Price Import Dialog */}
+      <Dialog open={costPriceImportOpen} onOpenChange={handleCostPriceDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Cost Prices from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with barcode and costPrice columns
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Button variant="outline" onClick={downloadCostPriceTemplate} size="sm" data-testid="button-download-cost-price-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="cost-price-file">Select Excel File</Label>
+              <Input
+                id="cost-price-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleCostPriceFileChange}
+                disabled={isImportingCostPrice || costPriceImportComplete}
+                data-testid="input-cost-price-file"
+              />
+              {costPriceFile && <p className="text-sm text-muted-foreground">Selected: {costPriceFile.name}</p>}
+            </div>
+            {costPriceErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">{costPriceErrors.length} validation error(s):</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {costPriceErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+            {costPricePreview.length > 0 && costPriceErrors.length === 0 && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>{costPricePreview.length} records ready to import</AlertDescription>
+              </Alert>
+            )}
+            {costPriceImportComplete && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>Cost prices imported successfully</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleCostPriceDialogClose} disabled={isImportingCostPrice}>Close</Button>
+              <Button
+                onClick={handleCostPriceImport}
+                disabled={costPricePreview.length === 0 || costPriceErrors.length > 0 || isImportingCostPrice || costPriceImportComplete}
+                data-testid="button-submit-cost-price-import"
+              >
+                {isImportingCostPrice ? "Importing..." : "Import Cost Prices"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stock Import Dialog */}
+      <Dialog open={stockImportOpen} onOpenChange={handleStockDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Stock from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with Item_barcode, quantity, rate, value columns
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Button variant="outline" onClick={downloadStockTemplate} size="sm" data-testid="button-download-stock-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="stock-file">Select Excel File</Label>
+              <Input
+                id="stock-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleStockFileChange}
+                disabled={isImportingStock || stockImportComplete}
+                data-testid="input-stock-file"
+              />
+              {stockFile && <p className="text-sm text-muted-foreground">Selected: {stockFile.name}</p>}
+            </div>
+            {stockErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="font-semibold mb-2">{stockErrors.length} validation error(s):</div>
+                  <ul className="list-disc list-inside space-y-1">
+                    {stockErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+            {stockPreview.length > 0 && stockErrors.length === 0 && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>{stockPreview.length} records ready to import</AlertDescription>
+              </Alert>
+            )}
+            {stockImportComplete && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>Stock imported successfully</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleStockDialogClose} disabled={isImportingStock}>Close</Button>
+              <Button
+                onClick={handleStockImport}
+                disabled={stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete}
+                data-testid="button-submit-stock-import"
+              >
+                {isImportingStock ? "Importing..." : "Import Stock"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 // Edit Log Table component
 function EditLogTable({ companyId }: { companyId?: number }) {
@@ -1325,6 +1911,10 @@ function EditLogTable({ companyId }: { companyId?: number }) {
             <TabsTrigger value="edit-log" data-testid="tab-edit-log">
               <History className="h-4 w-4 mr-2" />
               Edit Log
+            </TabsTrigger>
+            <TabsTrigger value="data-tools" data-testid="tab-data-tools">
+              <Database className="h-4 w-4 mr-2" />
+              Data Tools
             </TabsTrigger>
           </TabsList>
   
@@ -3046,6 +3636,10 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="data-tools" className="space-y-4">
+            <DataToolsTab />
           </TabsContent>
         </Tabs>
 
