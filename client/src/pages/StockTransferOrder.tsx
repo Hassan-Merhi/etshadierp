@@ -641,6 +641,29 @@ export default function StockTransferOrder() {
               Optional
             </Label>
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={orderItems.length === 0}
+                data-testid="button-export-order"
+              >
+                <FileDown className="h-4 w-4 mr-1" />
+                Export
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportOrder(false)} data-testid="export-order-summary">
+                Summary Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportOrder(true)} data-testid="export-order-detailed">
+                Detailed Export
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -817,28 +840,6 @@ export default function StockTransferOrder() {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Transfer Order</CardTitle>
                 <div className="flex items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={orderItems.length === 0}
-                        data-testid="button-export-order"
-                      >
-                        <FileDown className="h-4 w-4 mr-1" />
-                        Export
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleExportOrder(false)} data-testid="export-order-summary">
-                        Summary Export
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExportOrder(true)} data-testid="export-order-detailed">
-                        Detailed Export
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                   <Badge variant="secondary">{orderItems.length} items</Badge>
                   <Badge variant="default" className="font-mono">
                     {formatNumber(totalBales, 0)} bales
