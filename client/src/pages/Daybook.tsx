@@ -808,10 +808,28 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 "Narration": "",
               });
             } else {
-              // Add a row for each entry
+              // Add a row for each entry (including stock items)
               for (const entry of entries) {
-                // Skip stock items in the export (they don't have account info)
-                if (entry.isStockItem || entry.stockItemId) continue;
+                // Determine account name - could be ledger account, stock item, supplier, employee, or asset
+                let accountName = "";
+                let accountType = "";
+                
+                if (entry.isStockItem || entry.stockItemId) {
+                  accountName = entry.stockItemName || entry.accountName || "";
+                  accountType = "Stock Item";
+                } else if (entry.supplierName) {
+                  accountName = entry.supplierName;
+                  accountType = "Supplier";
+                } else if (entry.employeeName) {
+                  accountName = entry.employeeName;
+                  accountType = "Employee";
+                } else if (entry.assetName) {
+                  accountName = entry.assetName;
+                  accountType = "Fixed Asset";
+                } else {
+                  accountName = entry.accountName || "";
+                  accountType = entry.accountType || "";
+                }
                 
                 detailedData.push({
                   "Voucher Number": voucher.voucherNumber,
@@ -820,8 +838,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   "Description": voucher.description || "",
                   "Location": (voucher as any).locationName || "",
                   "Optional": voucher.optional ? "Yes" : "No",
-                  "Account Name": entry.accountName || entry.supplierName || entry.employeeName || entry.assetName || "",
-                  "Account Type": entry.accountType || (entry.supplierName ? "Supplier" : "") || (entry.employeeName ? "Employee" : "") || (entry.assetName ? "Fixed Asset" : "") || "",
+                  "Account Name": accountName,
+                  "Account Type": accountType,
                   "Debit": entry.debitAmount && parseFloat(entry.debitAmount) > 0 ? formatAmount(entry.debitAmount) : "",
                   "Credit": entry.creditAmount && parseFloat(entry.creditAmount) > 0 ? formatAmount(entry.creditAmount) : "",
                   "Narration": entry.narration || "",
