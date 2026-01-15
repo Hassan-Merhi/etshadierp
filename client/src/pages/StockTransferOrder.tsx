@@ -402,37 +402,23 @@ export default function StockTransferOrder() {
 
   const processOrderMutation = useMutation({
     mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number; voucherDate: string; optional: boolean }) => {
-      const groupedBySource: Record<number, OrderItem[]> = {};
-      
-      for (const item of data.orderItems) {
-        if (!groupedBySource[item.sourceLocationId]) {
-          groupedBySource[item.sourceLocationId] = [];
-        }
-        groupedBySource[item.sourceLocationId].push(item);
-      }
-
-      const results = [];
-      for (const [sourceId, items] of Object.entries(groupedBySource)) {
-        const response = await apiRequest("POST", "/api/stock-transfers", {
-          sourceLocationId: parseInt(sourceId),
-          destinationLocationId: data.destinationLocationId,
-          notes: `Stock Transfer Order - ${items.length} items`,
-          voucherDate: data.voucherDate,
-          optional: data.optional,
-          items: items.map(item => ({
-            stockItemId: item.stockItemId,
-            quantity: item.quantity.toString(),
-          })),
-        });
-        results.push(await response.json());
-      }
-      
-      return results;
+      const response = await apiRequest("POST", "/api/stock-transfers", {
+        destinationLocationId: data.destinationLocationId,
+        notes: `Stock Transfer Order - ${data.orderItems.length} items`,
+        voucherDate: data.voucherDate,
+        optional: data.optional,
+        items: data.orderItems.map(item => ({
+          stockItemId: item.stockItemId,
+          sourceLocationId: item.sourceLocationId,
+          quantity: item.quantity.toString(),
+        })),
+      });
+      return response.json();
     },
-    onSuccess: (results) => {
+    onSuccess: () => {
       toast({
         title: "Order Processed",
-        description: `Successfully created ${results.length} stock transfer voucher(s)`,
+        description: "Successfully created stock transfer voucher",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
