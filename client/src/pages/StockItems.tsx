@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle } from "lucide-react";
+import { Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download, PlusCircle, MinusCircle, ChevronDown, Settings } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockItemDetailsDialog } from "@/components/StockItemDetailsDialog";
 import { StockItemEditDialog } from "@/components/StockItemEditDialog";
@@ -291,41 +297,33 @@ export default function StockItems() {
               Delete {selectedIds.length} {selectedIds.length === 1 ? 'Item' : 'Items'}
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={exportToExcel}
-            data-testid="button-export-items"
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setImportDialogOpen(true)}
-            data-testid="button-import-data"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Import
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setAdjustDialogOpen(true)}
-            data-testid="button-adjust-stock"
-          >
-            <Edit className="h-4 w-4" />
-            Adjust Stock
-          </Button>
-          <Button 
-            className="gap-2" 
-            onClick={() => setCreateDialogOpen(true)}
-            data-testid="button-add-item"
-          >
-            <Plus className="h-4 w-4" />
-            Add Item
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-manage-dropdown">
+                <Settings className="h-4 w-4" />
+                Manage
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)} data-testid="menu-add-item">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportDialogOpen(true)} data-testid="menu-import">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Import
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAdjustDialogOpen(true)} data-testid="menu-adjust-stock">
+                <Edit className="h-4 w-4 mr-2" />
+                Adjust Stock
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToExcel} data-testid="menu-export">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHeader>
 
