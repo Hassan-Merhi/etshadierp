@@ -149,7 +149,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(salesItems.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        sql`${vouchers.voucherDate} > ${asOfDate}`
       )
     )
     .execute();
@@ -182,7 +182,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockAdjustmentVouchers.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        sql`${vouchers.voucherDate} > ${asOfDate}`
       )
     )
     .execute();
@@ -222,7 +222,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferVouchers.destinationLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        sql`${vouchers.voucherDate} > ${asOfDate}`
       )
     )
     .execute();
@@ -253,7 +253,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferItems.sourceLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        sql`${vouchers.voucherDate} > ${asOfDate}`
       )
     )
     .execute();
@@ -283,7 +283,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(containerOffloads.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        sql`${vouchers.voucherDate} > ${asOfDate}`
       )
     )
     .execute();
