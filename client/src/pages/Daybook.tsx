@@ -861,11 +861,19 @@ export default function Daybook({ user }: { user?: any } = {}) {
         return;
       }
       
-      const worksheet = utils.json_to_sheet(detailedData);
-      const workbook = utils.book_new();
-      utils.book_append_sheet(workbook, worksheet, "Daybook Detailed");
+      // Group data by voucher type for separate sheets
+      const dataByType: { [key: string]: typeof detailedData } = {};
+      for (const row of detailedData) {
+        const type = row.Type || "Other";
+        if (!dataByType[type]) {
+          dataByType[type] = [];
+        }
+        dataByType[type].push(row);
+      }
       
-      // Auto-size columns
+      const workbook = utils.book_new();
+      
+      // Auto-size columns config
       const colWidths = [
         { wch: 15 }, // Voucher Number
         { wch: 12 }, // Date
@@ -879,14 +887,33 @@ export default function Daybook({ user }: { user?: any } = {}) {
         { wch: 15 }, // Credit
         { wch: 30 }, // Narration
       ];
-      worksheet["!cols"] = colWidths;
+      
+      // Create a sheet for each voucher type
+      const voucherTypeOrder = ["Sales", "Purchase", "Payment", "Receipt", "Journal", "Stock Transfer", "Production", "Consumption", "Contra", "Credit Note"];
+      const sortedTypes = Object.keys(dataByType).sort((a, b) => {
+        const indexA = voucherTypeOrder.indexOf(a);
+        const indexB = voucherTypeOrder.indexOf(b);
+        if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+      
+      for (const type of sortedTypes) {
+        const typeData = dataByType[type];
+        const worksheet = utils.json_to_sheet(typeData);
+        worksheet["!cols"] = colWidths;
+        // Sheet name max 31 chars, sanitize for Excel
+        const sheetName = type.substring(0, 31).replace(/[\\/*?[\]:]/g, "_");
+        utils.book_append_sheet(workbook, worksheet, sheetName);
+      }
 
       const fileName = `Daybook_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
       writeFile(workbook, fileName);
 
       toast({
         title: "Export successful",
-        description: `Downloaded ${fileName} with ${detailedData.length} entries from ${filteredVouchers.length} vouchers.`,
+        description: `Downloaded ${fileName} with ${detailedData.length} entries from ${filteredVouchers.length} vouchers across ${sortedTypes.length} sheets.`,
       });
     } catch (error) {
       console.error("Export error:", error);

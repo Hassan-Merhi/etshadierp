@@ -2651,7 +2651,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (detailed) {
       // Detailed export - one row per entry
       const exportData = validEntries.map((entry: any) => ({
-        "Voucher Type": entry.type === "consume" ? "Consumption" : "Production",
+        "Entry Type": entry.type?.toUpperCase() === "CONSUME" ? "Consumption" : "Production",
         "Date": voucherDate,
         "Location": locationName,
         "Stock Item": entry.stockItemName || "",
@@ -2674,8 +2674,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
     } else {
       // Summary export
-      const consumeTotal = validEntries.filter((e: any) => e.type === "consume").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
-      const produceTotal = validEntries.filter((e: any) => e.type === "produce").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
+      const consumeTotal = validEntries.filter((e: any) => e.type?.toUpperCase() === "CONSUME").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
+      const produceTotal = validEntries.filter((e: any) => e.type?.toUpperCase() === "PRODUCE").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
       
       const exportData = [{
         "Voucher Type": "Production/Consumption",
