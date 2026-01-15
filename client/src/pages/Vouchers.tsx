@@ -79,7 +79,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown } from "lucide-react";
+import { utils, writeFile } from "xlsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -1190,6 +1197,72 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     )}`,
   });
 
+  // Export current Payment/Receipt voucher to Excel
+  const handleExportVoucher = (detailed: boolean) => {
+    const formData = form.getValues();
+    const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
+    const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+    const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
+    
+    if (validEntries.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add at least one entry before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const total = validEntries.reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+    
+    if (detailed) {
+      // Detailed export - one row per entry
+      const exportData = validEntries.map((entry: any) => ({
+        "Voucher Type": voucherType,
+        "Date": voucherDate,
+        "Pay From/Receive In": formData.paymentAccountName || "",
+        "Account": entry.accountName || "",
+        "Account Type": entry.accountType || "",
+        "Amount": parseFloat(entry.amount).toFixed(2),
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, `${voucherType} Detailed`);
+      const fileName = `${voucherType}_Voucher_Detailed_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${validEntries.length} entries.`,
+      });
+    } else {
+      // Summary export - one row for the voucher
+      const exportData = [{
+        "Voucher Type": voucherType,
+        "Date": voucherDate,
+        "Pay From/Receive In": formData.paymentAccountName || "",
+        "Total Amount": total.toFixed(2),
+        "Number of Entries": validEntries.length,
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, `${voucherType} Summary`);
+      const fileName = `${voucherType}_Voucher_Summary_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
+
   const onSubmit = (data: VoucherFormData) => {
     // Validate that all amounts are numeric and positive
     const validEntries = data.entries.filter(entry => entry.accountId > 0 && entry.amount);
@@ -1501,6 +1574,72 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       });
     },
   });
+
+  // Export current Journal voucher to Excel
+  const handleExportJournalVoucher = (detailed: boolean) => {
+    const formData = journalForm.getValues();
+    const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+    const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
+    
+    if (validEntries.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add at least one entry before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (detailed) {
+      // Detailed export - one row per entry
+      const exportData = validEntries.map((entry: any) => ({
+        "Voucher Type": "Journal",
+        "Date": voucherDate,
+        "DR/CR": entry.type,
+        "Account": entry.accountName || "",
+        "Account Type": entry.accountType || "",
+        "Amount": parseFloat(entry.amount).toFixed(2),
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Journal Detailed");
+      const fileName = `Journal_Voucher_Detailed_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${validEntries.length} entries.`,
+      });
+    } else {
+      // Summary export
+      const totalDr = validEntries.filter((e: any) => e.type === "DR").reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+      const totalCr = validEntries.filter((e: any) => e.type === "CR").reduce((sum: number, e: any) => sum + (parseFloat(e.amount) || 0), 0);
+      
+      const exportData = [{
+        "Voucher Type": "Journal",
+        "Date": voucherDate,
+        "Total Debit": totalDr.toFixed(2),
+        "Total Credit": totalCr.toFixed(2),
+        "Number of Entries": validEntries.length,
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Journal Summary");
+      const fileName = `Journal_Voucher_Summary_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
 
   const onJournalSubmit = (data: JournalFormData) => {
     // Validate that all entries have valid accounts
@@ -2491,6 +2630,77 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
   });
 
+  // Export current Production/Consumption voucher to Excel
+  const handleExportProductionConsumptionVoucher = (detailed: boolean) => {
+    const formData = stockAdjustmentForm.getValues();
+    const voucherDate = formData.voucherDate ? format(formData.voucherDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
+    const validEntries = formData.entries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0);
+    
+    if (validEntries.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add at least one entry before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const selectedLocation = locations?.find((l: any) => l.id === formData.locationId);
+    const locationName = selectedLocation?.name || "";
+    
+    if (detailed) {
+      // Detailed export - one row per entry
+      const exportData = validEntries.map((entry: any) => ({
+        "Voucher Type": entry.type === "consume" ? "Consumption" : "Production",
+        "Date": voucherDate,
+        "Location": locationName,
+        "Stock Item": entry.stockItemName || "",
+        "Quantity": parseFloat(entry.quantity).toFixed(2),
+        "Rate": parseFloat(entry.rate || "0").toFixed(2),
+        "Amount": (parseFloat(entry.quantity) * parseFloat(entry.rate || "0")).toFixed(2),
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Production-Consumption Detailed");
+      const fileName = `Production_Consumption_Detailed_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${validEntries.length} items.`,
+      });
+    } else {
+      // Summary export
+      const consumeTotal = validEntries.filter((e: any) => e.type === "consume").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
+      const produceTotal = validEntries.filter((e: any) => e.type === "produce").reduce((sum: number, e: any) => sum + (parseFloat(e.quantity) * parseFloat(e.rate || "0")), 0);
+      
+      const exportData = [{
+        "Voucher Type": "Production/Consumption",
+        "Date": voucherDate,
+        "Location": locationName,
+        "Consumption Total": consumeTotal.toFixed(2),
+        "Production Total": produceTotal.toFixed(2),
+        "Number of Items": validEntries.length,
+        "Notes": formData.notes || "",
+        "Optional": formData.optional ? "Yes" : "No",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Production-Consumption Summary");
+      const fileName = `Production_Consumption_Summary_${voucherDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
+
   const onStockAdjustmentSubmit = (data: StockAdjustmentFormData) => {
     // Validate entries
     const validEntries = data.entries.filter(
@@ -2992,6 +3202,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               handleSidebarAccountSelect={handleSidebarAccountSelect}
               handleAmountCommit={handleAmountCommit}
               handlePrint={handlePrint}
+              handleExportVoucher={handleExportVoucher}
               onSubmit={onSubmit}
               activeTab="payment"
               activeRowIndex={activeRowIndex}
@@ -3023,6 +3234,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               handleSidebarAccountSelect={handleSidebarAccountSelect}
               handleAmountCommit={handleAmountCommit}
               handlePrint={handlePrint}
+              handleExportVoucher={handleExportVoucher}
               onSubmit={onSubmit}
               activeTab="receipt"
               activeRowIndex={activeRowIndex}
@@ -3436,8 +3648,30 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     )}
                   />
 
-                    {/* Submit button */}
-                    <div className="flex justify-end">
+                    {/* Submit and Export buttons */}
+                    <div className="flex justify-end gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={journalEntries.filter((e) => e.accountId > 0 && parseFloat(e.amount) > 0).length === 0}
+                            data-testid="button-export-journal-voucher"
+                          >
+                            <FileDown className="h-4 w-4 mr-2" />
+                            Export
+                            <ChevronDown className="h-4 w-4 ml-1" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleExportJournalVoucher(false)} data-testid="export-journal-summary">
+                            Summary Export
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExportJournalVoucher(true)} data-testid="export-journal-detailed">
+                            Detailed Export
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button
                         type="submit"
                         disabled={journalMutation.isPending || Math.abs(totalDebit - totalCredit) > 0.01}
@@ -4821,7 +5055,29 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   />
 
                   {/* Submit button */}
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={adjustmentEntries.filter((e: any) => e.stockItemId > 0 && parseFloat(e.quantity) > 0).length === 0}
+                          data-testid="button-export-production-consumption"
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Export
+                          <ChevronDown className="h-4 w-4 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleExportProductionConsumptionVoucher(false)} data-testid="export-prod-cons-summary">
+                          Summary Export
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportProductionConsumptionVoucher(true)} data-testid="export-prod-cons-detailed">
+                          Detailed Export
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                       type="submit"
                       disabled={stockAdjustmentMutation.isPending || adjustmentEntries.length === 0}

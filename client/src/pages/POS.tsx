@@ -10,7 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown } from "lucide-react";
+import { utils, writeFile } from "xlsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -944,6 +951,74 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }, 0);
   };
 
+  // Export current Sale to Excel
+  const handleExportSale = (detailed: boolean) => {
+    const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
+    
+    if (validItems.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "Add at least one item before exporting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const exportDate = saleDate || new Date().toISOString().split('T')[0];
+    const locationName = activeLocation?.name || "";
+    
+    if (detailed) {
+      // Detailed export - one row per item
+      const exportData = validItems.map((item: any) => ({
+        "Voucher Type": "Sales",
+        "Voucher Number": editVoucher?.voucherNumber || "New Sale",
+        "Date": exportDate,
+        "Location": locationName,
+        "Item Name": item.itemName || "",
+        "Quantity": item.quantity,
+        "Rate": item.rate.toFixed(2),
+        "Amount": item.amount.toFixed(2),
+        "Credit Sale": isCreditSale ? "Yes" : "No",
+        "Notes": notes || "",
+      }));
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Sales Detailed");
+      const fileName = `Sales_Voucher_Detailed_${exportDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${validItems.length} items.`,
+      });
+    } else {
+      // Summary export
+      const exportData = [{
+        "Voucher Type": "Sales",
+        "Voucher Number": editVoucher?.voucherNumber || "New Sale",
+        "Date": exportDate,
+        "Location": locationName,
+        "Total Items": validItems.length,
+        "Total Quantity": totalQty,
+        "Total Amount": total.toFixed(2),
+        "Credit Sale": isCreditSale ? "Yes" : "No",
+        "Notes": notes || "",
+      }];
+      
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Sales Summary");
+      const fileName = `Sales_Voucher_Summary_${exportDate}.xlsx`;
+      writeFile(workbook, fileName);
+      
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName}.`,
+      });
+    }
+  };
+
   const handleSaveSale = () => {
     // Validate
     if (!activeLocation) {
@@ -1043,6 +1118,28 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </Button>
             </>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0).length === 0}
+                className="gap-2"
+                data-testid="button-export-sale"
+              >
+                <FileDown className="h-4 w-4" />
+                Export
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportSale(false)} data-testid="export-sale-summary">
+                Summary Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportSale(true)} data-testid="export-sale-detailed">
+                Detailed Export
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button 
             onClick={handleSaveSale}
             disabled={saveMutation.isPending}

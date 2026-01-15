@@ -18,7 +18,13 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Printer } from "lucide-react";
+import { CalendarIcon, Printer, FileDown, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
@@ -46,6 +52,7 @@ interface ReceiptVoucherTabProps {
   handleSidebarAccountSelect: (account: Account) => void;
   handleAmountCommit: (rowIndex: number) => void;
   handlePrint: () => void;
+  handleExportVoucher?: (detailed: boolean) => void;
   onSubmit: (values: any) => void;
   activeTab: "payment" | "receipt";
   activeRowIndex: number | null;
@@ -73,6 +80,7 @@ export function ReceiptVoucherTab({
   handleSidebarAccountSelect,
   handleAmountCommit,
   handlePrint,
+  handleExportVoucher,
   onSubmit,
   activeTab,
   activeRowIndex,
@@ -174,7 +182,7 @@ export function ReceiptVoucherTab({
                       )}
                     />
 
-                    <div className="pt-6">
+                    <div className="pt-6 flex gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -186,6 +194,31 @@ export function ReceiptVoucherTab({
                         <Printer className="h-4 w-4 mr-2" />
                         Print
                       </Button>
+                      {handleExportVoucher && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="default"
+                              disabled={paymentAccountId === 0 || entries.filter((e) => e.accountId > 0).length === 0}
+                              data-testid="button-export-voucher"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Export
+                              <ChevronDown className="h-4 w-4 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleExportVoucher(false)} data-testid="export-summary">
+                              Summary Export
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExportVoucher(true)} data-testid="export-detailed">
+                              Detailed Export
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </div>
                 </div>
