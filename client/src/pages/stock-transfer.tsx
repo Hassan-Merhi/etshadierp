@@ -37,7 +37,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect, useRef } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle, FileDown } from "lucide-react";
+import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle, FileDown, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { utils, writeFile } from "xlsx";
 import { Link } from "wouter";
 
@@ -440,6 +446,116 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       description: `Downloaded ${fileName} with ${stockTransferVouchers.length} records.`,
     });
   };
+  
+  const [isExportingDetailed, setIsExportingDetailed] = useState(false);
+  
+  const handleExportDetailedToExcel = async () => {
+    if (stockTransferVouchers.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no stock transfers to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsExportingDetailed(true);
+    
+    try {
+      const detailedData: Array<{
+        "Voucher Number": string;
+        "Date": string;
+        "Description": string;
+        "Source Location": string;
+        "Destination Location": string;
+        "Stock Item": string;
+        "Quantity": string;
+      }> = [];
+      
+      // Fetch details for each voucher
+      for (const voucher of stockTransferVouchers) {
+        try {
+          const res = await fetch(`/api/stock-transfers?voucherId=${voucher.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            const transfer = Array.isArray(data) ? data[0] : data;
+            
+            const sourceLocation = locations.find((l: any) => l.id === transfer?.sourceLocationId);
+            const destLocation = locations.find((l: any) => l.id === transfer?.destinationLocationId);
+            
+            if (transfer?.items && transfer.items.length > 0) {
+              for (const item of transfer.items) {
+                detailedData.push({
+                  "Voucher Number": voucher.voucherNumber,
+                  "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                  "Description": voucher.description || "",
+                  "Source Location": item.sourceLocationName || sourceLocation?.name || "Unknown",
+                  "Destination Location": destLocation?.name || "Unknown",
+                  "Stock Item": item.stockItemName || `Item ${item.stockItemId}`,
+                  "Quantity": formatNumber(parseFloat(item.quantity || "0"), 0),
+                });
+              }
+            } else {
+              // No items - still add a row
+              detailedData.push({
+                "Voucher Number": voucher.voucherNumber,
+                "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                "Description": voucher.description || "",
+                "Source Location": sourceLocation?.name || "Unknown",
+                "Destination Location": destLocation?.name || "Unknown",
+                "Stock Item": "",
+                "Quantity": "",
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching transfer ${voucher.id}:`, error);
+        }
+      }
+      
+      if (detailedData.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "Could not fetch transfer details.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const worksheet = utils.json_to_sheet(detailedData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Stock Transfers Detailed");
+      
+      // Auto-size columns
+      const colWidths = [
+        { wch: 15 }, // Voucher Number
+        { wch: 12 }, // Date
+        { wch: 30 }, // Description
+        { wch: 20 }, // Source Location
+        { wch: 20 }, // Destination Location
+        { wch: 30 }, // Stock Item
+        { wch: 12 }, // Quantity
+      ];
+      worksheet["!cols"] = colWidths;
+
+      const fileName = `Stock_Transfers_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      writeFile(workbook, fileName);
+
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${detailedData.length} items from ${stockTransferVouchers.length} transfers.`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export failed",
+        description: "An error occurred while exporting.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };
 
   const sourceLocationName = locations.find((l: any) => l.id === activeSourceLocation)?.name;
   const filteredItems = getFilteredInventory();
@@ -699,16 +815,28 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle className="text-base">Recent Transfers</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportToExcel}
-            disabled={stockTransferVouchers.length === 0}
-            data-testid="button-export-transfers-excel"
-          >
-            <FileDown className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={stockTransferVouchers.length === 0 || isExportingDetailed}
+                data-testid="button-export-transfers-excel"
+              >
+                <FileDown className="h-4 w-4 mr-2" />
+                {isExportingDetailed ? "Exporting..." : "Export"}
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportToExcel} data-testid="export-simple">
+                Summary Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDetailedToExcel} data-testid="export-detailed">
+                Detailed Export (with items)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardHeader>
         <CardContent>
           {stockTransferVouchers.length === 0 ? (
