@@ -401,7 +401,7 @@ export default function StockTransferOrder() {
   };
 
   const processOrderMutation = useMutation({
-    mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number }) => {
+    mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number; voucherDate: string; optional: boolean }) => {
       const groupedBySource: Record<number, OrderItem[]> = {};
       
       for (const item of data.orderItems) {
@@ -417,6 +417,8 @@ export default function StockTransferOrder() {
           sourceLocationId: parseInt(sourceId),
           destinationLocationId: data.destinationLocationId,
           notes: `Stock Transfer Order - ${items.length} items`,
+          voucherDate: data.voucherDate,
+          optional: data.optional,
           items: items.map(item => ({
             stockItemId: item.stockItemId,
             quantity: item.quantity.toString(),
@@ -464,6 +466,8 @@ export default function StockTransferOrder() {
       await processOrderMutation.mutateAsync({
         orderItems,
         destinationLocationId,
+        voucherDate: format(transferDate, "yyyy-MM-dd"),
+        optional: isOptional,
       });
       setOrderItems([]);
       setValidationErrors([]);
