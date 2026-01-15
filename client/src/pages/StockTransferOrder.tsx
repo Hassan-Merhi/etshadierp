@@ -629,18 +629,18 @@ export default function StockTransferOrder() {
                 ref={matrixRef}
                 tabIndex={0}
                 onKeyDown={handleMatrixKeyDown}
-                className="overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
+                className="relative overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
               >
                 <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-muted">
+                  <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[200px] sticky left-0 bg-muted z-40 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                      <TableHead className="min-w-[200px] sticky top-0 left-0 bg-muted z-50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                         Item
                       </TableHead>
                       {selectedLocations.map((loc) => (
                         <TableHead
                           key={loc.id}
-                          className="text-center min-w-[100px] bg-muted"
+                          className="text-center min-w-[100px] sticky top-0 bg-muted z-40"
                         >
                           {loc.name}
                         </TableHead>
