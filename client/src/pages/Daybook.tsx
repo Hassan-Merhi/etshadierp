@@ -751,6 +751,136 @@ export default function Daybook({ user }: { user?: any } = {}) {
       description: `Downloaded ${fileName} with ${filteredVouchers.length} records.`,
     });
   };
+  
+  const [isExportingDetailed, setIsExportingDetailed] = useState(false);
+  
+  const handleExportDetailedToExcel = async () => {
+    if (filteredVouchers.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no vouchers to export based on current filters.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsExportingDetailed(true);
+    
+    try {
+      const detailedData: Array<{
+        "Voucher Number": string;
+        "Date": string;
+        "Type": string;
+        "Description": string;
+        "Location": string;
+        "Optional": string;
+        "Account Name": string;
+        "Account Type": string;
+        "Debit": string;
+        "Credit": string;
+        "Narration": string;
+      }> = [];
+      
+      // Fetch entries for each voucher
+      for (const voucher of filteredVouchers) {
+        try {
+          const res = await fetch(`/api/vouchers/${voucher.id}/view-entries`, {
+            credentials: "include"
+          });
+          
+          if (res.ok) {
+            const response = await res.json();
+            const entries = Array.isArray(response) ? response : (response.entries || []);
+            
+            if (entries.length === 0) {
+              // Voucher with no entries - still add a row
+              detailedData.push({
+                "Voucher Number": voucher.voucherNumber,
+                "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                "Type": voucher.voucherType,
+                "Description": voucher.description || "",
+                "Location": (voucher as any).locationName || "",
+                "Optional": voucher.optional ? "Yes" : "No",
+                "Account Name": "",
+                "Account Type": "",
+                "Debit": "",
+                "Credit": "",
+                "Narration": "",
+              });
+            } else {
+              // Add a row for each entry
+              for (const entry of entries) {
+                // Skip stock items in the export (they don't have account info)
+                if (entry.isStockItem || entry.stockItemId) continue;
+                
+                detailedData.push({
+                  "Voucher Number": voucher.voucherNumber,
+                  "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                  "Type": voucher.voucherType,
+                  "Description": voucher.description || "",
+                  "Location": (voucher as any).locationName || "",
+                  "Optional": voucher.optional ? "Yes" : "No",
+                  "Account Name": entry.accountName || entry.supplierName || entry.employeeName || entry.assetName || "",
+                  "Account Type": entry.accountType || (entry.supplierName ? "Supplier" : "") || (entry.employeeName ? "Employee" : "") || (entry.assetName ? "Fixed Asset" : "") || "",
+                  "Debit": entry.debitAmount && parseFloat(entry.debitAmount) > 0 ? formatAmount(entry.debitAmount) : "",
+                  "Credit": entry.creditAmount && parseFloat(entry.creditAmount) > 0 ? formatAmount(entry.creditAmount) : "",
+                  "Narration": entry.narration || "",
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching entries for voucher ${voucher.id}:`, error);
+        }
+      }
+      
+      if (detailedData.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "Could not fetch voucher details.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const worksheet = utils.json_to_sheet(detailedData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, "Daybook Detailed");
+      
+      // Auto-size columns
+      const colWidths = [
+        { wch: 15 }, // Voucher Number
+        { wch: 12 }, // Date
+        { wch: 12 }, // Type
+        { wch: 30 }, // Description
+        { wch: 15 }, // Location
+        { wch: 8 },  // Optional
+        { wch: 30 }, // Account Name
+        { wch: 15 }, // Account Type
+        { wch: 15 }, // Debit
+        { wch: 15 }, // Credit
+        { wch: 30 }, // Narration
+      ];
+      worksheet["!cols"] = colWidths;
+
+      const fileName = `Daybook_Detailed_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      writeFile(workbook, fileName);
+
+      toast({
+        title: "Export successful",
+        description: `Downloaded ${fileName} with ${detailedData.length} entries from ${filteredVouchers.length} vouchers.`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export failed",
+        description: "An error occurred while exporting.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingDetailed(false);
+    }
+  };
 
   const clearFilters = () => {
     setFilters({
@@ -796,16 +926,28 @@ export default function Daybook({ user }: { user?: any } = {}) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleExportToExcel}
-            disabled={filteredVouchers.length === 0}
-            data-testid="button-export-excel"
-            className="gap-2"
-          >
-            <FileDown className="w-4 h-4" />
-            Export to Excel
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={filteredVouchers.length === 0 || isExportingDetailed}
+                data-testid="button-export-excel"
+                className="gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                {isExportingDetailed ? "Exporting..." : "Export"}
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportToExcel} data-testid="export-simple">
+                Summary Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDetailedToExcel} data-testid="export-detailed">
+                Detailed Export (with entries)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button 
             onClick={() => navigate("/vouchers")}
             data-testid="button-new-voucher" 
