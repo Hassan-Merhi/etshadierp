@@ -1,0 +1,38 @@
+Fix calculateHistoricalLocationInventory() so historical queries don’t return empty.
+
+Root cause:
+We seed from CURRENT inventory rows only. Items that existed in the past but are now 0 / have no inventory row never get included, so reversing “after asOfDate” transactions can’t recreate them → empty result.
+
+Final required fix:
+1) Seed inventoryMap with ALL stockItemIds that ever existed at this location (not just inventory table).
+   Build a distinct stockItemId seed set by UNION from:
+   - containerOffloadItems join containerOffloads on offloadId, where containerOffloads.locationId = locationId
+   - salesItems where salesItems.locationId = locationId
+   - stockAdjustmentItems join stockAdjustmentVouchers on voucherId, where stockAdjustmentVouchers.locationId = locationId
+   - stockTransferItems where stockTransferItems.sourceLocationId = locationId (items left)
+   - stockTransferItems join stockTransferVouchers on voucherId, where stockTransferVouchers.destinationLocationId = locationId (items arrived)
+   + also include any stockItemId already in inventory table for this location/company
+   Then initialize each missing item in inventoryMap with {quantity:0,totalValue:0,rate:0} BEFORE reversal.
+
+2) Keep the “reverse from current” strategy but ensure reversals apply correctly per transaction type AFTER asOfDate:
+   - Sales AFTER date: add back to location (qty += saleQty, totalValue += saleQty*costPrice)
+   - Container offloads AFTER date (inbound): reverse by subtracting (qty -= qty, totalValue -= qty*rate)
+   - Stock adjustments AFTER date:
+       Production (inbound): reverse by subtracting (qty -= qty, totalValue -= qty*rate)
+       Consumption (outbound): reverse by adding back (qty += qty, totalValue += qty*rate)
+   - Transfers AFTER date:
+       If location is SOURCE: reverse by adding back (qty += qty, totalValue += qty*rate)
+       If location is DESTINATION: reverse by subtracting (qty -= qty, totalValue -= qty*rate)
+       Use stockTransferItems.sourceLocationId when present (multi-source), otherwise stockTransferVouchers.sourceLocationId.
+       For destination, use stockTransferVouchers.destinationLocationId.
+
+3) Date correctness (must not be string-compare):
+   Ensure vouchers/offloads dates are compared as DATE/TIMESTAMP values.
+   Also decide “as of end of day”: compare > endOfDay(asOfDate) (not just > asOfDate) to avoid missing same-day transactions due to times/timezones.
+
+4) Output:
+Return items even if they’re not in current inventory; optionally filter negative/near-zero qty at the end only if desired.
+Add a test: item had inventory on day X, sold out later; querying day X must return it with positive qty.
+
+Deliver:
+Implement the seed-union + reversal fixes and add the regression test.
