@@ -146,9 +146,12 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/vouchers"],
   });
 
-  const stockTransferVouchers = vouchers
-    .filter((v: any) => v.voucherType === "Stock Transfer" || v.voucherType === "StockTransfer")
-    .slice(0, 20);
+  // All stock transfer vouchers for export
+  const allStockTransferVouchers = vouchers
+    .filter((v: any) => v.voucherType === "Stock Transfer" || v.voucherType === "StockTransfer");
+  
+  // Limited list for UI display (last 20)
+  const stockTransferVouchers = allStockTransferVouchers.slice(0, 20);
 
   const createTransferMutation = useMutation({
     mutationFn: async (data: { notes: string; items: TransferEntry[] }) => {
@@ -418,7 +421,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const handleExportToExcel = () => {
-    if (stockTransferVouchers.length === 0) {
+    if (allStockTransferVouchers.length === 0) {
       toast({
         title: "No data to export",
         description: "There are no stock transfers to export.",
@@ -427,7 +430,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       return;
     }
 
-    const exportData = stockTransferVouchers.map((voucher: any) => ({
+    const exportData = allStockTransferVouchers.map((voucher: any) => ({
       "Voucher Number": voucher.voucherNumber,
       "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
       "Description": voucher.description || "",
@@ -443,14 +446,14 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
     toast({
       title: "Export successful",
-      description: `Downloaded ${fileName} with ${stockTransferVouchers.length} records.`,
+      description: `Downloaded ${fileName} with ${allStockTransferVouchers.length} records.`,
     });
   };
   
   const [isExportingDetailed, setIsExportingDetailed] = useState(false);
   
   const handleExportDetailedToExcel = async () => {
-    if (stockTransferVouchers.length === 0) {
+    if (allStockTransferVouchers.length === 0) {
       toast({
         title: "No data to export",
         description: "There are no stock transfers to export.",
@@ -473,7 +476,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       }> = [];
       
       // Fetch details for each voucher
-      for (const voucher of stockTransferVouchers) {
+      for (const voucher of allStockTransferVouchers) {
         try {
           const res = await fetch(`/api/stock-transfers?voucherId=${voucher.id}`);
           if (res.ok) {
@@ -543,7 +546,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
       toast({
         title: "Export successful",
-        description: `Downloaded ${fileName} with ${detailedData.length} items from ${stockTransferVouchers.length} transfers.`,
+        description: `Downloaded ${fileName} with ${detailedData.length} items from ${allStockTransferVouchers.length} transfers.`,
       });
     } catch (error) {
       console.error("Export error:", error);
@@ -820,7 +823,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={stockTransferVouchers.length === 0 || isExportingDetailed}
+                disabled={allStockTransferVouchers.length === 0 || isExportingDetailed}
                 data-testid="button-export-transfers-excel"
               >
                 <FileDown className="h-4 w-4 mr-2" />
