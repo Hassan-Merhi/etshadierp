@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Table,
   TableBody,
@@ -31,7 +39,7 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2 } from "lucide-react";
+import { ChevronDown, ChevronRight, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -118,6 +126,8 @@ export default function StockTransferOrder() {
   
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [transferDate, setTransferDate] = useState<Date>(new Date());
+  const [isOptional, setIsOptional] = useState(false);
   
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
@@ -537,6 +547,42 @@ export default function StockTransferOrder() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[140px] justify-start text-left font-normal",
+                  !transferDate && "text-muted-foreground"
+                )}
+                data-testid="button-select-date"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {transferDate ? format(transferDate, "MMM dd, yyyy") : "Pick date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={transferDate}
+                onSelect={(date) => date && setTransferDate(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          
+          <div className="flex items-center gap-2">
+            <Switch
+              id="optional-mode"
+              checked={isOptional}
+              onCheckedChange={setIsOptional}
+              data-testid="switch-optional"
+            />
+            <Label htmlFor="optional-mode" className="text-sm cursor-pointer">
+              Optional
+            </Label>
+          </div>
         </div>
       </div>
 
