@@ -20368,7 +20368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Matches the exact formula used for netImportCycleBalance:
       // Assets + Expenses - (Liabilities - OpeningBalanceEquity) = Net
       const traceAssetTotal = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance;
-      const traceExpenseTotal = indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance;
+      const traceExpenseTotal = indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance + generalExpenseBalance;
       // liabilitiesBeforeEquity is the raw sum, then we subtract openingBalanceEquity
       const traceLiabilitiesRaw = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + 
         liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance;
@@ -20387,7 +20387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           expenseTotal: { 
             value: traceExpenseTotal,
-            breakdown: { indirectExpenseBalance, payrollExpenseBalance, governmentTaxesBalance, cogsBalance }
+            breakdown: { indirectExpenseBalance, payrollExpenseBalance, governmentTaxesBalance, cogsBalance, generalExpenseBalance }
           },
           liabilityTotal: { 
             value: traceNetLiabilities,
@@ -22532,6 +22532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const governmentTaxesBalance = await getAccountTypeBalance("Government Taxes", false);
       const payrollExpenseBalance = await getAccountTypeBalance("Payroll Expense", false);
       const salaryAdvancesBalance = await getAccountTypeBalance("Salary Advances", false);
+      const generalExpenseBalance = await getAccountTypeBalance("Expense", false);
 
       // Stock on floor (excluding orphaned)
       const inventoryItems = await db
@@ -22608,7 +22609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance);
       
       // Operating Expenses: Indirect Expenses + Government Taxes + COGS + Payroll Expenses
-      const totalExpenses = round2(indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance);
+      const totalExpenses = round2(indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance + generalExpenseBalance);
       
       // Liabilities + Income: Supplier Balance + Duty Agent + Transporter Agent + Loans + Liability + Profit + Income + Payroll Liabilities - Opening Balance Equity
       const totalLiabilities = round2(supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance + profitBalance + incomeBalance + payrollLiabilitiesBalance - openingBalanceEquity);
