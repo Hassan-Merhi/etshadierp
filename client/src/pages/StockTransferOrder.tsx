@@ -629,33 +629,33 @@ export default function StockTransferOrder() {
                 ref={matrixRef}
                 tabIndex={0}
                 onKeyDown={handleMatrixKeyDown}
-                className="relative overflow-x-auto max-h-[500px] overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
+                className="overflow-auto max-h-[500px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md border"
               >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[200px] sticky top-0 left-0 bg-muted z-50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                <table className="w-full caption-bottom text-sm border-collapse">
+                  <thead className="[&_tr]:border-b">
+                    <tr className="border-b">
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground min-w-[200px] sticky top-0 left-0 bg-muted z-50 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                         Item
-                      </TableHead>
+                      </th>
                       {selectedLocations.map((loc) => (
-                        <TableHead
+                        <th
                           key={loc.id}
-                          className="text-center min-w-[100px] sticky top-0 bg-muted z-40"
+                          className="h-12 px-4 text-center align-middle font-medium text-muted-foreground min-w-[100px] sticky top-0 bg-muted z-40"
                         >
                           {loc.name}
-                        </TableHead>
+                        </th>
                       ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                    </tr>
+                  </thead>
+                  <tbody className="[&_tr:last-child]:border-0">
                     {summaryData?.stockGroups.map((group) => (
                       <Fragment key={group.id}>
-                        <TableRow
-                          className="cursor-pointer hover-elevate bg-muted/50"
+                        <tr
+                          className="border-b transition-colors cursor-pointer hover-elevate bg-muted/50"
                           onClick={() => toggleGroup(group.id)}
                           data-testid={`group-row-${group.id}`}
                         >
-                          <TableCell className="font-medium sticky left-0 bg-muted/50 z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                          <td className="p-4 align-middle font-medium sticky left-0 bg-muted/50 z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                             <div className="flex items-center gap-2">
                               {expandedGroups.has(group.id) ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -667,17 +667,17 @@ export default function StockTransferOrder() {
                                 {group.items.length}
                               </Badge>
                             </div>
-                          </TableCell>
+                          </td>
                           {selectedLocations.map((loc) => {
                             const locData = group.locationData[loc.id];
                             const qty = locData?.quantity || 0;
                             return (
-                              <TableCell key={loc.id} className="text-center font-mono text-sm">
+                              <td key={loc.id} className="p-4 align-middle text-center font-mono text-sm">
                                 {qty > 0 ? formatNumber(qty, 0) : "-"}
-                              </TableCell>
+                              </td>
                             );
                           })}
-                        </TableRow>
+                        </tr>
 
                         {expandedGroups.has(group.id) &&
                           [...group.items]
@@ -685,10 +685,10 @@ export default function StockTransferOrder() {
                             .map((item) => {
                               const flatRowIndex = flatItems.findIndex(fi => fi.id === item.id);
                               return (
-                              <TableRow key={item.id} data-testid={`item-row-${item.id}`} className="bg-background">
-                                <TableCell className="pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                              <tr key={item.id} data-testid={`item-row-${item.id}`} className="border-b transition-colors hover:bg-muted/50 bg-background">
+                                <td className="p-4 align-middle pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                                   <p className="text-sm">{item.name}</p>
-                                </TableCell>
+                                </td>
                                 {selectedLocations.map((loc, colIndex) => {
                                   const locData = item.locationData[loc.id];
                                   const qty = locData?.quantity || 0;
@@ -696,7 +696,7 @@ export default function StockTransferOrder() {
                                   const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
                                   
                                   return (
-                                    <TableCell key={loc.id} className="p-1">
+                                    <td key={loc.id} className="p-1 align-middle">
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -714,16 +714,16 @@ export default function StockTransferOrder() {
                                       >
                                         {hasStock ? formatNumber(qty, 0) : "-"}
                                       </Button>
-                                    </TableCell>
+                                    </td>
                                   );
                                 })}
-                              </TableRow>
+                              </tr>
                             );
                             })}
                       </Fragment>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
