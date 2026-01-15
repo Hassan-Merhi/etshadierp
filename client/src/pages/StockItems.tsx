@@ -294,15 +294,6 @@ export default function StockItems() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => updateUOMMutation.mutate()}
-            disabled={updateUOMMutation.isPending}
-            data-testid="button-update-uom"
-          >
-            {updateUOMMutation.isPending ? "Converting..." : "Convert Bale to BL"}
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
             onClick={exportToExcel}
             data-testid="button-export-items"
           >

@@ -305,15 +305,6 @@ export default function SalesReport() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => recalculateMutation.mutate()}
-            disabled={recalculateMutation.isPending}
-            data-testid="button-recalculate-costs"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${recalculateMutation.isPending ? "animate-spin" : ""}`} />
-            {recalculateMutation.isPending ? "Updating..." : "Fix Cost Prices"}
-          </Button>
-          <Button
-            variant="outline"
             onClick={handleExportExcel}
             disabled={groupedData.length === 0}
             data-testid="button-export-excel"
