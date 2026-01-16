@@ -24429,7 +24429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             eq(vouchers.optional, false),
-            gt(vouchers.voucherDate, targetDateStr)
+            sql`${vouchers.voucherDate} > ${targetDateStr}`
           )
         )
         .execute();
@@ -24464,7 +24464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           and(
             eq(vouchers.companyId, companyId),
             eq(vouchers.optional, false),
-            gt(vouchers.voucherDate, targetDateStr)
+            sql`${vouchers.voucherDate} > ${targetDateStr}`
           )
         )
         .execute();
@@ -24502,7 +24502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(
           and(
             eq(containers.companyId, companyId),
-            gt(containerOffloads.offloadedAt, targetDate)
+            sql`${containerOffloads.offloadedAt} > ${targetDate}`
           )
         )
         .execute();
