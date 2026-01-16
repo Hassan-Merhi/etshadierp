@@ -29663,6 +29663,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(desc(bankAccounts.deletedAt));
 
+      // Get deleted vouchers (payments, receipts, journals, stock transfers, POS sales, etc.)
+      const deletedVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(and(
+          eq(vouchers.companyId, companyId),
+          isNotNull(vouchers.deletedAt)
+        ))
+        .orderBy(desc(vouchers.deletedAt));
+
       // Get orphaned POS sales - vouchers with locationId pointing to deleted or non-existent locations
       // Wrap in try-catch to prevent breaking the entire endpoint if this query fails
       let orphanedPosSales: any[] = [];
@@ -29755,6 +29765,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: b.code,
           deletedAt: b.deletedAt,
         })),
+        vouchers: deletedVouchers.map(v => ({
+          id: v.id,
+          type: "voucher",
+          name: v.voucherNumber || "Unknown Voucher",
+          code: v.voucherType || "-",
+          voucherType: v.voucherType,
+          amount: v.totalAmount != null ? Number(v.totalAmount) : 0,
+          date: v.voucherDate,
+          locationName: v.locationName || null,
+          deletedAt: v.deletedAt,
+        })),
         orphanedPosSales: (orphanedPosSales || []).map(v => ({
           id: v.id,
           type: "orphanedPosSale",
@@ -29765,7 +29786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           locationName: v.locationName ? `${v.locationName} (Deleted)` : "(Location Missing)",
           deletedAt: v.locationDeletedAt != null ? v.locationDeletedAt : (v.date != null ? v.date : null),
         })),
-        totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length +
+        totalCount: deletedLocations.length + deletedStockItems.length + deletedStockGroups.length + deletedVouchers.length +
           deletedLedgerAccounts.length + deletedEmployees.length + deletedCustomers.length +
           deletedSuppliers.length + deletedBankAccounts.length + (orphanedPosSales || []).length,
       });
@@ -29829,6 +29850,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .set({ deletedAt: null, active: true })
             .where(and(eq(bankAccounts.id, itemId), eq(bankAccounts.companyId, companyId)));
           break;
+        case "voucher":
+          await db.update(vouchers)
+            .set({ deletedAt: null })
+            .where(and(eq(vouchers.id, itemId), eq(vouchers.companyId, companyId)));
+          break;
         default:
           return res.status(400).json({ message: "Invalid item type" });
       }
@@ -29888,6 +29914,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         case "bankAccount":
           await db.delete(bankAccounts)
             .where(and(eq(bankAccounts.id, itemId), eq(bankAccounts.companyId, companyId)));
+          break;
+        case "voucher":
+          await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, itemId));
+          await db.delete(vouchers)
+            .where(and(eq(vouchers.id, itemId), eq(vouchers.companyId, companyId)));
           break;
         case "orphanedPosSale":
           // Permanently delete an orphaned voucher and its entries

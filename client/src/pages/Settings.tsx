@@ -391,6 +391,42 @@ import * as XLSX from "xlsx";
       return company?.name || "Unknown";
     };
 
+    const getPageLabel = (route) => {
+      if (!route || route === "/") return "Dashboard";
+      const routeLabels = {
+        "/": "Dashboard",
+        "/dashboard": "Dashboard",
+        "/locations": "Locations",
+        "/locations/inventory": "Location Inventory",
+        "/stock-items": "Stock Items",
+        "/stock-groups": "Stock Groups",
+        "/ledger-accounts": "Ledger Accounts",
+        "/vouchers": "Vouchers",
+        "/vouchers/payment": "Payment Vouchers",
+        "/vouchers/receipt": "Receipt Vouchers",
+        "/vouchers/journal": "Journal Vouchers",
+        "/vouchers/sales": "Sales Vouchers",
+        "/purchase-orders": "Purchase Orders",
+        "/containers": "Containers",
+        "/containers/otw": "Containers OTW",
+        "/employees": "Employees",
+        "/customers": "Customers",
+        "/suppliers": "Suppliers",
+        "/bank-accounts": "Bank Accounts",
+        "/reports": "Reports",
+        "/reports/profit-loss": "Profit & Loss",
+        "/reports/balance-sheet": "Balance Sheet",
+        "/settings": "Settings",
+        "/pos": "Point of Sale",
+        "/pos/sales": "POS Sales",
+        "/chatbot": "AI Chatbot",
+        "/deleted-items": "Deleted Items",
+      };
+      if (routeLabels[route]) return routeLabels[route];
+      const cleanRoute = route.replace(/^\//, "").replace(/-/g, " ").replace(/\//g, " > ");
+      return cleanRoute.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    };
+
     // Group users by company
     const groupedUsers = presenceData?.reduce((acc: any, presence: any) => {
       const companyId = presence.companyId || "unassigned";
@@ -452,7 +488,7 @@ import * as XLSX from "xlsx";
                           <Badge variant="outline">{presence.role || "—"}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {presence.currentRoute || "/"}
+                          {getPageLabel(presence.currentRoute)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {formatTimeAgo(presence.lastSeen)}

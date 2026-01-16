@@ -51,7 +51,18 @@ import {
   Building2,
   Loader2,
   Receipt,
+  FileText,
+  Eye,
+  X,
 } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 
 interface DeletedItem {
   id: number;
@@ -63,6 +74,7 @@ interface DeletedItem {
   amount?: number;
   date?: string;
   locationName?: string;
+  voucherType?: string;
 }
 
 interface DeletedItemsResponse {
@@ -74,6 +86,7 @@ interface DeletedItemsResponse {
   customers: DeletedItem[];
   suppliers: DeletedItem[];
   bankAccounts: DeletedItem[];
+  vouchers: DeletedItem[];
   orphanedPosSales: DeletedItem[];
   totalCount: number;
 }
@@ -87,6 +100,7 @@ const typeLabels: Record<string, string> = {
   customer: "Customer",
   supplier: "Supplier",
   bankAccount: "Bank Account",
+  voucher: "Voucher",
   orphanedPosSale: "Orphaned POS Sale",
 };
 
@@ -99,6 +113,7 @@ const typeIcons: Record<string, any> = {
   customer: User,
   supplier: Truck,
   bankAccount: Building2,
+  voucher: FileText,
   orphanedPosSale: Receipt,
 };
 
@@ -110,6 +125,7 @@ export default function DeletedItems() {
     action: "restore" | "delete";
     item: DeletedItem | null;
   }>({ open: false, action: "restore", item: null });
+  const [detailItem, setDetailItem] = useState<DeletedItem | null>(null);
 
   const { data, isLoading, error } = useQuery<DeletedItemsResponse>({
     queryKey: ["/api/deleted-items"],
@@ -178,6 +194,7 @@ export default function DeletedItems() {
       ...data.customers,
       ...data.suppliers,
       ...data.bankAccounts,
+      ...(data.vouchers || []),
       ...(data.orphanedPosSales || []),
     ];
     if (filterType === "all") return allItems;
@@ -255,6 +272,7 @@ export default function DeletedItems() {
                   <SelectItem value="customer">Customers ({data?.customers.length || 0})</SelectItem>
                   <SelectItem value="supplier">Suppliers ({data?.suppliers.length || 0})</SelectItem>
                   <SelectItem value="bankAccount">Bank Accounts ({data?.bankAccounts.length || 0})</SelectItem>
+                  <SelectItem value="voucher">Vouchers ({data?.vouchers?.length || 0})</SelectItem>
                   <SelectItem value="orphanedPosSale">Orphaned POS Sales ({data?.orphanedPosSales?.length || 0})</SelectItem>
                 </SelectContent>
               </Select>
@@ -289,7 +307,12 @@ export default function DeletedItems() {
                 {items.map((item) => {
                   const IconComponent = typeIcons[item.type] || Package;
                   return (
-                    <TableRow key={`${item.type}-${item.id}`} data-testid={`row-deleted-${item.type}-${item.id}`}>
+                    <TableRow 
+                      key={`${item.type}-${item.id}`} 
+                      data-testid={`row-deleted-${item.type}-${item.id}`}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => setDetailItem(item)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <IconComponent className="h-4 w-4 text-muted-foreground" />
@@ -312,6 +335,11 @@ export default function DeletedItems() {
                               {item.locationName} | ${item.amount?.toLocaleString() || "0"}
                             </span>
                           )}
+                          {item.type === "voucher" && (
+                            <span className="text-xs text-muted-foreground">
+                              {item.voucherType} | ${item.amount?.toLocaleString() || "0"}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -321,11 +349,19 @@ export default function DeletedItems() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => { e.stopPropagation(); setDetailItem(item); }}
+                            data-testid={`button-view-${item.type}-${item.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           {item.type !== "orphanedPosSale" && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRestore(item)}
+                              onClick={(e) => { e.stopPropagation(); handleRestore(item); }}
                               disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
                               data-testid={`button-restore-${item.type}-${item.id}`}
                             >
@@ -336,7 +372,7 @@ export default function DeletedItems() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handlePermanentDelete(item)}
+                            onClick={(e) => { e.stopPropagation(); handlePermanentDelete(item); }}
                             disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
                             data-testid={`button-delete-permanent-${item.type}-${item.id}`}
                           >
@@ -409,6 +445,113 @@ export default function DeletedItems() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Sheet open={!!detailItem} onOpenChange={(open) => !open && setDetailItem(null)}>
+        <SheetContent className="w-[400px] sm:w-[540px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              {detailItem && (() => {
+                const IconComponent = typeIcons[detailItem.type] || Package;
+                return <IconComponent className="h-5 w-5" />;
+              })()}
+              {typeLabels[detailItem?.type || ""] || detailItem?.type} Details
+            </SheetTitle>
+            <SheetDescription>
+              Viewing deleted item information
+            </SheetDescription>
+          </SheetHeader>
+          {detailItem && (
+            <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Type</p>
+                  <p className="font-medium">{typeLabels[detailItem.type] || detailItem.type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ID</p>
+                  <p className="font-medium font-mono">{detailItem.id}</p>
+                </div>
+              </div>
+              <Separator />
+              <div>
+                <p className="text-sm text-muted-foreground">Code</p>
+                <p className="font-medium font-mono">{detailItem.code || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="font-medium">{detailItem.name}</p>
+              </div>
+              {detailItem.accountType && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Account Type</p>
+                  <p className="font-medium">{detailItem.accountType}</p>
+                </div>
+              )}
+              {detailItem.voucherType && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Voucher Type</p>
+                  <p className="font-medium">{detailItem.voucherType}</p>
+                </div>
+              )}
+              {detailItem.amount !== undefined && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-medium">${detailItem.amount?.toLocaleString() || "0"}</p>
+                </div>
+              )}
+              {detailItem.date && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{format(new Date(detailItem.date), "MMM d, yyyy")}</p>
+                </div>
+              )}
+              {detailItem.locationName && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Location</p>
+                  <p className="font-medium">{detailItem.locationName}</p>
+                </div>
+              )}
+              <Separator />
+              <div>
+                <p className="text-sm text-muted-foreground">Deleted At</p>
+                <p className="font-medium">
+                  {detailItem.deletedAt
+                    ? format(new Date(detailItem.deletedAt), "MMM d, yyyy h:mm a")
+                    : "-"}
+                </p>
+              </div>
+              <div className="flex gap-2 pt-4">
+                {detailItem.type !== "orphanedPosSale" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleRestore(detailItem);
+                      setDetailItem(null);
+                    }}
+                    disabled={restoreMutation.isPending}
+                    data-testid="button-restore-detail"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Restore
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    handlePermanentDelete(detailItem);
+                    setDetailItem(null);
+                  }}
+                  disabled={permanentDeleteMutation.isPending}
+                  data-testid="button-delete-detail"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Forever
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
