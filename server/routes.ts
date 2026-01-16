@@ -358,13 +358,12 @@ async function calculateHistoricalLocationInventory(
     })
     .from(containerOffloadItems)
     .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
-    .innerJoin(vouchers, eq(containerOffloads.voucherId, vouchers.id))
+    .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
     .where(
       and(
-        eq(vouchers.companyId, companyId),
+        eq(containers.companyId, companyId),
         eq(containerOffloads.locationId, locationId),
-        eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        gt(containerOffloads.offloadedAt, asOfDate)
       )
     )
     .execute();
