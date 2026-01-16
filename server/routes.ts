@@ -100,11 +100,14 @@ async function calculateHistoricalLocationInventory(
   companyId: number,
   asOfDate: string
 ): Promise<any[]> {
-  // Convert asOfDate string to Date object for proper SQL comparison
-  const asOfDateObj = new Date(asOfDate + 'T23:59:59');
+  // Convert asOfDate string to end-of-day Date for proper SQL comparison
+  // Use end of day (23:59:59.999) to include all transactions ON that date
+  const cutoffDate = new Date(asOfDate + 'T23:59:59.999');
+  
+  console.log(`[HIST-INV] Starting historical inventory calculation for locationId=${locationId}, companyId=${companyId}, asOfDate=${asOfDate}`);
+  console.log(`[HIST-INV] Cutoff date: ${cutoffDate.toISOString()}`);
   
   // STEP 1: Build seed set of ALL stockItemIds that ever existed at this location
-  // This ensures items that were sold out still appear in historical views
   const seedStockItemIds = new Set<number>();
 
   // 1a. From current inventory
@@ -126,6 +129,7 @@ async function calculateHistoricalLocationInventory(
   for (const inv of currentInventory) {
     seedStockItemIds.add(inv.stockItemId);
   }
+  console.log(`[HIST-INV] Seed from currentInventory: ${currentInventory.length} items`);
 
   // 1b. From sales at this location (any time)
   const salesStockItems = await db
@@ -143,18 +147,26 @@ async function calculateHistoricalLocationInventory(
   for (const item of salesStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
+  console.log(`[HIST-INV] Seed from sales: ${salesStockItems.length} items`);
 
-  // 1c. From container offloads at this location (any time)
+  // 1c. From container offloads at this location (any time) - WITH company filter
   const offloadStockItems = await db
     .selectDistinct({ stockItemId: containerOffloadItems.stockItemId })
     .from(containerOffloadItems)
     .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
-    .where(eq(containerOffloads.locationId, locationId))
+    .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+    .where(
+      and(
+        eq(containers.companyId, companyId),
+        eq(containerOffloads.locationId, locationId)
+      )
+    )
     .execute();
 
   for (const item of offloadStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
+  console.log(`[HIST-INV] Seed from offloads: ${offloadStockItems.length} items`);
 
   // 1d. From stock adjustments at this location (any time)
   const adjustmentStockItems = await db
@@ -173,8 +185,9 @@ async function calculateHistoricalLocationInventory(
   for (const item of adjustmentStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
+  console.log(`[HIST-INV] Seed from adjustments: ${adjustmentStockItems.length} items`);
 
-  // 1e. From transfers INTO this location (destination)
+  // 1e. From transfers INTO this location (destination on voucher level)
   const transfersInStockItems = await db
     .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
     .from(stockTransferItems)
@@ -191,8 +204,9 @@ async function calculateHistoricalLocationInventory(
   for (const item of transfersInStockItems) {
     seedStockItemIds.add(item.stockItemId);
   }
+  console.log(`[HIST-INV] Seed from transfers-in: ${transfersInStockItems.length} items`);
 
-  // 1f. From transfers OUT of this location (source - item level)
+  // 1f. From transfers OUT of this location (source can be item-level OR voucher-level)
   const transfersOutStockItems = await db
     .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
     .from(stockTransferItems)
@@ -201,13 +215,28 @@ async function calculateHistoricalLocationInventory(
     .where(
       and(
         eq(vouchers.companyId, companyId),
-        eq(stockTransferItems.sourceLocationId, locationId)
+        or(
+          eq(stockTransferItems.sourceLocationId, locationId),
+          and(
+            isNull(stockTransferItems.sourceLocationId),
+            eq(stockTransferVouchers.sourceLocationId, locationId)
+          )
+        )
       )
     )
     .execute();
 
   for (const item of transfersOutStockItems) {
     seedStockItemIds.add(item.stockItemId);
+  }
+  console.log(`[HIST-INV] Seed from transfers-out: ${transfersOutStockItems.length} items`);
+
+  const finalSeedCount = seedStockItemIds.size;
+  console.log(`[HIST-INV] Final seed distinct count: ${finalSeedCount}`);
+
+  if (finalSeedCount === 0) {
+    console.log(`[HIST-INV] WARNING: No seed items found! Returning empty result.`);
+    return [];
   }
 
   // STEP 2: Initialize inventoryMap with all seeded items at zero
@@ -224,7 +253,7 @@ async function calculateHistoricalLocationInventory(
     inventoryMap.set(inv.stockItemId, { quantity: qty, totalValue: qty * rate, rate });
   }
 
-  // STEP 4: Add back sales that occurred AFTER the target date (sales reduce inventory)
+  // STEP 4: Add back sales that occurred AFTER the target date (sales reduce inventory, so add back)
   const salesAfterDate = await db
     .select({
       stockItemId: salesItems.stockItemId,
@@ -238,16 +267,18 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(salesItems.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDateObj)
+        gt(vouchers.voucherDate, cutoffDate)
       )
     )
     .execute();
+
+  console.log(`[HIST-INV] Sales after cutoff to reverse: ${salesAfterDate.length}`);
 
   for (const sale of salesAfterDate) {
     const qty = parseFloat(sale.quantity) || 0;
     const cost = parseFloat(sale.costPrice) || 0;
     const existing = inventoryMap.get(sale.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
-    existing.quantity += qty;
+    existing.quantity += qty; // Add back (reverse sale)
     existing.totalValue += qty * cost;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(sale.stockItemId, existing);
@@ -269,10 +300,12 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockAdjustmentVouchers.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDateObj)
+        gt(vouchers.voucherDate, cutoffDate)
       )
     )
     .execute();
+
+  console.log(`[HIST-INV] Adjustments after cutoff to reverse: ${adjustmentsAfterDate.length}`);
 
   for (const adj of adjustmentsAfterDate) {
     const qty = parseFloat(adj.quantity) || 0;
@@ -281,9 +314,11 @@ async function calculateHistoricalLocationInventory(
     const adjType = (adj.adjustmentType || '').toLowerCase().trim();
     
     if (adjType === 'production' || adjType === 'produce') {
+      // Production adds inventory, so reverse by subtracting
       existing.quantity -= qty;
       existing.totalValue -= qty * rate;
     } else {
+      // Consumption reduces inventory, so reverse by adding
       existing.quantity += qty;
       existing.totalValue += qty * rate;
     }
@@ -307,22 +342,25 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferVouchers.destinationLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDateObj)
+        gt(vouchers.voucherDate, cutoffDate)
       )
     )
     .execute();
+
+  console.log(`[HIST-INV] Transfers-in after cutoff to reverse: ${transfersInAfterDate.length}`);
 
   for (const transfer of transfersInAfterDate) {
     const qty = parseFloat(transfer.quantity) || 0;
     const rate = parseFloat(transfer.rate) || 0;
     const existing = inventoryMap.get(transfer.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
-    existing.quantity -= qty;
+    existing.quantity -= qty; // Subtract (reverse transfer in)
     existing.totalValue -= qty * rate;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(transfer.stockItemId, existing);
   }
 
   // Transfers OUT of this location should be added back (to reverse them)
+  // Source can be item-level OR voucher-level
   const transfersOutAfterDate = await db
     .select({
       stockItemId: stockTransferItems.stockItemId,
@@ -335,24 +373,32 @@ async function calculateHistoricalLocationInventory(
     .where(
       and(
         eq(vouchers.companyId, companyId),
-        eq(stockTransferItems.sourceLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDateObj)
+        gt(vouchers.voucherDate, cutoffDate),
+        or(
+          eq(stockTransferItems.sourceLocationId, locationId),
+          and(
+            isNull(stockTransferItems.sourceLocationId),
+            eq(stockTransferVouchers.sourceLocationId, locationId)
+          )
+        )
       )
     )
     .execute();
+
+  console.log(`[HIST-INV] Transfers-out after cutoff to reverse: ${transfersOutAfterDate.length}`);
 
   for (const transfer of transfersOutAfterDate) {
     const qty = parseFloat(transfer.quantity) || 0;
     const rate = parseFloat(transfer.rate) || 0;
     const existing = inventoryMap.get(transfer.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
-    existing.quantity += qty;
+    existing.quantity += qty; // Add back (reverse transfer out)
     existing.totalValue += qty * rate;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(transfer.stockItemId, existing);
   }
 
-  // STEP 7: Reverse container offloads AFTER the target date (offloads add inventory)
+  // STEP 7: Reverse container offloads AFTER the target date (offloads add inventory, so subtract)
   const offloadsAfterDate = await db
     .select({
       stockItemId: containerOffloadItems.stockItemId,
@@ -366,22 +412,32 @@ async function calculateHistoricalLocationInventory(
       and(
         eq(containers.companyId, companyId),
         eq(containerOffloads.locationId, locationId),
-        gt(containerOffloads.offloadedAt, asOfDateObj)
+        gt(containerOffloads.offloadedAt, cutoffDate)
       )
     )
     .execute();
+
+  console.log(`[HIST-INV] Offloads after cutoff to reverse: ${offloadsAfterDate.length}`);
 
   for (const offload of offloadsAfterDate) {
     const qty = parseFloat(offload.quantity) || 0;
     const cost = parseFloat(offload.costPrice) || 0;
     const existing = inventoryMap.get(offload.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
-    existing.quantity -= qty;
+    existing.quantity -= qty; // Subtract (reverse offload)
     existing.totalValue -= qty * cost;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(offload.stockItemId, existing);
   }
 
+  // Count items with nonzero quantity after reversals
+  let nonzeroCount = 0;
+  for (const [, data] of inventoryMap) {
+    if (data.quantity !== 0) nonzeroCount++;
+  }
+  console.log(`[HIST-INV] Items with qty != 0 after reversals: ${nonzeroCount}`);
+
   // STEP 8: Build the result array with stock item details
+  // Use LEFT JOIN and build from inventoryMap keys, NOT from currentInventory
   const stockItemDetails = await db
     .select({
       id: stockItems.id,
@@ -402,7 +458,8 @@ async function calculateHistoricalLocationInventory(
   const result: any[] = [];
   for (const [stockItemId, data] of inventoryMap) {
     const itemDetails = stockItemMap.get(stockItemId);
-    if (itemDetails && data.quantity !== 0) {
+    // Include all items from inventoryMap (even qty=0 for debugging - remove later)
+    if (itemDetails) {
       result.push({
         inventoryId: 0,
         locationId,
@@ -420,6 +477,7 @@ async function calculateHistoricalLocationInventory(
     }
   }
 
+  console.log(`[HIST-INV] Final result count: ${result.length}`);
   return result;
 }
 
