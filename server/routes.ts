@@ -100,24 +100,18 @@ async function calculateHistoricalLocationInventory(
   companyId: number,
   asOfDate: string
 ): Promise<any[]> {
-  // Get current inventory for this location
+  // STEP 1: Build seed set of ALL stockItemIds that ever existed at this location
+  // This ensures items that were sold out still appear in historical views
+  const seedStockItemIds = new Set<number>();
+
+  // 1a. From current inventory
   const currentInventory = await db
     .select({
-      inventoryId: inventory.id,
-      locationId: inventory.locationId,
       stockItemId: inventory.stockItemId,
       quantity: inventory.quantity,
       averageRate: inventory.averageRate,
-      stockItemCode: stockItems.code,
-      stockItemName: stockItems.name,
-      stockItemUom: stockItems.uom,
-      stockGroupId: stockItems.stockGroupId,
-      stockGroupName: stockGroups.name,
-      stockGroupCode: stockGroups.code,
     })
     .from(inventory)
-    .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
-    .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
     .where(
       and(
         eq(inventory.locationId, locationId),
@@ -126,16 +120,108 @@ async function calculateHistoricalLocationInventory(
     )
     .execute();
 
-  // Create a map to track inventory adjustments
+  for (const inv of currentInventory) {
+    seedStockItemIds.add(inv.stockItemId);
+  }
+
+  // 1b. From sales at this location (any time)
+  const salesStockItems = await db
+    .selectDistinct({ stockItemId: salesItems.stockItemId })
+    .from(salesItems)
+    .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(salesItems.locationId, locationId)
+      )
+    )
+    .execute();
+
+  for (const item of salesStockItems) {
+    seedStockItemIds.add(item.stockItemId);
+  }
+
+  // 1c. From container offloads at this location (any time)
+  const offloadStockItems = await db
+    .selectDistinct({ stockItemId: containerOffloadItems.stockItemId })
+    .from(containerOffloadItems)
+    .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
+    .where(eq(containerOffloads.locationId, locationId))
+    .execute();
+
+  for (const item of offloadStockItems) {
+    seedStockItemIds.add(item.stockItemId);
+  }
+
+  // 1d. From stock adjustments at this location (any time)
+  const adjustmentStockItems = await db
+    .selectDistinct({ stockItemId: stockAdjustmentItems.stockItemId })
+    .from(stockAdjustmentItems)
+    .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
+    .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockAdjustmentVouchers.locationId, locationId)
+      )
+    )
+    .execute();
+
+  for (const item of adjustmentStockItems) {
+    seedStockItemIds.add(item.stockItemId);
+  }
+
+  // 1e. From transfers INTO this location (destination)
+  const transfersInStockItems = await db
+    .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
+    .from(stockTransferItems)
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+    .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockTransferVouchers.destinationLocationId, locationId)
+      )
+    )
+    .execute();
+
+  for (const item of transfersInStockItems) {
+    seedStockItemIds.add(item.stockItemId);
+  }
+
+  // 1f. From transfers OUT of this location (source - item level)
+  const transfersOutStockItems = await db
+    .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
+    .from(stockTransferItems)
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
+    .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(stockTransferItems.sourceLocationId, locationId)
+      )
+    )
+    .execute();
+
+  for (const item of transfersOutStockItems) {
+    seedStockItemIds.add(item.stockItemId);
+  }
+
+  // STEP 2: Initialize inventoryMap with all seeded items at zero
   const inventoryMap = new Map<number, { quantity: number; totalValue: number; rate: number }>();
   
+  for (const stockItemId of seedStockItemIds) {
+    inventoryMap.set(stockItemId, { quantity: 0, totalValue: 0, rate: 0 });
+  }
+
+  // STEP 3: Overlay current inventory values
   for (const inv of currentInventory) {
     const qty = parseFloat(inv.quantity) || 0;
     const rate = parseFloat(inv.averageRate) || 0;
     inventoryMap.set(inv.stockItemId, { quantity: qty, totalValue: qty * rate, rate });
   }
 
-  // Add back sales that occurred AFTER the target date (sales reduce inventory)
+  // STEP 4: Add back sales that occurred AFTER the target date (sales reduce inventory)
   const salesAfterDate = await db
     .select({
       stockItemId: salesItems.stockItemId,
@@ -164,9 +250,7 @@ async function calculateHistoricalLocationInventory(
     inventoryMap.set(sale.stockItemId, existing);
   }
 
-  // Reverse stock adjustments (production/consumption) that occurred AFTER the target date
-  // Production adds inventory, so to reverse we subtract
-  // Consumption removes inventory, so to reverse we add back
+  // STEP 5: Reverse stock adjustments (production/consumption) that occurred AFTER the target date
   const adjustmentsAfterDate = await db
     .select({
       stockItemId: stockAdjustmentItems.stockItemId,
@@ -194,11 +278,9 @@ async function calculateHistoricalLocationInventory(
     const adjType = (adj.adjustmentType || '').toLowerCase().trim();
     
     if (adjType === 'production' || adjType === 'produce') {
-      // Production added inventory, reverse by subtracting
       existing.quantity -= qty;
       existing.totalValue -= qty * rate;
     } else {
-      // Consumption removed inventory, reverse by adding back
       existing.quantity += qty;
       existing.totalValue += qty * rate;
     }
@@ -206,7 +288,7 @@ async function calculateHistoricalLocationInventory(
     inventoryMap.set(adj.stockItemId, existing);
   }
 
-  // Reverse stock transfers AFTER the target date
+  // STEP 6: Reverse stock transfers AFTER the target date
   // Transfers INTO this location should be subtracted (to reverse them)
   const transfersInAfterDate = await db
     .select({
@@ -238,7 +320,6 @@ async function calculateHistoricalLocationInventory(
   }
 
   // Transfers OUT of this location should be added back (to reverse them)
-  // Items have sourceLocationId on the item level for multi-source transfers
   const transfersOutAfterDate = await db
     .select({
       stockItemId: stockTransferItems.stockItemId,
@@ -268,7 +349,7 @@ async function calculateHistoricalLocationInventory(
     inventoryMap.set(transfer.stockItemId, existing);
   }
 
-  // Reverse container offloads AFTER the target date (offloads add inventory)
+  // STEP 7: Reverse container offloads AFTER the target date (offloads add inventory)
   const offloadsAfterDate = await db
     .select({
       stockItemId: containerOffloadItems.stockItemId,
@@ -298,7 +379,7 @@ async function calculateHistoricalLocationInventory(
     inventoryMap.set(offload.stockItemId, existing);
   }
 
-  // Build the result array with stock item details
+  // STEP 8: Build the result array with stock item details
   const stockItemDetails = await db
     .select({
       id: stockItems.id,
