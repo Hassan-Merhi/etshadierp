@@ -100,6 +100,9 @@ async function calculateHistoricalLocationInventory(
   companyId: number,
   asOfDate: string
 ): Promise<any[]> {
+  // Convert asOfDate string to Date object for proper SQL comparison
+  const asOfDateObj = new Date(asOfDate + 'T23:59:59');
+  
   // STEP 1: Build seed set of ALL stockItemIds that ever existed at this location
   // This ensures items that were sold out still appear in historical views
   const seedStockItemIds = new Set<number>();
@@ -235,7 +238,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(salesItems.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        gt(vouchers.voucherDate, asOfDateObj)
       )
     )
     .execute();
@@ -266,7 +269,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockAdjustmentVouchers.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        gt(vouchers.voucherDate, asOfDateObj)
       )
     )
     .execute();
@@ -304,7 +307,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferVouchers.destinationLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        gt(vouchers.voucherDate, asOfDateObj)
       )
     )
     .execute();
@@ -334,7 +337,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferItems.sourceLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(vouchers.voucherDate, asOfDate)
+        gt(vouchers.voucherDate, asOfDateObj)
       )
     )
     .execute();
@@ -363,7 +366,7 @@ async function calculateHistoricalLocationInventory(
       and(
         eq(containers.companyId, companyId),
         eq(containerOffloads.locationId, locationId),
-        gt(containerOffloads.offloadedAt, asOfDate)
+        gt(containerOffloads.offloadedAt, asOfDateObj)
       )
     )
     .execute();
