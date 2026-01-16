@@ -221,9 +221,9 @@ export default function ContainerDashboard() {
         subtitle="Cross-company view of all containers on the way"
       />
 
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
         <Select value={filterCompany} onValueChange={setFilterCompany}>
-          <SelectTrigger className="w-[180px]" data-testid="select-filter-company">
+          <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-filter-company">
             <SelectValue placeholder="All Companies" />
           </SelectTrigger>
           <SelectContent>
@@ -235,7 +235,7 @@ export default function ContainerDashboard() {
         </Select>
 
         <Select value={filterAgent} onValueChange={setFilterAgent}>
-          <SelectTrigger className="w-[150px]" data-testid="select-filter-agent">
+          <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-filter-agent">
             <SelectValue placeholder="All Agents" />
           </SelectTrigger>
           <SelectContent>
@@ -247,7 +247,7 @@ export default function ContainerDashboard() {
         </Select>
 
         <Select value={filterTransporter} onValueChange={setFilterTransporter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-filter-transporter">
+          <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-filter-transporter">
             <SelectValue placeholder="All Transporters" />
           </SelectTrigger>
           <SelectContent>
@@ -274,9 +274,9 @@ export default function ContainerDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-3 space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="lg:col-span-3 space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">

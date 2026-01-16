@@ -1027,7 +1027,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="start-date">Start Date</Label>
               <DatePickerInput

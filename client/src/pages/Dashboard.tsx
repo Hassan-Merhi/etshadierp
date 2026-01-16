@@ -308,7 +308,7 @@ export default function Dashboard() {
         showHomeButton={false}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KPICard
           title="Total Income"
           value={isLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
@@ -344,7 +344,7 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Loading...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {/* What We Have (Assets) - Full Breakdown */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-green-600 mb-3 flex items-center gap-2">
@@ -441,7 +441,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Bottom Row: Available Cash, Cash to Pay */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
         {/* Available Cash */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">

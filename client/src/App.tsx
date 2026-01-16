@@ -215,58 +215,62 @@ function AuthenticatedApp() {
     return (
       <div className="flex flex-col h-screen w-full">
         <header className="flex flex-col border-b">
-          <div className="flex items-center justify-between p-4 h-16 gap-4">
+          <div className="flex items-center justify-between p-2 sm:p-4 min-h-14 sm:h-16 gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">POS Station {user.posStation || ""}</h1>
+              <h1 className="text-base sm:text-lg font-semibold truncate">POS {user.posStation || ""}</h1>
             </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-sm text-muted-foreground">{user.username}</span>
-              <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
+            <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+              <span className="hidden sm:inline text-sm text-muted-foreground">{user.username}</span>
+              <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                 <LogOut className="h-4 w-4" />
               </Button>
               <ThemeToggle />
             </div>
           </div>
-          <div className="flex items-center gap-2 px-4 pb-2">
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 pb-2 overflow-x-auto">
             <Button
               variant={isOnPOS ? "default" : "ghost"}
               size="sm"
               onClick={() => setLocation("/")}
               data-testid="button-pos-tab"
+              className="shrink-0"
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Point of Sale
+              <ShoppingCart className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Point of Sale</span>
             </Button>
             <Button
               variant={isOnDaybook ? "default" : "ghost"}
               size="sm"
               onClick={() => setLocation("/pos-daybook")}
               data-testid="button-daybook-tab"
+              className="shrink-0"
             >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Daybook
+              <BookOpen className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Daybook</span>
             </Button>
             <Button
               variant={isOnInventory ? "default" : "ghost"}
               size="sm"
               onClick={() => setLocation("/location-inventory")}
               data-testid="button-inventory-tab"
+              className="shrink-0"
             >
-              <MapPin className="h-4 w-4 mr-2" />
-              Location Inventory
+              <MapPin className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Inventory</span>
             </Button>
             <Button
               variant={currentLocation.startsWith("/vouchers") ? "default" : "ghost"}
               size="sm"
               onClick={() => setLocation("/vouchers?tab=transfer")}
               data-testid="button-stock-transfer-tab"
+              className="shrink-0"
             >
-              <Package className="h-4 w-4 mr-2" />
-              Stock Transfer
+              <Package className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Transfer</span>
             </Button>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6">
           <div className="max-w-7xl mx-auto">
             <Router user={user} />
           </div>
@@ -281,18 +285,18 @@ function AuthenticatedApp() {
       <div className="flex h-screen w-full">
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between p-4 border-b h-16 gap-4">
+          <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-sm text-muted-foreground">{user.username} ({user.role})</span>
-              <Button variant="ghost" size="sm" onClick={handleLogout} data-testid="button-logout">
+            <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+              <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
+              <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                 <LogOut className="h-4 w-4" />
               </Button>
               <CompanySelector />
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto p-3 sm:p-6">
             <div className="max-w-7xl mx-auto">
               <Router user={user} />
             </div>

@@ -307,6 +307,54 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* Mobile-responsive table wrapper - makes tables horizontally scrollable */
+  .table-responsive {
+    @apply w-full overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Stack children vertically on mobile, horizontal on larger screens */
+  .mobile-stack {
+    @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4;
+  }
+
+  /* Responsive card grid - 1 col mobile, 2 cols tablet, 3+ cols desktop */
+  .card-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* KPI card grid for dashboards */
+  .kpi-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4;
+  }
+
+  /* Hide on mobile, show on larger screens */
+  .mobile-hide {
+    @apply hidden sm:block;
+  }
+
+  /* Show on mobile, hide on larger screens */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+
+  /* Responsive text sizing */
+  .text-responsive-lg {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+
+  .text-responsive-md {
+    @apply text-base sm:text-lg lg:text-xl;
+  }
+
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
 }
 
 /* Print styles for account statements */

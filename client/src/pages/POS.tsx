@@ -1152,12 +1152,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       </PageHeader>
 
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-2 sm:gap-4">
         <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground" />
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
           {posUser ? (
-            <div className="px-3 py-1.5">
-              <span className="font-medium">{activeLocation?.name}</span>
+            <div className="px-2 sm:px-3 py-1.5">
+              <span className="font-medium text-sm sm:text-base">{activeLocation?.name}</span>
             </div>
           ) : (
             <Select 
@@ -1169,7 +1169,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 }
               }}
             >
-              <SelectTrigger className="w-64" data-testid="select-location">
+              <SelectTrigger className="w-40 sm:w-64" data-testid="select-location">
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
@@ -1189,26 +1189,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             value={saleDate}
             onChange={setSaleDate}
             placeholder="Sale date"
-            className="w-48"
+            className="w-32 sm:w-48"
             data-testid="input-sale-date"
           />
         </div>
 
         {/* Hide cash account selector when credit sale is ON */}
         {!isCreditSale && (
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             {posUser?.cashAccountId && assignedCashAccount ? (
-              // Show read-only cash account for POS users
-              <div className="px-3 py-1.5 bg-muted/50 rounded-md border">
-                <span className="text-sm font-medium">{assignedCashAccount.name}</span>
-                <span className="text-xs text-muted-foreground ml-2">({assignedCashAccount.code})</span>
+              <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
+                <span className="text-xs sm:text-sm font-medium">{assignedCashAccount.name}</span>
+                <span className="text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">({assignedCashAccount.code})</span>
               </div>
             ) : (
-              // Show selectors for non-POS users
               <>
                 <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
-                  <SelectTrigger className="w-40" data-testid="select-account-type">
+                  <SelectTrigger className="w-28 sm:w-40" data-testid="select-account-type">
                     <SelectValue placeholder="Account Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1217,7 +1215,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   </SelectContent>
                 </Select>
                 <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                  <SelectTrigger className="w-56" data-testid="select-payment-account">
+                  <SelectTrigger className="w-36 sm:w-56" data-testid="select-payment-account">
                     <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1249,17 +1247,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             onCheckedChange={setIsCreditSale}
             data-testid="toggle-credit-sale"
           />
-          <Label htmlFor="credit-sale" className="text-sm font-medium cursor-pointer">
-            Credit Sale
+          <Label htmlFor="credit-sale" className="text-xs sm:text-sm font-medium cursor-pointer">
+            Credit
           </Label>
         </div>
 
         {/* Customer Selector (shown when credit sale is enabled) */}
         {isCreditSale && (
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
+            <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger className="w-56" data-testid="select-customer">
+              <SelectTrigger className="w-36 sm:w-56" data-testid="select-customer">
                 <SelectValue placeholder="Select customer" />
               </SelectTrigger>
               <SelectContent>
@@ -1273,7 +1271,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
         )}
 
-        <div className="flex-1 flex items-center gap-2">
+        <div className="w-full sm:flex-1 flex items-center gap-2 order-last sm:order-none">
           <Textarea
             placeholder="Notes (optional)"
             value={notes}

@@ -11,18 +11,18 @@ interface KPICardProps {
 
 export function KPICard({ title, value, change, changeType, icon: Icon }: KPICardProps) {
   return (
-    <Card className="p-6" data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <Card className="p-4 sm:p-6" data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1 sm:gap-2 min-w-0">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
             {title}
           </span>
-          <span className="text-3xl font-bold font-mono" data-testid={`text-kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+          <span className="text-xl sm:text-3xl font-bold font-mono truncate" data-testid={`text-kpi-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
             {value}
           </span>
           {change && (
             <span
-              className={`text-xs font-medium ${
+              className={`text-xs font-medium truncate ${
                 changeType === "positive"
                   ? "text-chart-2"
                   : changeType === "negative"
@@ -34,8 +34,8 @@ export function KPICard({ title, value, change, changeType, icon: Icon }: KPICar
             </span>
           )}
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-          <Icon className="h-5 w-5 text-primary" />
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-md bg-primary/10 shrink-0">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
         </div>
       </div>
     </Card>
