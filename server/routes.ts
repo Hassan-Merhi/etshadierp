@@ -261,7 +261,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(salesItems.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(sql`${vouchers.voucherDate}::date`, sql`${cutoffDateStr}::date`)
+        sql`${vouchers.voucherDate} > ${cutoffDateStr}`
       )
     )
     .execute();
@@ -294,7 +294,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockAdjustmentVouchers.locationId, locationId),
         eq(vouchers.optional, false),
-        gt(sql`${vouchers.voucherDate}::date`, sql`${cutoffDateStr}::date`)
+        sql`${vouchers.voucherDate} > ${cutoffDateStr}`
       )
     )
     .execute();
@@ -334,7 +334,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferVouchers.destinationLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(sql`${vouchers.voucherDate}::date`, sql`${cutoffDateStr}::date`)
+        sql`${vouchers.voucherDate} > ${cutoffDateStr}`
       )
     )
     .execute();
@@ -366,7 +366,7 @@ async function calculateHistoricalLocationInventory(
         eq(vouchers.companyId, companyId),
         eq(stockTransferItems.sourceLocationId, locationId),
         eq(vouchers.optional, false),
-        gt(sql`${vouchers.voucherDate}::date`, sql`${cutoffDateStr}::date`)
+        sql`${vouchers.voucherDate} > ${cutoffDateStr}`
       )
     )
     .execute();
