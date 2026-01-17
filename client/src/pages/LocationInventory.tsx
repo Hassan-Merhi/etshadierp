@@ -1159,6 +1159,25 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     ))
                   )}
                 </tbody>
+                {filteredStockItems.length > 0 && (
+                  <tfoot className="bg-muted/50 border-t-2 font-semibold">
+                    <tr className="h-12">
+                      <td className="px-3 font-bold">Total</td>
+                      <td className="px-3 text-right font-mono font-bold">
+                        {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} {filteredStockItems[0]?.stockItemUom || ""}
+                      </td>
+                      <td className="px-3"></td>
+                      {!posUser && (
+                        <>
+                          <td className="px-3"></td>
+                          <td className="px-3 text-right font-mono font-bold">
+                            ${filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
             {filteredStockItems.length > 0 && (
@@ -1359,6 +1378,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                     ))}
                                   </>
                                 ))}
+                                {/* Grand Totals Row */}
+                                <tr className="bg-muted/50 border-t-2 font-semibold h-12">
+                                  <td className="px-3 font-bold">Grand Total</td>
+                                  <td className="px-3 text-right font-mono font-bold">
+                                    {Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
+                                  </td>
+                                  <td className="px-3"></td>
+                                  {!posUser && (
+                                    <>
+                                      <td className="px-3"></td>
+                                      <td className="px-3 text-right font-mono font-bold">
+                                        ${inventory.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
                               </tbody>
                             </table>
                           </div>
