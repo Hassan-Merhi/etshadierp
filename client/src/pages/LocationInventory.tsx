@@ -164,15 +164,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   }, [posUser, posLocation, selectedLocationLocal]);
 
+  // Debug: Log when asOfDate changes
+  useEffect(() => {
+    console.log('[LocationInventory] asOfDate changed to:', asOfDate);
+  }, [asOfDate]);
+
   // Fetch inventory for selected location (with optional historical date)
-  const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
+  const { data: inventoryData = [], isLoading: inventoryLoading, isFetching } = useQuery<InventoryItem[]>({
     queryKey: selectedLocationLocal 
-      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, asOfDate || null] 
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate }] 
       : [],
     queryFn: async () => {
       const url = asOfDate 
         ? `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`
         : `/api/locations/${selectedLocationLocal!.id}/inventory`;
+      console.log('[LocationInventory] Fetching from URL:', url);
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch inventory');
       return response.json();
