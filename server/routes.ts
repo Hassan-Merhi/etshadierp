@@ -1521,15 +1521,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Check for asOfDate query parameter for historical inventory
-        const asOfDate = req.query.asOfDate as string | undefined;
-        
-        let inventory;
-        if (asOfDate) {
-          const companyId = req.session.currentCompanyId!;
-          inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
-        } else {
-          inventory = await storage.getLocationInventory(locationId);
-        }
+const rawAsOfDate = req.query.asOfDate as string | undefined;
+
+// Normalize asOfDate to YYYY-MM-DD (supports DD/MM/YYYY too)
+let asOfDate: string | undefined = undefined;
+
+if (rawAsOfDate) {
+  const s = rawAsOfDate.trim();
+
+  // DD/MM/YYYY -> YYYY-MM-DD
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const [dd, mm, yyyy] = s.split("/");
+    asOfDate = `${yyyy}-${mm}-${dd}`;
+  }
+  // YYYY-MM-DD (already OK)
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    asOfDate = s;
+  }
+  // Try parse other formats (ISO, etc.)
+  else {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) {
+      return res.status(400).json({ message: "Invalid asOfDate format. Use YYYY-MM-DD" });
+    }
+    asOfDate = d.toISOString().slice(0, 10);
+  }
+}
+
+let inventory;
+if (asOfDate) {
+  const companyId = req.session.currentCompanyId!;
+  inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
+} else {
+  inventory = await storage.getLocationInventory(locationId);
+}
 
         // Filter sensitive data for POS users (they should only see quantity)
         const isPOS = req.user?.role?.startsWith("POS");
