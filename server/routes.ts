@@ -4929,6 +4929,22 @@ if (asOfDate) {
           parsed,
         );
 
+        // Sync ledger account opening balance if customer has a linked ledger account
+        // and opening balance was updated
+        if (updatedCustomer.ledgerAccountId && 
+            (parsed.openingBalance !== undefined || parsed.openingBalanceSide !== undefined)) {
+          const ledgerUpdate: { openingBalance?: string; openingBalanceSide?: string } = {};
+          if (parsed.openingBalance !== undefined) {
+            ledgerUpdate.openingBalance = updatedCustomer.openingBalance ?? "0";
+          }
+          if (parsed.openingBalanceSide !== undefined) {
+            ledgerUpdate.openingBalanceSide = updatedCustomer.openingBalanceSide ?? "Dr";
+          }
+          if (Object.keys(ledgerUpdate).length > 0) {
+            await storage.updateLedgerAccount(updatedCustomer.ledgerAccountId, ledgerUpdate);
+          }
+        }
+
         res.json(updatedCustomer);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
