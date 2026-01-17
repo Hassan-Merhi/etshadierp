@@ -107,11 +107,13 @@ export default function POSDaybook() {
   });
 
   // Only allow editing if explicitly permitted - defaults to false for safety
+  // Admin and Owner can always edit regardless of daybookEditDays setting
   const daybookEditDays = currentUser?.daybookEditDays || 0;
-  const canEditDaybook = daybookEditDays > 0;
+  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
   
   // Check if user can see profit/cost (Admin or Owner only)
-  const canSeeProfitCost = currentUser?.role === "Admin" || currentUser?.role === "Owner";
+  const canSeeProfitCost = isAdminOrOwner;
 
   // Fetch today's sales vouchers (only fetch after user is loaded)
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
@@ -121,7 +123,7 @@ export default function POSDaybook() {
 
   // Filter to show Sales and StockTransfer vouchers from the user's assigned location
   // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
-  const bypassLocationFilter = voucherIdParam && (currentUser?.role === "Admin" || currentUser?.role === "Owner");
+  const bypassLocationFilter = voucherIdParam && isAdminOrOwner;
   
   const filteredVouchers = vouchers.filter((v) => {
     // Must be a Sales or Stock Transfer voucher
