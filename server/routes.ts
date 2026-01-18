@@ -14974,7 +14974,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
         const poItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
@@ -15168,7 +15168,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
         const adjustmentItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
@@ -15441,7 +15441,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
           const transferItemsData = items.map((item: any) => {
             const quantity = parseFloat(item.quantity);
@@ -17708,7 +17708,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
 
         for (const voucher of salesVouchers) {
@@ -18849,7 +18849,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
           const transferItems = [];
 
@@ -25602,9 +25602,9 @@ if (asOfDate) {
             companyCode: companyMap.get(c.companyId)?.code || "",
             supplierName: supplierMap.get(c.supplierId)?.name || "Unknown",
           };
-          if (c.status === "OTW") {
+          if (!c.offloadDate && c.numberPlate && c.numberPlate.trim() !== "") {
             otwContainers.push(enrichedContainer);
-          } else if (c.status === "Offloaded") {
+          } else if (c.offloadDate) {
             offloadedContainers.push(enrichedContainer);
           }
         });
@@ -25667,7 +25667,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
 
       for (const container of otwContainers) {
@@ -27232,7 +27232,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
       const transferItems = [];
       
@@ -31069,7 +31069,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
@@ -31349,7 +31349,7 @@ if (asOfDate) {
         const agent = container.agent || "Unassigned";
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
         const details: any[] = [];
         

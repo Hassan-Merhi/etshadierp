@@ -246,9 +246,6 @@ export default function ContainerDashboard() {
                       <Badge variant="secondary" className="text-xs">{agentData?.containers.length || 0} OTW</Badge>
                       <Badge variant="outline" className="text-xs">{agentData?.offloadedContainers?.length || 0} Offloaded</Badge>
                     </div>
-                    <span className={cn("font-bold", (agentData?.balance || 0) < 0 ? "text-red-600" : "text-green-600")}>
-                      ${formatNumber(Math.abs(agentData?.balance || 0))} {(agentData?.balance || 0) < 0 ? "Cr" : "Dr"}
-                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -267,9 +264,6 @@ export default function ContainerDashboard() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
           <h3 className="font-bold text-lg">{selectedAgent}</h3>
-          <Badge variant={agentData.balance < 0 ? "destructive" : "default"}>
-            Balance: ${formatNumber(Math.abs(agentData.balance))} {agentData.balance < 0 ? "Cr" : "Dr"}
-          </Badge>
         </div>
 
         <Card>
@@ -283,18 +277,18 @@ export default function ContainerDashboard() {
                   <tr>
                     <th className="text-left py-1 px-2 font-medium">Container</th>
                     <th className="text-left py-1 px-2 font-medium">Company</th>
-                    <th className="text-right py-1 px-2 font-medium">Amount</th>
+                    <th className="text-right py-1 px-2 font-medium">Duty Fee</th>
                     <th className="text-left py-1 px-2 font-medium">Location</th>
                     <th className="text-left py-1 px-2 font-medium">Offload Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {agentData.offloadedContainers?.length > 0 ? (
-                    agentData.offloadedContainers.map((container) => (
+                    agentData.offloadedContainers.map((container: any) => (
                       <tr key={container.id} className="border-t" data-testid={`row-offloaded-${container.id}`}>
                         <td className="py-1 px-2 font-mono">{container.containerNumber}</td>
                         <td className="py-1 px-2">{container.companyCode}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
                         <td className="py-1 px-2">{formatDate(container.offloadDate)}</td>
                       </tr>
@@ -306,8 +300,8 @@ export default function ContainerDashboard() {
                 {agentData.offloadedContainers?.length > 0 && (
                   <tfoot className="bg-green-100 dark:bg-green-900/30">
                     <tr>
-                      <td colSpan={2} className="py-1 px-2 font-bold">Total Offloaded</td>
-                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.offloadedTotal)}</td>
+                      <td colSpan={2} className="py-1 px-2 font-bold">Total Balance Owed</td>
+                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tfoot>
