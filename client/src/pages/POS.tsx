@@ -691,11 +691,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   }
 
   const columns = [
-    { key: "itemName", label: "Item Name", width: "flex-1" },
-    { key: "quantity", label: "Qty", width: "w-24" },
-    { key: "rate", label: "Rate", width: "w-32" },
-    { key: "amount", label: "Amount", width: "w-32" },
-    { key: "delete", label: "", width: "w-12" },
+    { key: "itemName", label: "Item", width: "flex-1 min-w-[120px]" },
+    { key: "quantity", label: "Qty", width: "w-16 sm:w-20" },
+    { key: "rate", label: "Rate", width: "w-20 sm:w-24" },
+    { key: "amount", label: "Amt", width: "w-20 sm:w-28" },
+    { key: "delete", label: "", width: "w-10 sm:w-12" },
   ];
 
   const getFilteredInventory = () => {
@@ -1089,12 +1089,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         title={editVoucherId ? "Edit Sale" : "Point of Sale"}
         subtitle={editVoucherId && editVoucher ? `Voucher #${editVoucher.voucherNumber}` : undefined}
       >
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1 sm:gap-2">
           {!posUser && !editVoucherId && (
             <Link href="/pos-import">
-              <Button variant="outline" className="gap-2" data-testid="button-import-sales">
+              <Button variant="outline" size="sm" className="gap-1 sm:gap-2" data-testid="button-import-sales">
                 <Upload className="h-4 w-4" />
-                Import Sales
+                <span className="hidden sm:inline">Import</span>
               </Button>
             </Link>
           )}
@@ -1102,19 +1102,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <>
               <Button 
                 variant="outline"
+                size="sm"
                 onClick={() => setShowDraftDialog(true)}
                 disabled={drafts.length === 0}
                 data-testid="button-load-draft"
               >
-                Load Draft {drafts.length > 0 && `(${drafts.length})`}
+                <span className="hidden sm:inline">Load Draft</span>
+                <span className="sm:hidden">Load</span>
+                {drafts.length > 0 && ` (${drafts.length})`}
               </Button>
               <Button 
                 variant="outline"
+                size="sm"
                 onClick={() => saveDraftMutation.mutate()}
                 disabled={saveDraftMutation.isPending || rows.filter(r => r.stockItemId && r.quantity > 0).length === 0}
                 data-testid="button-save-draft"
               >
-                {saveDraftMutation.isPending ? "Saving..." : currentDraftId ? "Update Draft" : "Save as Draft"}
+                {saveDraftMutation.isPending ? "..." : currentDraftId ? <span className="hidden sm:inline">Update Draft</span> : <span className="hidden sm:inline">Save Draft</span>}
+                {!saveDraftMutation.isPending && <span className="sm:hidden">Draft</span>}
               </Button>
             </>
           )}
@@ -1122,13 +1127,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
+                size="sm"
                 disabled={rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0).length === 0}
-                className="gap-2"
+                className="gap-1"
                 data-testid="button-export-sale"
               >
                 <FileDown className="h-4 w-4" />
-                Export
-                <ChevronDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Export</span>
+                <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1142,19 +1148,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </DropdownMenu>
           <Button 
             onClick={handleSaveSale}
+            size="sm"
             disabled={saveMutation.isPending}
-            className="gap-2"
+            className="gap-1 sm:gap-2"
             data-testid="button-complete-sale"
           >
-            {saveMutation.isPending ? (editVoucherId ? "Updating..." : "Saving...") : (editVoucherId ? "Update Sale" : "Save & Print")}
+            {saveMutation.isPending ? "..." : <><span className="hidden sm:inline">{editVoucherId ? "Update" : "Save"}</span><span className="sm:hidden">Save</span></>}
             {!saveMutation.isPending && <Check className="h-4 w-4" />}
           </Button>
         </div>
       </PageHeader>
 
-      <div className="flex flex-wrap gap-2 sm:gap-4">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           {posUser ? (
             <div className="px-2 sm:px-3 py-1.5">
               <span className="font-medium text-sm sm:text-base">{activeLocation?.name}</span>
@@ -1169,7 +1176,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 }
               }}
             >
-              <SelectTrigger className="w-40 sm:w-64" data-testid="select-location">
+              <SelectTrigger className="w-full sm:w-48" data-testid="select-location">
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
@@ -1188,8 +1195,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <DatePickerInput
             value={saleDate}
             onChange={setSaleDate}
-            placeholder="Sale date"
-            className="w-32 sm:w-48"
+            placeholder="Date"
+            className="w-full sm:w-36"
             data-testid="input-sale-date"
           />
         </div>
@@ -1206,17 +1213,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             ) : (
               <>
                 <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
-                  <SelectTrigger className="w-28 sm:w-40" data-testid="select-account-type">
-                    <SelectValue placeholder="Account Type" />
+                  <SelectTrigger className="w-20 sm:w-28" data-testid="select-account-type">
+                    <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bank">Bank Account</SelectItem>
-                    <SelectItem value="cash">Cash Account</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
-                  <SelectTrigger className="w-36 sm:w-56" data-testid="select-payment-account">
-                    <SelectValue placeholder={`Select ${paymentAccountType === "bank" ? "bank" : "cash"} account`} />
+                  <SelectTrigger className="w-28 sm:w-44" data-testid="select-payment-account">
+                    <SelectValue placeholder={paymentAccountType === "bank" ? "Bank" : "Cash"} />
                   </SelectTrigger>
                   <SelectContent>
                     {paymentAccountType === "bank" ? (
@@ -1257,8 +1264,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger className="w-36 sm:w-56" data-testid="select-customer">
-                <SelectValue placeholder="Select customer" />
+              <SelectTrigger className="w-full sm:w-44" data-testid="select-customer">
+                <SelectValue placeholder="Customer" />
               </SelectTrigger>
               <SelectContent>
                 {customerAccounts.map((acc: any) => (
@@ -1282,20 +1289,20 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Main Spreadsheet Area */}
-        <Card className="flex-1 overflow-hidden">
+        <Card className="flex-1 overflow-hidden min-w-0">
           <div className="overflow-x-auto">
-            <div className="min-w-full">
+            <div className="min-w-[500px]">
               {/* Header */}
               <div className="flex bg-muted/50 border-b sticky top-0 z-10">
-                <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
                   #
                 </div>
                 {columns.map((col) => (
                   <div
                     key={col.key}
-                    className={`${col.width} flex items-center px-3 border-r h-10 font-medium text-sm`}
+                    className={`${col.width} flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm`}
                   >
                     {col.label}
                   </div>
@@ -1306,13 +1313,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                 {rows.map((row, rowIndex) => (
                   <div key={row.id} className="flex border-b hover-elevate">
-                    <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                    <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 text-xs text-muted-foreground">
                       {rowIndex + 1}
                     </div>
                     {columns.map((col, colIndex) => (
                       <div
                         key={col.key}
-                        className={`${col.width} border-r h-10 ${
+                        className={`${col.width} border-r h-9 sm:h-10 ${
                           col.key === "amount" ? "bg-muted/30" : ""
                         }`}
                       >
@@ -1385,26 +1392,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           {/* Total Section */}
-          <div className="border-t bg-muted/20 p-4">
-            <div className="flex justify-end items-center gap-8 max-w-md ml-auto">
-              <div className="text-sm text-muted-foreground">Total Items:</div>
-              <div className="text-sm font-mono font-medium">
-                {rows.filter((r) => r.amount > 0).length}
+          <div className="border-t bg-muted/20 p-2 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:justify-end items-end sm:items-center gap-2 sm:gap-6 max-w-md ml-auto">
+              <div className="flex items-center gap-2 text-xs sm:text-sm">
+                <span className="text-muted-foreground">Items:</span>
+                <span className="font-mono font-medium">{rows.filter((r) => r.amount > 0).length}</span>
+                <span className="text-muted-foreground ml-2">Qty:</span>
+                <span className="font-mono font-medium" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
               </div>
-              <div className="text-sm text-muted-foreground">Total Qty:</div>
-              <div className="text-sm font-mono font-medium" data-testid="text-total-qty">
-                {totalQty > 0 ? totalQty.toFixed(3) : "0"}
-              </div>
-              <div className="text-lg font-semibold">Grand Total:</div>
-              <div className="text-2xl font-bold font-mono" data-testid="text-grand-total">
-                ${formatNumber(total)}
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-lg font-semibold">Total:</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono" data-testid="text-grand-total">${formatNumber(total)}</span>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Right Panel - Item Search */}
-        <Card className="w-96 flex flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
+        <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
             <h3 className="text-sm font-semibold mb-3">Search Items</h3>
             <div className="relative">
