@@ -510,23 +510,23 @@ export default function ContainerDashboard() {
                             <CollapsibleContent>
                               <CardContent className="p-0">
                                 <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
-                                  <table className="w-full text-[11px]" style={{ tableLayout: 'fixed' }}>
+                                  <table className="w-full text-[11px]">
                                   <thead className="bg-muted/50">
                                     <tr>
-                                      <th className="text-left py-0.5 px-1 font-medium">#</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Container</th>
-                                      <th className="text-right py-0.5 px-1 font-medium">Amount</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Supplier</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">ETA</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Plate</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Loc</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Border</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Offld</th>
-                                      <th className="text-center py-0.5 px-1 font-medium">Doc</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Transport</th>
-                                      <th className="text-right py-0.5 px-1 font-medium">Fee</th>
-                                      <th className="text-left py-0.5 px-1 font-medium">Agent</th>
-                                      <th className="text-right py-0.5 px-1 font-medium">Duty</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium w-5">#</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Container</th>
+                                      <th className="text-right py-0.5 px-0.5 font-medium">Amount</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Supplier</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">ETA</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Plate</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Location</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Border</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Offload</th>
+                                      <th className="text-center py-0.5 px-0.5 font-medium w-6">Doc</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Transporter</th>
+                                      <th className="text-right py-0.5 px-0.5 font-medium">Fee</th>
+                                      <th className="text-left py-0.5 px-0.5 font-medium">Agent</th>
+                                      <th className="text-right py-0.5 px-0.5 font-medium">Duty</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -541,28 +541,28 @@ export default function ContainerDashboard() {
                                         onClick={() => handleContainerClick(container.companyId)}
                                         data-testid={`row-container-${container.id}`}
                                       >
-                                        <td className="py-0.5 px-1">{idx + 1}</td>
-                                        <td className="py-0.5 px-1 font-mono text-[10px]">{container.containerNumber}</td>
-                                        <td className="py-0.5 px-1 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
-                                        <td className="py-0.5 px-1 max-w-[100px] truncate" title={container.supplierName || "-"}>{container.supplierName || "-"}</td>
-                                        <td className={cn("py-0.5 px-1", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
+                                        <td className="py-0.5 px-0.5 w-5">{idx + 1}</td>
+                                        <td className="py-0.5 px-0.5 font-mono text-[10px]">{container.containerNumber}</td>
+                                        <td className="py-0.5 px-0.5 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                                        <td className="py-0.5 px-0.5">{container.supplierName || "-"}</td>
+                                        <td className={cn("py-0.5 px-0.5", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
                                           {formatDate(container.eta)}
                                         </td>
-                                        <td className="py-0.5 px-1">{container.numberPlate || "-"}</td>
-                                        <td className="py-0.5 px-1 max-w-[80px] truncate" title={container.trackingLocation || "-"}>{container.trackingLocation || "-"}</td>
-                                        <td className="py-0.5 px-1">{formatDate(container.borderDate)}</td>
-                                        <td className="py-0.5 px-1">{formatDate(container.offloadDate)}</td>
-                                        <td className="py-0.5 px-1 text-center">
+                                        <td className="py-0.5 px-0.5">{container.numberPlate || "-"}</td>
+                                        <td className="py-0.5 px-0.5">{container.trackingLocation || "-"}</td>
+                                        <td className="py-0.5 px-0.5">{formatDate(container.borderDate)}</td>
+                                        <td className="py-0.5 px-0.5">{formatDate(container.offloadDate)}</td>
+                                        <td className="py-0.5 px-0.5 text-center w-6">
                                           {container.docReceived ? (
                                             <FileCheck className="h-3 w-3 text-green-600 mx-auto" />
                                           ) : (
                                             <AlertTriangle className="h-3 w-3 text-yellow-500 mx-auto" />
                                           )}
                                         </td>
-                                        <td className="py-0.5 px-1 max-w-[80px] truncate" title={container.transporter || "-"}>{container.transporter || "-"}</td>
-                                        <td className="py-0.5 px-1 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
-                                        <td className="py-0.5 px-1">{container.agent || "-"}</td>
-                                        <td className="py-0.5 px-1 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
+                                        <td className="py-0.5 px-0.5">{container.transporter || "-"}</td>
+                                        <td className="py-0.5 px-0.5 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
+                                        <td className="py-0.5 px-0.5">{container.agent || "-"}</td>
+                                        <td className="py-0.5 px-0.5 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
                                       </tr>
                                     ))}
                                   </tbody>
