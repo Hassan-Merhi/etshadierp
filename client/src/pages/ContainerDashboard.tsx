@@ -491,7 +491,7 @@ export default function ContainerDashboard() {
                       const isExpanded = expandedRoutes.has(route);
                       
                       return (
-                        <Card key={route} className="overflow-hidden">
+                        <Card key={route}>
                           <Collapsible open={isExpanded} onOpenChange={() => toggleRoute(route)}>
                             <CollapsibleTrigger asChild>
                               <CardHeader className="cursor-pointer hover-elevate py-2 px-3">
@@ -509,8 +509,8 @@ export default function ContainerDashboard() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                  <table className="min-w-max w-full text-xs">
+                                <div className="overflow-x-auto overflow-y-visible" style={{ scrollbarWidth: 'thin' }}>
+                                  <table className="min-w-[1200px] w-full text-xs">
                                     <thead className="bg-muted/50">
                                       <tr>
                                         <th className="text-left py-1 px-1 font-medium whitespace-nowrap">#</th>
