@@ -510,23 +510,23 @@ export default function ContainerDashboard() {
                             <CollapsibleContent>
                               <CardContent className="p-0">
                                 <div className="overflow-x-auto">
-                                  <table className="w-full text-xs">
+                                  <table className="min-w-max w-full text-xs">
                                     <thead className="bg-muted/50">
                                       <tr>
-                                        <th className="text-left py-1 px-1 font-medium">#</th>
-                                        <th className="text-left py-1 px-1 font-medium">Container</th>
-                                        <th className="text-right py-1 px-1 font-medium">Amount</th>
-                                        <th className="text-left py-1 px-1 font-medium">Co</th>
-                                        <th className="text-left py-1 px-1 font-medium">ETA</th>
-                                        <th className="text-left py-1 px-1 font-medium">Plate</th>
-                                        <th className="text-left py-1 px-1 font-medium">Location</th>
-                                        <th className="text-left py-1 px-1 font-medium">Border</th>
-                                        <th className="text-left py-1 px-1 font-medium">Offload</th>
-                                        <th className="text-center py-1 px-1 font-medium">Docs</th>
-                                        <th className="text-left py-1 px-1 font-medium">Transporter</th>
-                                        <th className="text-right py-1 px-1 font-medium">Fee</th>
-                                        <th className="text-left py-1 px-1 font-medium">Agent</th>
-                                        <th className="text-right py-1 px-1 font-medium">Duty</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">#</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Container</th>
+                                        <th className="text-right py-1 px-1 font-medium whitespace-nowrap">Amount</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap min-w-[140px]">Supplier Name</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">ETA</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Plate</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Location</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Border</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Offload</th>
+                                        <th className="text-center py-1 px-1 font-medium whitespace-nowrap">Docs</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Transporter</th>
+                                        <th className="text-right py-1 px-1 font-medium whitespace-nowrap">Fee</th>
+                                        <th className="text-left py-1 px-1 font-medium whitespace-nowrap">Agent</th>
+                                        <th className="text-right py-1 px-1 font-medium whitespace-nowrap">Duty</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -541,30 +541,30 @@ export default function ContainerDashboard() {
                                           onClick={() => handleContainerClick(container.companyId)}
                                           data-testid={`row-container-${container.id}`}
                                         >
-                                          <td className="py-1 px-1">{idx + 1}</td>
-                                          <td className="py-1 px-1 font-mono">{container.containerNumber}</td>
-                                          <td className="py-1 px-1 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
-                                          <td className="py-1 px-1">
-                                            <Badge variant="outline" className="text-[10px] py-0 px-1">{container.companyCode}</Badge>
+                                          <td className="py-1 px-1 whitespace-nowrap">{idx + 1}</td>
+                                          <td className="py-1 px-1 font-mono whitespace-nowrap">{container.containerNumber}</td>
+                                          <td className="py-1 px-1 text-right whitespace-nowrap">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                                          <td className="py-1 px-1 min-w-[140px]">
+                                            <span className="text-xs">{container.supplierName || "-"}</span>
                                           </td>
-                                          <td className={cn("py-1 px-1", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
+                                          <td className={cn("py-1 px-1 whitespace-nowrap", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
                                             {formatDate(container.eta)}
                                           </td>
-                                          <td className="py-1 px-1">{container.numberPlate || "-"}</td>
-                                          <td className="py-1 px-1">{container.trackingLocation || "-"}</td>
-                                          <td className="py-1 px-1">{formatDate(container.borderDate)}</td>
-                                          <td className="py-1 px-1">{formatDate(container.offloadDate)}</td>
-                                          <td className="py-1 px-1 text-center">
+                                          <td className="py-1 px-1 whitespace-nowrap">{container.numberPlate || "-"}</td>
+                                          <td className="py-1 px-1 whitespace-nowrap">{container.trackingLocation || "-"}</td>
+                                          <td className="py-1 px-1 whitespace-nowrap">{formatDate(container.borderDate)}</td>
+                                          <td className="py-1 px-1 whitespace-nowrap">{formatDate(container.offloadDate)}</td>
+                                          <td className="py-1 px-1 text-center whitespace-nowrap">
                                             {container.docReceived ? (
                                               <FileCheck className="h-3 w-3 text-green-600 mx-auto" />
                                             ) : (
                                               <AlertTriangle className="h-3 w-3 text-yellow-500 mx-auto" />
                                             )}
                                           </td>
-                                          <td className="py-1 px-1">{container.transporter || "-"}</td>
-                                          <td className="py-1 px-1 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
-                                          <td className="py-1 px-1">{container.agent || "-"}</td>
-                                          <td className="py-1 px-1 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
+                                          <td className="py-1 px-1 whitespace-nowrap">{container.transporter || "-"}</td>
+                                          <td className="py-1 px-1 text-right whitespace-nowrap">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
+                                          <td className="py-1 px-1 whitespace-nowrap">{container.agent || "-"}</td>
+                                          <td className="py-1 px-1 text-right whitespace-nowrap">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
                                         </tr>
                                       ))}
                                     </tbody>
