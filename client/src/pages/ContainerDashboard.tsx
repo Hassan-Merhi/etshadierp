@@ -508,9 +508,9 @@ export default function ContainerDashboard() {
                               </CardHeader>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
-                              <CardContent className="p-0">
-                                <div className="overflow-x-auto overflow-y-visible" style={{ scrollbarWidth: 'thin' }}>
-                                  <table className="min-w-[1200px] w-full text-xs">
+                              <CardContent className="p-0 overflow-visible">
+                                <div className="overflow-x-scroll pb-2" style={{ scrollbarWidth: 'auto', scrollbarColor: 'rgb(156 163 175) transparent' }}>
+                                  <table className="min-w-[1400px] w-full text-xs">
                                     <thead className="bg-muted/50">
                                       <tr>
                                         <th className="text-left py-1 px-1 font-medium whitespace-nowrap">#</th>
