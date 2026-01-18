@@ -25604,7 +25604,7 @@ if (asOfDate) {
           };
           if (c.status === "OFFLOADED") {
             offloadedContainers.push(enrichedContainer);
-          } else if (c.status === "OTW" && c.numberPlate && c.numberPlate.trim() !== "") {
+          } else if (c.status === "OTW") {
             otwContainers.push(enrichedContainer);
           }
           
