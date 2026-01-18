@@ -19655,6 +19655,8 @@ if (asOfDate) {
       
       let stockOtwValue = 0;
       for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
         // Use grandTotal (items + charges) if available, otherwise use itemsTotal
         const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
         stockOtwValue += containerValue;
@@ -23527,6 +23529,8 @@ if (asOfDate) {
 
       // For each OTW container without offload record, find any charge vouchers that shouldn't exist
       for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
         const chargeVouchersForContainer = await db
           .select({
             id: vouchers.id,
@@ -23613,6 +23617,8 @@ if (asOfDate) {
 
       // For each OTW container without offload record, find and delete charge vouchers
       for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
         const chargeVouchersForContainer = await db
           .select({
             id: vouchers.id,
@@ -25672,6 +25678,8 @@ if (asOfDate) {
       }
 
       for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
         const route = container.shopName || "Unassigned";
         const agent = container.agent || "Unassigned";
         const location = container.trackingLocation || "Unknown";
@@ -25681,10 +25689,12 @@ if (asOfDate) {
         if (!byRoute[route]) byRoute[route] = [];
         byRoute[route].push(container);
 
-        // Group by agent with balance
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].containers.push(container);
-        byAgent[agent].total += amount;
+        // Group by agent with balance - only for containers with plate numbers
+        if (hasPlate) {
+          if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+          byAgent[agent].containers.push(container);
+          byAgent[agent].total += amount;
+        }
 
         // Group by location
         if (!byLocation[location]) byLocation[location] = { count: 0, total: 0 };
@@ -25698,6 +25708,8 @@ if (asOfDate) {
       const byTransporter: Record<string, { otw: any[], offloaded: any[], otwTotal: number, offloadedTotal: number }> = {};
       
       for (const container of otwContainers) {
+        // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
+        const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
         const transporter = container.transporter || "Unassigned";
         if (!byTransporter[transporter]) {
           byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
