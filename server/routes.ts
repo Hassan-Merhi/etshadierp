@@ -9920,6 +9920,80 @@ if (asOfDate) {
     }
   });
 
+
+  // Get POs for a container (for viewing details from dashboard)
+  app.get("/api/containers/:id/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const containerId = parseInt(req.params.id);
+      if (isNaN(containerId)) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+
+      const container = await storage.getContainerById(containerId);
+      
+      if (!container) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      // Verify user has access to this container's company
+      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
+      const hasAccess = userCompanyRoles.some(r => r.companyId === container.companyId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const supplier = await storage.getSupplierById(container.supplierId);
+      const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
+      
+      const posWithItems = await Promise.all(purchaseOrders.map(async (po) => {
+        const lineItems = await storage.getLineItemsByPO(po.id);
+        const itemsWithNames = await Promise.all(lineItems.map(async (item) => {
+          const stockItem = item.stockItemId ? await storage.getStockItemById(item.stockItemId) : null;
+          return {
+            stockItemCode: stockItem?.code || "",
+            stockItemName: stockItem?.name || item.itemName,
+            quantity: item.quantity,
+            rate: item.rate,
+            lineTotal: item.lineTotal,
+          };
+        }));
+        return {
+          id: po.id,
+          poNumber: po.poNumber,
+          currency: po.currency,
+          itemsTotal: po.itemsTotal,
+          freight: po.freight,
+          surcharge: po.surcharge,
+          fumigation: po.fumigation,
+          documentCharges: po.documentCharges,
+          discount: po.discount,
+          otherCharges: po.otherCharges,
+          status: po.status,
+          lineItems: itemsWithNames,
+        };
+      }));
+
+      res.json({
+        container: {
+          id: container.id,
+          containerNumber: container.containerNumber,
+          status: container.status,
+          importDate: container.importDate,
+          grandTotal: container.grandTotal,
+        },
+        supplier: supplier ? { id: supplier.id, legalName: supplier.legalName } : null,
+        purchaseOrders: posWithItems,
+      });
+    } catch (error) {
+      console.error("Error fetching container POs:", error);
+      res.status(500).json({ message: "Failed to fetch purchase orders" });
+    }
+  });
   // Export single container with all details (JSON)
   app.get("/api/containers/:id/export", requireAuth, requireNonPOS, async (req, res) => {
     try {

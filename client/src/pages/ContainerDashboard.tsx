@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, MapPin, Users, DollarSign, FileCheck, AlertTriangle, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
+import { Truck, Package, MapPin, Users, DollarSign, FileCheck, AlertTriangle, ChevronDown, ChevronRight, ArrowLeft, Loader2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,43 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useState, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
+
+type POLineItem = {
+  stockItemCode: string;
+  stockItemName: string;
+  quantity: string;
+  rate: string;
+  lineTotal: string;
+};
+
+type POData = {
+  id: number;
+  poNumber: string;
+  currency: string;
+  itemsTotal: string;
+  freight: string;
+  surcharge: string;
+  fumigation: string;
+  documentCharges: string;
+  discount: string;
+  otherCharges: string;
+  status: string;
+  lineItems: POLineItem[];
+};
+
+type ContainerPOResponse = {
+  container: {
+    id: number;
+    containerNumber: string;
+    status: string;
+    importDate: string;
+    grandTotal: string;
+  };
+  supplier: { id: number; legalName: string } | null;
+  purchaseOrders: POData[];
+};
 
 type Container = {
   id: number;
@@ -69,10 +106,51 @@ export default function ContainerDashboard() {
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
   const [mainTab, setMainTab] = useState<string>("tracking");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedContainerId, setSelectedContainerId] = useState<number | null>(null);
+  const [poDialogOpen, setPoDialogOpen] = useState(false);
+  const [poData, setPoData] = useState<ContainerPOResponse | null>(null);
+  const [loadingPO, setLoadingPO] = useState(false);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard/container-tracking"],
   });
+
+  const handleContainerNumberClick = async (e: React.MouseEvent, containerId: number) => {
+    e.stopPropagation();
+    setSelectedContainerId(containerId);
+    setPoData(null);
+    setLoadingPO(true);
+    setPoDialogOpen(true);
+    try {
+      const response = await apiRequest("GET", `/api/containers/${containerId}/purchase-orders`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch");
+      }
+      const data = await response.json();
+      setPoData(data);
+    } catch (error) {
+      console.error("Failed to fetch PO data:", error);
+      setPoData(null);
+    } finally {
+      setLoadingPO(false);
+    }
+  };
+
+  const sortContainersByLocationAndEta = (containers: Container[]) => {
+    return [...containers].sort((a, b) => {
+      const locA = (a.trackingLocation || "zzz").toLowerCase();
+      const locB = (b.trackingLocation || "zzz").toLowerCase();
+      if (locA !== locB) return locA.localeCompare(locB);
+      
+      const supplierA = (a.supplierName || "").toLowerCase();
+      const supplierB = (b.supplierName || "").toLowerCase();
+      if (supplierA !== supplierB) return supplierA.localeCompare(supplierB);
+      
+      const etaA = a.eta ? new Date(a.eta).getTime() : Infinity;
+      const etaB = b.eta ? new Date(b.eta).getTime() : Infinity;
+      return etaA - etaB;
+    });
+  };
 
   const agents = useMemo(() => {
     if (!data) return [];
@@ -530,7 +608,7 @@ export default function ContainerDashboard() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {containers.map((container, idx) => (
+                                    {sortContainersByLocationAndEta(containers).map((container, idx) => (
                                       <tr
                                         key={container.id}
                                         className={cn(
@@ -542,7 +620,13 @@ export default function ContainerDashboard() {
                                         data-testid={`row-container-${container.id}`}
                                       >
                                         <td className="py-0.5 px-0.5 w-5">{idx + 1}</td>
-                                        <td className="py-0.5 px-0.5 font-mono text-[10px]">{container.containerNumber}</td>
+                                        <td 
+                                          className="py-0.5 px-0.5 font-mono text-[10px] text-primary underline cursor-pointer hover:text-primary/80"
+                                          onClick={(e) => handleContainerNumberClick(e, container.id)}
+                                          data-testid={`link-container-${container.id}`}
+                                        >
+                                          {container.containerNumber}
+                                        </td>
                                         <td className="py-0.5 px-0.5 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
                                         <td className="py-0.5 px-0.5">{container.supplierName || "-"}</td>
                                         <td className={cn("py-0.5 px-0.5", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
@@ -679,6 +763,121 @@ export default function ContainerDashboard() {
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={poDialogOpen} onOpenChange={setPoDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Container Details: {poData?.container.containerNumber}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {loadingPO ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : poData ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Status:</span>
+                  <Badge variant={poData.container.status === "OFFLOADED" ? "default" : "secondary"} className="ml-2">
+                    {poData.container.status}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Import Date:</span>
+                  <span className="ml-2 font-medium">{formatDate(poData.container.importDate)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Supplier:</span>
+                  <span className="ml-2 font-medium">{poData.supplier?.legalName || "-"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total:</span>
+                  <span className="ml-2 font-bold">${formatNumber(parseFloat(poData.container.grandTotal || "0"))}</span>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold mb-3">Purchase Orders ({poData.purchaseOrders.length})</h4>
+                {poData.purchaseOrders.map((po) => (
+                  <Card key={po.id} className="mb-3">
+                    <CardHeader className="py-2 px-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium">PO #{po.poNumber}</CardTitle>
+                        <Badge variant={po.status === "OFFLOADED" ? "default" : "secondary"} className="text-xs">
+                          {po.status}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="py-2 px-3">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left py-1 px-2">Item</th>
+                              <th className="text-right py-1 px-2">Qty</th>
+                              <th className="text-right py-1 px-2">Rate</th>
+                              <th className="text-right py-1 px-2">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {po.lineItems.map((item, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="py-1 px-2">
+                                  <span className="font-mono text-[10px] text-muted-foreground">{item.stockItemCode}</span>
+                                  <span className="ml-1">{item.stockItemName}</span>
+                                </td>
+                                <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.quantity || "0"))}</td>
+                                <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.rate || "0"))}</td>
+                                <td className="py-1 px-2 text-right font-medium">${formatNumber(parseFloat(item.lineTotal || "0"))}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-muted/30">
+                            <tr className="border-t font-medium">
+                              <td colSpan={3} className="py-1 px-2 text-right">Items Total:</td>
+                              <td className="py-1 px-2 text-right">${formatNumber(parseFloat(po.itemsTotal || "0"))}</td>
+                            </tr>
+                            {parseFloat(po.freight || "0") > 0 && (
+                              <tr>
+                                <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Freight:</td>
+                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.freight || "0"))}</td>
+                              </tr>
+                            )}
+                            {parseFloat(po.surcharge || "0") > 0 && (
+                              <tr>
+                                <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Surcharge:</td>
+                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.surcharge || "0"))}</td>
+                              </tr>
+                            )}
+                            {parseFloat(po.otherCharges || "0") > 0 && (
+                              <tr>
+                                <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Other Charges:</td>
+                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.otherCharges || "0"))}</td>
+                              </tr>
+                            )}
+                            {parseFloat(po.discount || "0") > 0 && (
+                              <tr>
+                                <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Discount:</td>
+                                <td className="py-0.5 px-2 text-right">-${formatNumber(parseFloat(po.discount || "0"))}</td>
+                              </tr>
+                            )}
+                          </tfoot>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground py-4">No data available</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
