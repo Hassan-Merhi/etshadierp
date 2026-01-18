@@ -87,12 +87,12 @@ export function ReceiptVoucherTab({
   setActiveRowIndex,
 }: ReceiptVoucherTabProps) {
   return (
-    <div className="flex gap-4">
-      {/* Left column: Form (60%) */}
-      <div className="flex-1" style={{ width: "60%" }}>
+    <div className="flex flex-col lg:flex-row gap-4">
+      {/* Left column: Form */}
+      <div className="flex-1 min-w-0 lg:w-[60%]">
         <Card>
-          <CardHeader>
-            <CardTitle>Receipt Voucher</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">Receipt Voucher</CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>

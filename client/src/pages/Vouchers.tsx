@@ -3315,11 +3315,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {/* Journal Voucher Tab */}
         {!isPOS && (
           <TabsContent value="journal" className="space-y-4">
-            <div className="flex gap-4">
+            <div className="flex flex-col lg:flex-row gap-4">
               {/* Left Panel - Form */}
-              <Card className="flex-1">
-                <CardHeader>
-                  <CardTitle>Journal Voucher</CardTitle>
+              <Card className="flex-1 min-w-0">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-base sm:text-lg">Journal Voucher</CardTitle>
                 </CardHeader>
                 <CardContent>
                 <Form {...journalForm}>
@@ -3925,49 +3925,49 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 )}
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main Spreadsheet Area */}
-                <Card className="flex-1 overflow-hidden">
+                <Card className="flex-1 overflow-hidden min-w-0">
                   <div className="overflow-x-auto">
-                    <div className="min-w-full">
+                    <div className="min-w-[400px]">
                       {/* Header */}
                       <div className="flex bg-muted/50 border-b sticky top-0 z-10">
-                        <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                        <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
                           #
                         </div>
                         {!isPOS && (
-                          <div className="w-40 flex items-center px-3 border-r h-10 font-medium text-sm">
+                          <div className="w-28 sm:w-40 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                             Source
                           </div>
                         )}
-                        <div className="flex-1 min-w-[200px] flex items-center px-3 border-r h-10 font-medium text-sm">
-                          Item Name
+                        <div className="flex-1 min-w-[120px] flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
+                          Item
                         </div>
-                        <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                        <div className="w-16 sm:w-24 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                           Qty
                         </div>
                         {!isPOS && (
                           <>
-                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                            <div className="w-16 sm:w-24 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                               Rate
                             </div>
-                            <div className="w-28 flex items-center px-3 border-r h-10 font-medium text-sm bg-muted/30">
-                              Amount
+                            <div className="w-20 sm:w-28 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm bg-muted/30">
+                              Amt
                             </div>
                           </>
                         )}
-                        <div className="w-12 flex items-center justify-center h-10" />
+                        <div className="w-10 sm:w-12 flex items-center justify-center h-9 sm:h-10" />
                       </div>
 
                       {/* Rows */}
                       <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                         {transferFields.map((field, index) => (
                           <div key={field.id} className="flex border-b hover-elevate">
-                            <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                            <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 text-xs text-muted-foreground">
                               {index + 1}
                             </div>
                             {!isPOS && (
-                              <div className="w-40 border-r h-10">
+                              <div className="w-28 sm:w-40 border-r h-9 sm:h-10">
                                 <input
                                   type="text"
                                   value={activeTransferRow === index && activeFieldType === 'source' ? transferSourceSearchTerm : (transferEntries[index]?.sourceLocationName || "")}
@@ -4050,7 +4050,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 />
                               </div>
                             )}
-                            <div className="flex-1 min-w-[200px] border-r h-10">
+                            <div className="flex-1 min-w-[120px] border-r h-9 sm:h-10">
                               <input
                                 type="text"
                                 value={activeTransferRow === index && activeFieldType === 'item' ? transferSearchTerm : (transferEntries[index]?.stockItemName || "")}
@@ -4179,7 +4179,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 data-testid={`input-item-name-${index}`}
                               />
                             </div>
-                            <div className="w-24 border-r h-10">
+                            <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                               <input
                                 type="number"
                                 step="0.001"
@@ -4256,7 +4256,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             {!isPOS && (
                               <>
-                                <div className="w-24 border-r h-10">
+                                <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                                   <input
                                     type="number"
                                     step="0.01"
@@ -4318,12 +4318,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     data-testid={`input-transfer-rate-${index}`}
                                   />
                                 </div>
-                                <div className="w-28 border-r h-10 bg-muted/30 flex items-center justify-end px-3 font-mono">
+                                <div className="w-20 sm:w-28 border-r h-9 sm:h-10 bg-muted/30 flex items-center justify-end px-2 sm:px-3 font-mono text-xs sm:text-sm">
                                   {formatNumber(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0"))}
                                 </div>
                               </>
                             )}
-                            <div className="w-12 flex items-center justify-center h-10">
+                            <div className="w-10 sm:w-12 flex items-center justify-center h-9 sm:h-10">
                               {transferFields.length > 1 && (
                                 <Button
                                   type="button"
@@ -4712,35 +4712,35 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   </div>
 
                   {/* UNIFIED PRODUCTION/CONSUMPTION TABLE WITH SIDEBAR */}
-                  <div className="flex gap-4">
+                  <div className="flex flex-col lg:flex-row gap-4">
                     {/* Main Spreadsheet Area */}
-                    <Card className="flex-1 overflow-hidden">
+                    <Card className="flex-1 overflow-hidden min-w-0">
                       <div className="overflow-x-auto">
-                        <div className="min-w-full">
+                        <div className="min-w-[400px]">
                           {/* Header */}
                           <div className="flex bg-muted/50 border-b sticky top-0 z-10">
-                            <div className="w-12 flex items-center justify-center border-r h-10 font-medium text-xs">
+                            <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
                               #
                             </div>
-                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                            <div className="w-16 sm:w-24 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                               Type
                             </div>
-                            <div className="flex-1 min-w-[200px] flex items-center px-3 border-r h-10 font-medium text-sm">
-                              Item Name
+                            <div className="flex-1 min-w-[120px] flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
+                              Item
                             </div>
-                            <div className="w-20 flex items-center px-3 border-r h-10 font-medium text-sm text-muted-foreground">
+                            <div className="w-16 sm:w-20 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm text-muted-foreground">
                               Avail
                             </div>
-                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                            <div className="w-16 sm:w-24 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                               Qty
                             </div>
-                            <div className="w-24 flex items-center px-3 border-r h-10 font-medium text-sm">
+                            <div className="w-16 sm:w-24 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm">
                               Rate
                             </div>
-                            <div className="w-28 flex items-center px-3 border-r h-10 font-medium text-sm bg-muted/30">
-                              Amount
+                            <div className="w-20 sm:w-28 flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm bg-muted/30">
+                              Amt
                             </div>
-                            <div className="w-12 flex items-center justify-center h-10" />
+                            <div className="w-10 sm:w-12 flex items-center justify-center h-9 sm:h-10" />
                           </div>
 
                           {/* Rows */}
@@ -4754,11 +4754,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               
                               return (
                                 <div key={field.id} className="flex border-b hover-elevate">
-                                  <div className="w-12 flex items-center justify-center border-r h-10 text-xs text-muted-foreground">
+                                  <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 text-xs text-muted-foreground">
                                     {index + 1}
                                   </div>
                                   {/* Type column - accepts p/c keyboard shortcuts */}
-                                  <div className="w-24 border-r h-10">
+                                  <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                                     <input
                                       type="text"
                                       value={currentEntry?.type === "PRODUCE" ? "Produce" : currentEntry?.type === "CONSUME" ? "Consume" : ""}
@@ -4797,7 +4797,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     />
                                   </div>
                                   {/* Item Name column - triggers sidebar */}
-                                  <div className="flex-1 min-w-[200px] border-r h-10">
+                                  <div className="flex-1 min-w-[120px] border-r h-9 sm:h-10">
                                     <input
                                       type="text"
                                       value={activeAdjustmentRow === index ? adjustmentSearchTerm : (currentEntry?.stockItemName || "")}
@@ -4872,11 +4872,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     />
                                   </div>
                                   {/* Available Qty column */}
-                                  <div className="w-20 border-r h-10 bg-muted/20 flex items-center justify-end px-3 font-mono text-sm text-muted-foreground">
+                                  <div className="w-16 sm:w-20 border-r h-9 sm:h-10 bg-muted/20 flex items-center justify-end px-2 sm:px-3 font-mono text-xs sm:text-sm text-muted-foreground">
                                     {formatNumber(parseFloat(availableQty))}
                                   </div>
                                   {/* Quantity column - Enter goes to Rate */}
-                                  <div className="w-24 border-r h-10">
+                                  <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                                     <input
                                       type="number"
                                       step="0.001"
@@ -4903,7 +4903,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     />
                                   </div>
                                   {/* Rate column - Enter creates new row or goes to next row */}
-                                  <div className="w-24 border-r h-10">
+                                  <div className="w-16 sm:w-24 border-r h-9 sm:h-10">
                                     <input
                                       type="number"
                                       step="0.01"
@@ -4944,11 +4944,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     />
                                   </div>
                                   {/* Amount column */}
-                                  <div className="w-28 border-r h-10 bg-muted/30 flex items-center justify-end px-3 font-mono">
+                                  <div className="w-20 sm:w-28 border-r h-9 sm:h-10 bg-muted/30 flex items-center justify-end px-2 sm:px-3 font-mono text-xs sm:text-sm">
                                     {formatNumber(parseFloat(currentEntry?.quantity || "0") * parseFloat(currentEntry?.rate || "0"))}
                                   </div>
                                   {/* Delete button */}
-                                  <div className="w-12 flex items-center justify-center h-10">
+                                  <div className="w-10 sm:w-12 flex items-center justify-center h-9 sm:h-10">
                                     {adjustmentFields.length > 1 && (
                                       <Button
                                         type="button"
