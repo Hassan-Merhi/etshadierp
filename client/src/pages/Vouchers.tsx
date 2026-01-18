@@ -3201,7 +3201,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader 
         title={isPOS ? "Stock Transfer" : "Vouchers"}
         subtitle={isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
@@ -3226,24 +3226,24 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote")}>
         {!isPOS && (
-          <TabsList>
-            <TabsTrigger value="payment" data-testid="tab-payment">
+          <TabsList className="flex flex-wrap h-auto gap-1">
+            <TabsTrigger value="payment" className="text-xs sm:text-sm" data-testid="tab-payment">
               Payment
             </TabsTrigger>
-            <TabsTrigger value="receipt" data-testid="tab-receipt">
+            <TabsTrigger value="receipt" className="text-xs sm:text-sm" data-testid="tab-receipt">
               Receipt
             </TabsTrigger>
-            <TabsTrigger value="journal" data-testid="tab-journal">
+            <TabsTrigger value="journal" className="text-xs sm:text-sm" data-testid="tab-journal">
               Journal
             </TabsTrigger>
-            <TabsTrigger value="transfer" data-testid="tab-transfer">
-              Stock Transfer
+            <TabsTrigger value="transfer" className="text-xs sm:text-sm" data-testid="tab-transfer">
+              Transfer
             </TabsTrigger>
-            <TabsTrigger value="adjustment" data-testid="tab-adjustment">
-              Production/Consumption
+            <TabsTrigger value="adjustment" className="text-xs sm:text-sm" data-testid="tab-adjustment">
+              Prod/Cons
             </TabsTrigger>
-            <TabsTrigger value="creditnote" data-testid="tab-creditnote">
-              Credit/Debit Note
+            <TabsTrigger value="creditnote" className="text-xs sm:text-sm" data-testid="tab-creditnote">
+              Cr/Dr Note
             </TabsTrigger>
           </TabsList>
         )}

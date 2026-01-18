@@ -569,12 +569,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Skip if in edit mode, as we can load and edit without location selection
   if (!activeLocation && !posUser && !editVoucherId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Point of Sale</h1>
-          <p className="text-muted-foreground">Select a location to begin</p>
+      <div className="flex flex-col items-center justify-center h-full gap-4 md:gap-6 p-4 md:p-8">
+        <div className="text-center">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Point of Sale</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Select a location to begin</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full max-w-4xl">
           {allLocations.map((location) => (
             <Card 
               key={location.id} 
@@ -582,7 +582,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               onClick={() => setSelectedLocation(location)}
               data-testid={`card-location-${location.id}`}
             >
-              <div className="p-6">
+              <div className="p-4 md:p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-lg">{location.name}</h3>
@@ -630,12 +630,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   // Show error if POS user's location is not accessible in current company
   if (posUser && locationError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-4 md:p-8">
         <div className="flex items-center gap-2 text-destructive">
-          <AlertCircle className="h-8 w-8" />
-          <h2 className="text-xl font-semibold">Location Access Denied</h2>
+          <AlertCircle className="h-6 w-6 md:h-8 md:w-8" />
+          <h2 className="text-lg md:text-xl font-semibold">Location Access Denied</h2>
         </div>
-        <p className="text-center text-muted-foreground max-w-md">
+        <p className="text-center text-sm md:text-base text-muted-foreground max-w-md">
           You don't have access to a location in the currently selected company. 
           Please contact your administrator to assign you to a location in this company, 
           or switch to a different company where you have location access.
