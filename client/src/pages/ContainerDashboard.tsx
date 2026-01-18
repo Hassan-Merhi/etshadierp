@@ -274,49 +274,49 @@ export default function ContainerDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="lg:col-span-3 space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="grid grid-cols-4 gap-2">
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-muted-foreground" />
+              <CardContent className="p-2">
+                <div className="flex items-center gap-1">
+                  <Package className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Total OTW</p>
-                    <p className="text-2xl font-bold">{filteredData?.totals.count || 0}</p>
+                    <p className="text-xs text-muted-foreground">Total OTW</p>
+                    <p className="text-lg font-bold">{filteredData?.totals.count || 0}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+              <CardContent className="p-2">
+                <div className="flex items-center gap-1">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Value</p>
-                    <p className="text-2xl font-bold">${formatNumber(filteredData?.totals.amount || 0)}</p>
+                    <p className="text-xs text-muted-foreground">Total Value</p>
+                    <p className="text-lg font-bold">${formatNumber(filteredData?.totals.amount || 0)}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-muted-foreground" />
+              <CardContent className="p-2">
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Routes</p>
-                    <p className="text-2xl font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
+                    <p className="text-xs text-muted-foreground">Routes</p>
+                    <p className="text-lg font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-muted-foreground" />
+              <CardContent className="p-2">
+                <div className="flex items-center gap-1">
+                  <Users className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Agents</p>
-                    <p className="text-2xl font-bold">{Object.keys(filteredData?.byAgent || {}).filter(a => a !== "Unassigned").length}</p>
+                    <p className="text-xs text-muted-foreground">Agents</p>
+                    <p className="text-lg font-bold">{Object.keys(filteredData?.byAgent || {}).filter(a => a !== "Unassigned").length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -421,14 +421,16 @@ export default function ContainerDashboard() {
           </ScrollArea>
         </div>
 
-        <Tabs defaultValue="summary" className="w-full">
+        <Tabs defaultValue="summary" className="w-full lg:col-span-2">
           <TabsList className="w-full grid grid-cols-2">
             <TabsTrigger value="summary" data-testid="tab-summary">Summary</TabsTrigger>
-            <TabsTrigger value="transporter" data-testid="tab-transporter">Transporter</TabsTrigger>
+            <TabsTrigger value="balances" data-testid="tab-balances">Statement Balances</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="summary" className="space-y-4 mt-4">
-            <Card>
+          <TabsContent value="summary" className="mt-4">
+            <ScrollArea className="h-[calc(100vh-280px)]">
+              <div className="space-y-4">
+                <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -442,17 +444,12 @@ export default function ContainerDashboard() {
                   .map(([agent, agentData]) => (
                     <div
                       key={agent}
-                      className="flex items-center justify-between p-2 rounded hover-elevate cursor-pointer"
+                      className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
                       onClick={() => setFilterAgent(filterAgent === agent ? "all" : agent)}
                       data-testid={`card-agent-${agent}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{agent}</span>
-                        <Badge variant="secondary" className="text-xs">{agentData.containers.length}</Badge>
-                      </div>
-                      <span className={cn("text-sm font-medium", agentData.balance > 0 ? "text-red-600" : agentData.balance < 0 ? "text-green-600" : "")}>
-                        ${formatNumber(Math.abs(agentData.balance))}
-                      </span>
+                      <span className="font-medium">{agent}</span>
+                      <Badge variant="secondary" className="text-xs">{agentData.containers.length}</Badge>
                     </div>
                   ))}
                 {filteredData?.byAgent["Unassigned"] && (
@@ -520,118 +517,22 @@ export default function ContainerDashboard() {
                     </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+                </Card>
+              </div>
+            </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="transporter" className="mt-4">
+          <TabsContent value="balances" className="mt-4">
             <ScrollArea className="h-[calc(100vh-280px)]">
-              <div className="space-y-4">
-                {filteredData?.byTransporter && Object.entries(filteredData.byTransporter)
-                  .filter(([name]) => name !== "Unassigned")
-                  .sort(([a], [b]) => (a || '').localeCompare(b || ''))
-                  .map(([transporterName, transporterData]) => (
-                    <Card key={transporterName}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Truck className="h-4 w-4" />
-                            {transporterName}
-                          </div>
-                          <Badge variant="secondary">
-                            {transporterData.offloaded.length + transporterData.otw.length} containers
-                          </Badge>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {transporterData.offloaded.length > 0 && (
-                          <div className="bg-yellow-500/20 rounded-md p-2">
-                            <div className="text-xs font-medium text-yellow-700 dark:text-yellow-400 mb-2">
-                              Already Offloaded ({transporterData.offloaded.length})
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="text-muted-foreground">
-                                    <th className="text-left p-1">Container</th>
-                                    <th className="text-left p-1">Company</th>
-                                    <th className="text-left p-1">Plate</th>
-                                    <th className="text-left p-1">Border</th>
-                                    <th className="text-left p-1">Location</th>
-                                    <th className="text-right p-1">Fee</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {transporterData.offloaded.map(c => (
-                                    <tr key={c.id} className="border-t border-yellow-500/30">
-                                      <td className="p-1 font-mono">{c.containerNumber}</td>
-                                      <td className="p-1">{c.companyCode}</td>
-                                      <td className="p-1">{c.numberPlate || "-"}</td>
-                                      <td className="p-1">{formatDate(c.borderDate)}</td>
-                                      <td className="p-1">{c.trackingLocation || "-"}</td>
-                                      <td className="p-1 text-right">${formatNumber(parseFloat(String(c.transportFee || "0")))}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr className="border-t-2 border-yellow-500/50 font-medium">
-                                    <td colSpan={5} className="p-1 text-right">Total:</td>
-                                    <td className="p-1 text-right">${formatNumber(transporterData.offloadedTotal || 0)}</td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-
-                        {transporterData.otw.length > 0 && (
-                          <div className="bg-muted/50 rounded-md p-2">
-                            <div className="text-xs font-medium text-muted-foreground mb-2">
-                              On The Way ({transporterData.otw.length})
-                            </div>
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="text-muted-foreground">
-                                    <th className="text-left p-1">Container</th>
-                                    <th className="text-left p-1">Company</th>
-                                    <th className="text-left p-1">Plate</th>
-                                    <th className="text-left p-1">Border</th>
-                                    <th className="text-left p-1">Location</th>
-                                    <th className="text-right p-1">Fee</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {transporterData.otw.map(c => (
-                                    <tr key={c.id} className="border-t">
-                                      <td className="p-1 font-mono">{c.containerNumber}</td>
-                                      <td className="p-1">{c.companyCode}</td>
-                                      <td className="p-1">{c.numberPlate || "-"}</td>
-                                      <td className="p-1">{formatDate(c.borderDate)}</td>
-                                      <td className="p-1">{c.trackingLocation || "-"}</td>
-                                      <td className="p-1 text-right">${formatNumber(parseFloat(String(c.transportFee || "0")))}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr className="border-t-2 font-medium">
-                                    <td colSpan={5} className="p-1 text-right">Total:</td>
-                                    <td className="p-1 text-right">${formatNumber(transporterData.otwTotal || 0)}</td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex justify-between pt-2 border-t font-medium text-sm">
-                          <span>Grand Total:</span>
-                          <span>${formatNumber((transporterData.offloadedTotal || 0) + (transporterData.otwTotal || 0))}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Statement Balances</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Coming soon...</p>
+                </CardContent>
+              </Card>
             </ScrollArea>
           </TabsContent>
         </Tabs>
