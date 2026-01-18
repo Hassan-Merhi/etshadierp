@@ -342,7 +342,7 @@ export default function ContainerDashboard() {
                         <td className="py-1 px-2">{formatDate(container.borderDate)}</td>
                         <td className="py-1 px-2">{container.transporter || "-"}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
                       </tr>
                     ))
                   ) : (
@@ -353,7 +353,7 @@ export default function ContainerDashboard() {
                   <tfoot className="bg-yellow-100 dark:bg-yellow-900/30">
                     <tr>
                       <td colSpan={6} className="py-1 px-2 font-bold">Total OTW</td>
-                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.total)}</td>
+                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
                     </tr>
                   </tfoot>
                 )}

@@ -25600,7 +25600,7 @@ if (asOfDate) {
             ...c,
             companyName: companyMap.get(c.companyId)?.name || "Unknown",
             companyCode: companyMap.get(c.companyId)?.code || "",
-            supplierName: supplierMap.get(c.supplierId)?.name || "Unknown",
+            supplierName: supplierMap.get(c.supplierId)?.legalName || "Unknown",
           };
           if (!c.offloadDate && c.numberPlate && c.numberPlate.trim() !== "") {
             otwContainers.push(enrichedContainer);
