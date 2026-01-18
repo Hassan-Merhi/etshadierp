@@ -275,11 +275,13 @@ export default function ContainerDashboard() {
               <table className="w-full text-xs">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="text-left py-1 px-2 font-medium">Container</th>
-                    <th className="text-left py-1 px-2 font-medium">Company</th>
-                    <th className="text-right py-1 px-2 font-medium">Duty Fee</th>
+                    <th className="text-left py-1 px-2 font-medium">Container #</th>
+                    <th className="text-left py-1 px-2 font-medium">Supplier</th>
+                    <th className="text-left py-1 px-2 font-medium">Number Plate</th>
+                    <th className="text-left py-1 px-2 font-medium">Border Date</th>
+                    <th className="text-left py-1 px-2 font-medium">Transporter</th>
                     <th className="text-left py-1 px-2 font-medium">Location</th>
-                    <th className="text-left py-1 px-2 font-medium">Offload Date</th>
+                    <th className="text-right py-1 px-2 font-medium">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -287,22 +289,23 @@ export default function ContainerDashboard() {
                     agentData.offloadedContainers.map((container: any) => (
                       <tr key={container.id} className="border-t" data-testid={`row-offloaded-${container.id}`}>
                         <td className="py-1 px-2 font-mono">{container.containerNumber}</td>
-                        <td className="py-1 px-2">{container.companyCode}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
+                        <td className="py-1 px-2">{container.supplierName || "-"}</td>
+                        <td className="py-1 px-2">{container.numberPlate || "-"}</td>
+                        <td className="py-1 px-2">{formatDate(container.borderDate)}</td>
+                        <td className="py-1 px-2">{container.transporter || "-"}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
-                        <td className="py-1 px-2">{formatDate(container.offloadDate)}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} className="py-2 px-2 text-center text-muted-foreground">No offloaded containers</td></tr>
+                    <tr><td colSpan={7} className="py-2 px-2 text-center text-muted-foreground">No offloaded containers</td></tr>
                   )}
                 </tbody>
                 {agentData.offloadedContainers?.length > 0 && (
                   <tfoot className="bg-green-100 dark:bg-green-900/30">
                     <tr>
-                      <td colSpan={2} className="py-1 px-2 font-bold">Total Balance Owed</td>
+                      <td colSpan={6} className="py-1 px-2 font-bold">Total Balance Owed</td>
                       <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
-                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 )}
@@ -320,34 +323,37 @@ export default function ContainerDashboard() {
               <table className="w-full text-xs">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="text-left py-1 px-2 font-medium">Container</th>
-                    <th className="text-left py-1 px-2 font-medium">Company</th>
-                    <th className="text-right py-1 px-2 font-medium">Amount</th>
-                    <th className="text-left py-1 px-2 font-medium">ETA</th>
+                    <th className="text-left py-1 px-2 font-medium">Container #</th>
+                    <th className="text-left py-1 px-2 font-medium">Supplier</th>
+                    <th className="text-left py-1 px-2 font-medium">Number Plate</th>
+                    <th className="text-left py-1 px-2 font-medium">Border Date</th>
+                    <th className="text-left py-1 px-2 font-medium">Transporter</th>
                     <th className="text-left py-1 px-2 font-medium">Location</th>
+                    <th className="text-right py-1 px-2 font-medium">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {agentData.containers.length > 0 ? (
-                    agentData.containers.map((container) => (
+                    agentData.containers.map((container: any) => (
                       <tr key={container.id} className="border-t" data-testid={`row-otw-${container.id}`}>
                         <td className="py-1 px-2 font-mono">{container.containerNumber}</td>
-                        <td className="py-1 px-2">{container.companyCode}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
-                        <td className={cn("py-1 px-2", isOverdue(container.eta) && "text-yellow-600")}>{formatDate(container.eta)}</td>
+                        <td className="py-1 px-2">{container.supplierName || "-"}</td>
+                        <td className="py-1 px-2">{container.numberPlate || "-"}</td>
+                        <td className="py-1 px-2">{formatDate(container.borderDate)}</td>
+                        <td className="py-1 px-2">{container.transporter || "-"}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={5} className="py-2 px-2 text-center text-muted-foreground">No OTW containers</td></tr>
+                    <tr><td colSpan={7} className="py-2 px-2 text-center text-muted-foreground">No OTW containers</td></tr>
                   )}
                 </tbody>
                 {agentData.containers.length > 0 && (
                   <tfoot className="bg-yellow-100 dark:bg-yellow-900/30">
                     <tr>
-                      <td colSpan={2} className="py-1 px-2 font-bold">Total OTW</td>
+                      <td colSpan={6} className="py-1 px-2 font-bold">Total OTW</td>
                       <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.total)}</td>
-                      <td colSpan={2}></td>
                     </tr>
                   </tfoot>
                 )}
