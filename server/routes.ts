@@ -25602,11 +25602,12 @@ if (asOfDate) {
             companyCode: companyMap.get(c.companyId)?.code || "",
             supplierName: supplierMap.get(c.supplierId)?.legalName || "Unknown",
           };
-          if (!c.offloadDate && c.numberPlate && c.numberPlate.trim() !== "") {
-            otwContainers.push(enrichedContainer);
-          } else if (c.offloadDate) {
+          if (c.status === "OFFLOADED") {
             offloadedContainers.push(enrichedContainer);
+          } else if (c.status === "OTW" && c.numberPlate && c.numberPlate.trim() !== "") {
+            otwContainers.push(enrichedContainer);
           }
+          
         });
       }
 
