@@ -374,14 +374,14 @@ export default function ContainerDashboard() {
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="tracking" data-testid="tab-main-tracking">Container Tracking</TabsTrigger>
-          <TabsTrigger value="statements" data-testid="tab-main-statements">Statement of Accounts</TabsTrigger>
+          <TabsTrigger value="tracking" className="text-xs sm:text-sm" data-testid="tab-main-tracking">Tracking</TabsTrigger>
+          <TabsTrigger value="statements" className="text-xs sm:text-sm" data-testid="tab-main-statements">Statements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tracking" className="mt-3">
           <div className="flex flex-wrap gap-2 items-center mb-3">
             <Select value={filterCompany} onValueChange={setFilterCompany}>
-              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-filter-company">
+              <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs" data-testid="select-filter-company">
                 <SelectValue placeholder="All Companies" />
               </SelectTrigger>
               <SelectContent>
@@ -393,7 +393,7 @@ export default function ContainerDashboard() {
             </Select>
 
             <Select value={filterAgent} onValueChange={setFilterAgent}>
-              <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-filter-agent">
+              <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" data-testid="select-filter-agent">
                 <SelectValue placeholder="All Agents" />
               </SelectTrigger>
               <SelectContent>
@@ -405,7 +405,7 @@ export default function ContainerDashboard() {
             </Select>
 
             <Select value={filterTransporter} onValueChange={setFilterTransporter}>
-              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-filter-transporter">
+              <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs" data-testid="select-filter-transporter">
                 <SelectValue placeholder="All Transporters" />
               </SelectTrigger>
               <SelectContent>
@@ -435,7 +435,7 @@ export default function ContainerDashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-2">
             <div className="space-y-2 min-w-0">
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                 <Card>
                   <CardContent className="py-1 px-2">
                     <div className="flex items-center gap-1">
