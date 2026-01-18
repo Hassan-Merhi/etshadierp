@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Package, MapPin, Users, DollarSign, FileCheck, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import { Truck, Package, MapPin, Users, DollarSign, FileCheck, AlertTriangle, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { useQuery } from "@tanstack/react-query";
@@ -43,10 +43,18 @@ type TransporterData = {
   offloadedTotal: number;
 };
 
+type AgentData = {
+  containers: Container[];
+  offloadedContainers: Container[];
+  total: number;
+  offloadedTotal: number;
+  balance: number;
+};
+
 type DashboardData = {
   containers: Container[];
   byRoute: Record<string, Container[]>;
-  byAgent: Record<string, { containers: Container[]; total: number; balance: number }>;
+  byAgent: Record<string, AgentData>;
   byLocation: Record<string, { count: number; total: number }>;
   byTransporter: Record<string, TransporterData>;
   totals: { count: number; amount: number };
@@ -59,6 +67,8 @@ export default function ContainerDashboard() {
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterTransporter, setFilterTransporter] = useState<string>("all");
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
+  const [mainTab, setMainTab] = useState<string>("tracking");
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard/container-tracking"],
@@ -103,7 +113,7 @@ export default function ContainerDashboard() {
     }
 
     const byRoute: Record<string, Container[]> = {};
-    const byAgent: Record<string, { containers: Container[]; total: number; balance: number }> = {};
+    const byAgent: Record<string, AgentData> = {};
     const byLocation: Record<string, { count: number; total: number }> = {};
     const byTransporter: Record<string, TransporterData> = {};
     let totalAmount = 0;
@@ -120,9 +130,14 @@ export default function ContainerDashboard() {
       byRoute[route].push(container);
 
       if (!byAgent[agent]) {
-        // Get balance from original API data
-        const originalBalance = data.byAgent[agent]?.balance || 0;
-        byAgent[agent] = { containers: [], total: 0, balance: originalBalance };
+        const originalData = data.byAgent[agent];
+        byAgent[agent] = { 
+          containers: [], 
+          offloadedContainers: originalData?.offloadedContainers || [],
+          total: 0, 
+          offloadedTotal: originalData?.offloadedTotal || 0,
+          balance: originalData?.balance || 0 
+        };
       }
       byAgent[agent].containers.push(container);
       byAgent[agent].total += amount;
@@ -131,7 +146,6 @@ export default function ContainerDashboard() {
       byLocation[location].count++;
       byLocation[location].total += amount;
 
-      // Build filtered transporter data from OTW containers
       if (!byTransporter[transporter]) {
         byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
       }
@@ -141,13 +155,11 @@ export default function ContainerDashboard() {
       totalAmount += amount;
     }
 
-    // Add offloaded containers from API (these are not affected by filters)
     if (data.byTransporter) {
       for (const [transporter, tData] of Object.entries(data.byTransporter)) {
         if (!byTransporter[transporter]) {
           byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
         }
-        // Filter offloaded containers by company if filter is applied
         let offloaded = tData.offloaded;
         if (filterCompany !== "all") {
           offloaded = offloaded.filter(c => c.companyCode === filterCompany);
@@ -185,7 +197,6 @@ export default function ContainerDashboard() {
   const handleContainerClick = (companyId: number) => {
     const company = companies.find(c => c.id === companyId);
     if (company) { selectCompany(company); navigate("/containers"); }
-    
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -214,329 +225,462 @@ export default function ContainerDashboard() {
     );
   }
 
-  return (
-    <div className="space-y-4 p-4">
-      <PageHeader
-        title="Container Tracking Dashboard"
-        subtitle="Cross-company view of all containers on the way"
-      />
-
-      <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
-        <Select value={filterCompany} onValueChange={setFilterCompany}>
-          <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-filter-company">
-            <SelectValue placeholder="All Companies" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Companies</SelectItem>
-            {companyFilterOptions.map(([code, name]) => (
-              <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterAgent} onValueChange={setFilterAgent}>
-          <SelectTrigger className="w-[120px] sm:w-[150px]" data-testid="select-filter-agent">
-            <SelectValue placeholder="All Agents" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Agents</SelectItem>
-            {agents.map(agent => (
-              <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filterTransporter} onValueChange={setFilterTransporter}>
-          <SelectTrigger className="w-[140px] sm:w-[180px]" data-testid="select-filter-transporter">
-            <SelectValue placeholder="All Transporters" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Transporters</SelectItem>
-            {transporters.map(t => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {(filterAgent !== "all" || filterCompany !== "all" || filterTransporter !== "all") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setFilterAgent("all");
-              setFilterCompany("all");
-              setFilterTransporter("all");
-            }}
-            data-testid="button-clear-filters"
-          >
-            Clear Filters
-          </Button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-4">
-        <div className="lg:col-span-3 space-y-3 sm:space-y-4">
-          <div className="grid grid-cols-4 gap-2">
-            <Card>
-              <CardContent className="p-2">
-                <div className="flex items-center gap-1">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total OTW</p>
-                    <p className="text-lg font-bold">{filteredData?.totals.count || 0}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-2">
-                <div className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total Value</p>
-                    <p className="text-lg font-bold">${formatNumber(filteredData?.totals.amount || 0)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-2">
-                <div className="flex items-center gap-1">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Routes</p>
-                    <p className="text-lg font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-2">
-                <div className="flex items-center gap-1">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Agents</p>
-                    <p className="text-lg font-bold">{Object.keys(filteredData?.byAgent || {}).filter(a => a !== "Unassigned").length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <ScrollArea className="h-[calc(100vh-320px)]">
-            <div className="space-y-3">
-              {filteredData && Object.entries(filteredData.byRoute)
-                .sort(([a], [b]) => (a || '').localeCompare(b || ''))
-                .map(([route, containers]) => {
-                  const routeTotal = containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
-                  const isExpanded = expandedRoutes.has(route);
-                  
-                  return (
-                    <Card key={route} className="overflow-hidden">
-                      <Collapsible open={isExpanded} onOpenChange={() => toggleRoute(route)}>
-                        <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer hover-elevate py-3 px-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                <CardTitle className="text-base font-semibold">
-                                  {route === "Unassigned" ? "Unassigned Route" : route}
-                                </CardTitle>
-                                <Badge variant="secondary">{containers.length}</Badge>
-                              </div>
-                              <span className="text-sm font-medium">${formatNumber(routeTotal)}</span>
-                            </div>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead className="bg-muted/50">
-                                  <tr>
-                                    <th className="text-left p-2 font-medium">#</th>
-                                    <th className="text-left p-2 font-medium">Container</th>
-                                    <th className="text-right p-2 font-medium">Amount</th>
-                                    <th className="text-left p-2 font-medium">Company</th>
-                                    <th className="text-left p-2 font-medium">ETA</th>
-                                    <th className="text-left p-2 font-medium">Plate</th>
-                                    <th className="text-left p-2 font-medium">Location</th>
-                                    <th className="text-left p-2 font-medium">Border</th>
-                                    <th className="text-left p-2 font-medium">Offload</th>
-                                    <th className="text-center p-2 font-medium">Docs</th>
-                                    <th className="text-left p-2 font-medium">Transporter</th>
-                                    <th className="text-right p-2 font-medium">Fee</th>
-                                    <th className="text-left p-2 font-medium">Agent</th>
-                                    <th className="text-right p-2 font-medium">Duty</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {containers.map((container, idx) => (
-                                    <tr
-                                      key={container.id}
-                                      className={cn(
-                                        "border-t hover-elevate cursor-pointer",
-                                        container.docReceived && "bg-green-500/10",
-                                        isOverdue(container.eta) && !container.docReceived && "bg-yellow-500/10"
-                                      )}
-                                      onClick={() => handleContainerClick(container.companyId)}
-                                      data-testid={`row-container-${container.id}`}
-                                    >
-                                      <td className="p-2">{idx + 1}</td>
-                                      <td className="p-2 font-mono text-xs">{container.containerNumber}</td>
-                                      <td className="p-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
-                                      <td className="p-2">
-                                        <Badge variant="outline" className="text-xs">{container.companyCode}</Badge>
-                                      </td>
-                                      <td className={cn("p-2", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
-                                        {formatDate(container.eta)}
-                                      </td>
-                                      <td className="p-2 text-xs">{container.numberPlate || "-"}</td>
-                                      <td className="p-2 text-xs">{container.trackingLocation || "-"}</td>
-                                      <td className="p-2">{formatDate(container.borderDate)}</td>
-                                      <td className="p-2">{formatDate(container.offloadDate)}</td>
-                                      <td className="p-2 text-center">
-                                        {container.docReceived ? (
-                                          <FileCheck className="h-4 w-4 text-green-600 mx-auto" />
-                                        ) : (
-                                          <AlertTriangle className="h-4 w-4 text-yellow-500 mx-auto" />
-                                        )}
-                                      </td>
-                                      <td className="p-2 text-xs">{container.transporter || "-"}</td>
-                                      <td className="p-2 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
-                                      <td className="p-2">{container.agent || "-"}</td>
-                                      <td className="p-2 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </Card>
-                  );
-                })}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <Tabs defaultValue="summary" className="w-full lg:col-span-2">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="summary" data-testid="tab-summary">Summary</TabsTrigger>
-            <TabsTrigger value="balances" data-testid="tab-balances">Statement Balances</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="summary" className="mt-4">
-            <ScrollArea className="h-[calc(100vh-280px)]">
-              <div className="space-y-4">
-                <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  By Agent
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {filteredData && Object.entries(filteredData.byAgent)
-                  .filter(([agent]) => agent !== "Unassigned")
-                  .sort(([, a], [, b]) => Math.abs(b.balance) - Math.abs(a.balance))
-                  .map(([agent, agentData]) => (
-                    <div
-                      key={agent}
-                      className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
-                      onClick={() => setFilterAgent(filterAgent === agent ? "all" : agent)}
-                      data-testid={`card-agent-${agent}`}
-                    >
-                      <span className="font-medium">{agent}</span>
-                      <Badge variant="secondary" className="text-xs">{agentData.containers.length}</Badge>
-                    </div>
-                  ))}
-                {filteredData?.byAgent["Unassigned"] && (
-                  <div className="flex items-center justify-between p-2 rounded text-muted-foreground">
+  const renderAgentStatement = () => {
+    if (!selectedAgent || !data?.byAgent[selectedAgent]) {
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground mb-4">Select an agent to view their statement</p>
+          {agents.map(agent => {
+            const agentData = data?.byAgent[agent];
+            return (
+              <Card 
+                key={agent} 
+                className="cursor-pointer hover-elevate"
+                onClick={() => setSelectedAgent(agent)}
+                data-testid={`card-statement-agent-${agent}`}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span>Unassigned</span>
-                      <Badge variant="outline" className="text-xs">{filteredData.byAgent["Unassigned"].containers.length}</Badge>
+                      <span className="font-medium">{agent}</span>
+                      <Badge variant="secondary" className="text-xs">{agentData?.containers.length || 0} OTW</Badge>
+                      <Badge variant="outline" className="text-xs">{agentData?.offloadedContainers?.length || 0} Offloaded</Badge>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  By Location
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {filteredData && Object.entries(filteredData.byLocation)
-                  .sort(([, a], [, b]) => b.count - a.count)
-                  .slice(0, 10)
-                  .map(([location, locationData]) => (
-                    <div
-                      key={location}
-                      className="flex items-center justify-between p-2 rounded"
-                      data-testid={`card-location-${location}`}
-                    >
-                      <span className="text-sm">{location}</span>
-                      <Badge variant="secondary" className="text-xs">{locationData.count}</Badge>
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Containers</span>
-                    <span className="font-bold">{filteredData?.totals.count || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Value</span>
-                    <span className="font-bold">${formatNumber(filteredData?.totals.amount || 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Docs Received</span>
-                    <span className="font-bold text-green-600">
-                      {filteredData?.containers.filter(c => c.docReceived).length || 0}
+                    <span className={cn("font-bold", (agentData?.balance || 0) < 0 ? "text-red-600" : "text-green-600")}>
+                      ${formatNumber(Math.abs(agentData?.balance || 0))} {(agentData?.balance || 0) < 0 ? "Cr" : "Dr"}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Pending Docs</span>
-                    <span className="font-bold text-yellow-600">
-                      {filteredData?.containers.filter(c => !c.docReceived).length || 0}
-                    </span>
-                  </div>
-                </div>
-                </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="balances" className="mt-4">
-            <ScrollArea className="h-[calc(100vh-280px)]">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Statement Balances</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">Coming soon...</p>
                 </CardContent>
               </Card>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const agentData = data.byAgent[selectedAgent];
+    
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedAgent(null)} data-testid="button-back-agents">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
+          <h3 className="font-bold text-lg">{selectedAgent}</h3>
+          <Badge variant={agentData.balance < 0 ? "destructive" : "default"}>
+            Balance: ${formatNumber(Math.abs(agentData.balance))} {agentData.balance < 0 ? "Cr" : "Dr"}
+          </Badge>
+        </div>
+
+        <Card>
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Offloaded Containers (Balance Owed)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left py-1 px-2 font-medium">Container</th>
+                    <th className="text-left py-1 px-2 font-medium">Company</th>
+                    <th className="text-right py-1 px-2 font-medium">Amount</th>
+                    <th className="text-left py-1 px-2 font-medium">Location</th>
+                    <th className="text-left py-1 px-2 font-medium">Offload Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentData.offloadedContainers?.length > 0 ? (
+                    agentData.offloadedContainers.map((container) => (
+                      <tr key={container.id} className="border-t" data-testid={`row-offloaded-${container.id}`}>
+                        <td className="py-1 px-2 font-mono">{container.containerNumber}</td>
+                        <td className="py-1 px-2">{container.companyCode}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                        <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
+                        <td className="py-1 px-2">{formatDate(container.offloadDate)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={5} className="py-2 px-2 text-center text-muted-foreground">No offloaded containers</td></tr>
+                  )}
+                </tbody>
+                {agentData.offloadedContainers?.length > 0 && (
+                  <tfoot className="bg-green-100 dark:bg-green-900/30">
+                    <tr>
+                      <td colSpan={2} className="py-1 px-2 font-bold">Total Offloaded</td>
+                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.offloadedTotal)}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="py-2 px-3">
+            <CardTitle className="text-sm font-medium text-yellow-700 dark:text-yellow-400">OTW Containers (Pending)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left py-1 px-2 font-medium">Container</th>
+                    <th className="text-left py-1 px-2 font-medium">Company</th>
+                    <th className="text-right py-1 px-2 font-medium">Amount</th>
+                    <th className="text-left py-1 px-2 font-medium">ETA</th>
+                    <th className="text-left py-1 px-2 font-medium">Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentData.containers.length > 0 ? (
+                    agentData.containers.map((container) => (
+                      <tr key={container.id} className="border-t" data-testid={`row-otw-${container.id}`}>
+                        <td className="py-1 px-2 font-mono">{container.containerNumber}</td>
+                        <td className="py-1 px-2">{container.companyCode}</td>
+                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                        <td className={cn("py-1 px-2", isOverdue(container.eta) && "text-yellow-600")}>{formatDate(container.eta)}</td>
+                        <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={5} className="py-2 px-2 text-center text-muted-foreground">No OTW containers</td></tr>
+                  )}
+                </tbody>
+                {agentData.containers.length > 0 && (
+                  <tfoot className="bg-yellow-100 dark:bg-yellow-900/30">
+                    <tr>
+                      <td colSpan={2} className="py-1 px-2 font-bold">Total OTW</td>
+                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.total)}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3 p-3">
+      <PageHeader
+        title="Container Tracking"
+        subtitle="Cross-company view of containers and agent statements"
+      />
+
+      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="tracking" data-testid="tab-main-tracking">Container Tracking</TabsTrigger>
+          <TabsTrigger value="statements" data-testid="tab-main-statements">Statement of Accounts</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tracking" className="mt-3">
+          <div className="flex flex-wrap gap-2 items-center mb-3">
+            <Select value={filterCompany} onValueChange={setFilterCompany}>
+              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-filter-company">
+                <SelectValue placeholder="All Companies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companyFilterOptions.map(([code, name]) => (
+                  <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterAgent} onValueChange={setFilterAgent}>
+              <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-filter-agent">
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {agents.map(agent => (
+                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterTransporter} onValueChange={setFilterTransporter}>
+              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-filter-transporter">
+                <SelectValue placeholder="All Transporters" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Transporters</SelectItem>
+                {transporters.map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(filterAgent !== "all" || filterCompany !== "all" || filterTransporter !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  setFilterAgent("all");
+                  setFilterCompany("all");
+                  setFilterTransporter("all");
+                }}
+                data-testid="button-clear-filters"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
+            <div className="lg:col-span-3 space-y-2">
+              <div className="grid grid-cols-4 gap-1">
+                <Card>
+                  <CardContent className="py-1 px-2">
+                    <div className="flex items-center gap-1">
+                      <Package className="h-3 w-3 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Total OTW</p>
+                        <p className="text-sm font-bold">{filteredData?.totals.count || 0}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-1 px-2">
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Total Value</p>
+                        <p className="text-sm font-bold">${formatNumber(filteredData?.totals.amount || 0)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-1 px-2">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Routes</p>
+                        <p className="text-sm font-bold">{Object.keys(filteredData?.byRoute || {}).length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-1 px-2">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Agents</p>
+                        <p className="text-sm font-bold">{Object.keys(filteredData?.byAgent || {}).filter(a => a !== "Unassigned").length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <ScrollArea className="h-[calc(100vh-280px)]">
+                <div className="space-y-2">
+                  {filteredData && Object.entries(filteredData.byRoute)
+                    .sort(([a], [b]) => (a || '').localeCompare(b || ''))
+                    .map(([route, containers]) => {
+                      const routeTotal = containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
+                      const isExpanded = expandedRoutes.has(route);
+                      
+                      return (
+                        <Card key={route} className="overflow-hidden">
+                          <Collapsible open={isExpanded} onOpenChange={() => toggleRoute(route)}>
+                            <CollapsibleTrigger asChild>
+                              <CardHeader className="cursor-pointer hover-elevate py-2 px-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                    <CardTitle className="text-sm font-semibold">
+                                      {route === "Unassigned" ? "Unassigned Route" : route}
+                                    </CardTitle>
+                                    <Badge variant="secondary" className="text-xs">{containers.length}</Badge>
+                                  </div>
+                                  <span className="text-xs font-medium">${formatNumber(routeTotal)}</span>
+                                </div>
+                              </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-muted/50">
+                                      <tr>
+                                        <th className="text-left py-1 px-1 font-medium">#</th>
+                                        <th className="text-left py-1 px-1 font-medium">Container</th>
+                                        <th className="text-right py-1 px-1 font-medium">Amount</th>
+                                        <th className="text-left py-1 px-1 font-medium">Co</th>
+                                        <th className="text-left py-1 px-1 font-medium">ETA</th>
+                                        <th className="text-left py-1 px-1 font-medium">Plate</th>
+                                        <th className="text-left py-1 px-1 font-medium">Location</th>
+                                        <th className="text-left py-1 px-1 font-medium">Border</th>
+                                        <th className="text-left py-1 px-1 font-medium">Offload</th>
+                                        <th className="text-center py-1 px-1 font-medium">Docs</th>
+                                        <th className="text-left py-1 px-1 font-medium">Transporter</th>
+                                        <th className="text-right py-1 px-1 font-medium">Fee</th>
+                                        <th className="text-left py-1 px-1 font-medium">Agent</th>
+                                        <th className="text-right py-1 px-1 font-medium">Duty</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {containers.map((container, idx) => (
+                                        <tr
+                                          key={container.id}
+                                          className={cn(
+                                            "border-t hover-elevate cursor-pointer",
+                                            container.docReceived && "bg-green-500/10",
+                                            isOverdue(container.eta) && !container.docReceived && "bg-yellow-500/10"
+                                          )}
+                                          onClick={() => handleContainerClick(container.companyId)}
+                                          data-testid={`row-container-${container.id}`}
+                                        >
+                                          <td className="py-1 px-1">{idx + 1}</td>
+                                          <td className="py-1 px-1 font-mono">{container.containerNumber}</td>
+                                          <td className="py-1 px-1 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                                          <td className="py-1 px-1">
+                                            <Badge variant="outline" className="text-[10px] py-0 px-1">{container.companyCode}</Badge>
+                                          </td>
+                                          <td className={cn("py-1 px-1", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
+                                            {formatDate(container.eta)}
+                                          </td>
+                                          <td className="py-1 px-1">{container.numberPlate || "-"}</td>
+                                          <td className="py-1 px-1">{container.trackingLocation || "-"}</td>
+                                          <td className="py-1 px-1">{formatDate(container.borderDate)}</td>
+                                          <td className="py-1 px-1">{formatDate(container.offloadDate)}</td>
+                                          <td className="py-1 px-1 text-center">
+                                            {container.docReceived ? (
+                                              <FileCheck className="h-3 w-3 text-green-600 mx-auto" />
+                                            ) : (
+                                              <AlertTriangle className="h-3 w-3 text-yellow-500 mx-auto" />
+                                            )}
+                                          </td>
+                                          <td className="py-1 px-1">{container.transporter || "-"}</td>
+                                          <td className="py-1 px-1 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
+                                          <td className="py-1 px-1">{container.agent || "-"}</td>
+                                          <td className="py-1 px-1 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </CardContent>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </Card>
+                      );
+                    })}
+                </div>
+              </ScrollArea>
+            </div>
+
+            <div className="lg:col-span-1">
+              <ScrollArea className="h-[calc(100vh-220px)]">
+                <div className="space-y-2 pr-2">
+                  <Card>
+                    <CardHeader className="py-2 px-3">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        By Agent
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1 py-1 px-3">
+                      {filteredData && Object.entries(filteredData.byAgent)
+                        .filter(([agent]) => agent !== "Unassigned")
+                        .sort(([, a], [, b]) => Math.abs(b.balance) - Math.abs(a.balance))
+                        .map(([agent, agentData]) => (
+                          <div
+                            key={agent}
+                            className="flex items-center gap-1 py-1 px-1 rounded hover-elevate cursor-pointer text-xs"
+                            onClick={() => setFilterAgent(filterAgent === agent ? "all" : agent)}
+                            data-testid={`card-agent-${agent}`}
+                          >
+                            <span className="font-medium">{agent}</span>
+                            <Badge variant="secondary" className="text-[10px] py-0 px-1">{agentData.containers.length}</Badge>
+                          </div>
+                        ))}
+                      {filteredData?.byAgent["Unassigned"] && (
+                        <div className="flex items-center gap-1 py-1 rounded text-muted-foreground text-xs">
+                          <span>Unassigned</span>
+                          <Badge variant="outline" className="text-[10px] py-0 px-1">{filteredData.byAgent["Unassigned"].containers.length}</Badge>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="py-2 px-3">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        By Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1 py-1 px-3">
+                      {filteredData && Object.entries(filteredData.byLocation)
+                        .sort(([, a], [, b]) => b.count - a.count)
+                        .map(([location, locationData]) => (
+                          <div
+                            key={location}
+                            className="flex items-center justify-between py-1 rounded text-xs"
+                            data-testid={`card-location-${location}`}
+                          >
+                            <span>{location}</span>
+                            <Badge variant="secondary" className="text-[10px] py-0 px-1">{locationData.count}</Badge>
+                          </div>
+                        ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="py-2 px-3">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1">
+                        <Truck className="h-3 w-3" />
+                        Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-1 px-3">
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total Containers</span>
+                          <span className="font-bold">{filteredData?.totals.count || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total Value</span>
+                          <span className="font-bold">${formatNumber(filteredData?.totals.amount || 0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Docs Received</span>
+                          <span className="font-bold text-green-600">
+                            {filteredData?.containers.filter(c => c.docReceived).length || 0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Pending Docs</span>
+                          <span className="font-bold text-yellow-600">
+                            {filteredData?.containers.filter(c => !c.docReceived).length || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="statements" className="mt-3">
+          <ScrollArea className="h-[calc(100vh-180px)]">
+            {renderAgentStatement()}
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

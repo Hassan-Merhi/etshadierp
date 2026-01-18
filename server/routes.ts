@@ -14968,6 +14968,14 @@ if (asOfDate) {
 
         // Calculate totals and prepare items data
         let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
         const poItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -15154,6 +15162,14 @@ if (asOfDate) {
 
         // Calculate totals and prepare items data
         let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
         const adjustmentItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -15419,6 +15435,14 @@ if (asOfDate) {
 
           // Calculate totals and prepare items data
           let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
           const transferItemsData = items.map((item: any) => {
             const quantity = parseFloat(item.quantity);
             const rate = parseFloat(item.rate);
@@ -17679,6 +17703,14 @@ if (asOfDate) {
         let totalQuantity = 0;
         let totalAmount = 0;
 
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
+
         for (const voucher of salesVouchers) {
           totalAmount += parseFloat(voucher.totalAmount || "0");
 
@@ -18811,6 +18843,14 @@ if (asOfDate) {
             .returning();
 
           let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
           const transferItems = [];
 
           for (const item of items) {
@@ -25617,10 +25657,18 @@ if (asOfDate) {
 
       // Group OTW containers by shopName (route)
       const byRoute: Record<string, any[]> = {};
-      const byAgent: Record<string, { containers: any[], total: number, balance: number }> = {};
+      const byAgent: Record<string, { containers: any[], offloadedContainers: any[], total: number, offloadedTotal: number, balance: number }> = {};
       const byLocation: Record<string, { count: number, total: number }> = {};
 
       let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
 
       for (const container of otwContainers) {
         const route = container.shopName || "Unassigned";
@@ -25633,7 +25681,7 @@ if (asOfDate) {
         byRoute[route].push(container);
 
         // Group by agent with balance
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], total: 0, balance: agentBalances[agent] || 0 };
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].containers.push(container);
         byAgent[agent].total += amount;
 
@@ -27178,6 +27226,14 @@ if (asOfDate) {
       
       // Create Stock Transfer voucher link
       let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
       const transferItems = [];
       
       for (const item of items) {
@@ -31007,6 +31063,14 @@ if (asOfDate) {
         
         let totalFixed = 0;
         let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
         // Process each company
@@ -31279,6 +31343,14 @@ if (asOfDate) {
         let fixed = 0;
         let skipped = 0;
         let totalAmount = 0;
+
+      // First, group offloaded containers by agent
+      for (const container of offloadedContainers) {
+        const agent = container.agent || "Unassigned";
+        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        byAgent[agent].offloadedContainers.push(container);
+        byAgent[agent].offloadedTotal += parseFloat(container.grandTotal || "0");
+      }
         const details: any[] = [];
         
         for (const po of allPOs) {
