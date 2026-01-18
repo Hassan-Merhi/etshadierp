@@ -301,25 +301,25 @@ export default function POSDaybook() {
   const transferCount = transferVouchers.length;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <PageHeader 
         title="POS Daybook" 
         subtitle={`Sales transactions - ${formatDisplayDate(targetDate)}`}
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Sales Count
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">
+              Sales
             </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-transaction-count">
+              <div className="text-xl md:text-2xl font-bold" data-testid="text-transaction-count">
                 {salesTransactionCount}
               </div>
             )}
@@ -327,56 +327,53 @@ export default function POSDaybook() {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Sales
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">
+              Total
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-total-sales">
-                ${totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-lg md:text-2xl font-bold" data-testid="text-total-sales">
+                ${formatNumber(totalSales)}
               </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Average Sale
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">
+              Average
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-avg-transaction">
-                ${salesTransactionCount > 0 
-                  ? (totalSales / salesTransactionCount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : "0.00"
-                }
+              <div className="text-lg md:text-2xl font-bold" data-testid="text-avg-transaction">
+                ${salesTransactionCount > 0 ? formatNumber(totalSales / salesTransactionCount) : "0.00"}
               </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Transfers Out
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 p-3 pb-1 md:p-6 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">
+              Transfers
             </CardTitle>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-transfer-count">
+              <div className="text-xl md:text-2xl font-bold" data-testid="text-transfer-count">
                 {transferCount}
               </div>
             )}
@@ -406,13 +403,13 @@ export default function POSDaybook() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Receipt #</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-xs">Time</TableHead>
+                    <TableHead className="text-xs">Type</TableHead>
+                    <TableHead className="text-xs">Receipt #</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">Location</TableHead>
+                    <TableHead className="text-xs text-right">Amount</TableHead>
+                    <TableHead className="text-xs hidden md:table-cell">Notes</TableHead>
+                    <TableHead className="text-xs text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -421,26 +418,26 @@ export default function POSDaybook() {
                       key={voucher.id}
                       data-testid={`row-voucher-${voucher.id}`}
                     >
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-xs">
                         {format(new Date(voucher.createdAt), "hh:mm a")}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"}>
-                          {voucher.voucherType === "Sales" ? "Sale" : "Transfer Out"}
+                        <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
+                          {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-sm font-medium">
+                      <TableCell className="font-mono text-xs font-medium">
                         {voucher.voucherNumber}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge variant="secondary" className="text-xs">
                           {voucher.locationName || `Location ${voucher.locationId}`}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono font-semibold">
+                      <TableCell className="text-right font-mono text-xs font-semibold">
                         ${parseFloat(voucher.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate text-sm">
+                      <TableCell className="max-w-xs truncate text-xs hidden md:table-cell">
                         {voucher.description || "-"}
                       </TableCell>
                       <TableCell className="text-right">
