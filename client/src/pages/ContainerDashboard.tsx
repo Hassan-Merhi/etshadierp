@@ -433,8 +433,8 @@ export default function ContainerDashboard() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
-            <div className="lg:col-span-3 space-y-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-2">
+            <div className="space-y-2 min-w-0">
               <div className="grid grid-cols-4 gap-1">
                 <Card>
                   <CardContent className="py-1 px-2">
@@ -580,7 +580,7 @@ export default function ContainerDashboard() {
               </ScrollArea>
             </div>
 
-            <div className="lg:col-span-1">
+            <div className="shrink-0">
               <ScrollArea className="h-[calc(100vh-220px)]">
                 <div className="space-y-2 pr-2">
                   <Card>
