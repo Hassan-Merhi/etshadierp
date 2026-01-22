@@ -962,7 +962,7 @@ export default function Accounts() {
         <Button
           data-testid="button-create-account"
           disabled={!selectedCompany}
-          onClick={() => navigate("/create")}
+          onClick={() => navigate("/accounting/create")}
         >
           <Plus className="w-4 h-4 mr-2" />
           Create

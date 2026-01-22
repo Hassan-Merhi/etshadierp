@@ -94,11 +94,11 @@ const getDefaultValues = (entityType: EntityType) => {
     case "ledger":
       return {
         name: "",
-        accountType: "" as any,
+        accountType: "Asset" as any,
         subType: "",
         parentId: undefined as any,
         openingBalance: "0",
-        openingBalanceSide: "" as any,
+        openingBalanceSide: "Dr" as any,
         active: true,
       };
 
@@ -421,6 +421,14 @@ function LedgerAccountForm({
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
   const [isParentDialogOpen, setIsParentDialogOpen] = useState(false);
+
+  // Set openingBalanceSide default when openingBalance is entered if not already set
+  useEffect(() => {
+    const currentSide = form.getValues("openingBalanceSide");
+    if (openingBalance && parseFloat(openingBalance) !== 0 && !currentSide) {
+      form.setValue("openingBalanceSide", "Dr");
+    }
+  }, [openingBalance, form]);
 
   // Get available subtypes based on account type
   const getSubTypes = () => {
