@@ -140,7 +140,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit
   accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Accounts Payable", "Profit"]),
   subType: z.string().optional(),
   openingBalance: z.string().optional(),
-  openingBalanceSide: z.string().optional(),
+  openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
   parentId: z.number().optional(),
 });
 
@@ -379,7 +379,7 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({
   name: z.string().min(1, "Name is required"),
   bankName: z.string().min(1, "Bank name is required"),
   accountNumber: z.string().min(1, "Account number is required"),
-  openingBalanceSide: z.string().optional(),
+  openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
 });
 
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
@@ -1022,7 +1022,7 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
   companyId: z.number().min(1, "Company is required"),
   legalName: z.string().min(1, "Legal name is required"),
   openingBalance: z.string().optional(),
-  openingBalanceSide: z.string().optional(),
+  openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
   ledgerAccountId: z.number().optional(),
 });
 

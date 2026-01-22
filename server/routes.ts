@@ -2039,8 +2039,8 @@ if (asOfDate) {
         const hasBalance =
           parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
         const hasSide =
-          parsed.openingBalanceSide !== undefined &&
-          parsed.openingBalanceSide !== null;
+          parsed.openingBalanceSide &&
+          parsed.openingBalanceSide !== "";
 
         if (hasBalance && !hasSide) {
           return res
@@ -2136,8 +2136,8 @@ if (asOfDate) {
         const hasBalance =
           parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
         const hasSide =
-          parsed.openingBalanceSide !== undefined &&
-          parsed.openingBalanceSide !== null;
+          parsed.openingBalanceSide &&
+          parsed.openingBalanceSide !== "";
 
         if (hasBalance && !hasSide) {
           return res
@@ -6746,8 +6746,8 @@ if (asOfDate) {
       const hasBalance =
         parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
       const hasSide =
-        parsed.openingBalanceSide !== undefined &&
-        parsed.openingBalanceSide !== null;
+        parsed.openingBalanceSide &&
+        parsed.openingBalanceSide !== "";
 
       if (hasBalance && !hasSide) {
         return res
@@ -6806,8 +6806,8 @@ if (asOfDate) {
       const hasBalance =
         parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
       const hasSide =
-        parsed.openingBalanceSide !== undefined &&
-        parsed.openingBalanceSide !== null;
+        parsed.openingBalanceSide &&
+        parsed.openingBalanceSide !== "";
 
       if (hasBalance && !hasSide) {
         return res
