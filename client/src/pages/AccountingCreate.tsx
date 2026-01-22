@@ -98,7 +98,7 @@ const getDefaultValues = (entityType: EntityType) => {
         subType: "",
         parentId: undefined as any,
         openingBalance: "0",
-        openingBalanceSide: "Dr" as any,
+        openingBalanceSide: "" as any,
         active: true,
       };
 
@@ -809,7 +809,7 @@ function LedgerAccountForm({
                 name="openingBalanceSide"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dr/Cr Side *</FormLabel>
+                    <FormLabel>Dr/Cr Side</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value || ""}
