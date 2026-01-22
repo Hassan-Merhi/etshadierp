@@ -803,14 +803,17 @@ function LedgerAccountForm({
               )}
             />
 
-            {openingBalance && parseFloat(openingBalance) > 0 && (
+            {openingBalance && parseFloat(openingBalance) !== 0 && (
               <FormField
                 control={form.control}
                 name="openingBalanceSide"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Dr/Cr Side *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || ""}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-balance-side">
                           <SelectValue placeholder="Select" />
