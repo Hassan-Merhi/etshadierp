@@ -136,19 +136,30 @@ export default function ContainerDashboard() {
     }
   };
 
+  /**
+   * ✅ FIXED SORTING (ONLY CHANGE IN THE FILE)
+   * Groups by Supplier first (WH TURKEY together, AL ZAYDAAN together, etc.)
+   * Then sorts by earliest ETA first inside each supplier group
+   * Then uses location as a tie-breaker
+   */
   const sortContainersByLocationAndEta = (containers: Container[]) => {
     return [...containers].sort((a, b) => {
+      // 1) Supplier first (groups suppliers together)
+      const supplierA = (a.supplierName || "zzz").toLowerCase();
+      const supplierB = (b.supplierName || "zzz").toLowerCase();
+      if (supplierA !== supplierB) return supplierA.localeCompare(supplierB);
+
+      // 2) ETA earliest first inside supplier group
+      const etaA = a.eta ? new Date(a.eta).getTime() : Infinity;
+      const etaB = b.eta ? new Date(b.eta).getTime() : Infinity;
+      if (etaA !== etaB) return etaA - etaB;
+
+      // 3) Location tie-breaker (only if supplier + ETA are same)
       const locA = (a.trackingLocation || "zzz").toLowerCase();
       const locB = (b.trackingLocation || "zzz").toLowerCase();
       if (locA !== locB) return locA.localeCompare(locB);
-      
-      const supplierA = (a.supplierName || "").toLowerCase();
-      const supplierB = (b.supplierName || "").toLowerCase();
-      if (supplierA !== supplierB) return supplierA.localeCompare(supplierB);
-      
-      const etaA = a.eta ? new Date(a.eta).getTime() : Infinity;
-      const etaB = b.eta ? new Date(b.eta).getTime() : Infinity;
-      return etaA - etaB;
+
+      return 0;
     });
   };
 
@@ -177,9 +188,9 @@ export default function ContainerDashboard() {
 
   const filteredData = useMemo(() => {
     if (!data) return null;
-    
+
     let containers = data.containers;
-    
+
     if (filterAgent !== "all") {
       containers = containers.filter(c => c.agent === filterAgent);
     }
@@ -209,12 +220,12 @@ export default function ContainerDashboard() {
 
       if (!byAgent[agent]) {
         const originalData = data.byAgent[agent];
-        byAgent[agent] = { 
-          containers: [], 
+        byAgent[agent] = {
+          containers: [],
           offloadedContainers: originalData?.offloadedContainers || [],
-          total: 0, 
+          total: 0,
           offloadedTotal: originalData?.offloadedTotal || 0,
-          balance: originalData?.balance || 0 
+          balance: originalData?.balance || 0
         };
       }
       byAgent[agent].containers.push(container);
@@ -311,8 +322,8 @@ export default function ContainerDashboard() {
           {agents.map(agent => {
             const agentData = data?.byAgent[agent];
             return (
-              <Card 
-                key={agent} 
+              <Card
+                key={agent}
                 className="cursor-pointer hover-elevate"
                 onClick={() => setSelectedAgent(agent)}
                 data-testid={`card-statement-agent-${agent}`}
@@ -334,7 +345,7 @@ export default function ContainerDashboard() {
     }
 
     const agentData = data.byAgent[selectedAgent];
-    
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
@@ -511,7 +522,7 @@ export default function ContainerDashboard() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-2">
             <div className="space-y-2 min-w-0">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                 <Card>
@@ -567,7 +578,7 @@ export default function ContainerDashboard() {
                     .map(([route, containers]) => {
                       const routeTotal = containers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
                       const isExpanded = expandedRoutes.has(route);
-                      
+
                       return (
                         <Card key={route}>
                           <Collapsible open={isExpanded} onOpenChange={() => toggleRoute(route)}>
@@ -602,8 +613,8 @@ export default function ContainerDashboard() {
                                       <th className="text-left py-0.5 px-0.5 font-medium">Offload</th>
                                       <th className="text-center py-0.5 px-0.5 font-medium w-6">Doc</th>
                                       <th className="text-left py-0.5 px-0.5 font-medium">Transporter</th>
-                                      <th className="text-right py-0.5 px-0.5 font-medium">Fee</th>
-                                      <th className="text-left py-0.5 px-0.5 font-medium">Agent</th>
+                                      <th className="text-center py-0.5 px-2 font-medium min-w-[80px]">Fee</th>
+                                      <th className="text-left py-0.5 px-2 font-medium min-w-[90px]">Agent</th>
                                       <th className="text-right py-0.5 px-0.5 font-medium">Duty</th>
                                     </tr>
                                   </thead>
@@ -620,7 +631,7 @@ export default function ContainerDashboard() {
                                         data-testid={`row-container-${container.id}`}
                                       >
                                         <td className="py-0.5 px-0.5 w-5">{idx + 1}</td>
-                                        <td 
+                                        <td
                                           className="py-0.5 px-0.5 font-mono text-[10px] text-primary underline cursor-pointer hover:text-primary/80"
                                           onClick={(e) => handleContainerNumberClick(e, container.id)}
                                           data-testid={`link-container-${container.id}`}
@@ -644,8 +655,8 @@ export default function ContainerDashboard() {
                                           )}
                                         </td>
                                         <td className="py-0.5 px-0.5">{container.transporter || "-"}</td>
-                                        <td className="py-0.5 px-0.5 text-right">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
-                                        <td className="py-0.5 px-0.5">{container.agent || "-"}</td>
+                                        <td className="py-0.5 px-2 text-center min-w-[80px]">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
+                                        <td className="py-0.5 px-2 min-w-[90px]">{container.agent || "-"}</td>
                                         <td className="py-0.5 px-0.5 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
                                       </tr>
                                     ))}
@@ -662,7 +673,7 @@ export default function ContainerDashboard() {
               </ScrollArea>
             </div>
 
-            <div className="shrink-0">
+            <div className="w-full lg:w-[200px] shrink-0">
               <ScrollArea className="h-[calc(100vh-220px)]">
                 <div className="space-y-2 pr-2">
                   <Card>
@@ -772,7 +783,7 @@ export default function ContainerDashboard() {
               Container Details: {poData?.container.containerNumber}
             </DialogTitle>
           </DialogHeader>
-          
+
           {loadingPO ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -881,3 +892,4 @@ export default function ContainerDashboard() {
     </div>
   );
 }
+

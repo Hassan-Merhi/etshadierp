@@ -2,13 +2,39 @@ import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { DollarSign, TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  DollarSign,
+  TrendingUp,
+  Plus,
+  X,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Check,
+  ChevronsUpDown,
+  Truck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatNumber } from "@/lib/formatNumber";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useState } from "react";
@@ -70,7 +96,6 @@ type ImportCycleBalanceData = {
   };
 };
 
-
 type DashboardCashAccount = {
   id: number;
   accountType: string;
@@ -107,18 +132,26 @@ type PayableAccount = {
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number>(0);
-  const [selectedPayableAccountId, setSelectedPayableAccountId] = useState<number>(0);
+  const [selectedPayableAccountId, setSelectedPayableAccountId] =
+    useState<number>(0);
   const [payableComboboxOpen, setPayableComboboxOpen] = useState(false);
   const [cashComboboxOpen, setCashComboboxOpen] = useState(false);
-  
+
   // Fetch net profit data
-  const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
+  const {
+    data: profitData,
+    isLoading,
+    isError,
+  } = useQuery<ProfitData>({
     queryKey: ["/api/stats/net-profit", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/stats/net-profit", { credentials: "include" });
+      const response = await fetch("/api/stats/net-profit", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch net profit");
       return await response.json();
     },
@@ -129,7 +162,9 @@ export default function Dashboard() {
   const { data: importCycleData } = useQuery<ImportCycleBalanceData>({
     queryKey: ["/api/stats/import-cycle-balance", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/stats/import-cycle-balance", { credentials: "include" });
+      const response = await fetch("/api/stats/import-cycle-balance", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch import cycle balance");
       return await response.json();
     },
@@ -137,10 +172,12 @@ export default function Dashboard() {
   });
 
   // Fetch dashboard cash accounts
-  const { data: dashboardCashAccounts = [] } = useQuery<DashboardCashAccount[]>({
-    queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
-    enabled: !!selectedCompany,
-  });
+  const { data: dashboardCashAccounts = [] } = useQuery<DashboardCashAccount[]>(
+    {
+      queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
+      enabled: !!selectedCompany,
+    },
+  );
 
   // Fetch all accounts for selection
   const { data: allAccounts = [] } = useQuery<Account[]>({
@@ -152,12 +189,14 @@ export default function Dashboard() {
   const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch("/api/accounts/all", { credentials: "include" });
+      const response = await fetch("/api/accounts/all", {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch accounts");
       const allAccounts = await response.json();
       // Filter to show only payable/liability type accounts
-      return allAccounts.filter((acc: any) => 
-        acc.type && acc.type.toLowerCase() === "ledger"
+      return allAccounts.filter(
+        (acc: any) => acc.type && acc.type.toLowerCase() === "ledger",
       );
     },
     enabled: !!selectedCompany,
@@ -176,7 +215,9 @@ export default function Dashboard() {
       return await apiRequest("POST", "/api/dashboard-cash-accounts", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-cash-accounts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
+      });
       setIsAddDialogOpen(false);
       setSelectedAccountId(0);
       toast({
@@ -193,13 +234,15 @@ export default function Dashboard() {
     },
   });
 
-  // Remove dashboard cash account mutation
+  // ✅ FIXED: Remove dashboard cash account mutation (removed duplicate onSuccess)
   const removeAccountMutation = useMutation({
     mutationFn: async (id: number) => {
       return await apiRequest("DELETE", `/api/dashboard-cash-accounts/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-cash-accounts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard-cash-accounts", selectedCompany?.id],
+      });
       toast({
         title: "Success",
         description: "Account removed from dashboard",
@@ -220,7 +263,9 @@ export default function Dashboard() {
       return await apiRequest("POST", "/api/dashboard-payable-accounts", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-payable-accounts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
+      });
       setIsAddPayableDialogOpen(false);
       setSelectedPayableAccountId(0);
       toast({
@@ -240,10 +285,15 @@ export default function Dashboard() {
   // Remove dashboard payable account mutation
   const removePayableAccountMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/dashboard-payable-accounts/${id}`);
+      return await apiRequest(
+        "DELETE",
+        `/api/dashboard-payable-accounts/${id}`,
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-payable-accounts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/dashboard-payable-accounts", selectedCompany?.id],
+      });
       toast({
         title: "Success",
         description: "Payable account removed from dashboard",
@@ -259,42 +309,51 @@ export default function Dashboard() {
   });
 
   // Get available cash accounts (excluding ones already added)
-  const availableCashAccounts = allAccounts.filter(acc => {
-    const alreadyAdded = dashboardCashAccounts.some(
-      dca => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId
-    );
-    return !alreadyAdded;
-  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const availableCashAccounts = allAccounts
+    .filter((acc) => {
+      const alreadyAdded = dashboardCashAccounts.some(
+        (dca) =>
+          dca.accountType === (acc.type || "").toLowerCase() &&
+          dca.accountId === acc.accountId,
+      );
+      return !alreadyAdded;
+    })
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   // Show all added cash accounts (regardless of balance)
   const displayedCashAccounts = dashboardCashAccounts;
 
   // Get available payable accounts (excluding ones already added)
-  const availablePayableAccounts = allPayableAccounts.filter(acc => {
-    const alreadyAdded = dashboardPayableAccounts.some(dpa => dpa.accountId === acc.accountId);
-    return !alreadyAdded;
-  }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const availablePayableAccounts = allPayableAccounts
+    .filter((acc) => {
+      const alreadyAdded = dashboardPayableAccounts.some(
+        (dpa) => dpa.accountId === acc.accountId,
+      );
+      return !alreadyAdded;
+    })
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   // Filter payable accounts with non-zero balance from dashboard payable accounts
-  const displayedPayableAccounts = dashboardPayableAccounts.filter(acc => {
-    const balance = Math.abs(acc.balance);
-    return balance !== 0;
-  });
+  const displayedPayableAccounts = dashboardPayableAccounts.filter(
+    (acc) => Math.abs(acc.balance) !== 0,
+  );
 
   // Display error message if query fails
   if (isError) {
     return (
       <div className="space-y-6">
-        <div className="text-destructive">Failed to load dashboard data. Please try again.</div>
+        <div className="text-destructive">
+          Failed to load dashboard data. Please try again.
+        </div>
       </div>
     );
   }
 
   // Format currency
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
@@ -302,8 +361,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Dashboard" 
+      <PageHeader
+        title="Dashboard"
         subtitle="Overview of your business performance"
         showHomeButton={false}
       />
@@ -311,7 +370,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KPICard
           title="Total Income"
-          value={isLoading ? "Loading..." : formatCurrency(profitData?.totalIncome || 0)}
+          value={
+            isLoading
+              ? "Loading..."
+              : formatCurrency(profitData?.totalIncome || 0)
+          }
           change="From all income accounts"
           changeType="positive"
           icon={DollarSign}
@@ -319,19 +382,36 @@ export default function Dashboard() {
         />
         <KPICard
           title="Net Position"
-          value={isLoading ? "Loading..." : formatCurrency(profitData?.netPosition || 0)}
-          change={profitData?.netPositionLabel || "What we have minus what we owe"}
-          changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
+          value={
+            isLoading
+              ? "Loading..."
+              : formatCurrency(profitData?.netPosition || 0)
+          }
+          change={
+            profitData?.netPositionLabel || "What we have minus what we owe"
+          }
+          changeType={
+            (profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"
+          }
           icon={TrendingUp}
           data-testid="kpi-net-position"
         />
         <KPICard
           title="Import Cycle Balance"
-          value={!importCycleData ? "Loading..." : Math.abs(importCycleData.netImportCycleBalance) < 1 ? "$0.00" : formatCurrency(importCycleData.netImportCycleBalance)}
+          value={
+            !importCycleData
+              ? "Loading..."
+              : Math.abs(importCycleData.netImportCycleBalance) < 1
+                ? "$0.00"
+                : formatCurrency(importCycleData.netImportCycleBalance)
+          }
           change="Should be $0 when balanced"
-          changeType={Math.abs(importCycleData?.netImportCycleBalance ?? 0) < 1 ? "positive" : "negative"}
+          changeType={
+            Math.abs(importCycleData?.netImportCycleBalance ?? 0) < 1
+              ? "positive"
+              : "negative"
+          }
           icon={Truck}
-          
           data-testid="kpi-import-cycle-balance"
         />
       </div>
@@ -355,16 +435,20 @@ export default function Dashboard() {
                 {(profitData?.forUsBreakdown ?? []).map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
-                    <span className="font-mono">{formatCurrency(item.value)}</span>
+                    <span className="font-mono">
+                      {formatCurrency(item.value)}
+                    </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Assets:</span>
-                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                  <span className="font-mono text-green-600">
+                    {formatCurrency(profitData?.forUsTotal ?? 0)}
+                  </span>
                 </div>
               </div>
             </div>
-            
+
             {/* What We Owe (Liabilities) - Full Breakdown */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-red-600 mb-3 flex items-center gap-2">
@@ -375,17 +459,21 @@ export default function Dashboard() {
                 {(profitData?.onUsBreakdown ?? []).map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
-                    <span className="font-mono text-red-600">{formatCurrency(item.value)}</span>
+                    <span className="font-mono text-red-600">
+                      {formatCurrency(item.value)}
+                    </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Liabilities:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
+                  <span className="font-mono text-red-600">
+                    {formatCurrency(profitData?.onUsTotal ?? 0)}
+                  </span>
                 </div>
               </div>
             </div>
-            
-            {/* Expenses (what we spent) */}
+
+            {/* Expenses */}
             <div className="border rounded-lg p-4">
               <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
@@ -395,42 +483,58 @@ export default function Dashboard() {
                 {(profitData?.expenses?.breakdown ?? []).map((item, idx) => (
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
-                    <span className="font-mono text-orange-600">{formatCurrency(item.value)}</span>
+                    <span className="font-mono text-orange-600">
+                      {formatCurrency(item.value)}
+                    </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Expenses:</span>
-                  <span className="font-mono text-orange-600">{formatCurrency(profitData?.expensesTotal ?? 0)}</span>
+                  <span className="font-mono text-orange-600">
+                    {formatCurrency(profitData?.expensesTotal ?? 0)}
+                  </span>
                 </div>
               </div>
             </div>
-            
+
             {/* Net Position Calculation */}
             <div className="border rounded-lg p-4 bg-muted/30">
               <h4 className="font-medium mb-3">Net Position</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Assets:</span>
-                  <span className="font-mono text-green-600">{formatCurrency(profitData?.forUsTotal ?? 0)}</span>
+                  <span className="font-mono text-green-600">
+                    {formatCurrency(profitData?.forUsTotal ?? 0)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">- Liabilities:</span>
-                  <span className="font-mono text-red-600">{formatCurrency(profitData?.onUsTotal ?? 0)}</span>
+                  <span className="font-mono text-red-600">
+                    {formatCurrency(profitData?.onUsTotal ?? 0)}
+                  </span>
                 </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
                   <span>=</span>
-                  <span className={cn(
-                    "font-mono",
-                    (profitData?.netPosition ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-                  )}>
+                  <span
+                    className={cn(
+                      "font-mono",
+                      (profitData?.netPosition ?? 0) >= 0
+                        ? "text-green-600"
+                        : "text-red-600",
+                    )}
+                  >
                     {formatCurrency(profitData?.netPosition ?? 0)}
                   </span>
                 </div>
                 <div className="text-center mt-2">
-                  <span className={cn(
-                    "text-xs font-medium px-2 py-1 rounded-full",
-                    (profitData?.netPosition ?? 0) >= 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2 py-1 rounded-full",
+                      (profitData?.netPosition ?? 0) >= 0
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                    )}
+                  >
                     {profitData?.netPositionLabel ?? ""}
                   </span>
                 </div>
@@ -440,7 +544,7 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* Bottom Row: Available Cash, Cash to Pay */}
+      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
         {/* Available Cash */}
         <Card className="p-6">
@@ -449,6 +553,7 @@ export default function Dashboard() {
               <ArrowDownLeft className="h-5 w-5 text-green-600" />
               Available
             </h3>
+
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-add-cash-account">
@@ -456,14 +561,22 @@ export default function Dashboard() {
                   Add
                 </Button>
               </DialogTrigger>
+
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Cash Account to Dashboard</DialogTitle>
                 </DialogHeader>
+
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Account</label>
-                    <Popover open={cashComboboxOpen} onOpenChange={setCashComboboxOpen}>
+                    <label className="text-sm font-medium mb-2 block">
+                      Account
+                    </label>
+
+                    <Popover
+                      open={cashComboboxOpen}
+                      onOpenChange={setCashComboboxOpen}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -473,11 +586,14 @@ export default function Dashboard() {
                           data-testid="select-account"
                         >
                           {selectedAccountId > 0
-                            ? availableCashAccounts.find((acc) => acc.accountId === selectedAccountId)?.name || "Select account..."
+                            ? availableCashAccounts.find(
+                                (acc) => acc.accountId === selectedAccountId,
+                              )?.name || "Select account..."
                             : "Search accounts..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
+
                       <PopoverContent className="w-full p-0" align="start">
                         <Command>
                           <CommandInput placeholder="Search accounts..." />
@@ -496,7 +612,9 @@ export default function Dashboard() {
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      selectedAccountId === account.accountId ? "opacity-100" : "opacity-0"
+                                      selectedAccountId === account.accountId
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {account.name}
@@ -508,17 +626,22 @@ export default function Dashboard() {
                       </PopoverContent>
                     </Popover>
                   </div>
+
                   <Button
                     onClick={() => {
                       if (selectedAccountId > 0) {
-                        const account = allAccounts.find(a => a.accountId === selectedAccountId);
+                        const account = allAccounts.find(
+                          (a) => a.accountId === selectedAccountId,
+                        );
                         addAccountMutation.mutate({
                           accountType: account?.type.toLowerCase() || "ledger",
                           accountId: selectedAccountId,
                         });
                       }
                     }}
-                    disabled={selectedAccountId === 0 || addAccountMutation.isPending}
+                    disabled={
+                      selectedAccountId === 0 || addAccountMutation.isPending
+                    }
                     className="w-full"
                     data-testid="button-save-cash-account"
                   >
@@ -528,7 +651,7 @@ export default function Dashboard() {
               </DialogContent>
             </Dialog>
           </div>
-          
+
           {displayedCashAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">No accounts added</p>
@@ -536,17 +659,30 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">
               {displayedCashAccounts.map((dca) => {
-                const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
+                const balance = parseFloat(
+                  String(
+                    dca.account.balance || dca.account.currentBalance || 0,
+                  ),
+                );
                 return (
-                  <div key={dca.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`cash-account-row-${dca.id}`}>
+                  <div
+                    key={dca.id}
+                    className="flex items-center justify-between py-2 px-3 rounded hover-elevate group"
+                    data-testid={`cash-account-row-${dca.id}`}
+                  >
                     <div className="flex-1">
                       <p className="text-sm font-medium">{dca.account.name}</p>
                     </div>
+
                     <div className="text-right">
-                      <p className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${dca.id}`}>
+                      <p
+                        className="text-sm font-bold font-mono text-green-600"
+                        data-testid={`text-balance-${dca.id}`}
+                      >
                         {formatCurrency(balance)}
                       </p>
                     </div>
+
                     <Button
                       size="icon"
                       variant="ghost"
@@ -559,15 +695,25 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+
               {displayedCashAccounts.length > 0 && (
                 <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-green-50 dark:bg-green-950/30 rounded font-bold">
                   <span>Total</span>
-                  <span className="text-green-600 font-mono" data-testid="text-total-available">
+                  <span
+                    className="text-green-600 font-mono"
+                    data-testid="text-total-available"
+                  >
                     {formatCurrency(
                       displayedCashAccounts.reduce((sum, dca) => {
-                        const balance = parseFloat(String(dca.account.balance || dca.account.currentBalance || 0));
+                        const balance = parseFloat(
+                          String(
+                            dca.account.balance ||
+                              dca.account.currentBalance ||
+                              0,
+                          ),
+                        );
                         return sum + balance;
-                      }, 0)
+                      }, 0),
                     )}
                   </span>
                 </div>
@@ -576,28 +722,40 @@ export default function Dashboard() {
           )}
         </Card>
 
-        {/* To Pay (Right) */}
+        {/* To Pay */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium flex items-center gap-2">
               <ArrowUpRight className="h-5 w-5 text-red-600" />
               To Pay
             </h3>
-            <Dialog open={isAddPayableDialogOpen} onOpenChange={setIsAddPayableDialogOpen}>
+
+            <Dialog
+              open={isAddPayableDialogOpen}
+              onOpenChange={setIsAddPayableDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-add-payable-account">
                   <Plus className="h-4 w-4 mr-1" />
                   Add
                 </Button>
               </DialogTrigger>
+
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Payable Account to Dashboard</DialogTitle>
                 </DialogHeader>
+
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Supplier</label>
-                    <Popover open={payableComboboxOpen} onOpenChange={setPayableComboboxOpen}>
+                    <label className="text-sm font-medium mb-2 block">
+                      Supplier
+                    </label>
+
+                    <Popover
+                      open={payableComboboxOpen}
+                      onOpenChange={setPayableComboboxOpen}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -607,11 +765,15 @@ export default function Dashboard() {
                           data-testid="select-payable-account"
                         >
                           {selectedPayableAccountId > 0
-                            ? availablePayableAccounts.find((acc) => acc.accountId === selectedPayableAccountId)?.name || "Select account..."
+                            ? availablePayableAccounts.find(
+                                (acc) =>
+                                  acc.accountId === selectedPayableAccountId,
+                              )?.name || "Select account..."
                             : "Search accounts..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
+
                       <PopoverContent className="w-full p-0" align="start">
                         <Command>
                           <CommandInput placeholder="Search accounts..." />
@@ -623,14 +785,19 @@ export default function Dashboard() {
                                   key={account.accountId}
                                   value={account.name}
                                   onSelect={() => {
-                                    setSelectedPayableAccountId(account.accountId);
+                                    setSelectedPayableAccountId(
+                                      account.accountId,
+                                    );
                                     setPayableComboboxOpen(false);
                                   }}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      selectedPayableAccountId === account.accountId ? "opacity-100" : "opacity-0"
+                                      selectedPayableAccountId ===
+                                        account.accountId
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {account.name}
@@ -642,6 +809,7 @@ export default function Dashboard() {
                       </PopoverContent>
                     </Popover>
                   </div>
+
                   <Button
                     onClick={() => {
                       if (selectedPayableAccountId > 0) {
@@ -650,17 +818,22 @@ export default function Dashboard() {
                         });
                       }
                     }}
-                    disabled={selectedPayableAccountId === 0 || addPayableAccountMutation.isPending}
+                    disabled={
+                      selectedPayableAccountId === 0 ||
+                      addPayableAccountMutation.isPending
+                    }
                     className="w-full"
                     data-testid="button-save-payable-account"
                   >
-                    {addPayableAccountMutation.isPending ? "Adding..." : "Add Account"}
+                    {addPayableAccountMutation.isPending
+                      ? "Adding..."
+                      : "Add Account"}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          
+
           {displayedPayableAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">No payable accounts</p>
@@ -668,12 +841,19 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">
               {displayedPayableAccounts.map((account) => (
-                <div key={account.id} className="flex items-center justify-between py-2 px-3 rounded hover-elevate group" data-testid={`payable-account-row-${account.id}`}>
+                <div
+                  key={account.id}
+                  className="flex items-center justify-between py-2 px-3 rounded hover-elevate group"
+                  data-testid={`payable-account-row-${account.id}`}
+                >
                   <div className="flex-1">
                     <p className="text-sm font-medium">{account.name}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold font-mono text-red-600" data-testid={`text-payable-${account.id}`}>
+                    <p
+                      className="text-sm font-bold font-mono text-red-600"
+                      data-testid={`text-payable-${account.id}`}
+                    >
                       {formatCurrency(Math.abs(account.balance))}
                     </p>
                   </div>
@@ -681,19 +861,28 @@ export default function Dashboard() {
                     size="icon"
                     variant="ghost"
                     className="h-6 w-6 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removePayableAccountMutation.mutate(account.id)}
+                    onClick={() =>
+                      removePayableAccountMutation.mutate(account.id)
+                    }
                     data-testid={`button-remove-payable-account-${account.id}`}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
+
               {displayedPayableAccounts.length > 0 && (
                 <div className="border-t pt-2 mt-2 flex items-center justify-between py-2 px-3 bg-red-50 dark:bg-red-950/30 rounded font-bold">
                   <span>Total</span>
-                  <span className="text-red-600 font-mono" data-testid="text-total-payable">
+                  <span
+                    className="text-red-600 font-mono"
+                    data-testid="text-total-payable"
+                  >
                     {formatCurrency(
-                      displayedPayableAccounts.reduce((sum, acc) => sum + Math.abs(acc.balance), 0)
+                      displayedPayableAccounts.reduce(
+                        (sum, acc) => sum + Math.abs(acc.balance),
+                        0,
+                      ),
                     )}
                   </span>
                 </div>

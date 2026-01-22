@@ -54,12 +54,36 @@ type EntityType =
   | "stockItem";
 
 const entityConfig = {
-  location: { label: "Location", endpoint: "/api/locations", schema: insertLocationSchema },
-  ledger: { label: "Ledger Account", endpoint: "/api/ledger-accounts", schema: insertLedgerAccountSchema.omit({ companyId: true }) },
-  employee: { label: "Employee", endpoint: "/api/employees", schema: insertEmployeeSchema.omit({ companyId: true }) },
-  supplier: { label: "Supplier", endpoint: "/api/suppliers", schema: insertSupplierSchema },
-  stockGroup: { label: "Stock Group", endpoint: "/api/stock-groups", schema: insertStockGroupSchema.omit({ companyId: true }) },
-  stockItem: { label: "Stock Item", endpoint: "/api/stock-items", schema: insertStockItemSchema.omit({ companyId: true }) },
+  location: {
+    label: "Location",
+    endpoint: "/api/locations",
+    schema: insertLocationSchema,
+  },
+  ledger: {
+    label: "Ledger Account",
+    endpoint: "/api/ledger-accounts",
+    schema: insertLedgerAccountSchema.omit({ companyId: true }),
+  },
+  employee: {
+    label: "Employee",
+    endpoint: "/api/employees",
+    schema: insertEmployeeSchema.omit({ companyId: true }),
+  },
+  supplier: {
+    label: "Supplier",
+    endpoint: "/api/suppliers",
+    schema: insertSupplierSchema,
+  },
+  stockGroup: {
+    label: "Stock Group",
+    endpoint: "/api/stock-groups",
+    schema: insertStockGroupSchema.omit({ companyId: true }),
+  },
+  stockItem: {
+    label: "Stock Item",
+    endpoint: "/api/stock-items",
+    schema: insertStockItemSchema.omit({ companyId: true }),
+  },
 };
 
 // Get default values for each entity type
@@ -68,33 +92,61 @@ const getDefaultValues = (entityType: EntityType) => {
     case "location":
       return { name: "", code: "", active: true };
     case "ledger":
-      return { name: "", openingBalance: "0", active: true };
+      return {
+        name: "",
+        accountType: "" as any,
+        subType: "",
+        parentId: undefined as any,
+        openingBalance: "0",
+        openingBalanceSide: "" as any,
+        active: true,
+      };
+
     case "employee":
-      return { firstName: "", lastName: "", phone: "", joinDate: "", department: "", openingBalance: "0", active: true };
+      return {
+        firstName: "",
+        lastName: "",
+        phone: "",
+        joinDate: "",
+        department: "",
+        employeeType: "Employee" as any,
+        openingBalance: "0",
+        active: true,
+      };
+
     case "supplier":
       return { legalName: "", phone: "", active: true };
     case "stockGroup":
       return { name: "", active: true };
     case "stockItem":
-      return { name: "", uom: "", openingQty: "0", openingRate: "0", openingValue: "0", sellingPrice: "0", reorderLevel: "0", active: true };
+      return {
+        name: "",
+        uom: "",
+        openingQty: "0",
+        openingRate: "0",
+        openingValue: "0",
+        sellingPrice: "0",
+        reorderLevel: "0",
+        active: true,
+      };
     default:
       return {};
   }
 };
 
 // Wrapper component to properly recreate form when entity changes
-function EntityFormWrapper({ 
-  entityType, 
+function EntityFormWrapper({
+  entityType,
   config,
-}: { 
-  entityType: EntityType; 
-  config: typeof entityConfig[EntityType];
+}: {
+  entityType: EntityType;
+  config: (typeof entityConfig)[EntityType];
 }) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  
+
   const defaultValues = getDefaultValues(entityType);
-  
+
   const form = useForm({
     resolver: zodResolver(config.schema),
     defaultValues: defaultValues as any,
@@ -103,10 +155,16 @@ function EntityFormWrapper({
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       // Only add companyId if not already provided by the form
-      const payload = data.companyId ? data : {
-        ...data,
-        companyId: selectedCompany?.id || (() => { throw new Error("No company selected"); })()
-      };
+      const payload = data.companyId
+        ? data
+        : {
+            ...data,
+            companyId:
+              selectedCompany?.id ||
+              (() => {
+                throw new Error("No company selected");
+              })(),
+          };
       const res = await apiRequest("POST", config.endpoint, payload);
       return await res.json();
     },
@@ -116,7 +174,18 @@ function EntityFormWrapper({
         description: `${config.label} "${data.name || data.legalName || data.code}" created successfully`,
       });
       queryClient.invalidateQueries({ queryKey: [config.endpoint] });
-      queryClient.invalidateQueries({ queryKey: [config.endpoint, selectedCompany?.id] });
+
+      // invalidate by the companyId that the backend actually stored
+      if (data?.companyId != null) {
+        queryClient.invalidateQueries({
+          queryKey: [config.endpoint, data.companyId],
+        });
+      } else if (selectedCompany?.id != null) {
+        queryClient.invalidateQueries({
+          queryKey: [config.endpoint, selectedCompany.id],
+        });
+      }
+
       form.reset(getDefaultValues(entityType) as any);
     },
     onError: (error: any) => {
@@ -139,17 +208,59 @@ function EntityFormWrapper({
   // Render appropriate form based on entity type
   switch (entityType) {
     case "location":
-      return <LocationForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <LocationForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
     case "ledger":
-      return <LedgerAccountForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <LedgerAccountForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
     case "employee":
-      return <EmployeeForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <EmployeeForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
     case "supplier":
-      return <SupplierForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <SupplierForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
     case "stockGroup":
-      return <StockGroupForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <StockGroupForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
     case "stockItem":
-      return <StockItemForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />;
+      return (
+        <StockItemForm
+          form={form}
+          onSubmit={onSubmit}
+          onCancel={handleCancel}
+          isPending={createMutation.isPending}
+        />
+      );
   }
 }
 
@@ -161,18 +272,37 @@ export default function AccountingCreate() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Create Master Data</h1>
 
-      <Tabs value={selectedEntity} onValueChange={(v) => setSelectedEntity(v as EntityType)}>
+      <Tabs
+        value={selectedEntity}
+        onValueChange={(v) => setSelectedEntity(v as EntityType)}
+      >
         <TabsList className="grid grid-cols-3 lg:grid-cols-6">
-          <TabsTrigger value="location" data-testid="tab-location">Location</TabsTrigger>
-          <TabsTrigger value="ledger" data-testid="tab-ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="employee" data-testid="tab-employee">Employee</TabsTrigger>
-          <TabsTrigger value="supplier" data-testid="tab-supplier">Supplier</TabsTrigger>
-          <TabsTrigger value="stockGroup" data-testid="tab-stock-group">Stock Group</TabsTrigger>
-          <TabsTrigger value="stockItem" data-testid="tab-stock-item">Stock Item</TabsTrigger>
+          <TabsTrigger value="location" data-testid="tab-location">
+            Location
+          </TabsTrigger>
+          <TabsTrigger value="ledger" data-testid="tab-ledger">
+            Ledger
+          </TabsTrigger>
+          <TabsTrigger value="employee" data-testid="tab-employee">
+            Employee
+          </TabsTrigger>
+          <TabsTrigger value="supplier" data-testid="tab-supplier">
+            Supplier
+          </TabsTrigger>
+          <TabsTrigger value="stockGroup" data-testid="tab-stock-group">
+            Stock Group
+          </TabsTrigger>
+          <TabsTrigger value="stockItem" data-testid="tab-stock-item">
+            Stock Item
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedEntity}>
-          <EntityFormWrapper key={selectedEntity} entityType={selectedEntity} config={config} />
+          <EntityFormWrapper
+            key={selectedEntity}
+            entityType={selectedEntity}
+            config={config}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -180,11 +310,21 @@ export default function AccountingCreate() {
 }
 
 // Location Form Component
-function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function LocationForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   const { data: companies = [] } = useQuery<any[]>({
     queryKey: ["/api/companies"],
   });
-  
+
   return (
     <Card className="p-6">
       <Form {...form}>
@@ -207,7 +347,10 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                     </FormControl>
                     <SelectContent>
                       {companies.map((company: any) => (
-                        <SelectItem key={company.id} value={company.id.toString()}>
+                        <SelectItem
+                          key={company.id}
+                          value={company.id.toString()}
+                        >
                           {company.name}
                         </SelectItem>
                       ))}
@@ -225,7 +368,11 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Main Warehouse" data-testid="input-name" />
+                    <Input
+                      {...field}
+                      placeholder="Main Warehouse"
+                      data-testid="input-name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -258,7 +405,17 @@ function LocationForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 }
 
 // Ledger Account Form Component
-function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function LedgerAccountForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const accountType = form.watch("accountType");
@@ -273,7 +430,13 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
       case "Expense":
         return ["Direct Expense", "Indirect Expense"];
       case "Liability":
-        return ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"];
+        return [
+          "Current Liability",
+          "Long-term Liability",
+          "Loans Payable",
+          "Output Tax",
+          "Tax Payable",
+        ];
       case "Asset":
         return ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"];
       default:
@@ -287,10 +450,12 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
   const { data: allLedgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
   });
-  
+
   // Filter to show only parent accounts (accounts with no parent themselves)
   // Use strict comparison to handle 0, null, undefined correctly
-  const ledgerAccounts = allLedgerAccounts.filter((acc: any) => acc.parentId === null || acc.parentId === undefined);
+  const ledgerAccounts = allLedgerAccounts.filter(
+    (acc: any) => acc.parentId === null || acc.parentId === undefined,
+  );
 
   // Form for creating parent account
   const parentForm = useForm({
@@ -309,7 +474,10 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
       if (!selectedCompany?.id) {
         throw new Error("No company selected");
       }
-      const res = await apiRequest("POST", "/api/ledger-accounts", { ...data, companyId: selectedCompany.id });
+      const res = await apiRequest("POST", "/api/ledger-accounts", {
+        ...data,
+        companyId: selectedCompany.id,
+      });
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -338,7 +506,10 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -347,7 +518,11 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Sales Revenue" data-testid="input-name" />
+                    <Input
+                      {...field}
+                      placeholder="Sales Revenue"
+                      data-testid="input-name"
+                    />
                   </FormControl>
                   <FormDescription>
                     Code will be auto-generated from the name
@@ -377,13 +552,23 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                       <SelectItem value="Expense">Expense</SelectItem>
                       <SelectItem value="Bank">Bank</SelectItem>
                       <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
-                      <SelectItem value="Direct Expense">Direct Expense</SelectItem>
-                      <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                      <SelectItem value="Indirect Expense">
+                        Indirect Expense
+                      </SelectItem>
+                      <SelectItem value="Direct Expense">
+                        Direct Expense
+                      </SelectItem>
+                      <SelectItem value="Government Taxes">
+                        Government Taxes
+                      </SelectItem>
                       <SelectItem value="Loans">Loans</SelectItem>
                       <SelectItem value="Duty Agent">Duty Agent</SelectItem>
-                      <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
-                      <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                      <SelectItem value="Transporter Agent">
+                        Transporter Agent
+                      </SelectItem>
+                      <SelectItem value="Accounts Payable">
+                        Accounts Payable
+                      </SelectItem>
                       <SelectItem value="Profit">Profit</SelectItem>
                     </SelectContent>
                   </Select>
@@ -426,7 +611,12 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                 <FormItem>
                   <FormLabel>Parent Account</FormLabel>
                   <div className="flex gap-2">
-                    <Select onValueChange={(v) => field.onChange(v === "none" ? undefined : parseInt(v))} value={field.value?.toString() || "none"}>
+                    <Select
+                      onValueChange={(v) =>
+                        field.onChange(v === "none" ? undefined : parseInt(v))
+                      }
+                      value={field.value?.toString() || "none"}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-parent">
                           <SelectValue placeholder="None" />
@@ -441,9 +631,17 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                         ))}
                       </SelectContent>
                     </Select>
-                    <Dialog open={isParentDialogOpen} onOpenChange={setIsParentDialogOpen}>
+                    <Dialog
+                      open={isParentDialogOpen}
+                      onOpenChange={setIsParentDialogOpen}
+                    >
                       <DialogTrigger asChild>
-                        <Button type="button" size="icon" variant="outline" data-testid="button-add-parent">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          data-testid="button-add-parent"
+                        >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
@@ -452,7 +650,12 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                           <DialogTitle>Create Parent Account</DialogTitle>
                         </DialogHeader>
                         <Form {...parentForm}>
-                          <form onSubmit={parentForm.handleSubmit(handleCreateParent)} className="space-y-4">
+                          <form
+                            onSubmit={parentForm.handleSubmit(
+                              handleCreateParent,
+                            )}
+                            className="space-y-4"
+                          >
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <FormField
                                 control={parentForm.control}
@@ -461,7 +664,11 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                                   <FormItem>
                                     <FormLabel>Name *</FormLabel>
                                     <FormControl>
-                                      <Input {...field} placeholder="Purchases" data-testid="input-parent-name" />
+                                      <Input
+                                        {...field}
+                                        placeholder="Purchases"
+                                        data-testid="input-parent-name"
+                                      />
                                     </FormControl>
                                     <FormDescription>
                                       Code will be auto-generated
@@ -476,28 +683,61 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Account Type *</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      value={field.value}
+                                    >
                                       <FormControl>
                                         <SelectTrigger data-testid="select-parent-account-type">
                                           <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                       </FormControl>
                                       <SelectContent>
-                                        <SelectItem value="Asset">Asset</SelectItem>
-                                        <SelectItem value="Liability">Liability</SelectItem>
-                                        <SelectItem value="Equity">Equity</SelectItem>
-                                        <SelectItem value="Income">Income</SelectItem>
-                                        <SelectItem value="Expense">Expense</SelectItem>
-                                        <SelectItem value="Bank">Bank</SelectItem>
-                                        <SelectItem value="Cash">Cash</SelectItem>
-                                        <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
-                                        <SelectItem value="Direct Expense">Direct Expense</SelectItem>
-                                        <SelectItem value="Government Taxes">Government Taxes</SelectItem>
-                                        <SelectItem value="Loans">Loans</SelectItem>
-                                        <SelectItem value="Duty Agent">Duty Agent</SelectItem>
-                                        <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
-                                        <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
-                                        <SelectItem value="Profit">Profit</SelectItem>
+                                        <SelectItem value="Asset">
+                                          Asset
+                                        </SelectItem>
+                                        <SelectItem value="Liability">
+                                          Liability
+                                        </SelectItem>
+                                        <SelectItem value="Equity">
+                                          Equity
+                                        </SelectItem>
+                                        <SelectItem value="Income">
+                                          Income
+                                        </SelectItem>
+                                        <SelectItem value="Expense">
+                                          Expense
+                                        </SelectItem>
+                                        <SelectItem value="Bank">
+                                          Bank
+                                        </SelectItem>
+                                        <SelectItem value="Cash">
+                                          Cash
+                                        </SelectItem>
+                                        <SelectItem value="Indirect Expense">
+                                          Indirect Expense
+                                        </SelectItem>
+                                        <SelectItem value="Direct Expense">
+                                          Direct Expense
+                                        </SelectItem>
+                                        <SelectItem value="Government Taxes">
+                                          Government Taxes
+                                        </SelectItem>
+                                        <SelectItem value="Loans">
+                                          Loans
+                                        </SelectItem>
+                                        <SelectItem value="Duty Agent">
+                                          Duty Agent
+                                        </SelectItem>
+                                        <SelectItem value="Transporter Agent">
+                                          Transporter Agent
+                                        </SelectItem>
+                                        <SelectItem value="Accounts Payable">
+                                          Accounts Payable
+                                        </SelectItem>
+                                        <SelectItem value="Profit">
+                                          Profit
+                                        </SelectItem>
                                       </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -515,8 +755,14 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                               >
                                 Cancel
                               </Button>
-                              <Button type="submit" disabled={createParentMutation.isPending} data-testid="button-save-parent">
-                                {createParentMutation.isPending ? "Creating..." : "Create"}
+                              <Button
+                                type="submit"
+                                disabled={createParentMutation.isPending}
+                                data-testid="button-save-parent"
+                              >
+                                {createParentMutation.isPending
+                                  ? "Creating..."
+                                  : "Create"}
                               </Button>
                             </div>
                           </form>
@@ -536,7 +782,13 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
                 <FormItem>
                   <FormLabel>Opening Balance</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-opening-balance"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -593,11 +845,24 @@ function LedgerAccountForm({ form, onSubmit, onCancel, isPending }: { form: any;
 }
 
 // Employee Form Component
-function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function EmployeeForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -606,7 +871,11 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>First Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="John" data-testid="input-first-name" />
+                    <Input
+                      {...field}
+                      placeholder="John"
+                      data-testid="input-first-name"
+                    />
                   </FormControl>
                   <FormDescription>
                     Code will be auto-generated from name
@@ -623,7 +892,11 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Last Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Doe" data-testid="input-last-name" />
+                    <Input
+                      {...field}
+                      placeholder="Doe"
+                      data-testid="input-last-name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -637,7 +910,12 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Starting Date *</FormLabel>
                   <FormControl>
-                    <Input {...field} type="text" placeholder="YYYY-MM-DD" data-testid="input-join-date" />
+                    <Input
+                      {...field}
+                      type="text"
+                      placeholder="YYYY-MM-DD"
+                      data-testid="input-join-date"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -650,15 +928,23 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Type *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-employee-type">
                         <SelectValue placeholder="Select employee type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Employee">Employee (Warehouse Staff)</SelectItem>
-                      <SelectItem value="Worker">Worker (Shop Floor Staff)</SelectItem>
+                      <SelectItem value="Employee">
+                        Employee (Warehouse Staff)
+                      </SelectItem>
+                      <SelectItem value="Worker">
+                        Worker (Shop Floor Staff)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -673,7 +959,13 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Opening Balance</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-opening-balance"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -706,11 +998,24 @@ function EmployeeForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 }
 
 // Supplier Form Component
-function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function SupplierForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -719,7 +1024,11 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Legal Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="ABC Suppliers Inc." data-testid="input-legal-name" />
+                    <Input
+                      {...field}
+                      placeholder="ABC Suppliers Inc."
+                      data-testid="input-legal-name"
+                    />
                   </FormControl>
                   <FormDescription>
                     Code will be auto-generated from name
@@ -736,7 +1045,13 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
                 <FormItem>
                   <FormLabel>Opening Balance</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-balance" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-opening-balance"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -769,11 +1084,24 @@ function SupplierForm({ form, onSubmit, onCancel, isPending }: { form: any; onSu
 }
 
 // Stock Group Form Component
-function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function StockGroupForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -782,7 +1110,11 @@ function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; on
                 <FormItem>
                   <FormLabel>Code *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="GRP001" data-testid="input-code" />
+                    <Input
+                      {...field}
+                      placeholder="GRP001"
+                      data-testid="input-code"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -796,7 +1128,11 @@ function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; on
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Cotton Bales" data-testid="input-name" />
+                    <Input
+                      {...field}
+                      placeholder="Cotton Bales"
+                      data-testid="input-name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -829,7 +1165,17 @@ function StockGroupForm({ form, onSubmit, onCancel, isPending }: { form: any; on
 }
 
 // Stock Item Form Component
-function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onSubmit: (data: any, saveAndNew?: boolean) => void; onCancel: () => void; isPending: boolean }) {
+function StockItemForm({
+  form,
+  onSubmit,
+  onCancel,
+  isPending,
+}: {
+  form: any;
+  onSubmit: (data: any, saveAndNew?: boolean) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   const { data: stockGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-groups"],
   });
@@ -840,7 +1186,9 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
   // Auto-calculate opening value
   useEffect(() => {
     if (openingQty && openingRate) {
-      const value = formatNumber(parseFloat(openingQty) * parseFloat(openingRate));
+      const value = formatNumber(
+        parseFloat(openingQty) * parseFloat(openingRate),
+      );
       form.setValue("openingValue", value);
     }
   }, [openingQty, openingRate]);
@@ -848,7 +1196,10 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
+          className="space-y-6"
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -857,7 +1208,11 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Code *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="ITEM001" data-testid="input-code" />
+                    <Input
+                      {...field}
+                      placeholder="ITEM001"
+                      data-testid="input-code"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -871,7 +1226,11 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Premium Cotton Bale" data-testid="input-name" />
+                    <Input
+                      {...field}
+                      placeholder="Premium Cotton Bale"
+                      data-testid="input-name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -884,7 +1243,12 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock Group</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)} value={field.value?.toString() || ""}>
+                  <Select
+                    onValueChange={(v) =>
+                      field.onChange(v ? parseInt(v) : undefined)
+                    }
+                    value={field.value?.toString() || ""}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-stock-group">
                         <SelectValue placeholder="None" />
@@ -910,7 +1274,11 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Unit of Measure *</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Kg, Pcs, Bale" data-testid="input-uom" />
+                    <Input
+                      {...field}
+                      placeholder="Kg, Pcs, Bale"
+                      data-testid="input-uom"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -924,7 +1292,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Opening Quantity</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.001" placeholder="0.000" data-testid="input-opening-qty" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.001"
+                      placeholder="0.000"
+                      data-testid="input-opening-qty"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -938,7 +1312,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Opening Rate</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-rate" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-opening-rate"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -952,7 +1332,12 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Opening Value (Auto)</FormLabel>
                   <FormControl>
-                    <Input {...field} readOnly className="bg-muted" data-testid="input-opening-value" />
+                    <Input
+                      {...field}
+                      readOnly
+                      className="bg-muted"
+                      data-testid="input-opening-value"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -966,7 +1351,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Reorder Level</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.001" placeholder="10.000" data-testid="input-reorder-level" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.001"
+                      placeholder="10.000"
+                      data-testid="input-reorder-level"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -980,7 +1371,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
                 <FormItem>
                   <FormLabel>Selling Price</FormLabel>
                   <FormControl>
-                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-selling-price" />
+                    <Input
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-selling-price"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1013,7 +1410,13 @@ function StockItemForm({ form, onSubmit, onCancel, isPending }: { form: any; onS
 }
 
 // Reusable Form Buttons Component
-function FormButtons({ onCancel, isPending }: { onCancel: () => void; isPending: boolean }) {
+function FormButtons({
+  onCancel,
+  isPending,
+}: {
+  onCancel: () => void;
+  isPending: boolean;
+}) {
   return (
     <div className="flex gap-2 justify-end border-t pt-4">
       <Button

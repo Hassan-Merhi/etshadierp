@@ -441,8 +441,9 @@ export default function Analytics() {
   });
 
   // Fetch financial ratios
+  // Fetch financial ratios
   const { data: ratiosData, isLoading: ratiosLoading } = useQuery<FinancialRatiosData>({
-    queryKey: ["/api/reports/financial-ratios", ratiosStartDate, ratiosEndDate],
+    queryKey: ["/api/reports/financial-ratios", selectedCompany?.id, ratiosStartDate, ratiosEndDate],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (ratiosStartDate) params.append("startDate", ratiosStartDate);

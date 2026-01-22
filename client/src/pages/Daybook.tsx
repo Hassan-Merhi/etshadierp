@@ -356,23 +356,28 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Fetch ledger accounts, bank accounts, and suppliers for dropdowns
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
-    queryKey: ["/api/bank-accounts"],
+    queryKey: ["/api/bank-accounts", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/suppliers", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ["/api/employees"],
+    queryKey: ["/api/employees", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
-    queryKey: ["/api/fixed-assets"],
+    queryKey: ["/api/fixed-assets", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   // State for purchase order data (for Purchase vouchers)
@@ -560,7 +565,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   // Fetch all vouchers
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/vouchers"],
+    queryKey: ["/api/vouchers", selectedCompany?.id],
+    enabled: !!selectedCompany,
   });
 
   // Fetch account names for Payment/Receipt/Journal vouchers
@@ -600,7 +606,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     if (paymentVouchers.length > 0) {
       fetchAccountNames();
     }
-  }, [vouchers]);
+  }, [vouchers, accountNameCache]);
 
   // Apply filters
   const filteredVouchers = useMemo(() => {
@@ -719,11 +725,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/employees"],
+        queryKey: ["/api/vouchers", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/accounts/all", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employees", selectedCompany?.id],
         refetchType: "all",
       });
       queryClient.invalidateQueries({
@@ -734,7 +746,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
         queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
         refetchType: "all",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/suppliers", selectedCompany?.id],
+      });
       if (cashAccountId) {
         queryClient.invalidateQueries({
           queryKey: [`/api/ledger-accounts/${cashAccountId}`],
@@ -763,11 +777,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
       return await apiRequest("DELETE", `/api/vouchers/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/employees"],
+        queryKey: ["/api/vouchers", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/accounts/all", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employees", selectedCompany?.id],
         refetchType: "all",
       });
       queryClient.invalidateQueries({
@@ -778,7 +798,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
         queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
         refetchType: "all",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/suppliers", selectedCompany?.id],
+      });
       if (cashAccountId) {
         queryClient.invalidateQueries({
           queryKey: [`/api/ledger-accounts/${cashAccountId}`],

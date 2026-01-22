@@ -19,30 +19,36 @@ interface Account {
 }
 
 export default function BalanceSheet() {
-  const { data: accounts = [], isLoading } = useQuery<Account[]>({
-    queryKey: ["/api/accounts/all"],
-  });
+  import { useCompany } from "@/contexts/CompanyContext";
 
+  export default function BalanceSheet() {
+    const { selectedCompany } = useCompany();
+
+    const { data: accounts = [], isLoading } = useQuery<Account[]>({
+      queryKey: ["/api/accounts/all", selectedCompany?.id],
+      enabled: !!selectedCompany,
+    });
+    
   // Filter accounts by type
   // Include Fixed Asset type and Ledger accounts with accountType=Asset
-  const assetAccounts = accounts.filter(
-    (acc) => 
-      acc.type === "Fixed Asset" || 
-      (acc.type === "Ledger" && acc.accountType === "Asset") ||
-      (acc.type === "Bank") // Banks are also assets
-  );
+    const assetAccounts = accounts.filter(
+      (acc) =>
+        acc.type === "fixedAsset" ||
+        (acc.type === "ledger" && acc.accountType === "Asset") ||
+        acc.type === "bank"
+    );
   
   // Include Supplier type and Ledger accounts with accountType=Liability
-  const liabilityAccounts = accounts.filter(
-    (acc) => 
-      acc.type === "Supplier" ||
-      (acc.type === "Ledger" && acc.accountType === "Liability")
-  );
+    const liabilityAccounts = accounts.filter(
+      (acc) =>
+        acc.type === "supplier" ||
+        (acc.type === "ledger" && acc.accountType === "Liability")
+    );
   
   // Ledger accounts with accountType=Equity
-  const equityAccounts = accounts.filter(
-    (acc) => acc.type === "Ledger" && acc.accountType === "Equity"
-  );
+    const equityAccounts = accounts.filter(
+      (acc) => acc.type === "ledger" && acc.accountType === "Equity"
+    );
 
   // Calculate totals
   const calculateTotal = (accountList: Account[]) => {

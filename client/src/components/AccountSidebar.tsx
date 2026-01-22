@@ -59,16 +59,17 @@ export default function AccountSidebar({
   const getProjectedBalance = (account: Account): number => {
     const currentBalance = account.balance ?? 0;
     let adjustment = 0;
-    
-    const isPaymentAccount = account.id === paymentAccountId && account.type === paymentAccountType;
-    
+
+    const isPaymentAccount =
+      account.id === paymentAccountId && account.type === paymentAccountType;
+
     // Check if this is the payment/receipt account
     if (isPaymentAccount && voucherTotal > 0) {
       // For payment vouchers, the payment account balance decreases
       // For receipt vouchers, the receipt account balance increases
       adjustment = mode === "payment" ? -voucherTotal : voucherTotal;
     }
-    
+
     // For non-payment accounts, check if they appear in the entries
     if (!isPaymentAccount) {
       const entryAmount = entries
@@ -77,34 +78,40 @@ export default function AccountSidebar({
             entry.accountId === account.id &&
             entry.accountType === account.type &&
             entry.amount &&
-            !isNaN(Number(entry.amount))
+            !isNaN(Number(entry.amount)),
         )
         .reduce((sum, entry) => sum + Number(entry.amount), 0);
-      
+
       // Entry amounts affect balance differently based on account type:
       // - For liability accounts (employee, supplier): Payment DECREASES balance (we're paying off what we owe)
       // - For asset/expense accounts: Payment INCREASES balance (we're spending/acquiring)
       // The inverse is true for receipts
-      const isLiabilityAccount = account.type === "employee" || account.type === "supplier";
+      const isLiabilityAccount =
+        account.type === "employee" || account.type === "supplier";
       if (entryAmount > 0) {
         if (isLiabilityAccount) {
           // Liability: Payment reduces balance (debit), Receipt increases balance (credit)
-          adjustment += mode === "payment" ? -entryAmount : entryAmount;
+          adjustment += mode === "payment" ? entryAmount : -entryAmount;
         } else {
           // Asset/Expense: Payment increases balance (debit), Receipt reduces balance (credit)
           adjustment += mode === "payment" ? entryAmount : -entryAmount;
         }
       }
     }
-    
+
     return currentBalance + adjustment;
   };
 
   // Scroll highlighted item into view
   useEffect(() => {
-    const highlightedElement = listRef.current?.querySelector(`[data-index="${highlightedIndex}"]`);
+    const highlightedElement = listRef.current?.querySelector(
+      `[data-index="${highlightedIndex}"]`,
+    );
     if (highlightedElement) {
-      highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      highlightedElement.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
     }
   }, [highlightedIndex]);
 
@@ -115,15 +122,20 @@ export default function AccountSidebar({
     return balance < 0 ? `($${formatted})` : `$${formatted}`;
   };
 
-  const getBalanceColorClass = (balance: number | undefined, accountType?: string) => {
+  const getBalanceColorClass = (
+    balance: number | undefined,
+    accountType?: string,
+  ) => {
     if (balance === undefined) return "text-muted-foreground";
     // For liability accounts (employee/supplier), flip the color logic:
     // Positive balance = Cr (we owe them) = Red
     // Negative balance = Dr (they owe us) = Green
-    const isLiabilityAccount = accountType === "employee" || accountType === "supplier";
+    const isLiabilityAccount =
+      accountType === "employee" || accountType === "supplier";
     if (isLiabilityAccount) {
-      if (balance > 0) return "text-destructive";
-      if (balance < 0) return "text-chart-2";
+      // your suppliers come as negative when it's Cr (we owe them)
+      if (balance < 0) return "text-destructive"; // Cr => red
+      if (balance > 0) return "text-chart-2"; // Dr => green
     } else {
       if (balance < 0) return "text-destructive";
       if (balance > 0) return "text-chart-2";
@@ -135,7 +147,7 @@ export default function AccountSidebar({
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
         <h3 className="text-base font-semibold mb-3">Select Account</h3>
-        
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -157,11 +169,13 @@ export default function AccountSidebar({
             </div>
           ) : (
             filteredAccounts.map((account, idx) => {
-              const isSelected = account.id === selectedAccountId && account.type === selectedAccountType;
+              const isSelected =
+                account.id === selectedAccountId &&
+                account.type === selectedAccountType;
               const isHighlighted = idx === highlightedIndex;
               const projectedBalance = getProjectedBalance(account);
               const hasProjection = projectedBalance !== (account.balance ?? 0);
-              
+
               return (
                 <button
                   key={`${account.type}-${account.id}`}
@@ -174,7 +188,11 @@ export default function AccountSidebar({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{account.name || account.code || `${account.type}-${account.id}`}</div>
+                      <div className="text-sm font-medium truncate">
+                        {account.name ||
+                          account.code ||
+                          `${account.type}-${account.id}`}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-0.5">
                       {hasProjection && (
@@ -182,7 +200,9 @@ export default function AccountSidebar({
                           {formatBalance(account.balance)}
                         </div>
                       )}
-                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}>
+                      <div
+                        className={`text-sm font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}
+                      >
                         {formatBalance(projectedBalance)}
                       </div>
                     </div>
