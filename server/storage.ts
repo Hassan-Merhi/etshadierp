@@ -686,7 +686,7 @@ export class DbStorage implements IStorage {
   }
 
   async createLedgerAccount(account: InsertLedgerAccount): Promise<LedgerAccount> {
-    const [created] = await db.insert(schema.ledgerAccounts).values([account as any]).returning();
+    const [created] = await db.insert(schema.ledgerAccounts).values(account).returning();
     return created;
   }
 

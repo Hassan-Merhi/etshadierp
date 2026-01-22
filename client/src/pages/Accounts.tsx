@@ -214,7 +214,6 @@ export default function Accounts() {
     documentTitle: selectedAccount
       ? `Statement - ${selectedAccount.name}`
       : "Account Statement",
-    removeAfterPrint: true,
   });
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<
     Account[]
@@ -450,7 +449,7 @@ export default function Accounts() {
     // If no search, return original tree
     if (!searchLower) return accountHierarchy;
 
-    const matchesSearch = (acc: Account): boolean => {
+    const matchesSearch = (acc: any): boolean => {
       return (
         (acc.name || "").toLowerCase().includes(searchLower) ||
         (acc.code || "").toLowerCase().includes(searchLower) ||
@@ -460,12 +459,12 @@ export default function Accounts() {
 
     // Recursively keep node if it matches OR any descendant matches.
     // Also prune children to only matching branches.
-    const filterNode = (node: Account): Account | null => {
+    const filterNode = (node: any): any | null => {
       const children = Array.isArray(node.children) ? node.children : [];
 
       const filteredChildren = children
         .map(filterNode)
-        .filter((x): x is Account => Boolean(x));
+        .filter((x: any): x is any => Boolean(x));
 
       if (matchesSearch(node) || filteredChildren.length > 0) {
         return { ...node, children: filteredChildren };
@@ -476,7 +475,7 @@ export default function Accounts() {
 
     return accountHierarchy
       .map(filterNode)
-      .filter((x): x is Account => Boolean(x));
+      .filter((x: any): x is any => Boolean(x));
   }, [accountHierarchy, searchTerm]);
 
   const toggleParent = (accountId: string) => {
