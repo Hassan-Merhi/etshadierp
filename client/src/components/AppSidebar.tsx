@@ -18,6 +18,7 @@ import {
   Ship,
   ArrowLeftRight,
   Factory,
+  Barcode,
   Grid3X3,
   ChevronRight,
   Eye,
