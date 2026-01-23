@@ -316,6 +316,15 @@ export interface IStorage {
   deleteBale(id: number): Promise<void>;
   bulkCreateBales(bales: schema.InsertBale[]): Promise<schema.Bale[]>;
 
+
+  // Pending Barcodes
+  getAllPendingBarcodes(companyId: number): Promise<schema.PendingBarcode[]>;
+  getPendingBarcodeByCode(barcode: string, companyId: number): Promise<schema.PendingBarcode | undefined>;
+  createPendingBarcode(data: schema.InsertPendingBarcode): Promise<schema.PendingBarcode>;
+  updatePendingBarcode(id: number, updates: Partial<schema.InsertPendingBarcode>): Promise<schema.PendingBarcode>;
+  deletePendingBarcode(id: number): Promise<void>;
+  bulkCreatePendingBarcodes(barcodes: schema.InsertPendingBarcode[]): Promise<schema.PendingBarcode[]>;
+  markBarcodesAsPrinted(ids: number[]): Promise<void>;
   // Bale Products
   getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]>;
   getBaleProductById(id: number): Promise<schema.BaleProduct | undefined>;
@@ -5280,6 +5289,58 @@ export class DbStorage implements IStorage {
   }
 
   // Bale Products
+
+  async getAllPendingBarcodes(companyId: number): Promise<schema.PendingBarcode[]> {
+    return await db
+      .select()
+      .from(schema.pendingBarcodes)
+      .where(eq(schema.pendingBarcodes.companyId, companyId))
+      .orderBy(desc(schema.pendingBarcodes.createdAt));
+  }
+
+  async getPendingBarcodeByCode(barcode: string, companyId: number): Promise<schema.PendingBarcode | undefined> {
+    const results = await db
+      .select()
+      .from(schema.pendingBarcodes)
+      .where(
+        and(
+          eq(schema.pendingBarcodes.barcode, barcode),
+          eq(schema.pendingBarcodes.companyId, companyId)
+        )
+      );
+    return results[0];
+  }
+
+  async createPendingBarcode(data: schema.InsertPendingBarcode): Promise<schema.PendingBarcode> {
+    const [result] = await db.insert(schema.pendingBarcodes).values(data).returning();
+    return result;
+  }
+
+  async updatePendingBarcode(id: number, updates: Partial<schema.InsertPendingBarcode>): Promise<schema.PendingBarcode> {
+    const [result] = await db
+      .update(schema.pendingBarcodes)
+      .set(updates)
+      .where(eq(schema.pendingBarcodes.id, id))
+      .returning();
+    return result;
+  }
+
+  async deletePendingBarcode(id: number): Promise<void> {
+    await db.delete(schema.pendingBarcodes).where(eq(schema.pendingBarcodes.id, id));
+  }
+
+  async bulkCreatePendingBarcodes(barcodes: schema.InsertPendingBarcode[]): Promise<schema.PendingBarcode[]> {
+    if (barcodes.length === 0) return [];
+    return await db.insert(schema.pendingBarcodes).values(barcodes).returning();
+  }
+
+  async markBarcodesAsPrinted(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db
+      .update(schema.pendingBarcodes)
+      .set({ printed: true })
+      .where(inArray(schema.pendingBarcodes.id, ids));
+  }
   async getAllBaleProducts(companyId: number): Promise<schema.BaleProduct[]> {
     return await db
       .select()

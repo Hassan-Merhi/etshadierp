@@ -55,6 +55,7 @@ export default function Bales() {
   const [showBaleDialog, setShowBaleDialog] = useState(false);
   const [scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [pendingBarcodeToMark, setPendingBarcodeToMark] = useState<number | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bales = [], isLoading } = useQuery<Bale[]>({
@@ -93,6 +94,18 @@ export default function Bales() {
       setShowBaleDialog(false);
       setScannedBale(null);
       setBarcodeInput("");
+      
+      // Mark pending barcode as used after successful creation
+      if (pendingBarcodeToMark) {
+        fetch(`/api/pending-barcodes/${pendingBarcodeToMark}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ used: true }),
+        });
+        setPendingBarcodeToMark(null);
+      }
+      
       if (barcodeInputRef.current) {
         barcodeInputRef.current.value = "";
         barcodeInputRef.current.focus();
@@ -104,6 +117,7 @@ export default function Bales() {
         description: error.message,
         variant: "destructive",
       });
+      setPendingBarcodeToMark(null);
     },
   });
 
@@ -147,25 +161,50 @@ export default function Bales() {
         return;
       }
 
+      // Check if barcode exists in pending barcodes (pre-printed labels)
+      const pendingResponse = await fetch(`/api/pending-barcodes/${encodeURIComponent(barcode)}`, {
+        credentials: "include",
+      });
+      
+      let pendingBarcode: any = null;
+      if (pendingResponse.ok) {
+        pendingBarcode = await pendingResponse.json();
+      }
+
       // Bale doesn't exist - create new one
       if (scanMode === "quick") {
-        // Quick mode - immediately create with defaults
+        // Quick mode - immediately create with defaults (or pending barcode data)
         if (!selectedCompany) return;
+        
+        // Set pending barcode ID to mark as used after successful creation
+        if (pendingBarcode) {
+          setPendingBarcodeToMark(pendingBarcode.id);
+        }
+        
         const newBale: z.infer<typeof insertBaleSchema> = {
           companyId: selectedCompany.id,
           barcode,
-          category: "Unsorted",
-          grade: "A",
-          origin: "EU",
+          category: pendingBarcode?.category || "Unsorted",
+          grade: pendingBarcode?.grade || "A",
+          origin: pendingBarcode?.origin || "EU",
           weight: "1",
           datePressed: new Date().toISOString().split("T")[0],
         };
         createBale.mutate(newBale);
         setBarcodeInput("");
       } else {
-        // Review mode - show dialog with barcode pre-filled
+        // Review mode - show dialog with barcode pre-filled (use pending data if available)
         setScannedBale({ barcode });
         form.setValue("barcode", barcode);
+        if (pendingBarcode?.category) form.setValue("category", pendingBarcode.category);
+        if (pendingBarcode?.grade) form.setValue("grade", pendingBarcode.grade);
+        if (pendingBarcode?.origin) form.setValue("origin", pendingBarcode.origin);
+        
+        // Set pending barcode ID to mark as used after successful creation
+        if (pendingBarcode) {
+          setPendingBarcodeToMark(pendingBarcode.id);
+        }
+        
         setShowBaleDialog(true);
         setBarcodeInput("");
       }

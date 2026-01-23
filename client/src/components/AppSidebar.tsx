@@ -108,6 +108,7 @@ const menuGroups: MenuGroup[] = [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
       { title: "Factory Production", url: "/factory-production", icon: Factory },
+      { title: "Barcode Manager", url: "/barcode-manager", icon: Barcode },
     ],
   },
   {

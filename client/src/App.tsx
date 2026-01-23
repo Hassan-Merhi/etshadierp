@@ -67,6 +67,7 @@ import LedgerMonthlySummary from "@/pages/LedgerMonthlySummary";
 import LedgerVouchers from "@/pages/LedgerVouchers";
 import VoucherDetail from "@/pages/VoucherDetail";
 import FactoryProduction from "@/pages/FactoryProduction";
+import BarcodeManager from "@/pages/BarcodeManager";
 import TestDataImport from "@/pages/TestDataImport";
 import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
@@ -144,6 +145,7 @@ function Router({ user }: { user: any }) {
       <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
       <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
       <Route path="/factory-production" component={FactoryProduction} />
+      <Route path="/barcode-manager" component={BarcodeManager} />
       <Route path="/bales"><Redirect to="/factory-production" /></Route>
       <Route path="/mix-batches"><Redirect to="/factory-production" /></Route>
       <Route path="/production-bales"><Redirect to="/factory-production" /></Route>

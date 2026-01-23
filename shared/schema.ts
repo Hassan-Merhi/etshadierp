@@ -1278,6 +1278,29 @@ export const insertBaleSchema = createInsertSchema(bales).omit({
 export type InsertBale = z.infer<typeof insertBaleSchema>;
 export type Bale = typeof bales.$inferSelect;
 
+// Pending Barcodes - imported barcodes waiting to be scanned and converted to bales
+export const pendingBarcodes = pgTable("pending_barcodes", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  barcode: varchar("barcode", { length: 100 }).notNull(),
+  category: text("category"),
+  grade: text("grade"),
+  origin: text("origin"),
+  printed: boolean("printed").notNull().default(false),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueCompanyPendingBarcode: uniqueIndex("pending_barcodes_company_barcode_unique").on(t.companyId, t.barcode),
+}));
+
+export const insertPendingBarcodeSchema = createInsertSchema(pendingBarcodes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPendingBarcode = z.infer<typeof insertPendingBarcodeSchema>;
+export type PendingBarcode = typeof pendingBarcodes.$inferSelect;
+
 // Mix Batches - combines containers into batches for bale production
 export const mixBatches = pgTable("mix_batches", {
   id: serial("id").primaryKey(),

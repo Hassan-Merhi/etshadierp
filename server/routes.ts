@@ -26447,6 +26447,117 @@ if (asOfDate) {
     }
   });
 
+
+  // Pending Barcodes API Routes - for pre-printing barcode labels
+  app.get("/api/pending-barcodes", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const barcodes = await storage.getAllPendingBarcodes(companyId);
+      res.json(barcodes);
+    } catch (error: any) {
+      console.error("Error fetching pending barcodes:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/pending-barcodes/:barcode", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const barcode = await storage.getPendingBarcodeByCode(req.params.barcode, companyId);
+      if (!barcode) {
+        return res.status(404).json({ message: "Barcode not found" });
+      }
+      res.json(barcode);
+    } catch (error: any) {
+      console.error("Error fetching pending barcode:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/pending-barcodes", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const { insertPendingBarcodeSchema } = await import("@shared/schema");
+      const data = insertPendingBarcodeSchema.parse({ ...req.body, companyId });
+      const barcode = await storage.createPendingBarcode(data);
+      res.json(barcode);
+    } catch (error: any) {
+      console.error("Error creating pending barcode:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/pending-barcodes/import", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const barcodes = req.body.barcodes || [];
+      if (!Array.isArray(barcodes)) {
+        return res.status(400).json({ message: "Invalid data format" });
+      }
+      const created = await storage.bulkCreatePendingBarcodes(
+        barcodes.map((b: any) => ({
+          companyId,
+          barcode: b.barcode || b.code || b,
+          category: b.category || null,
+          grade: b.grade || null,
+          origin: b.origin || null,
+          printed: false,
+          used: false,
+        }))
+      );
+      res.json({ success: true, count: created.length, barcodes: created });
+    } catch (error: any) {
+      console.error("Error importing pending barcodes:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const barcode = await storage.updatePendingBarcode(id, req.body);
+      res.json(barcode);
+    } catch (error: any) {
+      console.error("Error updating pending barcode:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/pending-barcodes/mark-printed", requireAuth, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        return res.status(400).json({ message: "ids must be an array" });
+      }
+      await storage.markBarcodesAsPrinted(ids);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error marking barcodes as printed:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deletePendingBarcode(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error deleting pending barcode:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
   // Bale Products API Routes
   app.get("/api/bale-products", requireAuth, async (req, res) => {
     try {
