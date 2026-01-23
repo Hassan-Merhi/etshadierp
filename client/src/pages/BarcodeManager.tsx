@@ -151,32 +151,61 @@ export default function BarcodeManager() {
       <head>
         <title>Barcode Labels</title>
         <style>
-          @page { margin: 5mm; }
-          body { font-family: monospace; margin: 0; padding: 10px; }
-          .labels { display: flex; flex-wrap: wrap; gap: 10px; }
-          .label {
-            border: 1px dashed #ccc;
-            padding: 10px;
-            text-align: center;
-            width: 180px;
-            page-break-inside: avoid;
+          @page { 
+            margin: 10mm;
+            size: A4;
           }
-          .barcode-img { max-width: 100%; height: 50px; }
-          .barcode-text { font-size: 14px; font-weight: bold; margin-top: 5px; }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+          }
+          .label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            page-break-after: always;
+            text-align: center;
+          }
+          .label:last-child {
+            page-break-after: auto;
+          }
+          .barcode-img { 
+            max-width: 80%; 
+            height: auto;
+            max-height: 200px;
+          }
+          .barcode-text { 
+            font-size: 32px; 
+            font-weight: bold; 
+            margin-top: 20px;
+            font-family: monospace;
+          }
+          .barcode-info {
+            font-size: 18px;
+            color: #666;
+            margin-top: 10px;
+          }
+          @media print {
+            .label {
+              height: 100vh;
+            }
+          }
         </style>
       </head>
       <body>
-        <div class="labels">
-          ${toPrint.map(b => `
-            <div class="label">
-              <img class="barcode-img" src="/api/barcode/${encodeURIComponent(b.barcode)}" alt="${b.barcode}" />
-              <div class="barcode-text">${b.barcode}</div>
-            </div>
-          `).join("")}
-        </div>
+        ${toPrint.map(b => `
+          <div class="label">
+            <img class="barcode-img" src="/api/barcode/${encodeURIComponent(b.barcode)}" alt="${b.barcode}" />
+            <div class="barcode-text">${b.barcode}</div>
+            ${b.category || b.grade || b.origin ? `<div class="barcode-info">${[b.category, b.grade, b.origin].filter(Boolean).join(" | ")}</div>` : ""}
+          </div>
+        `).join("")}
         <script>
           window.onload = function() {
-            window.print();
+            setTimeout(function() { window.print(); }, 500);
           };
         </script>
       </body>
