@@ -8,6 +8,7 @@ export const companies = pgTable("companies", {
   id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
+  companyType: text("company_type").notNull().default("erp"),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -18,6 +19,7 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
 }).extend({
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
+  companyType: z.enum(["erp", "factory"]).default("erp"),
 });
 
 export type InsertCompany = z.infer<typeof insertCompanySchema>;

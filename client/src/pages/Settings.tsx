@@ -1342,6 +1342,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
       defaultValues: {
         name: "",
         code: "",
+        companyType: "erp",
         active: true,
       },
     });
@@ -1427,6 +1428,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
         companyForm.reset({
           name: "",
           code: "",
+          companyType: "erp",
           active: true,
         });
       },
@@ -1826,6 +1828,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
       companyForm.reset({
         name: company.name,
         code: company.code,
+        companyType: company.companyType || "erp",
         active: company.active,
       });
       setIsCompanyDialogOpen(true);
@@ -1972,6 +1975,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                     companyForm.reset({
                       name: "",
                       code: "",
+                      companyType: "erp",
                       active: true,
                     });
                   }}
@@ -2025,6 +2029,28 @@ function EditLogTable({ companyId }: { companyId?: number }) {
   
                     <FormField
                       control={companyForm.control}
+                      name="companyType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "erp"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-company-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="erp">Normal ERP</SelectItem>
+                              <SelectItem value="factory">Factory Production</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={companyForm.control}
                       name="active"
                       render={({ field }) => (
                         <FormItem className="flex items-center gap-2 space-y-0">
@@ -2071,6 +2097,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Company Name</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Parent Credit Account</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -2081,6 +2108,11 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                     <TableRow key={company.id}>
                       <TableCell className="font-medium" data-testid={`text-company-name-${company.id}`}>
                         {company.name}
+                      </TableCell>
+                      <TableCell data-testid={`text-company-type-${company.id}`}>
+                        <Badge variant={company.companyType === "factory" ? "default" : "secondary"}>
+                          {company.companyType === "factory" ? "Factory" : "ERP"}
+                        </Badge>
                       </TableCell>
                       <TableCell data-testid={`text-company-status-${company.id}`}>
                         {company.active ? "Active" : "Inactive"}

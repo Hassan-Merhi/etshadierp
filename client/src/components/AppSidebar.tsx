@@ -46,6 +46,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { ROUTE_TO_FEATURE, type FeatureKey } from "@shared/schema";
 import { useState, useEffect } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface MenuItem {
   title: string;
@@ -127,6 +128,7 @@ const standaloneItems: MenuItem[] = [
 export function AppSidebar({ user }: { user?: any }) {
   const [location] = useLocation();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const { selectedCompany } = useCompany();
 
   // Auto-collapse: only keep the group containing current route open
   useEffect(() => {
@@ -154,6 +156,12 @@ export function AppSidebar({ user }: { user?: any }) {
     const isPOSUser = user?.role?.startsWith("POS");
     const isAdmin = user?.role === "Admin";
     const featureKey = ROUTE_TO_FEATURE[item.url];
+
+    // Hide Factory Production for ERP companies (only show for factory companies)
+    if (item.url === "/factory-production") {
+      const isFactoryCompany = selectedCompany?.companyType === "factory";
+      if (!isFactoryCompany) return false;
+    }
 
     if (isAdmin) return true;
 
