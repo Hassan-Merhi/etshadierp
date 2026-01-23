@@ -152,8 +152,11 @@ export default function BarcodeManager() {
         <title>Barcode Labels</title>
         <style>
           @page { 
-            margin: 10mm;
-            size: A4;
+            margin: 0;
+            size: 100mm 75mm;
+          }
+          * {
+            box-sizing: border-box;
           }
           body { 
             font-family: Arial, sans-serif; 
@@ -161,36 +164,42 @@ export default function BarcodeManager() {
             padding: 0;
           }
           .label {
+            width: 100mm;
+            height: 75mm;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
             page-break-after: always;
             text-align: center;
+            padding: 5mm;
           }
           .label:last-child {
             page-break-after: auto;
           }
           .barcode-img { 
-            max-width: 80%; 
+            width: 80mm;
             height: auto;
-            max-height: 200px;
+            max-height: 35mm;
           }
           .barcode-text { 
-            font-size: 32px; 
+            font-size: 24px; 
             font-weight: bold; 
-            margin-top: 20px;
+            margin-top: 4mm;
             font-family: monospace;
           }
           .barcode-info {
-            font-size: 18px;
+            font-size: 14px;
             color: #666;
-            margin-top: 10px;
+            margin-top: 2mm;
           }
           @media print {
+            body {
+              width: 100mm;
+            }
             .label {
-              height: 100vh;
+              width: 100mm;
+              height: 75mm;
             }
           }
         </style>

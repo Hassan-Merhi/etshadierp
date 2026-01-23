@@ -27179,6 +27179,38 @@ if (asOfDate) {
     }
   });
 
+
+  // GET endpoint to return barcode as PNG image (for print labels)
+  app.get("/api/barcode/:code", async (req, res) => {
+    try {
+      const code = decodeURIComponent(req.params.code);
+      
+      if (!code) {
+        return res.status(400).json({ message: "Barcode code is required" });
+      }
+
+      // @ts-ignore - bwip-js types are incomplete
+      const bwipjs = await import("bwip-js");
+      
+      // Render to PNG buffer - larger for printing
+      const png = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: code,
+        scale: 4,
+        height: 15,
+        includetext: false,
+        textxalign: "center",
+      });
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(png);
+    } catch (error: any) {
+      console.error("Error generating barcode image:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete("/api/production-bales/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
