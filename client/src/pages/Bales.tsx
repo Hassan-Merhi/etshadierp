@@ -50,7 +50,7 @@ export default function Bales() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const [scanMode, setScanMode] = useState<"quick" | "review">("review");
+  const [scanMode, setScanMode] = useState<"quick" | "review">("quick");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showBaleDialog, setShowBaleDialog] = useState(false);
   const [scannedBale, setScannedBale] = useState<Partial<InsertBale> | null>(null);
@@ -92,8 +92,10 @@ export default function Bales() {
       form.reset();
       setShowBaleDialog(false);
       setScannedBale(null);
+      setBarcodeInput("");
       if (barcodeInputRef.current) {
         barcodeInputRef.current.value = "";
+        barcodeInputRef.current.focus();
       }
     },
     onError: (error: any) => {
@@ -139,6 +141,9 @@ export default function Bales() {
           variant: "destructive",
         });
         setBarcodeInput("");
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
         return;
       }
 
@@ -170,6 +175,9 @@ export default function Bales() {
         description: "Please try again",
         variant: "destructive",
       });
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
     }
   };
 

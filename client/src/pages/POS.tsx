@@ -1415,13 +1415,38 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or code..."
+                placeholder="Scan barcode or search..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setHighlightedIndex(0);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (!searchTerm.trim()) return;
+                    const items = getFilteredInventory();
+                    if (items.length > 0) {
+                      const item = items[highlightedIndex] || items[0];
+                      const targetRow = activeRow ?? selectedCell.row;
+                      if (activeRow === null) {
+                        setActiveRow(targetRow);
+                        setTimeout(() => selectItem(item), 0);
+                      } else {
+                        selectItem(item);
+                      }
+                    }
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    const items = getFilteredInventory();
+                    setHighlightedIndex((prev) => Math.min(prev + 1, items.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                  }
+                }}
                 className="pl-9"
+                autoFocus
                 data-testid="input-search"
               />
             </div>
