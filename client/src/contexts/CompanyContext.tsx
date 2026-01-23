@@ -7,6 +7,7 @@ interface Company {
   code: string;
   name: string;
   active: boolean;
+  companyType: "erp" | "factory";
 }
 
 interface CompanyContextType {
@@ -33,6 +34,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       code: uc.companyCode,
       name: uc.companyName,
       active: uc.companyActive,
+      companyType: uc.companyType || "erp",
     }))
     .filter((company, index, self) => 
       index === self.findIndex((c) => c.id === company.id)

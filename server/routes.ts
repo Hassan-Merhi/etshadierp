@@ -1241,6 +1241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             companyCode: company?.code,
             companyName: company?.name,
             companyActive: company?.active,
+            companyType: company?.companyType || "erp",
           };
         }),
       );
