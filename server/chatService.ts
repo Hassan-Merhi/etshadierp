@@ -199,6 +199,9 @@ interface ERPContext {
   employeeBalances: any[];
   itemsToMarkdown: any[];
   containersInTransit: any[];
+  // Full searchable data
+  stockItemsWithInventory: any[];
+  recentSalesHistory: any[];
 }
 
 interface UserPreferences {
@@ -235,8 +238,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       totalValue: schema.inventory.totalValue,
     })
       .from(schema.inventory)
-      .where(eq(schema.inventory.companyId, companyId))
-      .limit(500),
+      .where(eq(schema.inventory.companyId, companyId)),
 
     db.select({
       id: schema.stockItems.id,
@@ -250,8 +252,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       .where(and(
         eq(schema.stockItems.companyId, companyId),
         eq(schema.stockItems.active, true)
-      ))
-      .limit(200),
+      )),
 
     db.select({
       id: schema.stockGroups.id,
@@ -272,8 +273,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       .where(and(
         eq(schema.ledgerAccounts.companyId, companyId),
         eq(schema.ledgerAccounts.active, true)
-      ))
-      .limit(200),
+      )),
 
     db.select({
       id: schema.suppliers.id,
@@ -283,8 +283,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       email: schema.suppliers.email,
     })
       .from(schema.suppliers)
-      .where(eq(schema.suppliers.active, true))
-      .limit(100),
+      .where(eq(schema.suppliers.active, true)),
 
     db.select({
       id: schema.customers.id,
@@ -296,8 +295,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       .where(and(
         eq(schema.customers.companyId, companyId),
         eq(schema.customers.active, true)
-      ))
-      .limit(100),
+      )),
 
     db.select({
       id: schema.locations.id,
@@ -325,7 +323,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
         isNull(schema.vouchers.deletedAt)
       ))
       .orderBy(desc(schema.vouchers.createdAt))
-      .limit(100),
+      .limit(200),
 
     db.select({
       id: schema.purchaseOrders.id,
@@ -339,8 +337,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     })
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.companyId, companyId))
-      .orderBy(desc(schema.purchaseOrders.createdAt))
-      .limit(50),
+      .orderBy(desc(schema.purchaseOrders.createdAt)),
 
     db.select({
       id: schema.containerSales.id,
@@ -355,8 +352,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     })
       .from(schema.containerSales)
       .where(eq(schema.containerSales.companyId, companyId))
-      .orderBy(desc(schema.containerSales.saleDate))
-      .limit(50),
+      .orderBy(desc(schema.containerSales.saleDate)),
   ]);
 
   const salesSummary = await db
@@ -659,6 +655,72 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     }))
     .filter(e => Math.abs(e.balance) > 0.01);
 
+  // Build comprehensive stock items with inventory by location (for full search)
+  const stockItemsWithInventory = stockItems.map(item => {
+    const stockGroup = stockGroups.find(g => g.id === item.stockGroupId);
+    const itemInventory = inventory.filter(inv => inv.stockItemId === item.id);
+    const inventoryByLocation = itemInventory.map(inv => {
+      const location = locations.find(l => l.id === inv.locationId);
+      return {
+        locationName: location?.name || 'Unknown',
+        locationCode: location?.code || '',
+        quantity: parseFloat(inv.quantity || '0'),
+        averageRate: parseFloat(inv.averageRate || '0'),
+        totalValue: parseFloat(inv.totalValue || '0'),
+      };
+    });
+    const totalQuantity = inventoryByLocation.reduce((sum, l) => sum + l.quantity, 0);
+    const totalValue = inventoryByLocation.reduce((sum, l) => sum + l.totalValue, 0);
+    
+    return {
+      code: item.code,
+      name: item.name,
+      groupName: stockGroup?.name || '',
+      sellingPrice: parseFloat(item.sellingPrice || '0'),
+      reorderLevel: parseFloat(item.reorderLevel || '0'),
+      totalQuantity,
+      totalValue,
+      locations: inventoryByLocation.filter(l => l.quantity > 0),
+    };
+  });
+
+  // Fetch ALL sales history with prices (no date limit)
+  const allSalesData = await db
+    .select({
+      stockItemId: schema.salesItems.stockItemId,
+      locationId: schema.salesItems.locationId,
+      quantity: schema.salesItems.quantity,
+      rate: schema.salesItems.rate,
+      totalSales: schema.salesItems.totalSales,
+      totalCost: schema.salesItems.totalCost,
+      profit: schema.salesItems.profit,
+      voucherDate: schema.vouchers.voucherDate,
+      voucherNumber: schema.vouchers.voucherNumber,
+    })
+    .from(schema.salesItems)
+    .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+    .where(and(
+      eq(schema.vouchers.companyId, companyId),
+      isNull(schema.vouchers.deletedAt)
+    ))
+    .orderBy(desc(schema.vouchers.voucherDate));
+
+  const recentSalesHistory = allSalesData.map(sale => {
+    const item = stockItems.find(i => i.id === sale.stockItemId);
+    const location = locations.find(l => l.id === sale.locationId);
+    return {
+      itemCode: item?.code || 'Unknown',
+      itemName: item?.name || 'Unknown',
+      locationName: location?.name || 'Unknown',
+      quantity: parseFloat(sale.quantity || '0'),
+      rate: parseFloat(sale.rate || '0'),
+      totalSales: parseFloat(sale.totalSales || '0'),
+      profit: parseFloat(sale.profit || '0'),
+      date: sale.voucherDate,
+      voucherNumber: sale.voucherNumber,
+    };
+  });
+
   return {
     dataFetchedAt, // Real-time timestamp
     inventory,
@@ -686,6 +748,9 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     employeeBalances: employeeBalancesList,
     itemsToMarkdown,
     containersInTransit,
+    // Full searchable data
+    stockItemsWithInventory,
+    recentSalesHistory,
   };
 }
 
@@ -709,10 +774,18 @@ All data below is LIVE from the database - not cached. These numbers reflect the
 
 ## YOUR CAPABILITIES:
 1. **Data Analysis**: Answer questions about inventory, sales, finances, suppliers, and customers
-2. **Business Insights**: Provide actionable recommendations based on data patterns
-3. **What-If Analysis**: Help users simulate scenarios (pricing changes, stock projections)
-4. **Alerts & Monitoring**: Highlight critical issues that need attention
-5. **Multi-language**: Respond in the same language as the user's question
+2. **Full Text Search**: Search through ALL stock items by partial name match (e.g., "dress cream" finds all items containing those words)
+3. **Sales History Lookup**: Find when items were last sold and at what price, per location
+4. **Business Insights**: Provide actionable recommendations based on data patterns
+5. **What-If Analysis**: Help users simulate scenarios (pricing changes, stock projections)
+6. **Alerts & Monitoring**: Highlight critical issues that need attention
+7. **Multi-language**: Respond in the same language as the user's question
+
+## SEARCH INSTRUCTIONS:
+- When user asks about items by partial name (e.g., "items with 'cream' in the name"), search through the COMPLETE STOCK ITEMS list below
+- When user asks "what was the last price for X", look in the RECENT SALES HISTORY for that item
+- When user asks about quantities at a location, check the COMPLETE STOCK ITEMS list which includes inventory by location
+- Case-insensitive matching is expected - "Dress Cream" matches "DRESS CREAM" and "dress cream"
 
 ## CURRENT COMPANY DATA (REAL-TIME as of ${formattedTime}):
 
@@ -793,26 +866,28 @@ ${context.recentTransactions.slice(0, 10).map(t =>
 - Open POs: ${context.purchaseOrders.filter(po => po.status === 'Open').length}
 - Recent POs: ${context.purchaseOrders.slice(0, 5).map(po => `${po.poNumber} ($${po.itemsTotal})`).join(', ') || 'None'}
 
-### 🏷️ STOCK ITEMS (Sample):
-${JSON.stringify(context.stockItems.slice(0, 15).map(s => ({
-  code: s.code,
-  name: s.name,
-  sellingPrice: s.sellingPrice,
-})), null, 2)}
+### 🏷️ COMPLETE STOCK ITEMS WITH INVENTORY (${context.stockItemsWithInventory.length} items):
+Search through ALL items below to answer questions about stock, quantities, locations, and prices.
+${JSON.stringify(context.stockItemsWithInventory, null, 1)}
 
-### 👥 SUPPLIERS:
-${JSON.stringify(context.suppliers.slice(0, 10).map(s => ({
+### 💵 COMPLETE SALES HISTORY (${context.recentSalesHistory.length} transactions):
+Use this data to answer questions like "what price did this item sell at?" or "when was this item last sold?" The data is sorted by date (newest first), so the first occurrence of an item is its most recent sale.
+${JSON.stringify(context.recentSalesHistory, null, 1)}
+
+### 👥 ALL SUPPLIERS (${context.suppliers.length}):
+${JSON.stringify(context.suppliers.map(s => ({
   code: s.code,
   name: s.legalName,
   phone: s.phone,
-})), null, 2)}
+  email: s.email,
+})), null, 1)}
 
-### 👤 CUSTOMERS:
-${JSON.stringify(context.customers.slice(0, 10).map(c => ({
+### 👤 ALL CUSTOMERS (${context.customers.length}):
+${JSON.stringify(context.customers.map(c => ({
   code: c.code,
   name: c.legalName,
   phone: c.phone,
-})), null, 2)}
+})), null, 1)}
 
 ## RESPONSE GUIDELINES:
 
