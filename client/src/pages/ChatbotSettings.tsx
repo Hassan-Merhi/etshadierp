@@ -49,7 +49,7 @@ export default function ChatbotSettings() {
     queryKey: ["/api/chatbot/all-history"],
   });
 
-  const { data: chatStatus } = useQuery<{ enabled: boolean; hasApiKey: boolean; isAdminOrOwner: boolean }>({
+  const { data: chatStatus } = useQuery<{ enabled: boolean; hasApiKey: boolean; providerName: string; selectedProvider: string; isAdminOrOwner: boolean }>({
     queryKey: ["/api/chatbot/status"],
   });
 
@@ -122,8 +122,8 @@ export default function ChatbotSettings() {
             <div className="flex items-center gap-3">
               <Bot className="h-5 w-5 text-orange-500" />
               <p className="text-sm">
-                <span className="font-medium">API Key Missing:</span> The Gemini API key is not configured. 
-                Please add the GEMINI_API_KEY secret in the Secrets tab to enable the AI chatbot.
+                <span className="font-medium">API Key Missing:</span> The {chatStatus?.providerName || "AI"} API key is not configured. 
+                Please add the {chatStatus?.selectedProvider === "chatgpt" ? "OPENAI_API_KEY" : chatStatus?.selectedProvider === "grok" ? "XAI_API_KEY" : "GEMINI_API_KEY"} secret in the Secrets tab to enable the AI chatbot.
               </p>
             </div>
           </CardContent>

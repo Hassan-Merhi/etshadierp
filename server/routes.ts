@@ -30286,11 +30286,26 @@ if (asOfDate) {
         .from(users)
         .where(eq(users.id, userId));
 
-      // Check if API key is configured
-      const hasApiKey = !!process.env.GEMINI_API_KEY;
+      // Get selected AI provider and check if its API key is configured
+      const providerSetting = await db.select({ value: systemSettings.value }).from(systemSettings).where(eq(systemSettings.key, "ai_provider")).limit(1);
+      const selectedProvider = (providerSetting.length > 0 && providerSetting[0].value) ? providerSetting[0].value.toLowerCase() : "gemini";
+      let hasApiKey = false;
+      let providerName = "Gemini";
+      if (selectedProvider === "chatgpt") {
+        hasApiKey = !!process.env.OPENAI_API_KEY;
+        providerName = "OpenAI";
+      } else if (selectedProvider === "grok") {
+        hasApiKey = !!process.env.XAI_API_KEY;
+        providerName = "Grok";
+      } else {
+        hasApiKey = !!process.env.GEMINI_API_KEY;
+        providerName = "Gemini";
+      }
 
       res.json({
         enabled: user?.chatbotEnabled || false,
+        providerName,
+        selectedProvider,
         hasApiKey,
         isAdminOrOwner: userRole === "Admin" || userRole === "Owner",
       });
