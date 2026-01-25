@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -16,7 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X } from "lucide-react";
+import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -74,6 +75,27 @@ export default function ChatbotSettings() {
     },
   });
 
+  const providerMutation = useMutation({
+    mutationFn: async (provider: string) => {
+      const response = await apiRequest("PATCH", "/api/chatbot/provider", { provider });
+      return response.json();
+    },
+    onSuccess: (_, provider) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chatbot/status"] });
+      toast({
+        title: "AI Provider Updated",
+        description: `Switched to ${provider === "chatgpt" ? "ChatGPT (OpenAI)" : provider === "grok" ? "Grok (xAI)" : "Gemini (Google)"}.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update AI provider",
+        variant: "destructive",
+      });
+    },
+  });
+
   const groupedHistory = chatHistory.reduce((acc, msg) => {
     const key = msg.sessionId;
     if (!acc[key]) {
@@ -125,6 +147,45 @@ export default function ChatbotSettings() {
                 <span className="font-medium">API Key Missing:</span> The {chatStatus?.providerName || "AI"} API key is not configured. 
                 Please add the {chatStatus?.selectedProvider === "chatgpt" ? "OPENAI_API_KEY" : chatStatus?.selectedProvider === "grok" ? "XAI_API_KEY" : "GEMINI_API_KEY"} secret in the Secrets tab to enable the AI chatbot.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {chatStatus?.isAdminOrOwner && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Settings className="h-5 w-5" />
+              AI Provider
+            </CardTitle>
+            <CardDescription>
+              Choose which AI service powers the chatbot
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Select
+                value={chatStatus?.selectedProvider || "gemini"}
+                onValueChange={(value) => providerMutation.mutate(value)}
+                disabled={providerMutation.isPending}
+              >
+                <SelectTrigger className="w-[200px]" data-testid="select-ai-provider">
+                  <SelectValue placeholder="Select AI Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini">Gemini (Google)</SelectItem>
+                  <SelectItem value="chatgpt">ChatGPT (OpenAI)</SelectItem>
+                  <SelectItem value="grok">Grok (xAI)</SelectItem>
+                </SelectContent>
+              </Select>
+              {providerMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {chatStatus?.hasApiKey && (
+                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
+                  <Check className="h-3 w-3 mr-1" />
+                  API Key Configured
+                </Badge>
+              )}
             </div>
           </CardContent>
         </Card>

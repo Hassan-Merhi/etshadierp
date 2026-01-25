@@ -30315,6 +30315,42 @@ if (asOfDate) {
   });
 
   // Send a chat message
+
+  // Update AI provider setting
+  app.patch("/api/chatbot/provider", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Owner") {
+        return res.status(403).json({ message: "Only admins can change AI provider" });
+      }
+
+      const { provider } = req.body;
+      if (!provider || !["gemini", "chatgpt", "grok"].includes(provider.toLowerCase())) {
+        return res.status(400).json({ message: "Invalid provider. Must be gemini, chatgpt, or grok" });
+      }
+
+      const normalizedProvider = provider.toLowerCase();
+      
+      // Check if setting exists
+      const existing = await db.select().from(systemSettings).where(eq(systemSettings.key, "ai_provider")).limit(1);
+      
+      if (existing.length > 0) {
+        await db.update(systemSettings)
+          .set({ value: normalizedProvider, updatedAt: new Date() })
+          .where(eq(systemSettings.key, "ai_provider"));
+      } else {
+        await db.insert(systemSettings).values({
+          key: "ai_provider",
+          value: normalizedProvider,
+          description: "AI provider for chatbot: gemini, chatgpt, or grok",
+        });
+      }
+
+      res.json({ success: true, provider: normalizedProvider });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
   app.post("/api/chatbot/message", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId;
