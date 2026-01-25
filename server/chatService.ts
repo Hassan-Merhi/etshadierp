@@ -688,9 +688,9 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   const allSalesData = await db
     .select({
       stockItemId: schema.salesItems.stockItemId,
-      locationId: schema.salesItems.locationId,
+      locationId: schema.vouchers.locationId,
       quantity: schema.salesItems.quantity,
-      rate: schema.salesItems.rate,
+      sellingPrice: schema.salesItems.sellingPrice,
       totalSales: schema.salesItems.totalSales,
       totalCost: schema.salesItems.totalCost,
       profit: schema.salesItems.profit,
@@ -713,7 +713,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       itemName: item?.name || 'Unknown',
       locationName: location?.name || 'Unknown',
       quantity: parseFloat(sale.quantity || '0'),
-      rate: parseFloat(sale.rate || '0'),
+      sellingPrice: parseFloat(sale.sellingPrice || '0'),
       totalSales: parseFloat(sale.totalSales || '0'),
       profit: parseFloat(sale.profit || '0'),
       date: sale.voucherDate,
