@@ -1363,7 +1363,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       data-testid={`row-voucher-${voucher.id}`}
                     >
                       <TableCell className="font-medium sticky left-0 bg-background z-10">
-                        {formatDisplayDate(parseISO(voucher.voucherDate))}
+                        <div className="flex flex-col">
+                          <span>{formatDisplayDate(parseISO(voucher.voucherDate))}</span>
+                          <span className="text-xs text-muted-foreground">{format(new Date(voucher.createdAt), "hh:mm a")}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

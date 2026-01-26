@@ -419,7 +419,7 @@ export default function POSDaybook() {
                       data-testid={`row-voucher-${voucher.id}`}
                     >
                       <TableCell className="font-mono text-xs">
-                        {format(new Date(voucher.createdAt), "hh:mm a")}
+                        {format(new Date(voucher.createdAt), "MMM dd, hh:mm a")}
                       </TableCell>
                       <TableCell>
                         <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
