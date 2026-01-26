@@ -8,7 +8,6 @@ import CryptoJS from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
 import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
-import { registerExportRoutes } from "./routes/export";
 import {
   requireAuth,
   requireRole,
@@ -314,9 +313,7 @@ async function calculateHistoricalLocationInventory(
     } else {
       existing.quantity += qty;
       existing.totalValue += qty * rate;
-    });
-
-  
+    }
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(adj.stockItemId, existing);
   }
@@ -460,9 +457,7 @@ async function calculateHistoricalLocationInventory(
         stockGroupName: itemDetails.stockGroupName,
         stockGroupCode: itemDetails.stockGroupCode,
       });
-    });
-
-  
+    }
   }
 
   console.log(`[HIST-INV] Final result: ${result.length} items`);
@@ -562,9 +557,7 @@ async function syncEmployeeBalancesFromEntries(
     if (account.code && account.code.startsWith("EMP-")) {
       const employeeCode = account.code.replace("EMP-", "");
       employeeAccountMap.set(account.id, { code: account.code, employeeCode });
-    });
-
-  
+    }
   }
   
   // Track balance changes AND deposits/withdrawals per employee
@@ -583,9 +576,7 @@ async function syncEmployeeBalancesFromEntries(
     let balanceChange = credit - debit;
     if (reverse) {
       balanceChange = -balanceChange;
-    });
-
-  
+    }
     
     // Deposits/Withdrawals track raw amounts:
     // - Forward: deposits += credit, withdrawals += debit
@@ -602,9 +593,7 @@ async function syncEmployeeBalancesFromEntries(
         withdrawals: current.withdrawals + withdrawalChange
       });
       continue;
-    });
-
-  
+    }
     
     // Check if entry has ledgerAccountId pointing to EMP-* account
     if (entry.ledgerAccountId) {
@@ -616,12 +605,8 @@ async function syncEmployeeBalancesFromEntries(
           deposits: current.deposits + depositChange,
           withdrawals: current.withdrawals + withdrawalChange
         });
-      });
-
-  
-    });
-
-  
+      }
+    }
   }
   
   // Apply balance changes for direct employee entries (by ID)
@@ -690,12 +675,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Database connection failed:", error);
       res.status(500).json({ status: "error", message: error.message });
-    });
-
-  
+    }
   });
-  // Register export routes from module
-  registerExportRoutes(app, storage, requireAuth, requireNonPOS);
 
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
@@ -707,9 +688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res
           .status(400)
           .json({ message: "Username and password are required" });
-      });
-
-  
+      }
 
       console.log("Fetching user from database...");
       const user = (await Promise.race([
@@ -721,16 +700,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("User fetch complete:", user ? "Found" : "Not found");
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
-      });
-
-  
+      }
 
       const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
       if (!passwordValid) {
         return res.status(401).json({ message: "Invalid credentials" });
-      });
-
-  
+      }
 
       // Migrate legacy SHA256 password to bcrypt on successful login
       if (needsMigration) {
@@ -738,15 +713,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const newHash = await hashPassword(password);
         await storage.updateUser(user.id, { password: newHash });
         console.log("Password migration complete for user:", user.id);
-      });
-
-  
+      }
 
       if (!user.active) {
         return res.status(403).json({ message: "Account is inactive" });
-      });
-
-  
+      }
 
       req.session.userId = user.id;
 
@@ -759,9 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.currentLocationId = firstCompany.assignedLocationId;
         req.session.currentPOSStation = firstCompany.posStation;
         req.session.cashAccountId = firstCompany.cashAccountId;
-      });
-
-  
+      }
 
       console.log("✅ Login successful, session saved");
       
@@ -770,9 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // User Presence tracking endpoints
@@ -786,9 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userRole = req.session.currentRole;
         if (!userRole || !["Admin", "Owner", "Manager"].includes(userRole)) {
           return res.status(403).json({ message: "Access denied. Admin, Owner, or Manager role required." });
-        });
-
-  
+        }
 
         // Clean up stale records (older than 2 minutes)
         const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
@@ -800,12 +765,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
         console.error("Error fetching active users:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // PATCH: Update user presence (heartbeat)
@@ -817,9 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const parseResult = updatePresenceSchema.safeParse(req.body);
         if (!parseResult.success) {
           return res.status(400).json({ message: "Invalid request body" });
-        });
-
-  
+        }
 
         const { route } = parseResult.data;
         const sessionId = req.sessionID;
@@ -853,20 +812,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role,
             lastSeen: sql`now()`,
           });
-        });
-
-  
+        }
 
         res.json({ success: true });
       } catch (error: any) {
         console.error("Error updating presence:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // DELETE: Clear user presence on logout
@@ -881,9 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
         console.error("Error clearing presence:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     });
 
   // POST: Handle sendBeacon leave request (no auth required as session may be ending)
@@ -894,19 +845,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionId = req.sessionID;
         if (sessionId) {
           await db.delete(userPresence).where(eq(userPresence.sessionId, sessionId));
-        });
-
-  
+        }
         res.json({ success: true });
       } catch (error: any) {
         console.error("Error clearing presence on leave:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
 
@@ -921,9 +866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userRole = req.session.currentRole;
         if (!userRole || !["Admin", "Owner"].includes(userRole)) {
           return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
-        });
-
-  
+        }
 
         const companyId = req.session.currentCompanyId;
         const { limit = "100", offset = "0", tableName, userId } = req.query;
@@ -932,14 +875,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let conditions = companyId ? [eq(auditLog.companyId, companyId)] : [];
         if (tableName && typeof tableName === "string") {
           conditions.push(eq(auditLog.tableName, tableName));
-        });
-
-  
+        }
         if (userId && typeof userId === "string") {
           conditions.push(eq(auditLog.userId, userId));
-        });
-
-  
+        }
 
         const logs = await db.select()
           .from(auditLog)
@@ -952,21 +891,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
         console.error("Error fetching audit logs:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Failed to logout" });
-      });
-
-  
+      }
       res.json({ message: "Logged out successfully" });
     });
   });
@@ -975,9 +908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
-    });
-
-  
+    }
     const { password: _, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
@@ -996,9 +927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(usersWithoutPasswords);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1014,9 +943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existing = await storage.getUserByUsername(parsed.username);
         if (existing) {
           return res.status(400).json({ message: "Username already exists" });
-        });
-
-  
+        }
 
         // Hash the password with bcrypt
         const hashedPassword = await hashPassword(parsed.password);
@@ -1029,9 +956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(userWithoutPassword);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1047,18 +972,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If password is being updated, hash it with bcrypt
         if (updates.password) {
           updates.password = await hashPassword(updates.password);
-        });
-
-  
+        }
 
         const user = await storage.updateUser(id, updates);
         const { password: _, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -1073,17 +994,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Prevent deleting yourself
         if (req.user?.id === id) {
           return res.status(400).json({ message: "Cannot delete your own account" });
-        });
-
-  
+        }
         
         await storage.deleteUser(id);
         res.json({ message: "User deleted successfully" });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1094,38 +1011,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ message: "Current password and new password are required" });
-      });
-
-  
+      }
       
       if (newPassword.length < 4) {
         return res.status(400).json({ message: "New password must be at least 4 characters" });
-      });
-
-  
+      }
       
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
-      });
-
-  
+      }
       
       // Get current user with password
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
-      });
-
-  
+      }
       
       // Verify current password
       const { valid } = await verifyPassword(currentPassword, user.password);
       if (!valid) {
         return res.status(400).json({ message: "Current password is incorrect" });
-      });
-
-  
+      }
       
       // Hash new password and update
       const hashedPassword = await hashPassword(newPassword);
@@ -1134,9 +1041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Password changed successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Admin resets any user's password
@@ -1151,23 +1056,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!newPassword) {
           return res.status(400).json({ message: "New password is required" });
-        });
-
-  
+        }
         
         if (newPassword.length < 4) {
           return res.status(400).json({ message: "Password must be at least 4 characters" });
-        });
-
-  
+        }
         
         // Verify user exists
         const user = await storage.getUser(userId);
         if (!user) {
           return res.status(404).json({ message: "User not found" });
-        });
-
-  
+        }
         
         // Hash new password and update
         const hashedPassword = await hashPassword(newPassword);
@@ -1176,9 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ message: `Password reset successfully for user: ${user.username}` });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1194,9 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(roles);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1213,17 +1108,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res
             .status(400)
             .json({ message: "POS roles require an assigned location" });
-        });
-
-  
+        }
 
         const role = await storage.createUserCompanyRole(parsed);
         res.status(201).json(role);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1241,17 +1132,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res
             .status(400)
             .json({ message: "POS roles require an assigned location" });
-        });
-
-  
+        }
 
         const role = await storage.updateUserCompanyRole(parseInt(id), parsed);
         res.json(role);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1266,9 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1277,43 +1162,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
-      });
-
-  
+      }
       
       const prefs = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
       
       if (prefs.length === 0) {
         // Return default preferences if none exist
         return res.json({ dateFormat: "MM/DD/YYYY" });
-      });
-
-  
+      }
       
       res.json(prefs[0]);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.put("/api/user-preferences", requireAuth, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
-      });
-
-  
+      }
       
       const { dateFormat } = req.body;
       
       // Validate date format
       if (!["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
         return res.status(400).json({ message: "Invalid date format" });
-      });
-
-  
+      }
       
       // Check if preferences exist
       const existing = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
@@ -1325,9 +1200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dateFormat,
         }).returning();
         return res.json(newPrefs[0]);
-      });
-
-  
+      }
       
       // Update existing preferences
       const updated = await db.update(userPreferences)
@@ -1338,9 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated[0]);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Company management routes
@@ -1350,18 +1221,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(companies);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/user/companies", requireAuth, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
-      });
-
-  
+      }
       const userCompanies = await storage.getUserCompaniesWithRoles(
         req.user.id,
       );
@@ -1381,9 +1248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(companiesWithRoles);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post(
@@ -1396,9 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(company);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1413,9 +1276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(company);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1430,9 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ message: "Company deleted successfully" });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1442,15 +1301,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { companyId } = req.body;
       if (!companyId) {
         return res.status(400).json({ message: "Company ID is required" });
-      });
-
-  
+      }
 
       if (!req.user) {
         return res.status(401).json({ message: "Unauthorized" });
-      });
-
-  
+      }
 
       // Verify user has access to this company
       const userRole = await storage.getUserCompanyRole(req.user.id, companyId);
@@ -1458,9 +1313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res
           .status(403)
           .json({ message: "You don't have access to this company" });
-      });
-
-  
+      }
 
       req.session.currentCompanyId = companyId;
       req.session.currentRole = userRole.role;
@@ -1475,16 +1328,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           console.error("Error saving session:", err);
           return res.status(500).json({ message: "Failed to save session" });
-        });
-
-  
+        }
         res.json({ message: "Company set successfully", companyId });
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Locations
@@ -1509,9 +1358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res
           .status(400)
           .json({ message: "No company selected or specified" });
-      });
-
-  
+      }
 
       const locations = await storage.getAllLocations(companyId);
       console.log(
@@ -1524,18 +1371,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[/api/locations] Error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/locations", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const parsed = insertLocationSchema.parse({
         ...req.body,
@@ -1551,9 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fallback if baseCode is empty after sanitization
         if (!baseCode || baseCode.length === 0) {
           baseCode = "LOC";
-        });
-
-  
+        }
         
         // Ensure uniqueness by adding suffix if needed
         let code = baseCode;
@@ -1561,9 +1402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         while (await storage.getLocationByCode(code, req.session.currentCompanyId)) {
           code = `${baseCode}${suffix}`;
           suffix++;
-        });
-
-  
+        }
         parsed.code = code;
       } else {
         // Check for duplicate code if manually provided
@@ -1575,12 +1414,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res
             .status(400)
             .json({ message: "Location code already exists" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Provide defaults for optional fields
       const locationData = {
@@ -1594,9 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(location);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get single location by ID
@@ -1609,16 +1442,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         const location = await storage.getLocationById(locationId);
         if (!location) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         // Verify location belongs to current company
         if (location.companyId !== req.session.currentCompanyId) {
@@ -1627,16 +1456,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({
               message: "Access denied: Location belongs to a different company",
             });
-        });
-
-  
+        }
 
         res.json(location);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1646,16 +1471,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
         return res.status(400).json({ message: "Invalid location ID" });
-      });
-
-  
+      }
 
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
 
       // Verify location belongs to current company
       if (location.companyId !== req.session.currentCompanyId) {
@@ -1664,17 +1485,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({
             message: "Access denied: Location belongs to a different company",
           });
-      });
-
-  
+      }
 
       await storage.deleteLocation(locationId);
       res.json({ message: "Location deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Location Inventory - Get inventory for a specific location
@@ -1687,17 +1504,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         // Validate location exists
         const location = await storage.getLocationById(locationId);
         if (!location) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         // Verify location belongs to current company
         if (location.companyId !== req.session.currentCompanyId) {
@@ -1706,9 +1519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .json({
               message: "Access denied: Location belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check for asOfDate query parameter for historical inventory
 const rawAsOfDate = req.query.asOfDate as string | undefined;
@@ -1733,9 +1544,7 @@ if (rawAsOfDate) {
     const d = new Date(s);
     if (isNaN(d.getTime())) {
       return res.status(400).json({ message: "Invalid asOfDate format. Use YYYY-MM-DD" });
-    });
-
-  
+    }
     asOfDate = d.toISOString().slice(0, 10);
   }
 }
@@ -1759,14 +1568,10 @@ if (asOfDate) {
           res.json(filteredInventory);
         } else {
           res.json(inventory);
-        });
-
-  
+        }
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1775,9 +1580,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const inventory = await storage.getCompanyInventory(
         req.session.currentCompanyId,
@@ -1785,9 +1588,7 @@ if (asOfDate) {
       res.json(inventory);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Quick stock adjustment - manually add or subtract quantity at a location
@@ -1797,56 +1598,40 @@ if (asOfDate) {
       
       if (!stockItemId || !locationId || !quantity || !type) {
         return res.status(400).json({ message: "Missing required fields: stockItemId, locationId, quantity, type" });
-      });
-
-  
+      }
       
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
       const qty = parseFloat(quantity);
       
       if (isNaN(qty) || qty <= 0) {
         return res.status(400).json({ message: "Quantity must be a positive number" });
-      });
-
-  
+      }
       
       if (type !== "add" && type !== "subtract") {
         return res.status(400).json({ message: "Type must be 'add' or 'subtract'" });
-      });
-
-  
+      }
 
       // Verify location belongs to current company
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
       if (location.companyId !== companyId) {
         return res.status(403).json({ message: "Location belongs to a different company" });
-      });
-
-  
+      }
 
       // Verify stock item exists and belongs to current company
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
       if (stockItem.companyId !== companyId) {
         return res.status(403).json({ message: "Stock item belongs to a different company" });
-      });
-
-  
+      }
 
       // Get or create inventory record
       const [existingInv] = await db
@@ -1874,9 +1659,7 @@ if (asOfDate) {
           currentQuantity: currentQty,
           requestedSubtraction: qty,
         });
-      });
-
-  
+      }
 
       if (existingInv) {
         // Update existing inventory
@@ -1893,9 +1676,7 @@ if (asOfDate) {
         // Create new inventory record (only for add, not subtract from nothing)
         if (type === "subtract") {
           return res.status(400).json({ message: "Cannot subtract from non-existent inventory. Item not found at this location." });
-        });
-
-  
+        }
         await db.insert(inventory).values({
           companyId,
           locationId,
@@ -1905,9 +1686,7 @@ if (asOfDate) {
           totalValue: "0",
           lastUpdated: new Date(),
         });
-      });
-
-  
+      }
 
       res.json({
         message: `Successfully ${type === "add" ? "added" : "subtracted"} ${qty} units. New quantity: ${newQty}`,
@@ -1918,9 +1697,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Quick adjust error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update cost prices by barcode for a location
@@ -1933,46 +1710,34 @@ if (asOfDate) {
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const location = await storage.getLocationById(locationId);
         if (!location) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         if (location.companyId !== req.session.currentCompanyId) {
           return res.status(403).json({
             message: "Access denied: Location belongs to a different company",
           });
-        });
-
-  
+        }
 
         const { updates } = req.body;
         if (!Array.isArray(updates)) {
           return res.status(400).json({ message: "Updates must be an array" });
-        });
-
-  
+        }
 
         const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
         res.json(result);
       } catch (error: any) {
         console.error("Error updating cost prices:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -1986,23 +1751,17 @@ if (asOfDate) {
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Validate location exists and belongs to current company
         const location = await storage.getLocationById(locationId);
         if (!location) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         if (location.companyId !== req.session.currentCompanyId) {
           return res
@@ -2010,16 +1769,12 @@ if (asOfDate) {
             .json({
               message: "Access denied: Location belongs to a different company",
             });
-        });
-
-  
+        }
 
         const { items } = req.body;
         if (!Array.isArray(items)) {
           return res.status(400).json({ message: "Items must be an array" });
-        });
-
-  
+        }
 
         // Get all stock items and stock groups for code matching
         const allStockItems = await storage.getAllStockItems(
@@ -2067,12 +1822,8 @@ if (asOfDate) {
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
                   break; // Found a match, stop searching
-                });
-
-  
-              });
-
-  
+                }
+              }
 
               // Fall back to stockGroupCode column if provided and prefix didn't match
               if (
@@ -2085,12 +1836,8 @@ if (asOfDate) {
                 );
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
-                });
-
-  
-              });
-
-  
+                }
+              }
 
               // Require valid stock group - reject if none found
               if (!stockGroupId) {
@@ -2099,9 +1846,7 @@ if (asOfDate) {
                   reason: `No matching stock group found for code prefix. Please create stock item "${item.Item_barcode}" manually with a valid stock group first.`,
                 });
                 continue;
-              });
-
-  
+              }
 
               // Create the stock item
               const newStockItem = await storage.createStockItem({
@@ -2115,9 +1860,7 @@ if (asOfDate) {
 
               stockItem = newStockItem;
               allStockItems.push(newStockItem); // Add to cache for subsequent rows
-            });
-
-  
+            }
 
             const quantity = parseFloat(item.quantity || "0");
             const rate = parseFloat(item.rate || "0");
@@ -2168,20 +1911,14 @@ if (asOfDate) {
                 itemName: stockItem.name,
                 quantity: quantity,
               });
-            });
-
-  
+            }
           } catch (error: any) {
             results.errors.push({
               code: item.code,
               error: error.message,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         res.json({
           message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`,
@@ -2189,9 +1926,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -2205,53 +1940,39 @@ if (asOfDate) {
 
       if (!effectiveCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const accounts = await storage.getAllLedgerAccounts(effectiveCompanyId);
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/ledger-accounts/:id", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const accountId = parseInt(req.params.id);
       if (isNaN(accountId)) {
         return res.status(400).json({ message: "Invalid ledger account ID" });
-      });
-
-  
+      }
 
       const account = await storage.getLedgerAccountById(accountId);
       if (!account) {
         return res.status(404).json({ message: "Ledger account not found" });
-      });
-
-  
+      }
 
       // Verify account belongs to current company
       if (account.companyId !== req.session.currentCompanyId) {
         return res.status(404).json({ message: "Ledger account not found" });
-      });
-
-  
+      }
 
       res.json(account);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post(
@@ -2274,9 +1995,7 @@ if (asOfDate) {
               message:
                 "Duplicate ledger: A ledger account with this name already exists",
             });
-        });
-
-  
+        }
 
         // Auto-generate code from name if not provided
         if (!parsed.code) {
@@ -2293,9 +2012,7 @@ if (asOfDate) {
           // Fallback if baseCode is empty (shouldn't happen with validation, but be safe)
           if (!baseCode || baseCode.length === 0) {
             baseCode = "ACC";
-          });
-
-  
+          }
 
           // Ensure uniqueness by adding suffix if needed
           let code = baseCode;
@@ -2303,9 +2020,7 @@ if (asOfDate) {
           while (await storage.getLedgerAccountByCode(code, req.session.currentCompanyId!)) {
             code = `${baseCode}${suffix}`;
             suffix++;
-          });
-
-  
+          }
           parsed.code = code;
         } else {
           // Check for duplicate code if manually provided
@@ -2314,12 +2029,8 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Ledger account code already exists" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Validate opening balance amount and side must both be present or both absent
         const hasBalance =
@@ -2332,17 +2043,13 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Opening balance requires Dr/Cr side" });
-        });
-
-  
+        }
 
         if (!hasBalance && hasSide) {
           return res
             .status(400)
             .json({ message: "Dr/Cr side requires opening balance amount" });
-        });
-
-  
+        }
 
         // Validate subType based on accountType
         const validSubTypes: Record<string, string[]> = {
@@ -2368,20 +2075,14 @@ if (asOfDate) {
             return res.status(400).json({
               message: `Invalid subType "${parsed.subType}" for accountType "${parsed.accountType}". Valid options: ${validSubTypes[parsed.accountType].join(", ")}`,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const account = await storage.createLedgerAccount(parsed);
         res.status(201).json(account);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -2393,33 +2094,25 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const accountId = parseInt(req.params.id);
         if (isNaN(accountId)) {
           return res.status(400).json({ message: "Invalid account ID" });
-        });
-
-  
+        }
 
         // Verify account exists and belongs to current company
         const existingAccount = await storage.getLedgerAccountById(accountId);
         if (!existingAccount) {
           return res.status(404).json({ message: "Account not found" });
-        });
-
-  
+        }
         if (existingAccount.companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({
               message: "Access denied: Account belongs to a different company",
             });
-        });
-
-  
+        }
 
         const parsed = updateLedgerAccountSchema.parse({
           ...req.body,
@@ -2433,12 +2126,8 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Ledger account code already exists" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Validate opening balance amount and side must both be present or both absent
         const hasBalance =
@@ -2451,17 +2140,13 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Opening balance requires Dr/Cr side" });
-        });
-
-  
+        }
 
         if (!hasBalance && hasSide) {
           return res
             .status(400)
             .json({ message: "Dr/Cr side requires opening balance amount" });
-        });
-
-  
+        }
 
         // Validate subType based on accountType if accountType is being updated
         const accountType = parsed.accountType || existingAccount.accountType;
@@ -2488,20 +2173,14 @@ if (asOfDate) {
             return res.status(400).json({
               message: `Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${validSubTypes[accountType].join(", ")}`,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const updatedAccount = await storage.updateLedgerAccount(parsed);
         res.json(updatedAccount);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -2513,33 +2192,25 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const accountId = parseInt(req.params.id);
         if (isNaN(accountId)) {
           return res.status(400).json({ message: "Invalid account ID" });
-        });
-
-  
+        }
 
         // Verify account exists and belongs to current company
         const existingAccount = await storage.getLedgerAccountById(accountId);
         if (!existingAccount) {
           return res.status(404).json({ message: "Account not found" });
-        });
-
-  
+        }
         if (existingAccount.companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({
               message: "Access denied: Account belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check if account is used in any voucher entries
         const entries = await storage.getVoucherEntriesByLedger(accountId);
@@ -2548,9 +2219,7 @@ if (asOfDate) {
             message:
               "Cannot delete ledger account: It has been used in transactions. Please remove all related transactions first.",
           });
-        });
-
-  
+        }
 
         // Check if account is a parent to other accounts
         const allAccounts = await storage.getAllLedgerAccounts(
@@ -2564,17 +2233,13 @@ if (asOfDate) {
             message:
               "Cannot delete ledger account: It is a parent account. Please remove or reassign child accounts first.",
           });
-        });
-
-  
+        }
 
         await storage.deleteLedgerAccount(accountId);
         res.json({ message: "Ledger account deleted successfully" });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -2587,16 +2252,12 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { accountIds } = req.body;
         if (!accountIds || !Array.isArray(accountIds) || accountIds.length === 0) {
           return res.status(400).json({ message: "No accounts selected" });
-        });
-
-  
+        }
 
         // Get all accounts for this company
         const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
@@ -2607,9 +2268,7 @@ if (asOfDate) {
         
         if (accountsToUpdate.length === 0) {
           return res.status(400).json({ message: "No valid accounts found" });
-        });
-
-  
+        }
 
         // Update each account to zero its opening balance
         let count = 0;
@@ -2620,16 +2279,12 @@ if (asOfDate) {
             openingBalanceSide: undefined,
           });
           count++;
-        });
-
-  
+        }
 
         res.json({ message: `Opening balances zeroed for ${count} account(s)`, count });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -2707,9 +2362,7 @@ if (asOfDate) {
               } else {
                 // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
                 signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-              });
-
-  
+              }
               
               const balance = entries.reduce((sum, entry) => {
                 const credit = parseFloat(entry.creditAmount || "0");
@@ -2719,15 +2372,11 @@ if (asOfDate) {
                   return sum + credit - debit;
                 } else {
                   return sum + debit - credit;
-                });
-
-  
+                }
               }, signedOpening);
               
               totalBalance += balance;
-            });
-
-  
+            }
             return totalBalance;
           };
 
@@ -2749,9 +2398,7 @@ if (asOfDate) {
             
             if (!importChargesParent) {
               return 0; // No import charges yet
-            });
-
-  
+            }
             
             // Get all accounts under IMPORT_CHARGES parent (including the parent itself)
             const importChargeAccounts = await db
@@ -2770,9 +2417,7 @@ if (asOfDate) {
             
             if (importChargeAccounts.length === 0) {
               return 0;
-            });
-
-  
+            }
             
             const accountIds = importChargeAccounts.map(a => a.id);
             
@@ -2993,9 +2638,7 @@ if (asOfDate) {
             // Mixed: only count items with negative quantity (consumption items)
             if (adjustmentType === "consumption" || (adjustmentType === "mixed" && qty < 0)) {
               return sum + Math.abs(parseFloat(item.totalAmount || "0"));
-            });
-
-  
+            }
             return sum;
           }, 0);
 
@@ -3032,9 +2675,7 @@ if (asOfDate) {
             // Mixed: only count items with positive quantity (production items)
             if (adjustmentType === "production" || (adjustmentType === "mixed" && qty > 0)) {
               return sum + parseFloat(item.totalAmount || "0");
-            });
-
-  
+            }
             return sum;
           }, 0);
 
@@ -3146,9 +2787,7 @@ if (asOfDate) {
               components: componentsBreakdown,
             });
             continue;
-          });
-
-  
+          }
 
           // Check if any Profit account exists - if so, update the first one instead of creating new
           const existingProfitAccounts = await db
@@ -3206,9 +2845,7 @@ if (asOfDate) {
               components: componentsBreakdown,
             });
             continue;
-          });
-
-  
+          }
 
           // No existing Profit account - generate unique code for new capital account
           let nextCodeNum = 1;
@@ -3243,9 +2880,7 @@ if (asOfDate) {
             message: `Created ${accountCode} - ${accountName} with opening balance ${openingBalanceAmount} ${openingBalanceSide}`,
             components: componentsBreakdown,
           });
-        });
-
-  
+        }
 
         // Generate SQL summary for production database
         const sqlStatements: string[] = [];
@@ -3258,12 +2893,8 @@ if (asOfDate) {
             sqlStatements.push(
               `UPDATE ledger_accounts SET opening_balance = '${result.openingBalance}', opening_balance_side = '${result.openingBalanceSide}'\nWHERE company_id = ${result.companyId} AND code = '${result.accountCode}';`
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         res.json({
           message: `Processed ${results.length} companies`,
@@ -3273,9 +2904,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Error initializing accounting balances:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3286,9 +2915,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const employees = await storage.getAllEmployees(
         req.session.currentCompanyId,
       );
@@ -3311,9 +2938,7 @@ if (asOfDate) {
       res.json(transformedEmployees);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/employees", requireAuth, requireNonPOS, async (req, res) => {
@@ -3330,9 +2955,7 @@ if (asOfDate) {
         // Fallback if baseCode is somehow empty (shouldn't happen with validation)
         if (!baseCode || baseCode.length === 0) {
           baseCode = "EMP";
-        });
-
-  
+        }
 
         // Ensure uniqueness by adding suffix if needed
         let code = baseCode;
@@ -3340,9 +2963,7 @@ if (asOfDate) {
         while (await storage.getEmployeeByCode(code)) {
           code = `${baseCode}${suffix}`;
           suffix++;
-        });
-
-  
+        }
         parsed.code = code;
       } else {
         // Check for duplicate code if manually provided
@@ -3351,12 +2972,8 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Employee code already exists" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       let employee = await storage.createEmployee(parsed);
       
@@ -3370,16 +2987,12 @@ if (asOfDate) {
           ...employee,
           currentBalance: parsed.openingBalance,
         };
-      });
-
-  
+      }
       
       res.status(201).json(employee);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/employees/:id", requireAuth, async (req, res) => {
@@ -3390,22 +3003,16 @@ if (asOfDate) {
         return res.status(403).json({ 
           message: "Only Admin users can delete employees" 
         });
-      });
-
-  
+      }
 
       const employeeId = parseInt(req.params.id);
       if (isNaN(employeeId)) {
         return res.status(400).json({ message: "Invalid employee ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get employee to verify it exists and belongs to current company
       const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
@@ -3413,17 +3020,13 @@ if (asOfDate) {
       
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
-      });
-
-  
+      }
 
       if (employee.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ 
           message: "Access denied: Employee belongs to a different company" 
         });
-      });
-
-  
+      }
 
       // Check for forceDelete flag from query parameter
       const forceDelete = req.query.forceDelete === "true";
@@ -3439,21 +3042,15 @@ if (asOfDate) {
             ledgerBalance: result.ledgerBalance,
             requiresConfirmation: true
           });
-        });
-
-  
+        }
         // Other errors (salary advances, transaction history)
         return res.status(400).json({ message: result.message });
-      });
-
-  
+      }
 
       res.json({ message: "Employee deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Employee Groups
@@ -3461,18 +3058,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const groups = await storage.getAllEmployeeGroups(
         req.session.currentCompanyId,
       );
       res.json(groups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/employee-groups/:id", requireAuth, async (req, res) => {
@@ -3480,24 +3073,18 @@ if (asOfDate) {
       const group = await storage.getEmployeeGroupById(parseInt(req.params.id));
       if (!group) {
         return res.status(404).json({ message: "Employee group not found" });
-      });
-
-  
+      }
       res.json(group);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/employee-groups", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const parsed = insertEmployeeGroupSchema.parse({
         ...req.body,
         companyId: req.session.currentCompanyId,
@@ -3506,9 +3093,7 @@ if (asOfDate) {
       res.status(201).json(group);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/employee-groups/:id", requireAuth, async (req, res) => {
@@ -3520,9 +3105,7 @@ if (asOfDate) {
       res.json(group);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/employee-groups/:id", requireAuth, async (req, res) => {
@@ -3531,9 +3114,7 @@ if (asOfDate) {
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/employee-groups/:id/members", requireAuth, async (req, res) => {
@@ -3544,9 +3125,7 @@ if (asOfDate) {
       res.json(members);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post(
@@ -3561,9 +3140,7 @@ if (asOfDate) {
         res.status(201).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3579,9 +3156,7 @@ if (asOfDate) {
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3590,26 +3165,20 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
       const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
       res.json(workerGroups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/worker-groups/with-members", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const companyId = req.session.currentCompanyId;
       const allGroups = await storage.getAllEmployeeGroups(companyId);
       console.log("DEBUG: allGroups from storage:", JSON.stringify(allGroups, null, 2));
@@ -3654,18 +3223,14 @@ if (asOfDate) {
       res.json(groupsWithMembers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/worker-groups", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const parsed = insertEmployeeGroupSchema.parse({
         ...req.body,
         companyId: req.session.currentCompanyId,
@@ -3675,9 +3240,7 @@ if (asOfDate) {
       res.status(201).json(group);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/worker-groups/:id", requireAuth, async (req, res) => {
@@ -3686,9 +3249,7 @@ if (asOfDate) {
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/worker-groups/:id/members", requireAuth, async (req, res) => {
@@ -3697,9 +3258,7 @@ if (asOfDate) {
       res.json(members);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post(
@@ -3709,9 +3268,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
         const companyId = req.session.currentCompanyId;
         const groupId = parseInt(req.params.groupId);
         const workerId = parseInt(req.params.workerId);
@@ -3720,9 +3277,7 @@ if (asOfDate) {
         const group = await storage.getEmployeeGroupById(groupId);
         if (!group || group.companyId !== companyId) {
           return res.status(403).json({ message: "Group not found or access denied" });
-        });
-
-  
+        }
         
         // Verify worker belongs to company
         const [worker] = await db
@@ -3731,17 +3286,13 @@ if (asOfDate) {
           .where(and(eq(employees.id, workerId), eq(employees.companyId, companyId)));
         if (!worker) {
           return res.status(404).json({ message: "Worker not found" });
-        });
-
-  
+        }
         
         await storage.addEmployeeToGroup(groupId, workerId);
         res.status(201).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3752,9 +3303,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
         const companyId = req.session.currentCompanyId;
         const groupId = parseInt(req.params.groupId);
         const workerId = parseInt(req.params.workerId);
@@ -3763,17 +3312,13 @@ if (asOfDate) {
         const group = await storage.getEmployeeGroupById(groupId);
         if (!group || group.companyId !== companyId) {
           return res.status(403).json({ message: "Group not found or access denied" });
-        });
-
-  
+        }
         
         await storage.removeEmployeeFromGroup(groupId, workerId);
         res.status(204).send();
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3786,9 +3331,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { employeeId, amount, date, notes } = req.body;
 
@@ -3796,18 +3339,14 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Employee, amount, and date are required" });
-        });
-
-  
+        }
 
         const depositAmount = parseFloat(amount);
         if (isNaN(depositAmount) || depositAmount <= 0) {
           return res
             .status(400)
             .json({ message: "Amount must be a positive number" });
-        });
-
-  
+        }
 
         // Get employee
         const [employee] = await db
@@ -3816,9 +3355,7 @@ if (asOfDate) {
           .where(eq(employees.id, employeeId));
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
-        });
-
-  
+        }
 
         // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
         // This is used when employee deposits wages during payroll - it IS an expense
@@ -3839,9 +3376,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Create voucher
         const voucherNumber = `SAL-DEP-${Date.now()}`;
@@ -3888,9 +3423,7 @@ if (asOfDate) {
               employeeId: employee.id,
               debitAmount: "0",
               creditAmount: depositAmount.toFixed(2),
-            });
-
-  
+            }
           ],
           req.session.currentCompanyId!
         );
@@ -3907,9 +3440,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -3922,23 +3453,17 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { deposits, date, notes } = req.body;
 
         if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
           return res.status(400).json({ message: "No deposits provided" });
-        });
-
-  
+        }
 
         if (!date) {
           return res.status(400).json({ message: "Date is required" });
-        });
-
-  
+        }
 
         // Validate all deposit amounts
         for (const deposit of deposits) {
@@ -3947,12 +3472,8 @@ if (asOfDate) {
             return res.status(400).json({
               message: "All deposit amounts must be positive numbers",
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
         // This is used when employee deposits wages during payroll - it IS an expense
@@ -3973,9 +3494,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Calculate total amount
         const totalAmount = deposits.reduce(
@@ -4017,16 +3536,12 @@ if (asOfDate) {
 
           if (!employee) {
             continue; // Skip if employee not found
-          });
-
-  
+          }
 
           // Verify employee belongs to current company
           if (employee.companyId !== req.session.currentCompanyId) {
             continue;
-          });
-
-  
+          }
 
           const depositAmount = parseFloat(deposit.amount);
 
@@ -4045,9 +3560,7 @@ if (asOfDate) {
             name: `${employee.firstName} ${employee.lastName}`,
             amount: depositAmount,
           });
-        });
-
-  
+        }
 
         // Sync all employee balances from voucher entries
         const allDepositEntries = await db
@@ -4076,9 +3589,7 @@ if (asOfDate) {
             ...result,
             newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
-        });
-
-  
+        }
 
         res.json({
           voucher,
@@ -4087,9 +3598,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4102,23 +3611,17 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { bonuses, date, notes } = req.body;
 
         if (!bonuses || !Array.isArray(bonuses) || bonuses.length === 0) {
           return res.status(400).json({ message: "No bonuses provided" });
-        });
-
-  
+        }
 
         if (!date) {
           return res.status(400).json({ message: "Date is required" });
-        });
-
-  
+        }
 
         // Filter out empty/zero amounts and validate
         const validBonuses = bonuses.filter((b: any) => {
@@ -4128,9 +3631,7 @@ if (asOfDate) {
 
         if (validBonuses.length === 0) {
           return res.status(400).json({ message: "No valid bonus amounts provided" });
-        });
-
-  
+        }
 
         // Get or create BONUS_EXPENSE ledger account
         const allAccounts = await storage.getAllLedgerAccounts(
@@ -4149,9 +3650,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Calculate total amount
         const totalAmount = validBonuses.reduce(
@@ -4193,16 +3692,12 @@ if (asOfDate) {
 
           if (!employee) {
             continue; // Skip if employee not found
-          });
-
-  
+          }
 
           // Verify employee belongs to current company
           if (employee.companyId !== req.session.currentCompanyId) {
             continue;
-          });
-
-  
+          }
 
           const bonusAmount = parseFloat(bonus.amount);
 
@@ -4221,9 +3716,7 @@ if (asOfDate) {
             name: `${employee.firstName} ${employee.lastName}`,
             amount: bonusAmount,
           });
-        });
-
-  
+        }
 
         // Sync all employee balances from voucher entries
         const allBonusEntries = await db
@@ -4252,9 +3745,7 @@ if (asOfDate) {
             ...result,
             newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
-        });
-
-  
+        }
 
         res.json({
           voucher,
@@ -4263,9 +3754,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4278,23 +3767,17 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { withdrawals, date, notes, paymentAccountType, paymentAccountId } = req.body;
 
         if (!withdrawals || !Array.isArray(withdrawals) || withdrawals.length === 0) {
           return res.status(400).json({ message: "No withdrawals provided" });
-        });
-
-  
+        }
 
         if (!date || !paymentAccountType || !paymentAccountId) {
           return res.status(400).json({ message: "Date, account type, and account are required" });
-        });
-
-  
+        }
 
         // Filter out empty/zero amounts and validate
         const validWithdrawals = withdrawals.filter((w: any) => {
@@ -4304,9 +3787,7 @@ if (asOfDate) {
 
         if (validWithdrawals.length === 0) {
           return res.status(400).json({ message: "No valid withdrawal amounts provided" });
-        });
-
-  
+        }
 
         // Verify all employees have sufficient balance
         for (const withdrawal of validWithdrawals) {
@@ -4325,12 +3806,8 @@ if (asOfDate) {
             return res.status(400).json({
               message: `${employee.firstName} ${employee.lastName} has insufficient balance. Balance: ${balance}, Requested: ${withdrawAmount}`,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Calculate total amount
         const totalAmount = validWithdrawals.reduce(
@@ -4348,15 +3825,11 @@ if (asOfDate) {
         } else {
           const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
           paymentAccount = allAccounts.find((a: any) => a.id === parseInt(paymentAccountId));
-        });
-
-  
+        }
 
         if (!paymentAccount) {
           return res.status(404).json({ message: "Payment account not found" });
-        });
-
-  
+        }
 
         // Create single voucher for all withdrawals
         const voucherNumber = `WD-BULK-${Date.now()}`;
@@ -4382,20 +3855,14 @@ if (asOfDate) {
           paymentLedgerAccount = allAccounts.find((a: any) => a.bankAccountId === paymentAccountId_num);
           if (!paymentLedgerAccount) {
             return res.status(404).json({ message: "Ledger account for bank account not found" });
-          });
-
-  
+          }
         } else {
           // For cash accounts (ledger accounts), find directly
           paymentLedgerAccount = allAccounts.find((a: any) => a.id === paymentAccountId_num);
           if (!paymentLedgerAccount) {
             return res.status(404).json({ message: "Cash account not found" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
@@ -4433,9 +3900,7 @@ if (asOfDate) {
             name: `${employee.firstName} ${employee.lastName}`,
             amount: withdrawAmount,
           });
-        });
-
-  
+        }
 
         // Sync all employee balances from voucher entries
         const allWithdrawEntries = await db
@@ -4464,9 +3929,7 @@ if (asOfDate) {
             ...result,
             newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
           });
-        });
-
-  
+        }
 
         res.json({
           voucher,
@@ -4475,9 +3938,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4490,9 +3951,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { employeeId, amount, date, notes } = req.body;
 
@@ -4500,18 +3959,14 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Employee, amount, and date are required" });
-        });
-
-  
+        }
 
         const bonusAmount = parseFloat(amount);
         if (isNaN(bonusAmount) || bonusAmount <= 0) {
           return res
             .status(400)
             .json({ message: "Amount must be a positive number" });
-        });
-
-  
+        }
 
         // Get employee
         const [employee] = await db
@@ -4520,9 +3975,7 @@ if (asOfDate) {
           .where(eq(employees.id, employeeId));
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
-        });
-
-  
+        }
 
         // Get or create SALARY_EXPENSE ledger account
         const allAccounts = await storage.getAllLedgerAccounts(
@@ -4541,9 +3994,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Create voucher
         const voucherNumber = `BONUS-${Date.now()}`;
@@ -4589,9 +4040,7 @@ if (asOfDate) {
               employeeId: employee.id,
               debitAmount: "0",
               creditAmount: bonusAmount.toFixed(2),
-            });
-
-  
+            }
           ],
           req.session.currentCompanyId!
         );
@@ -4608,9 +4057,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4623,9 +4070,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           employeeId,
@@ -4648,18 +4093,14 @@ if (asOfDate) {
               message:
                 "Employee, amount, payment account, and date are required",
             });
-        });
-
-  
+        }
 
         const withdrawalAmount = parseFloat(amount);
         if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
           return res
             .status(400)
             .json({ message: "Amount must be a positive number" });
-        });
-
-  
+        }
 
         // Get employee
         const [employee] = await db
@@ -4668,9 +4109,7 @@ if (asOfDate) {
           .where(eq(employees.id, employeeId));
         if (!employee) {
           return res.status(404).json({ message: "Employee not found" });
-        });
-
-  
+        }
 
         const currentBalance = parseFloat(employee.currentBalance);
         if (withdrawalAmount > currentBalance) {
@@ -4679,9 +4118,7 @@ if (asOfDate) {
             .json({
               message: `Insufficient balance. Current balance: ${currentBalance.toFixed(2)}`,
             });
-        });
-
-  
+        }
 
         // Create voucher
         const voucherNumber = `SAL-WD-${Date.now()}`;
@@ -4722,9 +4159,7 @@ if (asOfDate) {
           creditEntry.ledgerAccountId = accountId;
         } else {
           creditEntry.bankAccountId = accountId;
-        });
-
-  
+        }
 
         await db.insert(voucherEntries).values(creditEntry);
 
@@ -4736,9 +4171,7 @@ if (asOfDate) {
               employeeId: employee.id,
               debitAmount: withdrawalAmount.toFixed(2),
               creditAmount: "0",
-            });
-
-  
+            }
           ],
           req.session.currentCompanyId!
         );
@@ -4755,9 +4188,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4770,9 +4201,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { employeeId, amount, bankAccountId, date, notes } = req.body;
 
@@ -4782,18 +4211,14 @@ if (asOfDate) {
             .json({
               message: "Employee, amount, bank account, and date are required",
             });
-        });
-
-  
+        }
 
         const paymentAmount = parseFloat(amount);
         if (isNaN(paymentAmount) || paymentAmount <= 0) {
           return res
             .status(400)
             .json({ message: "Amount must be a positive number" });
-        });
-
-  
+        }
 
         // Get employee/worker
         const [employee] = await db
@@ -4802,9 +4227,7 @@ if (asOfDate) {
           .where(eq(employees.id, employeeId));
         if (!employee) {
           return res.status(404).json({ message: "Worker not found" });
-        });
-
-  
+        }
 
         // Get or create SALARY_EXPENSE ledger account
         const allAccounts = await storage.getAllLedgerAccounts(
@@ -4823,9 +4246,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Create voucher
         const voucherNumber = `SAL-PAY-${Date.now()}`;
@@ -4868,9 +4289,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -4883,9 +4302,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           payments,
@@ -4902,17 +4319,13 @@ if (asOfDate) {
 
         if (!payments || !Array.isArray(payments) || payments.length === 0) {
           return res.status(400).json({ message: "No payments provided" });
-        });
-
-  
+        }
 
         if (!accountId || !date) {
           return res
             .status(400)
             .json({ message: "Payment account and date are required" });
-        });
-
-  
+        }
 
         // Validate all payment amounts
         for (const payment of payments) {
@@ -4923,12 +4336,8 @@ if (asOfDate) {
               .json({
                 message: "All payment amounts must be positive numbers",
               });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Get or create SALARY_EXPENSE ledger account
         const allAccounts = await storage.getAllLedgerAccounts(
@@ -4947,9 +4356,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Calculate total amount
         const totalAmount = payments.reduce(
@@ -4993,9 +4400,7 @@ if (asOfDate) {
           creditEntry.ledgerAccountId = parseInt(accountId);
         } else {
           creditEntry.bankAccountId = parseInt(accountId);
-        });
-
-  
+        }
 
         await db.insert(voucherEntries).values(creditEntry);
 
@@ -5006,9 +4411,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5022,9 +4425,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const employeesWithBalances = await storage.getEmployeesWithBalances(
           req.session.currentCompanyId
@@ -5032,12 +4433,8 @@ if (asOfDate) {
         res.json(employeesWithBalances);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // Get worker payment summary (total paid to each worker)
@@ -5049,9 +4446,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Get all employees of type Worker for current company
         const allEmployees = await storage.getAllEmployees(
@@ -5100,9 +4495,7 @@ if (asOfDate) {
                   sum + parseFloat(entry.creditAmount || "0"),
                 0,
               );
-            });
-
-  
+            }
 
             return {
               workerId: worker.id,
@@ -5125,9 +4518,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5138,9 +4529,7 @@ if (asOfDate) {
       res.json(suppliers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get all suppliers with their container counts and balances (global, no company filter)
@@ -5175,9 +4564,7 @@ if (asOfDate) {
               return sum + credit; // Increase payable
             } else if (debit > 0 && credit === 0) {
               return sum - debit; // Decrease payable
-            });
-
-  
+            }
             return sum;
           }, openingBalance);
 
@@ -5193,9 +4580,7 @@ if (asOfDate) {
       res.json(suppliersWithStats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/suppliers/:id", async (req, res) => {
@@ -5203,23 +4588,17 @@ if (asOfDate) {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) {
         return res.status(400).json({ message: "Invalid supplier ID" });
-      });
-
-  
+      }
 
       const supplier = await storage.getSupplierById(supplierId);
       if (!supplier) {
         return res.status(404).json({ message: "Supplier not found" });
-      });
-
-  
+      }
 
       res.json(supplier);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/suppliers", requireAuth, requireNonPOS, async (req, res) => {
@@ -5235,9 +4614,7 @@ if (asOfDate) {
         // Fallback if baseCode is empty after sanitization
         if (!baseCode || baseCode.length === 0) {
           baseCode = "SUP";
-        });
-
-  
+        }
         
         // Ensure uniqueness by adding suffix if needed
         let code = baseCode;
@@ -5245,9 +4622,7 @@ if (asOfDate) {
         while (await storage.getSupplierByCode(code)) {
           code = `${baseCode}${suffix}`;
           suffix++;
-        });
-
-  
+        }
         parsed.code = code;
       } else {
         // Check for duplicate code if manually provided
@@ -5256,12 +4631,8 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Supplier code already exists" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Provide defaults for optional fields
       const supplierData = {
@@ -5277,9 +4648,7 @@ if (asOfDate) {
       res.status(201).json(supplier);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch(
@@ -5291,16 +4660,12 @@ if (asOfDate) {
         const supplierId = parseInt(req.params.id);
         if (isNaN(supplierId)) {
           return res.status(400).json({ message: "Invalid supplier ID" });
-        });
-
-  
+        }
 
         const existingSupplier = await storage.getSupplierById(supplierId);
         if (!existingSupplier) {
           return res.status(404).json({ message: "Supplier not found" });
-        });
-
-  
+        }
 
         // If code is being changed, check for duplicates
         if (req.body.code && req.body.code !== existingSupplier.code) {
@@ -5309,12 +4674,8 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Supplier code already exists" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const parsed = insertSupplierSchema.partial().parse(req.body);
         const updatedSupplier = await storage.updateSupplier(
@@ -5325,9 +4686,7 @@ if (asOfDate) {
         res.json(updatedSupplier);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5336,18 +4695,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const customers = await storage.getAllCustomers(
         req.session.currentCompanyId,
       );
       res.json(customers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get customers with calculated balances (including voucher entries)
@@ -5355,9 +4710,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const customers = await storage.getAllCustomers(req.session.currentCompanyId);
 
@@ -5380,9 +4733,7 @@ if (asOfDate) {
                 return sum + debit; // Increase receivable
               } else if (credit > 0 && debit === 0) {
                 return sum - credit; // Decrease receivable
-              });
-
-  
+              }
               return sum;
             }, openingSide === "Dr" ? openingBalance : -openingBalance);
 
@@ -5391,9 +4742,7 @@ if (asOfDate) {
               balance: Math.abs(balance),
               balanceSide: balance >= 0 ? "Dr" : "Cr",
             };
-          });
-
-  
+          }
 
           // If no ledger account, check customer_balances table for balance from credit sales
           const customerBalance = await storage.getCustomerBalance(customer.id, req.session.currentCompanyId!);
@@ -5414,9 +4763,7 @@ if (asOfDate) {
       res.json(customersWithBalances);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get(
@@ -5428,16 +4775,12 @@ if (asOfDate) {
         const customerId = parseInt(req.params.id);
         if (isNaN(customerId)) {
           return res.status(400).json({ message: "Invalid customer ID" });
-        });
-
-  
+        }
 
         const customer = await storage.getCustomerById(customerId);
         if (!customer) {
           return res.status(404).json({ message: "Customer not found" });
-        });
-
-  
+        }
 
         // Verify customer belongs to current company
         if (
@@ -5449,16 +4792,12 @@ if (asOfDate) {
             .json({
               message: "Access denied: Customer belongs to a different company",
             });
-        });
-
-  
+        }
 
         res.json(customer);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5466,9 +4805,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Inject companyId before schema validation
       const dataWithCompany = {
@@ -5495,9 +4832,7 @@ if (asOfDate) {
       if (existingCodes.length > 0) {
         const maxNumber = Math.max(...existingCodes);
         suffix = maxNumber + 1;
-      });
-
-  
+      }
 
       code = `CUST${suffix.toString().padStart(3, "0")}`;
 
@@ -5507,9 +4842,7 @@ if (asOfDate) {
       ) {
         suffix++;
         code = `CUST${suffix.toString().padStart(3, "0")}`;
-      });
-
-  
+      }
 
       // Create customer with auto-generated code
       const customer = await storage.createCustomer({ ...parsed, code } as any);
@@ -5535,16 +4868,12 @@ if (asOfDate) {
         await storage.updateCustomer(customer.id, {
           ledgerAccountId: customerAccount.id,
         });
-      });
-
-  
+      }
 
       res.status(201).json(customer);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.put(
@@ -5556,22 +4885,16 @@ if (asOfDate) {
         const customerId = parseInt(req.params.id);
         if (isNaN(customerId)) {
           return res.status(400).json({ message: "Invalid customer ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const existingCustomer = await storage.getCustomerById(customerId);
         if (!existingCustomer) {
           return res.status(404).json({ message: "Customer not found" });
-        });
-
-  
+        }
 
         // Verify customer belongs to current company
         if (existingCustomer.companyId !== req.session.currentCompanyId) {
@@ -5580,9 +4903,7 @@ if (asOfDate) {
             .json({
               message: "Access denied: Customer belongs to a different company",
             });
-        });
-
-  
+        }
 
         // If code is being changed, check for duplicates
         if (req.body.code && req.body.code !== existingCustomer.code) {
@@ -5596,12 +4917,8 @@ if (asOfDate) {
               .json({
                 message: "Customer code already exists in this company",
               });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const parsed = insertCustomerSchema.partial().parse(req.body);
         const updatedCustomer = await storage.updateCustomer(
@@ -5616,29 +4933,19 @@ if (asOfDate) {
           const ledgerUpdate: { openingBalance?: string; openingBalanceSide?: string } = {};
           if (parsed.openingBalance !== undefined) {
             ledgerUpdate.openingBalance = updatedCustomer.openingBalance ?? "0";
-          });
-
-  
+          }
           if (parsed.openingBalanceSide !== undefined) {
             ledgerUpdate.openingBalanceSide = updatedCustomer.openingBalanceSide ?? "Dr";
-          });
-
-  
+          }
           if (Object.keys(ledgerUpdate).length > 0) {
             await storage.updateLedgerAccount(updatedCustomer.ledgerAccountId, ledgerUpdate);
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         res.json(updatedCustomer);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5651,18 +4958,14 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
         const sales = await storage.getContainerSales(
           req.session.currentCompanyId,
         );
         res.json(sales);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5675,9 +4978,7 @@ if (asOfDate) {
         const customerId = parseInt(req.params.customerId);
         if (isNaN(customerId)) {
           return res.status(400).json({ message: "Invalid customer ID" });
-        });
-
-  
+        }
 
         const sales = await storage.getContainerSalesByCustomer(
           customerId,
@@ -5686,9 +4987,7 @@ if (asOfDate) {
         res.json(sales);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5700,9 +4999,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Inject companyId before schema validation
         const dataWithCompany = {
@@ -5716,31 +5013,23 @@ if (asOfDate) {
         const customer = await storage.getCustomerById(parsed.customerId);
         if (!customer) {
           return res.status(404).json({ message: "Customer not found" });
-        });
-
-  
+        }
         if (customer.companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({ message: "Customer belongs to a different company" });
-        });
-
-  
+        }
 
         // Verify container exists and belongs to current company
         const container = await storage.getContainerById(parsed.containerId);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
         if (container.companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({ message: "Container belongs to a different company" });
-        });
-
-  
+        }
 
         // Check if container is already sold
         const existingSale = await storage.getContainerSaleByContainerId(
@@ -5751,18 +5040,14 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Container has already been sold" });
-        });
-
-  
+        }
 
         // Get customer's ledger account
         if (!customer.ledgerAccountId) {
           return res
             .status(400)
             .json({ message: "Customer does not have a ledger account" });
-        });
-
-  
+        }
 
         // Determine commission account - use provided ID or default to COMMISSION_REVENUE
         let commissionAccountId = parsed.commissionAccountId;
@@ -5772,14 +5057,10 @@ if (asOfDate) {
           const commissionAccount = await storage.getLedgerAccountById(commissionAccountId);
           if (!commissionAccount) {
             return res.status(404).json({ message: "Commission account not found" });
-          });
-
-  
+          }
           if (commissionAccount.companyId !== req.session.currentCompanyId) {
             return res.status(403).json({ message: "Commission account belongs to a different company" });
-          });
-
-  
+          }
         } else {
           // Get or create default COMMISSION_REVENUE ledger account
           const allAccounts = await storage.getAllLedgerAccounts(
@@ -5798,13 +5079,9 @@ if (asOfDate) {
               openingBalance: "0",
               active: true,
             });
-          });
-
-  
+          }
           commissionAccountId = commissionRevenueAccount.id;
-        });
-
-  
+        }
 
         // Execute all operations in a single transaction for atomicity
         const sale = await db.transaction(async (tx) => {
@@ -5865,9 +5142,7 @@ if (asOfDate) {
         res.status(201).json(sale);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5880,9 +5155,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
         // Get all transfers where current company is either sender or receiver
         const transfers = await storage.getAllInterCompanyTransfers(
           req.session.currentCompanyId,
@@ -5890,9 +5163,7 @@ if (asOfDate) {
         res.json(transfers);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -5904,9 +5175,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const parsed = insertInterCompanyTransferSchema.parse(req.body);
 
@@ -5914,16 +5183,12 @@ if (asOfDate) {
         const fromCompany = await storage.getCompanyById(parsed.fromCompanyId);
         if (!fromCompany) {
           return res.status(404).json({ message: "From company not found" });
-        });
-
-  
+        }
 
         const toCompany = await storage.getCompanyById(parsed.toCompanyId);
         if (!toCompany) {
           return res.status(404).json({ message: "To company not found" });
-        });
-
-  
+        }
 
         // Verify user has access to both companies (optional, depending on requirements)
         // For now, we'll allow the transfer if the user is in the current company
@@ -5939,9 +5204,7 @@ if (asOfDate) {
               message:
                 "From ledger account not found or doesn't belong to from company",
             });
-        });
-
-  
+        }
 
         const toAccount = await storage.getLedgerAccountById(
           parsed.toLedgerAccountId,
@@ -5953,9 +5216,7 @@ if (asOfDate) {
               message:
                 "To ledger account not found or doesn't belong to to company",
             });
-        });
-
-  
+        }
 
         // Get or create inter-company accounts for both companies
         const fromCompanyAccounts = await storage.getAllLedgerAccounts(
@@ -5974,9 +5235,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         const toCompanyAccounts = await storage.getAllLedgerAccounts(
           parsed.toCompanyId,
@@ -5995,9 +5254,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         // Create voucher in FROM company
         const fromVoucherNumber = `ICT-FROM-${Date.now()}`;
@@ -6079,9 +5336,7 @@ if (asOfDate) {
         res.status(201).json(transfer);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6094,18 +5349,14 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
         const advances = await storage.getAllSalaryAdvances(
           req.session.currentCompanyId,
         );
         res.json(advances);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6118,17 +5369,13 @@ if (asOfDate) {
         const employeeId = parseInt(req.params.employeeId);
         if (isNaN(employeeId)) {
           return res.status(400).json({ message: "Invalid employee ID" });
-        });
-
-  
+        }
 
         const advances = await storage.getSalaryAdvancesByEmployee(employeeId);
         res.json(advances);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6140,9 +5387,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Inject companyId before schema validation
         const dataWithCompany = {
@@ -6163,17 +5408,13 @@ if (asOfDate) {
 
         if (!employee || employee.length === 0) {
           return res.status(404).json({ message: "Employee not found" });
-        });
-
-  
+        }
 
         if (employee[0].companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({ message: "Employee belongs to a different company" });
-        });
-
-  
+        }
 
         let voucherId: number | null = null;
 
@@ -6184,9 +5425,7 @@ if (asOfDate) {
             req.body.cashAccountId || req.session.cashAccountId;
           if (!cashAccountId) {
             return res.status(400).json({ message: "Cash account is required" });
-          });
-
-  
+          }
 
           // Create voucher for the salary advance
           const voucherNumber = `SA-${Date.now()}`;
@@ -6225,9 +5464,7 @@ if (asOfDate) {
             creditAmount: parsed.amount,
             narration: `Salary advance - ${voucherNumber}`,
           });
-        });
-
-  
+        }
 
         // Create salary advance record
         const advance = await storage.createSalaryAdvance({
@@ -6238,9 +5475,7 @@ if (asOfDate) {
         res.status(201).json(advance);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6252,16 +5487,12 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const advanceId = parseInt(req.params.id);
         if (isNaN(advanceId)) {
           return res.status(400).json({ message: "Invalid salary advance ID" });
-        });
-
-  
+        }
 
         const parsed = insertSalaryAdvanceDeductionSchema.parse(req.body);
 
@@ -6269,25 +5500,19 @@ if (asOfDate) {
         const advance = await storage.getSalaryAdvanceById(advanceId);
         if (!advance) {
           return res.status(404).json({ message: "Salary advance not found" });
-        });
-
-  
+        }
 
         if (advance.companyId !== req.session.currentCompanyId) {
           return res
             .status(403)
             .json({ message: "Salary advance belongs to a different company" });
-        });
-
-  
+        }
 
         if (advance.fullyPaid) {
           return res
             .status(400)
             .json({ message: "Salary advance is already fully paid" });
-        });
-
-  
+        }
 
         const deductionAmount = parseFloat(parsed.deductionAmount);
         const remainingBalance = parseFloat(advance.remainingBalance);
@@ -6298,9 +5523,7 @@ if (asOfDate) {
             .json({
               message: `Deduction amount cannot exceed remaining balance of ${remainingBalance}`,
             });
-        });
-
-  
+        }
 
         // Create salary advance deduction record
         await db.insert(salaryAdvanceDeductions).values({
@@ -6328,9 +5551,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6339,18 +5560,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const groups = await storage.getAllStockGroups(
         req.session.currentCompanyId,
       );
       res.json(groups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post(
@@ -6361,9 +5578,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Inject companyId before schema validation
         const dataWithCompany = {
@@ -6384,17 +5599,13 @@ if (asOfDate) {
             .json({
               message: "Stock group code already exists in this company",
             });
-        });
-
-  
+        }
 
         const group = await storage.createStockGroup(parsed);
         res.status(201).json(group);
       } catch (error: any) {
         res.status(400).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6403,27 +5614,21 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const items = await storage.getAllStockItems(
         req.session.currentCompanyId,
       );
       res.json(items);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/stock-items", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Inject companyId before schema validation
       const dataWithCompany = {
@@ -6442,26 +5647,20 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Stock item code already exists in this company" });
-      });
-
-  
+      }
 
       // Calculate opening value if qty and rate provided
       if (parsed.openingQty && parsed.openingRate) {
         const qty = parseFloat(parsed.openingQty);
         const rate = parseFloat(parsed.openingRate);
         parsed.openingValue = (qty * rate).toFixed(2);
-      });
-
-  
+      }
 
       const item = await storage.createStockItem(parsed);
       res.status(201).json(item);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk delete stock items
@@ -6469,16 +5668,12 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ message: "Invalid or empty ids array" });
-      });
-
-  
+      }
 
       // Get all items that exist and belong to the current company
       const validItems = await storage.bulkGetStockItemsByIds(ids, req.session.currentCompanyId);
@@ -6486,9 +5681,7 @@ if (asOfDate) {
       
       if (validIds.length === 0) {
         return res.status(404).json({ message: "No valid stock items found to delete" });
-      });
-
-  
+      }
 
       await storage.bulkDeleteStockItems(validIds);
       
@@ -6504,9 +5697,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk update selling prices by barcode (global or location-specific)
@@ -6514,16 +5705,12 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { prices } = req.body;
       if (!Array.isArray(prices) || prices.length === 0) {
         return res.status(400).json({ message: "Invalid or empty prices array" });
-      });
-
-  
+      }
 
       let updated = 0;
       let notFound = 0;
@@ -6540,26 +5727,18 @@ if (asOfDate) {
           } else {
             // Update global price
             await storage.updateStockItem(item.id, { sellingPrice });
-          });
-
-  
+          }
           updated++;
         } else {
           notFound++;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const message = `Updated ${updated} price(s)${notFound > 0 ? `. ${notFound} barcode(s) not found.` : "."}`;
       res.json({ message, updated, notFound });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Import Opening Balances from Excel (columns: Barcode, Qty, Rate, Total Value)
@@ -6568,16 +5747,12 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { openingBalances } = req.body;
       if (!Array.isArray(openingBalances) || openingBalances.length === 0) {
         return res.status(400).json({ message: "Invalid or empty opening balances array" });
-      });
-
-  
+      }
 
       let updated = 0;
       let notFound = 0;
@@ -6591,12 +5766,8 @@ if (asOfDate) {
       for (const item of allItems) {
         if (item.code && typeof item.code === 'string') {
           itemsByCode.set((item.code || "").toLowerCase(), item);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Pre-fetch all code aliases and build alias lookup map (skip empty/null aliases)
       const allAliases = await storage.getAllCompanyCodeAliases(req.session.currentCompanyId);
@@ -6606,15 +5777,9 @@ if (asOfDate) {
           const item = itemsById.get(alias.stockItemId);
           if (item) {
             itemsByAlias.set((alias.aliasCode || "").toLowerCase(), item);
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       for (const entry of openingBalances) {
         const { barcode, openingQty, openingRate, openingValue } = entry;
@@ -6633,9 +5798,7 @@ if (asOfDate) {
           // If total value not provided, calculate from qty * rate
           if (totalValue === 0 && qty > 0 && rate > 0) {
             totalValue = qty * rate;
-          });
-
-  
+          }
 
           await storage.updateStockItem(item.id, {
             openingQty: String(qty),
@@ -6646,20 +5809,14 @@ if (asOfDate) {
         } else {
           notFound++;
           notFoundBarcodes.push(barcode);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const message = `Updated opening balances for ${updated} item(s)${notFound > 0 ? `. ${notFound} barcode(s) not found: ${notFoundBarcodes.slice(0, 5).join(", ")}${notFoundBarcodes.length > 5 ? "..." : ""}` : "."}`;
       res.json({ message, updated, notFound, notFoundBarcodes });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk update UOM from "bale" to "BL"
@@ -6667,9 +5824,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Find all stock items with UOM = "bale" for current company (case-insensitive)
       const baleItems = await db.query.stockItems.findMany({
@@ -6685,25 +5840,19 @@ if (asOfDate) {
 
       if (baleItems.length === 0) {
         return res.json({ message: "No items with UOM 'bale' found to update", updated: 0 });
-      });
-
-  
+      }
 
       // Update all bale items to BL
       let updated = 0;
       for (const item of baleItems) {
         await storage.updateStockItem(item.id, { uom: "BL" });
         updated++;
-      });
-
-  
+      }
 
       res.json({ message: `Successfully updated ${updated} stock item(s) from 'bale' to 'BL'`, updated });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get single stock item by ID
@@ -6712,22 +5861,16 @@ if (asOfDate) {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
         return res.status(400).json({ message: "Invalid stock item ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
 
       if (stockItem.companyId !== req.session.currentCompanyId) {
         return res
@@ -6735,16 +5878,12 @@ if (asOfDate) {
           .json({
             message: "Access denied: Stock item belongs to a different company",
           });
-      });
-
-  
+      }
 
       res.json(stockItem);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get location prices for a stock item
@@ -6753,17 +5892,13 @@ if (asOfDate) {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
         return res.status(400).json({ message: "Invalid stock item ID" });
-      });
-
-  
+      }
 
       const prices = await storage.getStockItemLocationPrices(stockItemId, req.session.currentCompanyId);
       res.json(prices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update or create location price for a stock item
@@ -6772,24 +5907,18 @@ if (asOfDate) {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
         return res.status(400).json({ message: "Invalid stock item ID" });
-      });
-
-  
+      }
 
       const { locationId, sellingPrice } = req.body;
       if (!locationId || !sellingPrice) {
         return res.status(400).json({ message: "Location ID and selling price are required" });
-      });
-
-  
+      }
 
       await storage.upsertLocationPrice(stockItemId, locationId, sellingPrice);
       res.json({ message: "Location price updated successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete location price
@@ -6798,17 +5927,13 @@ if (asOfDate) {
       const priceId = parseInt(req.params.id);
       if (isNaN(priceId)) {
         return res.status(400).json({ message: "Invalid price ID" });
-      });
-
-  
+      }
 
       await storage.deleteLocationPrice(priceId);
       res.json({ message: "Location price deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk import stock items
@@ -6820,16 +5945,12 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { items } = req.body;
         if (!Array.isArray(items)) {
           return res.status(400).json({ message: "Items must be an array" });
-        });
-
-  
+        }
 
 
         // Fetch all valid stock groups for this company for validation
@@ -6863,9 +5984,7 @@ if (asOfDate) {
                 error: "Missing or invalid stock group. All stock items must have a valid stock group.",
               });
               continue;
-            });
-
-  
+            }
 
             const parsed = insertStockItemSchema.parse(itemWithCompany);
 
@@ -6881,9 +6000,7 @@ if (asOfDate) {
                 reason: "Code already exists",
               });
               continue;
-            });
-
-  
+            }
 
             const created = await storage.createStockItem(parsed);
             results.created.push(created);
@@ -6893,12 +6010,8 @@ if (asOfDate) {
               name: item.name,
               error: error.message,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         res.json({
           message: `Import completed: ${results.created.length} created, ${results.skipped.length} skipped, ${results.errors.length} errors`,
@@ -6906,9 +6019,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -6922,23 +6033,17 @@ if (asOfDate) {
         const stockItemId = parseInt(req.params.id);
         if (isNaN(stockItemId)) {
           return res.status(400).json({ message: "Invalid stock item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Verify stock item exists and belongs to current company
         const existingItem = await storage.getStockItemById(stockItemId);
         if (!existingItem) {
           return res.status(404).json({ message: "Stock item not found" });
-        });
-
-  
+        }
 
         if (existingItem.companyId !== req.session.currentCompanyId) {
           return res
@@ -6947,9 +6052,7 @@ if (asOfDate) {
               message:
                 "Access denied: Stock item belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Trim and validate required fields
         const updates: any = {};
@@ -6958,25 +6061,17 @@ if (asOfDate) {
           const trimmedCode = String(req.body.code).trim();
           if (trimmedCode === "") {
             return res.status(400).json({ message: "Code is required" });
-          });
-
-  
+          }
           updates.code = trimmedCode;
-        });
-
-  
+        }
 
         if (req.body.name !== undefined) {
           const trimmedName = String(req.body.name).trim();
           if (trimmedName === "") {
             return res.status(400).json({ message: "Name is required" });
-          });
-
-  
+          }
           updates.name = trimmedName;
-        });
-
-  
+        }
 
         if (req.body.uom !== undefined) {
           const trimmedUom = String(req.body.uom).trim();
@@ -6984,39 +6079,27 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Unit of measure is required" });
-          });
-
-  
+          }
           updates.uom = trimmedUom;
-        });
-
-  
+        }
 
         if (req.body.barcode !== undefined) {
           updates.barcode = req.body.barcode
             ? String(req.body.barcode).trim()
             : null;
-        });
-
-  
+        }
 
         if (req.body.stockGroupId !== undefined) {
           updates.stockGroupId = req.body.stockGroupId;
-        });
-
-  
+        }
 
         if (req.body.sellingPrice !== undefined) {
           updates.sellingPrice = req.body.sellingPrice ? String(req.body.sellingPrice) : "0";
-        });
-
-  
+        }
 
         if (req.body.active !== undefined) {
           updates.active = req.body.active;
-        });
-
-  
+        }
 
         // If updating code, check for duplicates
         if (updates.code && updates.code !== existingItem.code) {
@@ -7028,20 +6111,14 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Stock item code already exists" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const updated = await storage.updateStockItem(stockItemId, updates);
         res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7055,23 +6132,17 @@ if (asOfDate) {
         const stockItemId = parseInt(req.params.id);
         if (isNaN(stockItemId)) {
           return res.status(400).json({ message: "Invalid stock item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Verify stock item exists and belongs to current company
         const existingItem = await storage.getStockItemById(stockItemId);
         if (!existingItem) {
           return res.status(404).json({ message: "Stock item not found" });
-        });
-
-  
+        }
 
         if (existingItem.companyId !== req.session.currentCompanyId) {
           return res
@@ -7080,9 +6151,7 @@ if (asOfDate) {
               message:
                 "Access denied: Stock item belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check if item has any inventory
         const inventoryLocations = await storage.getInventoryLocationsByItem(
@@ -7100,17 +6169,13 @@ if (asOfDate) {
               message:
                 "Cannot delete stock item with existing inventory. Please transfer or adjust inventory to zero first.",
             });
-        });
-
-  
+        }
 
         await storage.deleteStockItem(stockItemId);
         res.json({ message: "Stock item deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7123,23 +6188,17 @@ if (asOfDate) {
         const stockItemId = parseInt(req.params.id);
         if (isNaN(stockItemId)) {
           return res.status(400).json({ message: "Invalid stock item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Verify stock item exists and belongs to current company
         const existingItem = await storage.getStockItemById(stockItemId);
         if (!existingItem) {
           return res.status(404).json({ message: "Stock item not found" });
-        });
-
-  
+        }
 
         if (existingItem.companyId !== req.session.currentCompanyId) {
           return res
@@ -7148,9 +6207,7 @@ if (asOfDate) {
               message:
                 "Access denied: Stock item belongs to a different company",
             });
-        });
-
-  
+        }
 
         const { startDate, endDate } = req.query;
         const transactions = await storage.getStockItemTransactions(
@@ -7163,9 +6220,7 @@ if (asOfDate) {
         res.json(transactions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7175,23 +6230,17 @@ if (asOfDate) {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
         return res.status(400).json({ message: "Invalid stock item ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Verify stock item exists and belongs to current company
       const existingItem = await storage.getStockItemById(stockItemId);
       if (!existingItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
 
       if (existingItem.companyId !== req.session.currentCompanyId) {
         return res
@@ -7199,9 +6248,7 @@ if (asOfDate) {
           .json({
             message: "Access denied: Stock item belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Get all purchases, all sales, and current locations
       const [purchases, sales, inventoryLocations] = await Promise.all([
@@ -7223,9 +6270,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get voucher history for a stock item (all transactions - sales, transfers, consumption, production)
@@ -7234,23 +6279,17 @@ if (asOfDate) {
       const stockItemId = parseInt(req.params.id);
       if (isNaN(stockItemId)) {
         return res.status(400).json({ message: "Invalid stock item ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Verify stock item exists and belongs to current company
       const existingItem = await storage.getStockItemById(stockItemId);
       if (!existingItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
 
       if (existingItem.companyId !== req.session.currentCompanyId) {
         return res
@@ -7258,9 +6297,7 @@ if (asOfDate) {
           .json({
             message: "Access denied: Stock item belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Get all voucher transactions for this item
       const voucherHistory = await storage.getVoucherHistoryForItem(stockItemId, req.session.currentCompanyId);
@@ -7268,9 +6305,7 @@ if (asOfDate) {
       res.json(voucherHistory);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Item Code Aliases
@@ -7283,23 +6318,17 @@ if (asOfDate) {
         const stockItemId = parseInt(req.params.id);
         if (isNaN(stockItemId)) {
           return res.status(400).json({ message: "Invalid stock item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Verify stock item exists and belongs to current company
         const existingItem = await storage.getStockItemById(stockItemId);
         if (!existingItem) {
           return res.status(404).json({ message: "Stock item not found" });
-        });
-
-  
+        }
 
         if (existingItem.companyId !== req.session.currentCompanyId) {
           return res
@@ -7308,17 +6337,13 @@ if (asOfDate) {
               message:
                 "Access denied: Stock item belongs to a different company",
             });
-        });
-
-  
+        }
 
         const aliases = await storage.getStockItemCodeAliases(stockItemId);
         res.json(aliases);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7332,23 +6357,17 @@ if (asOfDate) {
         const stockItemId = parseInt(req.params.id);
         if (isNaN(stockItemId)) {
           return res.status(400).json({ message: "Invalid stock item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Verify stock item exists and belongs to current company
         const existingItem = await storage.getStockItemById(stockItemId);
         if (!existingItem) {
           return res.status(404).json({ message: "Stock item not found" });
-        });
-
-  
+        }
 
         if (existingItem.companyId !== req.session.currentCompanyId) {
           return res
@@ -7357,9 +6376,7 @@ if (asOfDate) {
               message:
                 "Access denied: Stock item belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Validate the alias (include companyId for security)
         const validatedAlias = insertStockItemCodeAliasSchema.parse({
@@ -7375,13 +6392,9 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Validation error", errors: error.errors });
-        });
-
-  
+        }
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7394,23 +6407,17 @@ if (asOfDate) {
         const aliasId = parseInt(req.params.id);
         if (isNaN(aliasId)) {
           return res.status(400).json({ message: "Invalid alias ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Get the alias first to verify ownership
         const alias = await storage.getStockItemCodeAliasById(aliasId);
         if (!alias) {
           return res.status(404).json({ message: "Code alias not found" });
-        });
-
-  
+        }
 
         // Verify the alias belongs to the current company
         if (alias.companyId !== req.session.currentCompanyId) {
@@ -7420,17 +6427,13 @@ if (asOfDate) {
               message:
                 "Access denied: Code alias belongs to a different company",
             });
-        });
-
-  
+        }
 
         await storage.deleteStockItemCodeAlias(aliasId);
         res.json({ message: "Code alias deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7440,15 +6443,11 @@ if (asOfDate) {
       const itemId = parseInt(req.params.id);
       if (isNaN(itemId)) {
         return res.status(400).json({ message: "Invalid item ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Validate numeric fields if provided
       if (req.body.quantity !== undefined) {
@@ -7457,44 +6456,30 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Quantity must be a valid number" });
-        });
-
-  
-      });
-
-  
+        }
+      }
       if (req.body.rate !== undefined) {
         const rate = parseFloat(req.body.rate);
         if (isNaN(rate) || rate < 0) {
           return res
             .status(400)
             .json({ message: "Rate must be a valid non-negative number" });
-        });
-
-  
-      });
-
-  
+        }
+      }
       if (req.body.stockItemId !== undefined) {
         const stockItemId = parseInt(req.body.stockItemId);
         if (isNaN(stockItemId)) {
           return res
             .status(400)
             .json({ message: "Stock item ID must be a valid number" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const updated = await storage.updateStockTransferItem(itemId, req.body);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update stock adjustment item
@@ -7506,15 +6491,11 @@ if (asOfDate) {
         const itemId = parseInt(req.params.id);
         if (isNaN(itemId)) {
           return res.status(400).json({ message: "Invalid item ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Validate numeric fields if provided
         if (req.body.quantity !== undefined) {
@@ -7523,36 +6504,24 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Quantity must be a valid number" });
-          });
-
-  
-        });
-
-  
+          }
+        }
         if (req.body.rate !== undefined) {
           const rate = parseFloat(req.body.rate);
           if (isNaN(rate) || rate < 0) {
             return res
               .status(400)
               .json({ message: "Rate must be a valid non-negative number" });
-          });
-
-  
-        });
-
-  
+          }
+        }
         if (req.body.stockItemId !== undefined) {
           const stockItemId = parseInt(req.body.stockItemId);
           if (isNaN(stockItemId)) {
             return res
               .status(400)
               .json({ message: "Stock item ID must be a valid number" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const updated = await storage.updateStockAdjustmentItem(
           itemId,
@@ -7561,9 +6530,7 @@ if (asOfDate) {
         res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -7572,9 +6539,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all stock items for the company
       const allStockItems = await db
@@ -7623,9 +6588,7 @@ if (asOfDate) {
         existing.totalQty += qty;
         existing.totalValue += qty * rate;
         inventoryMap.set(record.stockItemId, existing);
-      });
-
-  
+      }
 
       // Combine stock items with aggregated inventory
       const result = allStockItems.map((item) => {
@@ -7640,9 +6603,7 @@ if (asOfDate) {
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Group Location Archives - Archive/Restore stock groups at specific locations
@@ -7650,56 +6611,42 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const archives = await storage.getStockGroupLocationArchives(req.session.currentCompanyId);
       res.json(archives);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/stock-group-archives/:id", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const archive = await storage.getStockGroupLocationArchiveById(
         parseInt(req.params.id),
         req.session.currentCompanyId
       );
       if (!archive) {
         return res.status(404).json({ message: "Archive not found" });
-      });
-
-  
+      }
       const items = await storage.getStockGroupLocationArchiveItems(archive.id);
       res.json({ archive, items });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/stock-group-archives", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const { locationId, stockGroupId, notes } = req.body;
       if (!locationId) {
         return res.status(400).json({ message: "Location ID is required" });
-      });
-
-  
+      }
       const archive = await storage.archiveStockGroupAtLocation(
         req.session.currentCompanyId,
         parseInt(locationId),
@@ -7710,18 +6657,14 @@ if (asOfDate) {
       res.json(archive);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/stock-group-archives/:id/restore", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const archive = await storage.restoreStockGroupLocationArchive(
         parseInt(req.params.id),
         req.session.currentCompanyId
@@ -7729,18 +6672,14 @@ if (asOfDate) {
       res.json(archive);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/stock-group-archives/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const permanent = req.query.permanent === 'true';
       if (permanent) {
         await storage.permanentlyDeleteStockGroupLocationArchive(
@@ -7752,15 +6691,11 @@ if (asOfDate) {
           parseInt(req.params.id),
           req.session.currentCompanyId
         );
-      });
-
-  
+      }
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bank Accounts
@@ -7768,27 +6703,21 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const accounts = await storage.getAllBankAccounts(
         req.session.currentCompanyId,
       );
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bank-accounts", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const parsed = insertBankAccountSchema.parse(req.body);
 
@@ -7798,9 +6727,7 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Bank account code already exists" });
-      });
-
-  
+      }
 
       // Validate opening balance amount and side must both be present or both absent
       const hasBalance =
@@ -7813,17 +6740,13 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Opening balance requires Dr/Cr side" });
-      });
-
-  
+      }
 
       if (!hasBalance && hasSide) {
         return res
           .status(400)
           .json({ message: "Dr/Cr side requires opening balance amount" });
-      });
-
-  
+      }
 
       // Validate linked ledger is Bank or Cash type
       if (parsed.linkedLedgerId) {
@@ -7838,9 +6761,7 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Linked ledger account not found" });
-        });
-
-  
+        }
 
         if (
           linkedLedger.accountType !== "Bank" &&
@@ -7849,29 +6770,21 @@ if (asOfDate) {
           return res.status(400).json({
             message: `Linked ledger must be Bank or Cash type. Found: ${linkedLedger.accountType}`,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const account = await storage.createBankAccount(parsed);
       res.status(201).json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.put("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       const parsed = insertBankAccountSchema.partial().parse(req.body);
@@ -7887,43 +6800,33 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Opening balance requires Dr/Cr side" });
-      });
-
-  
+      }
 
       if (!hasBalance && hasSide) {
         return res
           .status(400)
           .json({ message: "Dr/Cr side requires opening balance amount" });
-      });
-
-  
+      }
 
       const account = await storage.updateBankAccount(id, parsed, req.session.currentCompanyId);
       res.json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       await storage.deleteBankAccount(id, req.session.currentCompanyId);
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Fixed Assets
@@ -7931,9 +6834,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const assets = await storage.getAllFixedAssets(
         req.session.currentCompanyId,
       );
@@ -7946,9 +6847,7 @@ if (asOfDate) {
       res.json(transformedAssets);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/fixed-assets", async (req, res) => {
@@ -7961,9 +6860,7 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Fixed asset code already exists" });
-      });
-
-  
+      }
 
       // Validate useful life is required when depreciation method is not "None"
       if (
@@ -7974,17 +6871,13 @@ if (asOfDate) {
           message:
             "Useful life (years) is required and must be greater than 0 when depreciation method is not 'None'",
         });
-      });
-
-  
+      }
 
       const asset = await storage.createFixedAsset(parsed);
       res.status(201).json(asset);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // PO Import - Parse and Preview Excel
@@ -7996,15 +6889,11 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         if (!req.file) {
           return res.status(400).json({ message: "No file uploaded" });
-        });
-
-  
+        }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -8013,9 +6902,7 @@ if (asOfDate) {
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
-        });
-
-  
+        }
 
         // Calculate file hash for idempotency
         const fileHash = createHash('md5')
@@ -8030,9 +6917,7 @@ if (asOfDate) {
             importedAt: existingImport.createdAt,
             containerId: existingImport.containerId,
           });
-        });
-
-  
+        }
 
         // Parse and structure the data
         const rows = rawData as any[];
@@ -8050,12 +6935,8 @@ if (asOfDate) {
           for (const name of possibleNames) {
             if (row[name] !== undefined && row[name] !== null && row[name] !== "") {
               return row[name];
-            });
-
-  
-          });
-
-  
+            }
+          }
           return undefined;
         };
 
@@ -8087,16 +6968,12 @@ if (asOfDate) {
               );
               if (stockItem) {
                 itemName = stockItem.name;
-              });
-
-  
+              }
             } else if (itemNameValue) {
               stockItem = allStockItems.find(
                 (item) => item.name === itemNameValue,
               );
-            });
-
-  
+            }
 
             const quantity = parseFloat(getColumnValue(row, "Quantity") || "0");
             const rate = parseFloat(getColumnValue(row, "Rate") || "0");
@@ -8104,16 +6981,12 @@ if (asOfDate) {
             if (!quantity || quantity <= 0) {
               errors.push(`Row ${rowNum}: Quantity must be greater than 0`);
               continue;
-            });
-
-  
+            }
 
             if (rate === undefined || rate < 0) {
               errors.push(`Row ${rowNum}: Rate must be non-negative`);
               continue;
-            });
-
-  
+            }
 
             itemRows.push({
               rowNum,
@@ -8133,25 +7006,17 @@ if (asOfDate) {
               discount: parseFloat(getColumnValue(row, "Discount") || "0"),
               documentCharges: parseFloat(getColumnValue(row, "Document_Charges", "Document Charges") || "0"),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Basic structural errors only (validation of item existence happens in validate step)
         if (errors.length > 0) {
           return res.status(400).json({ message: "Validation errors", errors });
-        });
-
-  
+        }
 
         if (itemRows.length === 0) {
           return res.status(400).json({ message: "No valid item rows found" });
-        });
-
-  
+        }
 
         // Group by container
         const containerGroups = itemRows.reduce(
@@ -8163,18 +7028,14 @@ if (asOfDate) {
                 items: [],
                 pos: new Map(),
               };
-            });
-
-  
+            }
 
             const container = acc[row.containerNumber];
             container.items.push(row);
 
             if (!container.pos.has(row.poNumber)) {
               container.pos.set(row.poNumber, []);
-            });
-
-  
+            }
             container.pos.get(row.poNumber)!.push(row);
 
             return acc;
@@ -8226,9 +7087,7 @@ if (asOfDate) {
               charges.discount += item.discount;
               charges.documentCharges += item.documentCharges;
             });
-          });
-
-  
+          }
 
           const chargesTotal =
             charges.freight +
@@ -8261,9 +7120,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("PO Import parse error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -8272,17 +7129,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { containerNumber, supplierId, preview } = req.body;
 
       if (!containerNumber || !supplierId || !preview) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const errors: string[] = [];
 
@@ -8291,9 +7144,7 @@ if (asOfDate) {
       const supplier = allSuppliers.find((s) => s.id === supplierId);
       if (!supplier) {
         errors.push("Selected supplier not found");
-      });
-
-  
+      }
 
       // Get all stock items for validation
       const allStockItems = await storage.getAllStockItems(
@@ -8315,9 +7166,7 @@ if (asOfDate) {
             errors.push(`Duplicate barcode in import: ${item.barcode}`);
           } else if (item.barcode) {
             seenBarcodes.add(item.barcode);
-          });
-
-  
+          }
 
           // Try to find stock item by code/alias first, then by name
           let stockItem = null;
@@ -8326,14 +7175,10 @@ if (asOfDate) {
               item.barcode,
               req.session.currentCompanyId!,
             );
-          });
-
-  
+          }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find((si) => si.name === item.itemName);
-          });
-
-  
+          }
 
           if (!stockItem) {
             if (item.barcode) {
@@ -8342,18 +7187,10 @@ if (asOfDate) {
               );
             } else {
               errors.push(`Item not found by name: ${item.itemName}`);
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
 
       res.json({
         valid: errors.length === 0,
@@ -8362,9 +7199,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("PO Import validation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // PO Import - Import data
@@ -8372,9 +7207,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const {
         fileHash,
@@ -8393,9 +7226,7 @@ if (asOfDate) {
         !preview
       ) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       // SERVER-SIDE VALIDATION - Mandatory before import
       const validationErrors: string[] = [];
@@ -8405,9 +7236,7 @@ if (asOfDate) {
       const supplier = allSuppliers.find((s) => s.id === supplierId);
       if (!supplier) {
         validationErrors.push("Selected supplier not found");
-      });
-
-  
+      }
 
       // Get all stock items for validation
       const allStockItems = await storage.getAllStockItems(
@@ -8431,9 +7260,7 @@ if (asOfDate) {
             );
           } else if (item.barcode) {
             seenBarcodes.add(item.barcode);
-          });
-
-  
+          }
 
           // Try to find stock item by code/alias first, then by name
           let stockItem = null;
@@ -8442,14 +7269,10 @@ if (asOfDate) {
               item.barcode,
               req.session.currentCompanyId!,
             );
-          });
-
-  
+          }
           if (!stockItem && item.itemName) {
             stockItem = allStockItems.find((si) => si.name === item.itemName);
-          });
-
-  
+          }
 
           if (!stockItem) {
             if (item.barcode) {
@@ -8458,18 +7281,10 @@ if (asOfDate) {
               );
             } else {
               validationErrors.push(`Item not found by name: ${item.itemName}`);
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
 
       // Reject import if validation fails
       if (validationErrors.length > 0) {
@@ -8477,9 +7292,7 @@ if (asOfDate) {
           message: "Validation failed",
           errors: validationErrors,
         });
-      });
-
-  
+      }
 
       // Check idempotency
       const existingImport = await storage.getImportLogByHash(fileHash);
@@ -8487,9 +7300,7 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "This file has already been imported" });
-      });
-
-  
+      }
 
       // Check if container already exists (after validation)
       let container = await storage.getContainerByNumber(containerNumber);
@@ -8525,17 +7336,13 @@ if (asOfDate) {
             containerPreview.grandTotal
           ).toString(),
         });
-      });
-
-  
+      }
 
       // Group items by PO
       const poGroups = containerPreview.items.reduce((acc: any, item: any) => {
         if (!acc[item.poNumber]) {
           acc[item.poNumber] = [];
-        });
-
-  
+        }
         acc[item.poNumber].push(item);
         return acc;
       }, {});
@@ -8558,9 +7365,7 @@ if (asOfDate) {
           openingBalanceSide: "Dr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get or create "Import Charges" ledger account for container charges
       let importChargesAccount =
@@ -8575,9 +7380,7 @@ if (asOfDate) {
           openingBalanceSide: "Dr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get charges for this container
       const charges = containerPreview.charges;
@@ -8635,9 +7438,7 @@ if (asOfDate) {
           allocatedDocCharges += poDocumentCharges;
           allocatedDiscount += poDiscount;
           allocatedOtherCharges += poOtherCharges;
-        });
-
-  
+        }
         
         // Calculate grand total (items + all charges - discount)
         const poChargesTotal = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
@@ -8691,9 +7492,7 @@ if (asOfDate) {
                   while (await storage.getLedgerAccountByCode(code, currentCompanyId)) {
                     code = parentName.substring(0, 3).toUpperCase() + "CRD" + suffix;
                     suffix++;
-                  });
-
-  
+                  }
                   existingAccount = await storage.createLedgerAccount({
                     companyId: currentCompanyId,
                     name: creditAccountName,
@@ -8701,9 +7500,7 @@ if (asOfDate) {
                     accountType: "Liability",
                     subType: "Current Liability",
                   });
-                });
-
-  
+                }
                 
                 if (existingAccount?.id) {
                   parentCreditAccountId = existingAccount.id;
@@ -8714,21 +7511,13 @@ if (asOfDate) {
                     parentCreditAccountId: parentCreditAccountId,
                   });
                   console.log(`Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`);
-                });
-
-  
+                }
               } catch (err: any) {
                 console.log(`Parent Credit Account creation attempt ${attempt + 1} failed, will retry fetch:`, err?.message);
                 // On any error, loop will retry with fetch-first approach
-              });
-
-  
-            });
-
-  
-          });
-
-  
+              }
+            }
+          }
           
           if (parentCreditAccountId) {
             
@@ -8742,9 +7531,7 @@ if (asOfDate) {
                 accountType: "Expense",
                 subType: "Direct Expense",
               });
-            });
-
-  
+            }
             
             // Create voucher entries in SUBSIDIARY: DR Purchases, CR Parent Credit Account
             await storage.createVoucherEntry({
@@ -8774,9 +7561,7 @@ if (asOfDate) {
               while (await storage.getLedgerAccountByCode(code, parentCompanyId)) {
                 code = subsidiaryName.substring(0, 3).toUpperCase() + "CRD" + suffix;
                 suffix++;
-              });
-
-  
+              }
               subsidiaryReceivableAccount = await storage.createLedgerAccount({
                 companyId: parentCompanyId,
                 name: subsidiaryAccountName,
@@ -8784,9 +7569,7 @@ if (asOfDate) {
                 accountType: "Asset",
                 subType: "Current Asset",
               });
-            });
-
-  
+            }
             
             // Create matching voucher in PARENT: DR Subsidiary Credit, CR Supplier
             const parentVoucher = await storage.createVoucher({
@@ -8815,9 +7598,7 @@ if (asOfDate) {
               creditAmount: poGrandTotal.toFixed(2),
               narration: `${subsidiaryName} PO ${poNumber} - Container ${containerNumber}`,
             });
-          });
-
-  
+          }
         } else {
           // === PARENT COMPANY: Create direct supplier entry ===
           // When importing to the parent company, create standard voucher entries:
@@ -8827,9 +7608,7 @@ if (asOfDate) {
           let purchasesAccount = await storage.getLedgerAccountByName("Purchases", currentCompanyId);
           if (!purchasesAccount) {
             purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", currentCompanyId);
-          });
-
-  
+          }
           if (!purchasesAccount) {
             purchasesAccount = await storage.createLedgerAccount({
               companyId: currentCompanyId,
@@ -8838,9 +7617,7 @@ if (asOfDate) {
               accountType: "Expense",
               subType: "Direct Expense",
             });
-          });
-
-  
+          }
           
           // DR Purchases (expense increases)
           await storage.createVoucherEntry({
@@ -8861,12 +7638,8 @@ if (asOfDate) {
               creditAmount: poGrandTotal.toFixed(2),
               narration: `PO ${poNumber} - Container ${containerNumber}`,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const po = await storage.createPurchaseOrder({
           companyId: req.session.currentCompanyId!,
@@ -8896,28 +7669,20 @@ if (asOfDate) {
               item.barcode,
               req.session.currentCompanyId!,
             );
-          });
-
-  
+          }
           if (!stockItem && item.itemName) {
             stockItem = freshStockItems.find((si) => si.name === item.itemName);
-          });
-
-  
+          }
 
           if (stockItem) {
             stockItemId = stockItem.id;
-          });
-
-  
+          }
 
           if (!stockItemId) {
             return res.status(400).json({
               message: `Stock item not found: ${item.barcode || item.itemName}. Please ensure all items exist before importing.`,
             });
-          });
-
-  
+          }
 
           await storage.createPOLineItem({
             poId: po.id,
@@ -8927,12 +7692,8 @@ if (asOfDate) {
             rate: item.rate.toString(),
             lineTotal: item.lineTotal.toString(),
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Create container charges records (for display in Container Extra Charges section)
       // Note: Charges are now consolidated into the main PO voucher, no separate vouchers needed
@@ -8955,12 +7716,8 @@ if (asOfDate) {
             chargeType: charge.type,
             amount: actualAmount.toString(),
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Create import log
       await storage.createImportLog({
@@ -8981,9 +7738,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("PO Import error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Download sample PO import template
@@ -9091,9 +7846,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Template generation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // POS Import - Parse and Preview Excel
@@ -9105,15 +7858,11 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         if (!req.file) {
           return res.status(400).json({ message: "No file uploaded" });
-        });
-
-  
+        }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -9122,9 +7871,7 @@ if (asOfDate) {
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
-        });
-
-  
+        }
 
         // Parse rows
         const rows = rawData as any[];
@@ -9146,15 +7893,11 @@ if (asOfDate) {
 
           if (!barcode) {
             continue; // Skip rows without barcode
-          });
-
-  
+          }
 
           if (quantity <= 0 || rate <= 0) {
             continue; // Skip invalid quantities/rates
-          });
-
-  
+          }
 
           const itemValue = quantity * rate;
           totalValue += itemValue;
@@ -9166,9 +7909,7 @@ if (asOfDate) {
             rate,
             value: itemValue,
           });
-        });
-
-  
+        }
 
         res.json({
           items,
@@ -9178,9 +7919,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("POS Import parse error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -9189,17 +7928,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationId, items } = req.body;
 
       if (!locationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -9210,9 +7945,7 @@ if (asOfDate) {
       if (!location) {
         errors.push("Selected location not found");
         return res.json({ errors, warnings, validatedItems });
-      });
-
-  
+      }
 
       // Get all stock items for validation
       const allStockItems = await storage.getAllStockItems(
@@ -9274,9 +8007,7 @@ if (asOfDate) {
               warnings.push(
                 `${stockItem.name}: Stock will reach zero (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)} ${stockItem.uom})`
               );
-            });
-
-  
+            }
           } else {
             // No inventory at this location
             validatedItem.currentStock = 0;
@@ -9285,17 +8016,11 @@ if (asOfDate) {
             warnings.push(
               `${stockItem.name}: No stock at this location (Selling: ${item.quantity} ${stockItem.uom})`
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         validatedItems.push(validatedItem);
-      });
-
-  
+      }
 
       res.json({
         errors,
@@ -9305,9 +8030,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("POS Import validation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // POS Import - Import sales transactions
@@ -9315,33 +8038,25 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationId, saleDate, items, cashAccountId } = req.body;
 
       if (!locationId || !saleDate || !items || !Array.isArray(items) || !cashAccountId) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       // Validate location
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(400).json({ message: "Location not found" });
-      });
-
-  
+      }
 
       // Validate cash account
       const cashAccount = await storage.getLedgerAccountById(cashAccountId);
       if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Invalid cash account" });
-      });
-
-  
+      }
 
       // Get or create "Sales Revenue" ledger account
       let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
@@ -9356,9 +8071,7 @@ if (asOfDate) {
           openingBalanceSide: "Cr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get or create "Cost of Goods Sold" ledger account
       let cogsAccount = await storage.getLedgerAccountByCode("COGS", req.session.currentCompanyId!);
@@ -9373,9 +8086,7 @@ if (asOfDate) {
           openingBalanceSide: "Dr",
           active: true,
         });
-      });
-
-  
+      }
 
       let totalSales = 0;
 
@@ -9408,9 +8119,7 @@ if (asOfDate) {
             throw new Error(
               `Stock item not found for barcode: ${item.barcode}`,
             );
-          });
-
-  
+          }
 
           // Get current inventory (allow negative stock for historical sales import)
           const [inventoryRecord] = await tx
@@ -9431,9 +8140,7 @@ if (asOfDate) {
           if (inventoryRecord) {
             costPrice = parseFloat(inventoryRecord.averageRate || "0");
             currentQty = parseFloat(inventoryRecord.quantity);
-          });
-
-  
+          }
 
           const itemSales = item.quantity * item.rate;
           const itemCost = item.quantity * costPrice;
@@ -9484,12 +8191,8 @@ if (asOfDate) {
               averageRate: "0",
               totalValue: "0",
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Create BALANCED voucher entries for double-entry bookkeeping
         // Periodic inventory system: Purchases are expensed when purchased
@@ -9530,9 +8233,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("POS Import error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Download sample POS import template
@@ -9574,9 +8275,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Template generation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // ============= Credit Sales Import Endpoints =============
@@ -9590,15 +8289,11 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         if (!req.file) {
           return res.status(400).json({ message: "No file uploaded" });
-        });
-
-  
+        }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -9607,9 +8302,7 @@ if (asOfDate) {
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
-        });
-
-  
+        }
 
         const rows = rawData as any[];
         const items: any[] = [];
@@ -9629,15 +8322,11 @@ if (asOfDate) {
 
           if (!barcode) {
             continue;
-          });
-
-  
+          }
 
           if (quantity <= 0 || rate <= 0) {
             continue;
-          });
-
-  
+          }
 
           const itemValue = quantity * rate;
           totalValue += itemValue;
@@ -9649,9 +8338,7 @@ if (asOfDate) {
             rate,
             value: itemValue,
           });
-        });
-
-  
+        }
 
         res.json({
           items,
@@ -9661,9 +8348,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Credit Sales Import parse error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -9672,17 +8357,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationId, items } = req.body;
 
       if (!locationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -9692,9 +8373,7 @@ if (asOfDate) {
       if (!location) {
         errors.push("Selected location not found");
         return res.json({ errors, warnings, validatedItems });
-      });
-
-  
+      }
 
       for (const item of items) {
         const validatedItem: any = { ...item };
@@ -9746,9 +8425,7 @@ if (asOfDate) {
               warnings.push(
                 `${stockItem.name}: Stock will reach zero (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)} ${stockItem.uom})`
               );
-            });
-
-  
+            }
           } else {
             validatedItem.currentStock = 0;
             validatedItem.remainingStock = -parseFloat(item.quantity);
@@ -9756,17 +8433,11 @@ if (asOfDate) {
             warnings.push(
               `${stockItem.name}: No stock at this location (Selling: ${item.quantity} ${stockItem.uom})`
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         validatedItems.push(validatedItem);
-      });
-
-  
+      }
 
       res.json({
         errors,
@@ -9776,9 +8447,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Credit Sales Import validation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Credit Sales Import - Import credit sales transactions
@@ -9786,31 +8455,23 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationId, saleDate, items, customerId } = req.body;
 
       if (!locationId || !saleDate || !items || !Array.isArray(items) || !customerId) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(400).json({ message: "Location not found" });
-      });
-
-  
+      }
 
       let customer = await storage.getCustomerById(customerId);
       if (!customer || customer.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Invalid customer" });
-      });
-
-  
+      }
 
       let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
       if (!salesRevenueAccount) {
@@ -9824,9 +8485,7 @@ if (asOfDate) {
           openingBalanceSide: "Cr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get or create the customer's linked ledger account for receivables
       let customerLedgerAccountId = customer.ledgerAccountId;
@@ -9845,15 +8504,11 @@ if (asOfDate) {
             openingBalanceSide: "Dr",
             active: true,
           });
-        });
-
-  
+        }
         // Update customer with the linked ledger account
         customer = await storage.updateCustomer(customer.id, { ledgerAccountId: customerLedgerAccount.id });
         customerLedgerAccountId = customerLedgerAccount.id;
-      });
-
-  
+      }
 
       let totalSales = 0;
 
@@ -9883,9 +8538,7 @@ if (asOfDate) {
             throw new Error(
               `Stock item not found for barcode: ${item.barcode}`,
             );
-          });
-
-  
+          }
 
           const [inventoryRecord] = await tx
             .select()
@@ -9904,9 +8557,7 @@ if (asOfDate) {
           if (inventoryRecord) {
             costPrice = parseFloat(inventoryRecord.averageRate || "0");
             currentQty = parseFloat(inventoryRecord.quantity);
-          });
-
-  
+          }
 
           const itemSales = item.quantity * item.rate;
           const itemCost = item.quantity * costPrice;
@@ -9950,12 +8601,8 @@ if (asOfDate) {
               averageRate: "0",
               totalValue: "0",
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Create voucher entries for credit sale
         // Entry 1: Debit Customer's Ledger Account (Customer owes money)
@@ -10025,9 +8672,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Credit Sales Import error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Download sample Credit Sales import template
@@ -10069,9 +8714,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Template generation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // ============= Stock Transfer Import Endpoints =============
@@ -10085,15 +8728,11 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         if (!req.file) {
           return res.status(400).json({ message: "No file uploaded" });
-        });
-
-  
+        }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -10102,9 +8741,7 @@ if (asOfDate) {
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
-        });
-
-  
+        }
 
         // Parse rows
         const rows = rawData as any[];
@@ -10122,24 +8759,18 @@ if (asOfDate) {
 
           if (!barcode) {
             continue; // Skip rows without barcode
-          });
-
-  
+          }
 
           if (quantity <= 0) {
             continue; // Skip invalid quantities
-          });
-
-  
+          }
 
           items.push({
             rowNum,
             barcode: barcode.toString().trim(),
             quantity,
           });
-        });
-
-  
+        }
 
         res.json({
           items,
@@ -10149,9 +8780,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Stock Transfer Import parse error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -10160,23 +8789,17 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { sourceLocationId, destinationLocationId, items } = req.body;
 
       if (!sourceLocationId || !destinationLocationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       if (sourceLocationId && sourceLocationId === destinationLocationId) {
         return res.status(400).json({ message: "Source and destination must be different" });
-      });
-
-  
+      }
 
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -10189,16 +8812,12 @@ if (asOfDate) {
       if (!sourceLocation) {
         errors.push("Source location not found");
         return res.json({ errors, warnings, validatedItems });
-      });
-
-  
+      }
       
       if (!destLocation) {
         errors.push("Destination location not found");
         return res.json({ errors, warnings, validatedItems });
-      });
-
-  
+      }
 
       // Validate each item
       for (const item of items) {
@@ -10246,9 +8865,7 @@ if (asOfDate) {
               warnings.push(
                 `${stockItem.name}: Stock will go negative (Available: ${currentQty.toFixed(2)}, Requested: ${transferQty.toFixed(2)})`
               );
-            });
-
-  
+            }
           } else {
             validatedItem.currentStock = 0;
             validatedItem.remainingStock = -parseFloat(item.quantity);
@@ -10257,17 +8874,11 @@ if (asOfDate) {
             warnings.push(
               `${stockItem.name}: No stock at source location`
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         validatedItems.push(validatedItem);
-      });
-
-  
+      }
 
       res.json({
         errors,
@@ -10277,9 +8888,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Stock Transfer Import validation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Transfer Import - Create stock transfer
@@ -10287,17 +8896,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { sourceLocationId, destinationLocationId, transferDate, items, notes } = req.body;
 
       if (!sourceLocationId || !destinationLocationId || !transferDate || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       // Validate locations
       const sourceLocation = await storage.getLocationById(sourceLocationId);
@@ -10305,15 +8910,11 @@ if (asOfDate) {
       
       if (!sourceLocation) {
         return res.status(400).json({ message: "Source location not found" });
-      });
-
-  
+      }
       
       if (!destLocation) {
         return res.status(400).json({ message: "Destination location not found" });
-      });
-
-  
+      }
 
       let totalValue = 0;
       const transferItems: Array<{ stockItemId: number; quantity: string; rate: string }> = [];
@@ -10327,9 +8928,7 @@ if (asOfDate) {
         
         if (!stockItem) {
           return res.status(400).json({ message: `Stock item not found: ${item.barcode}` });
-        });
-
-  
+        }
 
         // Get rate from source inventory
         const [inventoryItem] = await db
@@ -10356,9 +8955,7 @@ if (asOfDate) {
           quantity: quantity.toString(),
           rate: rate.toString(),
         });
-      });
-
-  
+      }
 
       await db.transaction(async (tx) => {
         // Create stock transfer voucher
@@ -10433,9 +9030,7 @@ if (asOfDate) {
               averageRate: item.rate,
               totalValue: (negativeQty * parseFloat(item.rate)).toString(),
             });
-          });
-
-  
+          }
 
           // Add to destination inventory
           const [destInventory] = await tx
@@ -10483,12 +9078,8 @@ if (asOfDate) {
               averageRate: item.rate,
               totalValue: (qty * rate).toString(),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
       });
 
       res.json({
@@ -10499,9 +9090,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Stock Transfer Import error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Download sample Stock Transfer import template
@@ -10540,9 +9129,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Template generation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Multi-source Stock Transfer Import - Template
@@ -10584,9 +9171,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Template generation error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Multi-source Stock Transfer Import - Parse Excel
@@ -10599,15 +9184,11 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         if (!req.file) {
           return res.status(400).json({ message: "No file uploaded" });
-        });
-
-  
+        }
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
         const sheetName = workbook.SheetNames[0];
@@ -10616,9 +9197,7 @@ if (asOfDate) {
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
-        });
-
-  
+        }
 
         const rows = rawData as any[];
         const items: any[] = [];
@@ -10636,15 +9215,11 @@ if (asOfDate) {
 
           if (!barcode) {
             continue; // Skip rows without barcode
-          });
-
-  
+          }
 
           if (quantity <= 0) {
             continue; // Skip invalid quantities
-          });
-
-  
+          }
 
           items.push({
             rowNum,
@@ -10652,17 +9227,13 @@ if (asOfDate) {
             barcode: barcode.toString().trim(),
             quantity,
           });
-        });
-
-  
+        }
 
         if (items.length === 0) {
           return res.status(400).json({
             message: "No valid items found in Excel file. Expected columns: Source Location, Barcode, Quantity",
           });
-        });
-
-  
+        }
 
         res.json({
           success: true,
@@ -10671,9 +9242,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Stock Transfer Parse error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -10682,17 +9251,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { destinationLocationId, items } = req.body;
 
       if (!destinationLocationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const errors: string[] = [];
       const warnings: string[] = [];
@@ -10703,9 +9268,7 @@ if (asOfDate) {
       if (!destLocation) {
         errors.push("Destination location not found");
         return res.json({ errors, warnings, validatedItems });
-      });
-
-  
+      }
 
       // Get all locations for name lookup
       const allLocations = await storage.getAllLocations(req.session.currentCompanyId!);
@@ -10725,9 +9288,7 @@ if (asOfDate) {
           errors.push(`Row ${item.rowNum}: Source location is required`);
           validatedItems.push(validatedItem);
           continue;
-        });
-
-  
+        }
 
         const sourceLocationId = locationsByName[sourceLocationName];
         if (!sourceLocationId) {
@@ -10735,18 +9296,14 @@ if (asOfDate) {
           errors.push(`Row ${item.rowNum}: Source location '${item.sourceLocation}' not found`);
           validatedItems.push(validatedItem);
           continue;
-        });
-
-  
+        }
 
         if (sourceLocationId && sourceLocationId === destinationLocationId) {
           validatedItem.error = "Source and destination cannot be the same";
           errors.push(`Row ${item.rowNum}: Source and destination cannot be the same`);
           validatedItems.push(validatedItem);
           continue;
-        });
-
-  
+        }
 
         validatedItem.sourceLocationId = sourceLocationId;
 
@@ -10794,20 +9351,12 @@ if (asOfDate) {
               warnings.push(
                 `Row ${item.rowNum}: '${stockItem.name}' - requested ${item.quantity}, available ${currentQty.toFixed(2)}`,
               );
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         validatedItems.push(validatedItem);
-      });
-
-  
+      }
 
       res.json({
         success: errors.length === 0,
@@ -10818,9 +9367,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Stock Transfer Validate error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Multi-source Stock Transfer Import - Execute Import
@@ -10828,17 +9375,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { destinationLocationId, transferDate, notes, items } = req.body;
 
       if (!destinationLocationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       // Validate all items have required fields
       for (const item of items) {
@@ -10846,20 +9389,14 @@ if (asOfDate) {
           return res.status(400).json({
             message: "Some items have validation errors. Please validate and fix before importing.",
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get destination location for the name - verify it belongs to this company
       const destLocation = await storage.getLocationById(destinationLocationId);
       if (!destLocation || destLocation.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Destination location not found or access denied" });
-      });
-
-  
+      }
 
       // Get all locations for this company for name lookup and validation
       const allLocations = await storage.getAllLocations(req.session.currentCompanyId!);
@@ -10884,9 +9421,7 @@ if (asOfDate) {
           return res.status(400).json({
             message: `Source location ${item.sourceLocationId} not found or access denied`,
           });
-        });
-
-  
+        }
 
         // Validate stock item exists and belongs to this company
         const stockItem = await storage.getStockItemById(item.stockItemId);
@@ -10894,18 +9429,14 @@ if (asOfDate) {
           return res.status(400).json({
             message: `Stock item ${item.stockItemId} not found or access denied`,
           });
-        });
-
-  
+        }
 
         // Validate source != destination
         if (item.sourceLocationId === destinationLocationId) {
           return res.status(400).json({
             message: "Source and destination locations cannot be the same",
           });
-        });
-
-  
+        }
 
         // Get inventory at source location to derive rate (don't trust client rate)
         const sourceInv = await db
@@ -10932,17 +9463,13 @@ if (asOfDate) {
           quantity: requestedQty,
           rate: serverRate,
         });
-      });
-
-  
+      }
 
       // Calculate total value using server-derived rates
       let totalValue = 0;
       for (const item of processedItems) {
         totalValue += item.rate * item.quantity;
-      });
-
-  
+      }
 
       // Create voucher and update inventory in a transaction
       await db.transaction(async (tx) => {
@@ -10965,12 +9492,8 @@ if (asOfDate) {
           const numMatch = lastNum.match(/(\d+)$/);
           if (numMatch) {
             nextNumber = parseInt(numMatch[1]) + 1;
-          });
-
-  
-        });
-
-  
+          }
+        }
         const voucherNumber = `STI-${String(nextNumber).padStart(4, "0")}`;
 
         // Create the voucher
@@ -11054,9 +9577,7 @@ if (asOfDate) {
               averageRate: rate.toString(),
               totalValue: (negativeQty * rate).toString(),
             });
-          });
-
-  
+          }
 
           // Add to destination inventory
           const destInventory = await tx
@@ -11097,12 +9618,8 @@ if (asOfDate) {
               averageRate: rate.toString(),
               totalValue: (qty * rate).toString(),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
       });
 
       res.json({
@@ -11113,9 +9630,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Stock Transfer Import error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get containers
@@ -11123,18 +9638,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const containers = await storage.getAllContainers(
         req.session.currentCompanyId,
       );
       res.json(containers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get active containers (not sold)
@@ -11142,18 +9653,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const containers = await storage.getActiveContainers(
         req.session.currentCompanyId,
       );
       res.json(containers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get sold containers with full details
@@ -11161,18 +9668,14 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const soldContainers = await storage.getSoldContainers(
         req.session.currentCompanyId,
       );
       res.json(soldContainers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update container tracking fields (OTW tracking)
@@ -11180,15 +9683,11 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
-      });
-
-  
+      }
       
       // Validate request body with Zod schema
       const parseResult = updateContainerTrackingSchema.safeParse(req.body);
@@ -11197,9 +9696,7 @@ if (asOfDate) {
           message: "Invalid tracking data", 
           errors: parseResult.error.errors 
         });
-      });
-
-  
+      }
       
       const {
         shopName,
@@ -11251,16 +9748,12 @@ if (asOfDate) {
       
       if (!updated) {
         return res.status(404).json({ message: "Container not found" });
-      });
-
-  
+      }
       
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk import container tracking from Excel data
@@ -11268,16 +9761,12 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const { rows } = req.body;
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: "No data provided" });
-      });
-
-  
+      }
       
       let updated = 0;
       let notFound = 0;
@@ -11289,18 +9778,14 @@ if (asOfDate) {
           if (!parseResult.success) {
             errors.push(`Invalid row data for ${row.containerNumber || 'unknown'}`);
             continue;
-          });
-
-  
+          }
           
           const data = parseResult.data;
           const containerNumber = data.containerNumber?.trim();
           if (!containerNumber) {
             errors.push("Missing container number in row");
             continue;
-          });
-
-  
+          }
           
           // Find container by number
           const [container] = await db
@@ -11316,9 +9801,7 @@ if (asOfDate) {
             notFound++;
             errors.push(`Container not found: ${containerNumber}`);
             continue;
-          });
-
-  
+          }
           
           // Build update object
           const updateData: any = {};
@@ -11334,9 +9817,7 @@ if (asOfDate) {
           if (data.dutyFee) updateData.dutyFee = data.dutyFee;
           if (data.docReceived !== undefined) {
             updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "YES" || data.docReceived === "TRUE" || data.docReceived === "true";
-          });
-
-  
+          }
           if (data.trackingDescription) updateData.trackingDescription = data.trackingDescription;
           
           if (Object.keys(updateData).length > 0) {
@@ -11345,17 +9826,11 @@ if (asOfDate) {
               .set(updateData)
               .where(eq(containers.id, container.id));
             updated++;
-          });
-
-  
+          }
         } catch (rowError: any) {
           errors.push(`Error processing ${row.containerNumber || 'unknown'}: ${rowError.message}`);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       res.json({
         success: true,
@@ -11366,9 +9841,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Fetch container ETA from external tracking API (optional - requires CONTAINER_TRACKING_API_KEY)
@@ -11376,15 +9849,11 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
-      });
-
-  
+      }
       
       // Get the container
       const [container] = await db
@@ -11398,9 +9867,7 @@ if (asOfDate) {
       
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
-      });
-
-  
+      }
       
       const apiKey = process.env.CONTAINER_TRACKING_API_KEY;
       if (!apiKey) {
@@ -11408,9 +9875,7 @@ if (asOfDate) {
           message: "Container tracking API not configured. Add CONTAINER_TRACKING_API_KEY to enable auto ETA updates.",
           needsSetup: true
         });
-      });
-
-  
+      }
       
       // Try to fetch from Terminal49 or similar API
       // For now, return a message that the feature requires setup
@@ -11436,14 +9901,10 @@ if (asOfDate) {
           message: "Failed to fetch from tracking API", 
           error: apiError.message 
         });
-      });
-
-  
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -11453,33 +9914,25 @@ if (asOfDate) {
       const userId = req.session.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
-      });
-
-  
+      }
 
       const containerId = parseInt(req.params.id);
       if (isNaN(containerId)) {
         return res.status(400).json({ message: "Invalid container ID" });
-      });
-
-  
+      }
 
       const container = await storage.getContainerById(containerId);
       
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
-      });
-
-  
+      }
 
       // Verify user has access to this container's company
       const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
       const hasAccess = userCompanyRoles.some(r => r.companyId === container.companyId);
       if (!hasAccess) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const supplier = await storage.getSupplierById(container.supplierId);
       const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
@@ -11526,27 +9979,21 @@ if (asOfDate) {
     } catch (error) {
       console.error("Error fetching container POs:", error);
       res.status(500).json({ message: "Failed to fetch purchase orders" });
-    });
-
-  
+    }
   });
   // Export single container with all details (JSON)
   app.get("/api/containers/:id/export", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const containerId = parseInt(req.params.id);
       const container = await storage.getContainerById(containerId);
       
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
-      });
-
-  
+      }
 
       const supplier = await storage.getSupplierById(container.supplierId);
       const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
@@ -11614,9 +10061,7 @@ if (asOfDate) {
           offloadedAt: offloadRecord.offloadedAt,
           offloadItems: itemsWithNames,
         };
-      });
-
-  
+      }
 
       const exportData = {
         exportDate: new Date().toISOString(),
@@ -11640,9 +10085,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Container export error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Export all containers as Excel (one sheet per container)
@@ -11650,9 +10093,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const allContainers = await storage.getAllContainers(req.session.currentCompanyId);
       const workbook = XLSX.utils.book_new();
@@ -11675,9 +10116,7 @@ if (asOfDate) {
           sheetData.push(["Manual Item", container.itemName]);
           sheetData.push(["Rate/Kg", container.ratePerKg]);
           sheetData.push(["Total Kg", container.totalKg]);
-        });
-
-  
+        }
         sheetData.push([]);
 
         for (const po of purchaseOrders) {
@@ -11704,16 +10143,10 @@ if (asOfDate) {
                 item.rate,
                 item.lineTotal,
               ]);
-            });
-
-  
+            }
             sheetData.push([]);
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         const [offloadRecord] = await db
           .select()
@@ -11751,24 +10184,16 @@ if (asOfDate) {
                 item.rate,
                 item.totalValue,
               ]);
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         const sheetName = container.containerNumber
           .replace(/[\\/*?:\[\]]/g, "_")
           .substring(0, 31);
         const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-      });
-
-  
+      }
 
       const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
       
@@ -11778,9 +10203,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Container export-all error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Create a manual container
@@ -11788,9 +10211,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const data = insertContainerSchema.parse({
         ...req.body,
@@ -11808,9 +10229,7 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Supplier is required for manual containers with cost information" 
         });
-      });
-
-  
+      }
 
       const container = await storage.createContainer(data);
 
@@ -11835,9 +10254,7 @@ if (asOfDate) {
               openingBalanceSide: "Dr",
               active: true,
             });
-          });
-
-  
+          }
 
           // Create purchase voucher
           const voucher = await storage.createVoucher({
@@ -11870,12 +10287,8 @@ if (asOfDate) {
           // Rollback: Delete container if voucher creation fails
           await storage.deleteContainer(container.id);
           throw new Error(`Failed to create purchase voucher: ${voucherError.message}`);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.status(201).json(container);
     } catch (error: any) {
@@ -11884,13 +10297,9 @@ if (asOfDate) {
           message: "Validation error", 
           errors: error.errors 
         });
-      });
-
-  
+      }
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get container details with POs, line items, and charges
@@ -11905,9 +10314,7 @@ if (asOfDate) {
 
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
 
         const pos = await storage.getPurchaseOrdersByContainer(containerId);
         const charges = await storage.getChargesByContainer(containerId);
@@ -11929,9 +10336,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -11951,9 +10356,7 @@ if (asOfDate) {
             message: "Validation failed",
             errors: validation.error.errors,
           });
-        });
-
-  
+        }
 
         const {
           locationId,
@@ -11973,9 +10376,7 @@ if (asOfDate) {
         const container = await storage.getContainerById(containerId);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
 
         // Check if this is an edit (container already offloaded)
         const isEdit = container.status === "OFFLOADED";
@@ -12017,18 +10418,10 @@ if (asOfDate) {
                       quantity: newQty.toString(),
                       totalValue: newTotalValue,
                     }).where(eq(inventory.id, inv.id));
-                  });
-
-  
-                });
-
-  
-              });
-
-  
-            });
-
-  
+                  }
+                }
+              }
+            }
 
             // Delete old OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG-, XFER- prefixes)
             // DO NOT delete PO vouchers that track supplier balances
@@ -12053,21 +10446,15 @@ if (asOfDate) {
             for (const voucher of oldVouchers) {
               await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
               await db.delete(vouchers).where(eq(vouchers.id, voucher.id));
-            });
-
-  
+            }
 
             // Delete old offload record
             await db.delete(containerOffloads).where(eq(containerOffloads.id, existingOffload.id));
-          });
-
-  
+          }
 
           // Set status back to OTW so offloadContainer can proceed
           await storage.updateContainer(containerId, { status: "OTW" });
-        });
-
-  
+        }
 
         // Perform offload
         const offload = await storage.offloadContainer(
@@ -12089,9 +10476,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Container offload error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -12105,35 +10490,27 @@ if (asOfDate) {
         const containerId = parseInt(req.params.id);
         if (isNaN(containerId)) {
           return res.status(400).json({ message: "Invalid container ID" });
-        });
-
-  
+        }
 
         // Get container
         const container = await storage.getContainerById(containerId);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
 
         // Verify container belongs to current company
         if (container.companyId !== req.session.currentCompanyId) {
           return res.status(403).json({
             message: "Access denied: Container belongs to a different company",
           });
-        });
-
-  
+        }
 
         // Check if container is offloaded
         if (container.status !== "OFFLOADED") {
           return res
             .status(400)
             .json({ message: "Container is not offloaded" });
-        });
-
-  
+        }
 
         // Get offload record (may not exist for old offloads)
         const [offloadRecord] = await db
@@ -12152,9 +10529,7 @@ if (asOfDate) {
           return res.json({ 
             message: "Container status reversed to OTW (no offload record to clean up)" 
           });
-        });
-
-  
+        }
 
         await db.transaction(async (tx) => {
           // Try to get stored offload items first (new approach - exact values)
@@ -12197,12 +10572,8 @@ if (asOfDate) {
                     averageRate: newAvgRate.toFixed(2),
                   })
                   .where(eq(inventory.id, inv.id));
-              });
-
-  
-            });
-
-  
+              }
+            }
             
             // Delete stored offload items
             await tx
@@ -12215,9 +10586,7 @@ if (asOfDate) {
             for (const po of pos) {
               const items = await storage.getLineItemsByPO(po.id);
               allLineItems.push(...items);
-            });
-
-  
+            }
             
             const additionalCostPerBale = parseFloat(offloadRecord.additionalCostPerBale || "0");
             const itemsMap = new Map<number, { 
@@ -12243,12 +10612,8 @@ if (asOfDate) {
                   totalQuantity: quantity,
                   weightedRateSum: rate * quantity,
                 });
-              });
-
-  
-            });
-
-  
+              }
+            }
 
             for (const [stockItemId, data] of Array.from(itemsMap)) {
               const baseRate = data.weightedRateSum / data.totalQuantity;
@@ -12283,15 +10648,9 @@ if (asOfDate) {
                     averageRate: newAvgRate.toFixed(2),
                   })
                   .where(eq(inventory.id, inv.id));
-              });
-
-  
-            });
-
-  
-          });
-
-  
+              }
+            }
+          }
 
           // Delete OFFLOAD-related vouchers only (DUTY-, OFFICE-, TRANS-, CHG- prefixes)
           // DO NOT delete PO vouchers that track supplier balances
@@ -12320,9 +10679,7 @@ if (asOfDate) {
 
             // Delete the voucher
             await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
-          });
-
-  
+          }
 
           // Delete the offload record
           await tx
@@ -12345,9 +10702,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Reverse offload error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -12361,35 +10716,27 @@ if (asOfDate) {
         const containerId = parseInt(req.params.id);
         if (isNaN(containerId)) {
           return res.status(400).json({ message: "Invalid container ID" });
-        });
-
-  
+        }
 
         // Get container
         const container = await storage.getContainerById(containerId);
         if (!container) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
 
         // Verify container belongs to current company
         if (container.companyId !== req.session.currentCompanyId) {
           return res.status(403).json({
             message: "Access denied: Container belongs to a different company",
           });
-        });
-
-  
+        }
 
         // Check if container is offloaded
         if (container.status !== "OFFLOADED") {
           return res
             .status(400)
             .json({ message: "Container must be offloaded to edit" });
-        });
-
-  
+        }
 
         // Validate request body
         const validation = offloadRequestSchema.extend({
@@ -12406,9 +10753,7 @@ if (asOfDate) {
 
         if (!validation.success) {
           return res.status(400).json({ errors: validation.error.errors });
-        });
-
-  
+        }
 
         const {
           locationId,
@@ -12433,9 +10778,7 @@ if (asOfDate) {
 
         if (!currentOffload) {
           return res.status(404).json({ message: "Offload record not found" });
-        });
-
-  
+        }
 
         await db.transaction(async (tx) => {
           // If location changed, need to move inventory
@@ -12470,18 +10813,10 @@ if (asOfDate) {
                     quantity: oldInv.quantity,
                     averageRate: oldInv.averageRate,
                   });
-                });
-
-  
-              });
-
-  
-            });
-
-  
-          });
-
-  
+                }
+              }
+            }
+          }
 
           // Recalculate charges
           const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
@@ -12527,9 +10862,7 @@ if (asOfDate) {
               .delete(voucherEntries)
               .where(eq(voucherEntries.voucherId, voucher.id));
             await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
-          });
-
-  
+          }
 
           // Create new voucher entries with updated charges (similar to offloadContainer logic)
           // This is a simplified version - you may want to call the full offload logic
@@ -12543,9 +10876,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Edit offload error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -12555,9 +10886,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
-      });
-
-  
+      }
 
       // Check role permissions - only Admin and Owner can view purchase orders
       const userRole = req.session.currentRole;
@@ -12565,9 +10894,7 @@ if (asOfDate) {
         return res
           .status(403)
           .json({ message: "Only Admin and Owner can view purchase orders" });
-      });
-
-  
+      }
 
       const po = await db.query.purchaseOrders.findFirst({
         where: eq(purchaseOrders.id, id),
@@ -12575,9 +10902,7 @@ if (asOfDate) {
 
       if (!po) {
         return res.status(404).json({ message: "Purchase order not found" });
-      });
-
-  
+      }
 
       // Verify purchase order belongs to current company
       if (po.companyId !== req.session.currentCompanyId) {
@@ -12587,9 +10912,7 @@ if (asOfDate) {
             message:
               "Access denied: Purchase order belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Get line items for this PO
       const lineItems = await db.query.poLineItems.findMany({
@@ -12653,15 +10976,9 @@ if (asOfDate) {
             case 'Other Charges':
               finalCharges.otherCharges = Math.abs(amount).toString();
               break;
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({
         ...po,
@@ -12675,9 +10992,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Get PO error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update a purchase order with line items
@@ -12686,16 +11001,12 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid purchase order ID" });
-      });
-
-  
+      }
 
       const existingPO = await storage.getPurchaseOrderById(id);
       if (!existingPO) {
         return res.status(404).json({ message: "Purchase order not found" });
-      });
-
-  
+      }
 
       // Verify purchase order belongs to current company
       if (existingPO.companyId !== req.session.currentCompanyId) {
@@ -12705,26 +11016,20 @@ if (asOfDate) {
             message:
               "Access denied: Purchase order belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Check edit permissions based on role
       const userRole = req.session.currentRole;
       if (!userRole) {
         return res.status(403).json({ message: "User role not found" });
-      });
-
-  
+      }
 
       // Only Admin and Owner can edit purchase orders
       if (userRole !== "Admin" && userRole !== "Owner") {
         return res
           .status(403)
           .json({ message: "Only Admin and Owner can edit purchase orders" });
-      });
-
-  
+      }
 
       // Check if container is offloaded - if so, prevent stock item changes that would cause import cycle imbalance
       const container = await storage.getContainerById(existingPO.containerId);
@@ -12740,15 +11045,9 @@ if (asOfDate) {
             return res.status(400).json({
               message: "Cannot change stock items on an offloaded container. The inventory has already been added with the original items. Changing stock items would cause an import cycle imbalance. To fix this, first reverse the container offload, then edit the PO, then re-offload."
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // Update line items if provided
       if (req.body.items && Array.isArray(req.body.items)) {
@@ -12798,9 +11097,7 @@ if (asOfDate) {
           // Insert new line items
           if (newItems.length > 0) {
             await tx.insert(poLineItems).values(newItems);
-          });
-
-  
+          }
           
           // Update PO with new items total and charges
           // Use ?? to correctly handle explicit zero values from the request
@@ -12852,12 +11149,8 @@ if (asOfDate) {
               } else {
                 totalItemsCost += parseFloat(po.itemsTotal || "0");
                 totalCharges += parseFloat(po.freight || "0") + parseFloat(po.surcharge || "0") + parseFloat(po.fumigation || "0") + parseFloat(po.documentCharges || "0") - parseFloat(po.discount || "0") + parseFloat(po.otherCharges || "0");
-              });
-
-  
-            });
-
-  
+              }
+            }
             
             // Update container totals
             const chargesTotal = totalCharges;
@@ -12868,9 +11161,7 @@ if (asOfDate) {
                 grandTotal: (totalItemsCost + chargesTotal).toFixed(2),
               })
               .where(eq(containers.id, existingPO.containerId));
-          });
-
-  
+          }
           
           // Update the associated voucher with new total (items + all charges)
           if (existingPO.voucherId) {
@@ -12898,15 +11189,9 @@ if (asOfDate) {
                 await tx.update(voucherEntries)
                   .set({ creditAmount: poGrandTotal.toFixed(2) })
                   .where(eq(voucherEntries.id, entry.id));
-              });
-
-  
-            });
-
-  
-          });
-
-  
+              }
+            }
+          }
           
           // Sync container_charges table when PO charges are edited
           if (chargesWereEdited && existingPO.containerId) {
@@ -12935,9 +11220,7 @@ if (asOfDate) {
                 if (existingCharge.length > 0) {
                   await tx.delete(containerCharges)
                     .where(eq(containerCharges.id, existingCharge[0].id));
-                });
-
-  
+                }
               } else {
                 // Upsert: update if exists, insert if not
                 if (existingCharge.length > 0) {
@@ -12950,18 +11233,10 @@ if (asOfDate) {
                     chargeType: chargeType,
                     amount: amount.toFixed(2),
                   });
-                });
-
-  
-              });
-
-  
-            });
-
-  
-          });
-
-  
+                }
+              }
+            }
+          }
         });
         
         // Get updated PO with items
@@ -12977,9 +11252,7 @@ if (asOfDate) {
           supplierCode: supplier?.code || '',
           containerNumber: container?.containerNumber || '',
         });
-      });
-
-  
+      }
 
       // Only allow updating specific fields if no items provided
       const allowedUpdates: Partial<InsertPurchaseOrder> = {};
@@ -13013,9 +11286,7 @@ if (asOfDate) {
                                 req.body.otherCharges !== undefined;
       if (chargesWereEdited) {
         allowedUpdates.chargesEdited = true;
-      });
-
-  
+      }
 
       // Check if any charges changed - need to update voucher entries
       const newFreight = parseFloat(req.body.freight ?? existingPO.freight ?? "0");
@@ -13064,12 +11335,8 @@ if (asOfDate) {
               await tx.update(voucherEntries)
                 .set({ creditAmount: newGrandTotal.toFixed(2) })
                 .where(eq(voucherEntries.id, entry.id));
-            });
-
-  
-          });
-
-  
+            }
+          }
           
           // Update container totals if applicable
           const container = await storage.getContainerById(existingPO.containerId);
@@ -13088,12 +11355,8 @@ if (asOfDate) {
               } else {
                 totalItemsCost += parseFloat(po.itemsTotal || "0");
                 totalCharges += parseFloat(po.freight || "0") + parseFloat(po.surcharge || "0") + parseFloat(po.fumigation || "0") + parseFloat(po.documentCharges || "0") - parseFloat(po.discount || "0") + parseFloat(po.otherCharges || "0");
-              });
-
-  
-            });
-
-  
+              }
+            }
             
             // Update container totals
             const chargesTotal = totalCharges;
@@ -13104,9 +11367,7 @@ if (asOfDate) {
                 grandTotal: (totalItemsCost + chargesTotal).toFixed(2),
               })
               .where(eq(containers.id, existingPO.containerId));
-          });
-
-  
+          }
           
           // Sync container_charges table when PO charges are edited
           if (chargesWereEdited && existingPO.containerId) {
@@ -13135,9 +11396,7 @@ if (asOfDate) {
                 if (existingCharge.length > 0) {
                   await tx.delete(containerCharges)
                     .where(eq(containerCharges.id, existingCharge[0].id));
-                });
-
-  
+                }
               } else {
                 // Upsert: update if exists, insert if not
                 if (existingCharge.length > 0) {
@@ -13150,18 +11409,10 @@ if (asOfDate) {
                     chargeType: chargeType,
                     amount: amount.toFixed(2),
                   });
-                });
-
-  
-              });
-
-  
-            });
-
-  
-          });
-
-  
+                }
+              }
+            }
+          }
         });
       } else if (chargesWereEdited && existingPO.containerId) {
         // If charges were edited but grand total didn't change (or no voucher), still sync container_charges
@@ -13190,9 +11441,7 @@ if (asOfDate) {
             if (existingCharge.length > 0) {
               await db.delete(containerCharges)
                 .where(eq(containerCharges.id, existingCharge[0].id));
-            });
-
-  
+            }
           } else {
             // Upsert: update if exists, insert if not
             if (existingCharge.length > 0) {
@@ -13205,25 +11454,15 @@ if (asOfDate) {
                 chargeType: chargeType,
                 amount: amount.toFixed(2),
               });
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
       
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete a purchase order (Admin only)
@@ -13236,16 +11475,12 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid purchase order ID" });
-        });
-
-  
+        }
 
         const existingPO = await storage.getPurchaseOrderById(id);
         if (!existingPO) {
           return res.status(404).json({ message: "Purchase order not found" });
-        });
-
-  
+        }
 
         // Verify purchase order belongs to current company
         if (existingPO.companyId !== req.session.currentCompanyId) {
@@ -13255,17 +11490,13 @@ if (asOfDate) {
               message:
                 "Access denied: Purchase order belongs to a different company",
             });
-        });
-
-  
+        }
 
         await storage.deletePurchaseOrder(id);
         res.json({ message: "Purchase order deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -13279,16 +11510,12 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid container ID" });
-        });
-
-  
+        }
 
         const existingContainer = await storage.getContainerById(id);
         if (!existingContainer) {
           return res.status(404).json({ message: "Container not found" });
-        });
-
-  
+        }
 
         // Verify container belongs to current company
         if (existingContainer.companyId !== req.session.currentCompanyId) {
@@ -13298,17 +11525,13 @@ if (asOfDate) {
               message:
                 "Access denied: Container belongs to a different company",
             });
-        });
-
-  
+        }
 
         await storage.deleteContainer(id);
         res.json({ message: "Container deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -13317,9 +11540,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all POs without voucher IDs
       const allPOs = await storage.getAllPurchaseOrders(
@@ -13332,9 +11553,7 @@ if (asOfDate) {
           message: "No POs need backfilling",
           count: 0,
         });
-      });
-
-  
+      }
 
       // Get or create "Purchases" ledger account for double-entry bookkeeping
       let purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", req.session.currentCompanyId!);
@@ -13348,9 +11567,7 @@ if (asOfDate) {
           openingBalanceSide: "Dr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get all containers to lookup import dates
       const allContainers = await storage.getAllContainers(
@@ -13400,9 +11617,7 @@ if (asOfDate) {
         });
 
         backfilledCount++;
-      });
-
-  
+      }
 
       res.json({
         message: "Backfill completed successfully",
@@ -13411,9 +11626,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Backfill error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Backfill voucher entries for existing sales
@@ -13421,9 +11634,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationCashAccountMap } = req.body;
 
@@ -13431,9 +11642,7 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Location-to-cash-account mapping is required. Please specify which cash account to use for each location's sales." 
         });
-      });
-
-  
+      }
 
       // Validate all cash accounts belong to this company
       const cashAccountIds = Object.values(locationCashAccountMap) as number[];
@@ -13441,12 +11650,8 @@ if (asOfDate) {
         const cashAccount = await storage.getLedgerAccountById(cashAccountId);
         if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
           return res.status(400).json({ message: `Invalid cash account ID: ${cashAccountId}` });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get or create "Sales Revenue" ledger account
       let salesRevenueAccount = await storage.getLedgerAccountByCode("SALES_REV", req.session.currentCompanyId!);
@@ -13461,9 +11666,7 @@ if (asOfDate) {
           openingBalanceSide: "Cr",
           active: true,
         });
-      });
-
-  
+      }
 
       // Get all Sales vouchers for this company
       const allVouchers = await db
@@ -13482,9 +11685,7 @@ if (asOfDate) {
           message: "No sales vouchers found",
           count: 0,
         });
-      });
-
-  
+      }
 
       // Get all existing voucher entries for these vouchers
       const voucherIds = allVouchers.map(v => v.id);
@@ -13499,17 +11700,11 @@ if (asOfDate) {
       for (const entry of existingEntries) {
         if (!voucherLedgerMap.has(entry.voucherId)) {
           voucherLedgerMap.set(entry.voucherId, new Set());
-        });
-
-  
+        }
         if (entry.ledgerAccountId) {
           voucherLedgerMap.get(entry.voucherId)!.add(entry.ledgerAccountId);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Filter to vouchers that need backfill (missing entries or have wrong structure)
       const vouchersNeedingBackfill = allVouchers.filter(v => {
@@ -13529,9 +11724,7 @@ if (asOfDate) {
           message: "All sales vouchers already have complete accounting entries",
           count: 0,
         });
-      });
-
-  
+      }
 
       let backfilledCount = 0;
       let skippedCount = 0;
@@ -13550,9 +11743,7 @@ if (asOfDate) {
             console.warn(`No sales items found for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
-          });
-
-  
+          }
 
           // Calculate total sales
           const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
@@ -13561,9 +11752,7 @@ if (asOfDate) {
             console.warn(`Voucher ${voucher.id} has zero sales, skipping`);
             skippedCount++;
             return;
-          });
-
-  
+          }
 
           // Determine location for this voucher by checking first sales item
           const firstItem = items[0];
@@ -13577,9 +11766,7 @@ if (asOfDate) {
             console.warn(`Could not find stock item ${firstItem.stockItemId} for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
-          });
-
-  
+          }
 
           // Find inventory record to determine location
           const inventoryRecords = await tx
@@ -13592,9 +11779,7 @@ if (asOfDate) {
             console.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
-          });
-
-  
+          }
 
           const locationId = inventoryRecords[0].locationId;
           const cashAccountId = locationCashAccountMap[locationId];
@@ -13603,9 +11788,7 @@ if (asOfDate) {
             console.warn(`No cash account mapped for location ${locationId}, skipping voucher ${voucher.id}`);
             skippedCount++;
             return;
-          });
-
-  
+          }
 
           // Delete all existing voucher entries (in case of old format)
           await tx
@@ -13634,9 +11817,7 @@ if (asOfDate) {
 
           backfilledCount++;
         });
-      });
-
-  
+      }
 
       res.json({
         message: `Sales backfill completed. ${backfilledCount} vouchers updated, ${skippedCount} skipped.`,
@@ -13647,9 +11828,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Sales backfill error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get all accounts (combined from ledgers, bank accounts, fixed assets, and suppliers)
@@ -13657,9 +11836,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
 
@@ -13720,9 +11897,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.bankAccountId) {
           const existing = bankBalances.get(entry.bankAccountId) || {
@@ -13733,9 +11908,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.fixedAssetId) {
           const existing = assetBalances.get(entry.fixedAssetId) || {
@@ -13746,9 +11919,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.employeeId) {
           const existing = employeeBalances.get(entry.employeeId) || {
@@ -13759,14 +11930,10 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
         // Note: Supplier balances are calculated separately below using global entries
         // (not company-filtered) to match the supplier stats endpoint
-      });
-
-  
+      }
 
       // Helper function to calculate actual balance
       const calculateBalance = (
@@ -13780,9 +11947,7 @@ if (asOfDate) {
         // If opening balance has a side, convert to signed number
         if (openingBalanceSide === "Cr") {
           balance = -balance;
-        });
-
-  
+        }
 
         // Add net change (debits increase, credits decrease)
         balance += debits - credits;
@@ -13918,9 +12083,7 @@ if (asOfDate) {
               return sum + credit;
             } else if (debit > 0 && credit === 0) {
               return sum - debit;
-            });
-
-  
+            }
             return sum;
           }, openingBalance);
 
@@ -13950,9 +12113,7 @@ if (asOfDate) {
       res.json(allAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get payable accounts (creditors - suppliers with positive balance)
@@ -13978,9 +12139,7 @@ if (asOfDate) {
       res.json(payableAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get all accounts for voucher sidebar (optimized format with balances)
@@ -13988,9 +12147,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
 
@@ -14038,9 +12195,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.bankAccountId) {
           const existing = bankBalances.get(entry.bankAccountId) || { debits: 0, credits: 0 };
@@ -14048,9 +12203,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.fixedAssetId) {
           const existing = assetBalances.get(entry.fixedAssetId) || { debits: 0, credits: 0 };
@@ -14058,9 +12211,7 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
+        }
 
         if (entry.supplierId) {
           const existing = supplierBalances.get(entry.supplierId) || 0;
@@ -14069,12 +12220,8 @@ if (asOfDate) {
             supplierBalances.set(entry.supplierId, existing + credit); // Increase payable
           } else if (debit > 0 && credit === 0) {
             supplierBalances.set(entry.supplierId, existing - debit); // Decrease payable
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         if (entry.employeeId) {
           const existing = employeeBalances.get(entry.employeeId) || { debits: 0, credits: 0 };
@@ -14082,12 +12229,8 @@ if (asOfDate) {
             debits: existing.debits + debit,
             credits: existing.credits + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // DO NOT add opening balance for suppliers in sidebar calculation
       // The sidebar should only show transactions from the current company
@@ -14106,9 +12249,7 @@ if (asOfDate) {
         // If opening balance has a side, convert to signed number
         if (openingBalanceSide === "Cr") {
           balance = -balance;
-        });
-
-  
+        }
 
         // Add net change (debits increase, credits decrease)
         return balance + debits - credits;
@@ -14218,9 +12359,7 @@ if (asOfDate) {
       res.json(accounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get balance for a specific ledger account
@@ -14230,16 +12369,12 @@ if (asOfDate) {
 
       if (isNaN(ledgerAccountId)) {
         return res.status(400).json({ message: "Invalid ledger account ID" });
-      });
-
-  
+      }
 
       const account = await storage.getLedgerAccountById(ledgerAccountId);
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
-      });
-
-  
+      }
 
       const transactions = await storage.getVoucherEntriesByLedger(ledgerAccountId);
       
@@ -14249,18 +12384,14 @@ if (asOfDate) {
       for (const tx of transactions) {
         debits += parseFloat(tx.debitAmount || "0");
         credits += parseFloat(tx.creditAmount || "0");
-      });
-
-  
+      }
 
       const balance = (parseFloat(account.openingBalance || "0") * (account.openingBalanceSide === "Cr" ? -1 : 1)) + debits - credits;
 
       res.json({ balance });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get transactions for a specific ledger account with optional date filtering
@@ -14270,9 +12401,7 @@ if (asOfDate) {
 
       if (isNaN(ledgerAccountId)) {
         return res.status(400).json({ message: "Invalid ledger account ID" });
-      });
-
-  
+      }
 
       const { startDate, endDate } = req.query;
 
@@ -14285,9 +12414,7 @@ if (asOfDate) {
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get transactions for a specific bank account with optional date filtering
@@ -14297,9 +12424,7 @@ if (asOfDate) {
 
       if (isNaN(bankAccountId)) {
         return res.status(400).json({ message: "Invalid bank account ID" });
-      });
-
-  
+      }
 
       const { startDate, endDate } = req.query;
 
@@ -14312,9 +12437,7 @@ if (asOfDate) {
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get transactions for a specific fixed asset with optional date filtering
@@ -14324,9 +12447,7 @@ if (asOfDate) {
 
       if (isNaN(fixedAssetId)) {
         return res.status(400).json({ message: "Invalid fixed asset ID" });
-      });
-
-  
+      }
 
       const { startDate, endDate } = req.query;
 
@@ -14339,9 +12460,7 @@ if (asOfDate) {
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get transactions for a specific supplier with optional date filtering
@@ -14354,9 +12473,7 @@ if (asOfDate) {
 
         if (isNaN(supplierId)) {
           return res.status(400).json({ message: "Invalid supplier ID" });
-        });
-
-  
+        }
 
         const { startDate, endDate, companyId } = req.query;
 
@@ -14375,9 +12492,7 @@ if (asOfDate) {
         res.json(transactions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14391,9 +12506,7 @@ if (asOfDate) {
 
         if (isNaN(employeeId)) {
           return res.status(400).json({ message: "Invalid employee ID" });
-        });
-
-  
+        }
 
         const { startDate, endDate, companyId } = req.query;
 
@@ -14412,9 +12525,7 @@ if (asOfDate) {
         res.json(transactions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14423,9 +12534,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const { startDate, endDate } = req.query;
       
       // Check if user is POS role
@@ -14439,9 +12548,7 @@ if (asOfDate) {
         );
       } else {
         vouchers = await storage.getAllVouchers(req.session.currentCompanyId);
-      });
-
-  
+      }
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
       const sanitizedVouchers = isPOS
@@ -14453,9 +12560,7 @@ if (asOfDate) {
             if (isStockTransfer) {
               const { totalAmount, ...rest } = v;
               return { ...rest, totalAmount: "0" };
-            });
-
-  
+            }
             return v;
           })
         : vouchers;
@@ -14463,9 +12568,7 @@ if (asOfDate) {
       res.json(sanitizedVouchers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get unified ledger for a supplier across all companies
@@ -14478,9 +12581,7 @@ if (asOfDate) {
 
         if (isNaN(supplierId)) {
           return res.status(400).json({ message: "Invalid supplier ID" });
-        });
-
-  
+        }
 
         const { companyId, startDate, endDate } = req.query;
         const filterCompanyId = companyId
@@ -14518,9 +12619,7 @@ if (asOfDate) {
             debit: parseFloat(entry.debitAmount || "0"),
             credit: parseFloat(entry.creditAmount || "0"),
           });
-        });
-
-  
+        }
 
         // Sort by date (newest first)
         transactions.sort((a, b) => {
@@ -14542,9 +12641,7 @@ if (asOfDate) {
         res.json(transactionsWithBalance.reverse()); // Return chronological order with running balance
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14558,9 +12655,7 @@ if (asOfDate) {
 
         if (isNaN(supplierId)) {
           return res.status(400).json({ message: "Invalid supplier ID" });
-        });
-
-  
+        }
 
         const { companyId } = req.query;
         const filterCompanyId = companyId
@@ -14580,14 +12675,10 @@ if (asOfDate) {
             allPOs.push(
               ...pos.map((po) => ({ ...po, companyName: company.name })),
             );
-          });
-
-  
+          }
 
           return res.json(allPOs);
-        });
-
-  
+        }
 
         const purchaseOrders = await storage.getPurchaseOrdersBySupplier(
           supplierId,
@@ -14602,9 +12693,7 @@ if (asOfDate) {
         res.json(posWithCompanyName);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14615,9 +12704,7 @@ if (asOfDate) {
       res.json(voucher);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Create a voucher with entries in one transaction
@@ -14631,9 +12718,7 @@ if (asOfDate) {
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Validate voucher data
         if (
@@ -14645,9 +12730,7 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Voucher and entries are required" });
-        });
-
-  
+        }
 
         // Validate that debits equal credits (only for non-optional vouchers)
         const totalDebits = entries.reduce(
@@ -14669,9 +12752,7 @@ if (asOfDate) {
               message:
                 "Total debits must equal total credits for active vouchers",
             });
-        });
-
-  
+        }
 
         // Create voucher with error handling
         let createdVoucher;
@@ -14709,9 +12790,7 @@ if (asOfDate) {
               })
               .returning();
             createdEntries.push(createdEntry);
-          });
-
-  
+          }
         } catch (error: any) {
           // Cleanup: Delete voucher and entries if anything failed
           if (createdVoucher?.id) {
@@ -14723,13 +12802,9 @@ if (asOfDate) {
               .delete(vouchers)
               .where(eq(vouchers.id, createdVoucher.id))
               .catch(() => {});
-          });
-
-  
+          }
           throw error;
-        });
-
-  
+        }
 
         // Sync employee balances from voucher entries (only for non-optional vouchers)
         if (!createdVoucher.optional) {
@@ -14742,9 +12817,7 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
-        });
-
-  
+        }
 
         const result = { voucher: createdVoucher, entries: createdEntries };
 
@@ -14763,9 +12836,7 @@ if (asOfDate) {
         res.json(result);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14778,9 +12849,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           voucherType, // "Payment" or "Receipt"
@@ -14796,15 +12865,11 @@ if (asOfDate) {
         // Validate required fields
         if (!voucherType || !voucherDate || !paymentAccountId || !entries || !Array.isArray(entries) || entries.length === 0) {
           return res.status(400).json({ message: "Missing required fields" });
-        });
-
-  
+        }
 
         if (voucherType !== "Payment" && voucherType !== "Receipt") {
           return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
-        });
-
-  
+        }
 
         // Calculate total amount
         const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
@@ -14847,9 +12912,7 @@ if (asOfDate) {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               entryAccountField.fixedAssetId = entry.accountId;
-            });
-
-  
+            }
 
             // Determine account field for payment account
             const paymentAccountField: any = {};
@@ -14863,9 +12926,7 @@ if (asOfDate) {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
               paymentAccountField.fixedAssetId = paymentAccountId;
-            });
-
-  
+            }
 
             if (voucherType === "Payment") {
               // Payment: Debit the expense/asset accounts
@@ -14903,12 +12964,8 @@ if (asOfDate) {
                 creditAmount: amount,
                 narration,
               });
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // Batch insert all voucher entries
           const createdEntries = await tx
@@ -14930,17 +12987,13 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
-        });
-
-  
+        }
 
         res.json(result);
       } catch (error: any) {
         console.error("Error creating payment/receipt voucher:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -14954,15 +13007,11 @@ if (asOfDate) {
         const voucherId = parseInt(req.params.id);
         if (isNaN(voucherId)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           voucherType, // "Payment" or "Receipt"
@@ -14978,15 +13027,11 @@ if (asOfDate) {
         // Validate required fields
         if (!voucherType || !voucherDate || !paymentAccountId || !entries || !Array.isArray(entries) || entries.length === 0) {
           return res.status(400).json({ message: "Missing required fields" });
-        });
-
-  
+        }
 
         if (voucherType !== "Payment" && voucherType !== "Receipt") {
           return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
-        });
-
-  
+        }
 
         // Calculate total amount
         const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
@@ -15001,15 +13046,11 @@ if (asOfDate) {
 
           if (!existingVoucher) {
             throw new Error("Voucher not found");
-          });
-
-  
+          }
 
           if (existingVoucher.companyId !== req.session.currentCompanyId) {
             throw new Error("Access denied: Voucher belongs to a different company");
-          });
-
-  
+          }
 
           // Get existing entries before deleting (for balance sync)
           const oldEntries = await tx
@@ -15054,9 +13095,7 @@ if (asOfDate) {
               entryAccountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               entryAccountField.fixedAssetId = entry.accountId;
-            });
-
-  
+            }
 
             // Determine account field for payment account
             const paymentAccountField: any = {};
@@ -15070,9 +13109,7 @@ if (asOfDate) {
               paymentAccountField.employeeId = paymentAccountId;
             } else if (paymentAccountType === "fixedAsset") {
               paymentAccountField.fixedAssetId = paymentAccountId;
-            });
-
-  
+            }
 
             if (voucherType === "Payment") {
               // Payment: Debit the expense/asset accounts
@@ -15110,12 +13147,8 @@ if (asOfDate) {
                 creditAmount: amount,
                 narration,
               });
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // Batch insert all new voucher entries
           const createdEntries = await tx
@@ -15138,9 +13171,7 @@ if (asOfDate) {
             req.session.currentCompanyId!,
             true // reverse
           );
-        });
-
-  
+        }
 
         // Apply new entries if voucher is non-optional
         if (!result.voucher.optional) {
@@ -15153,17 +13184,13 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
-        });
-
-  
+        }
 
         res.json({ voucher: result.voucher, entries: result.entries });
       } catch (error: any) {
         console.error("Error updating payment/receipt voucher:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -15176,9 +13203,7 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           voucherDate,
@@ -15190,9 +13215,7 @@ if (asOfDate) {
         // Validate required fields
         if (!voucherDate || !entries || !Array.isArray(entries) || entries.length === 0) {
           return res.status(400).json({ message: "Missing required fields" });
-        });
-
-  
+        }
 
         // Calculate total debits and credits
         let totalDebits = 0;
@@ -15203,17 +13226,13 @@ if (asOfDate) {
             totalDebits += amount;
           } else if (entry.type === "CR") {
             totalCredits += amount;
-          });
-
-  
+          }
         });
 
         // Validate debits equal credits (for non-optional vouchers)
         if (!optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
           return res.status(400).json({ message: "Total debits must equal total credits" });
-        });
-
-  
+        }
 
         // Generate voucher number
         const voucherNumber = `JOURNAL-${Date.now()}`;
@@ -15253,9 +13272,7 @@ if (asOfDate) {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               accountField.fixedAssetId = entry.accountId;
-            });
-
-  
+            }
 
             voucherEntriesToCreate.push({
               voucherId: createdVoucher.id,
@@ -15264,9 +13281,7 @@ if (asOfDate) {
               creditAmount: entry.type === "CR" ? amount : "0",
               narration,
             });
-          });
-
-  
+          }
 
           // Batch insert all voucher entries
           const createdEntries = await tx
@@ -15288,17 +13303,13 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
-        });
-
-  
+        }
 
         res.json(result);
       } catch (error: any) {
         console.error("Error creating journal voucher:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -15312,15 +13323,11 @@ if (asOfDate) {
         const voucherId = parseInt(req.params.id);
         if (isNaN(voucherId)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const {
           voucherDate,
@@ -15332,9 +13339,7 @@ if (asOfDate) {
         // Validate required fields
         if (!voucherDate || !entries || !Array.isArray(entries) || entries.length === 0) {
           return res.status(400).json({ message: "Missing required fields" });
-        });
-
-  
+        }
 
         // Calculate total debits and credits
         let totalDebits = 0;
@@ -15345,17 +13350,13 @@ if (asOfDate) {
             totalDebits += amount;
           } else if (entry.type === "CR") {
             totalCredits += amount;
-          });
-
-  
+          }
         });
 
         // Validate debits equal credits (for non-optional vouchers)
         if (!optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
           return res.status(400).json({ message: "Total debits must equal total credits" });
-        });
-
-  
+        }
 
         // Use database transaction for atomic operation
         const result = await db.transaction(async (tx) => {
@@ -15367,15 +13368,11 @@ if (asOfDate) {
 
           if (!existingVoucher) {
             throw new Error("Voucher not found");
-          });
-
-  
+          }
 
           if (existingVoucher.companyId !== req.session.currentCompanyId) {
             throw new Error("Access denied: Voucher belongs to a different company");
-          });
-
-  
+          }
 
           // Get existing entries before deleting (for balance sync)
           const oldEntries = await tx
@@ -15419,9 +13416,7 @@ if (asOfDate) {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
               accountField.fixedAssetId = entry.accountId;
-            });
-
-  
+            }
 
             voucherEntriesToCreate.push({
               voucherId: updatedVoucher.id,
@@ -15430,9 +13425,7 @@ if (asOfDate) {
               creditAmount: entry.type === "CR" ? amount : "0",
               narration,
             });
-          });
-
-  
+          }
 
           // Batch insert all new voucher entries
           const createdEntries = await tx
@@ -15455,9 +13448,7 @@ if (asOfDate) {
             req.session.currentCompanyId!,
             true // reverse
           );
-        });
-
-  
+        }
 
         // Apply new entries if voucher is non-optional
         if (!result.voucher.optional) {
@@ -15470,17 +13461,13 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId!
           );
-        });
-
-  
+        }
 
         res.json({ voucher: result.voucher, entries: result.entries });
       } catch (error: any) {
         console.error("Error updating journal voucher:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -15490,16 +13477,12 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       const voucher = await storage.getVoucherById(id);
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       // Verify voucher belongs to current company
       if (voucher.companyId !== req.session.currentCompanyId) {
@@ -15508,9 +13491,7 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       const entries = await storage.getVoucherEntriesByVoucher(id);
 
@@ -15525,12 +13506,8 @@ if (asOfDate) {
             ...linkedPO,
             items: lineItems,
           };
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // If this is a Sales voucher, also fetch the linked sales items
       let salesItemsList = null;
@@ -15562,12 +13539,8 @@ if (asOfDate) {
                   .limit(1);
                 if (locationPrice) {
                   configuredPrice = locationPrice.sellingPrice || "0";
-                });
-
-  
-              });
-
-  
+                }
+              }
               
               const qty = parseFloat(item.quantity || "0");
               const configuredPriceNum = parseFloat(configuredPrice);
@@ -15594,12 +13567,8 @@ if (asOfDate) {
             }),
           );
           salesItemsList = itemsWithDetails;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // If this is a Consumption, Mixed, or Production voucher, fetch adjustment details
       let adjustmentData = null;
@@ -15660,12 +13629,8 @@ if (asOfDate) {
             items: [],
             createdAt: new Date(),
           };
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // If this is a Stock Transfer voucher, fetch transfer details
       let transferData = null;
@@ -15722,12 +13687,8 @@ if (asOfDate) {
             items: [],
             createdAt: new Date(),
           };
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         ...voucher,
@@ -15739,9 +13700,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update a voucher with entries (Admin, Owner, or Manager for today's vouchers)
@@ -15754,17 +13713,13 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         // Get the existing voucher to check company and permissions
         const existingVoucher = await storage.getVoucherById(id);
         if (!existingVoucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Verify voucher belongs to current company
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -15773,17 +13728,13 @@ if (asOfDate) {
             .json({
               message: "Access denied: Voucher belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check edit permissions based on role
         const userRole = req.session.currentRole;
         if (!userRole) {
           return res.status(403).json({ message: "User role not found" });
-        });
-
-  
+        }
 
         // Admin and Owner can edit all vouchers
         if (userRole !== "Admin" && userRole !== "Owner") {
@@ -15798,20 +13749,14 @@ if (asOfDate) {
               return res
                 .status(403)
                 .json({ message: "Managers can only edit today's vouchers" });
-            });
-
-  
+            }
           } else {
             // Other roles cannot edit
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Get old entries before updating (for balance sync)
         const oldEntries = await storage.getVoucherEntriesByVoucher(id);
@@ -15857,9 +13802,7 @@ if (asOfDate) {
               const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
               if (itemsWithoutSource.length > 0) {
                 throw new Error(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data.`);
-              });
-
-  
+              }
 
               for (const item of items) {
                 const quantity = parseFloat(item.quantity);
@@ -15895,9 +13838,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, sourceInv.id));
-                  });
-
-  
+                  }
 
                   // Subtract from destination
                   const [destInv] = await tx.select().from(inventory)
@@ -15920,9 +13861,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, destInv.id));
-                  });
-
-  
+                  }
                 } else {
                   // Applying: was optional (true), now making active (false)
                   // Subtract from source, add to destination
@@ -15948,9 +13887,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, sourceInv.id));
-                  });
-
-  
+                  }
 
                   // Add to destination
                   const [destInv] = await tx.select().from(inventory)
@@ -15992,21 +13929,11 @@ if (asOfDate) {
                         totalValue: totalAmount.toFixed(2),
                         lastUpdated: new Date(),
                       });
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
-              });
-
-  
-            });
-
-  
+                    }
+                  }
+                }
+              }
+            }
 
             if (hasStockAdjustment.length > 0) {
               const adjustment = hasStockAdjustment[0];
@@ -16057,9 +13984,7 @@ if (asOfDate) {
                         ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
                         : 0;
                       newValue = newQty * newRate;
-                    });
-
-  
+                    }
                   } else {
                     // Applying the adjustment
                     if (isProduction) {
@@ -16075,12 +14000,8 @@ if (asOfDate) {
                       newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
                       newRate = currentRate;
-                    });
-
-  
-                  });
-
-  
+                    }
+                  }
 
                   await tx.update(inventory)
                     .set({
@@ -16105,21 +14026,11 @@ if (asOfDate) {
                       totalValue: totalAmount.toFixed(2),
                       lastUpdated: new Date(),
                     });
-                  });
-
-  
-                });
-
-  
-              });
-
-  
-            });
-
-  
-          });
-
-  
+                  }
+                }
+              }
+            }
+          }
 
           await tx
             .update(vouchers)
@@ -16145,12 +14056,8 @@ if (asOfDate) {
                 creditAmount: entry.creditAmount || "0",
                 narration: entry.narration || "",
               });
-            });
-
-  
-          });
-
-  
+            }
+          }
         });
 
         // Fetch updated voucher with entries
@@ -16169,9 +14076,7 @@ if (asOfDate) {
             req.session.currentCompanyId,
             true // reverse
           );
-        });
-
-  
+        }
 
         // Apply new entries if voucher is now non-optional
         const isNowOptional = req.body.optional !== undefined ? req.body.optional : wasOptional;
@@ -16185,16 +14090,12 @@ if (asOfDate) {
             })),
             req.session.currentCompanyId
           );
-        });
-
-  
+        }
 
         res.json({ ...updated, entries: newEntries });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -16203,9 +14104,7 @@ if (asOfDate) {
     constructor(message: string) {
       super(message);
       this.name = 'ValidationError';
-    });
-
-  
+    }
   }
 
   // Toggle optional status for a voucher
@@ -16218,26 +14117,20 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         const { optional } = req.body;
         if (typeof optional !== "boolean") {
           return res
             .status(400)
             .json({ message: "Optional must be a boolean value" });
-        });
-
-  
+        }
 
         // Get the existing voucher to check company and permissions
         const existingVoucher = await storage.getVoucherById(id);
         if (!existingVoucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Verify voucher belongs to current company
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -16246,9 +14139,7 @@ if (asOfDate) {
             .json({
               message: "Access denied: Voucher belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Only Admin and Owner can toggle optional status
         const userRole = req.session.currentRole;
@@ -16258,9 +14149,7 @@ if (asOfDate) {
             .json({
               message: "Only Admin and Owner can toggle optional status",
             });
-        });
-
-  
+        }
 
         const wasOptional = existingVoucher.optional;
         const willBeOptional = optional;
@@ -16295,9 +14184,7 @@ if (asOfDate) {
             const itemsWithoutSource = items.filter(item => !item.sourceLocationId);
             if (itemsWithoutSource.length > 0) {
               throw new ValidationError(`Cannot toggle optional status: This stock transfer has ${itemsWithoutSource.length} items missing source location data. It was created before per-item source locations were tracked.`);
-            });
-
-  
+            }
               for (const item of items) {
                 const quantity = parseFloat(item.quantity);
                 const rate = parseFloat(item.rate);
@@ -16332,9 +14219,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, sourceInv.id));
-                  });
-
-  
+                  }
 
                   // Subtract from destination
                   const [destInv] = await tx.select().from(inventory)
@@ -16357,9 +14242,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, destInv.id));
-                  });
-
-  
+                  }
                 } else {
                   // Applying: was optional (true), now making active (false)
                   // Subtract from source, add to destination
@@ -16385,9 +14268,7 @@ if (asOfDate) {
                         lastUpdated: new Date(),
                       })
                       .where(eq(inventory.id, sourceInv.id));
-                  });
-
-  
+                  }
 
                   // Add to destination
                   const [destInv] = await tx.select().from(inventory)
@@ -16429,21 +14310,11 @@ if (asOfDate) {
                         totalValue: totalAmount.toFixed(2),
                         lastUpdated: new Date(),
                       });
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
-              });
-
-  
-          });
-
-  
+                    }
+                  }
+                }
+              }
+          }
 
           if (hasStockAdjustment.length > 0) {
             const adjustment = hasStockAdjustment[0];
@@ -16494,9 +14365,7 @@ if (asOfDate) {
                         ? ((currentQty * currentRate) + (quantity * rate)) / newQty 
                         : 0;
                       newValue = newQty * newRate;
-                    });
-
-  
+                    }
                   } else {
                     // Applying the adjustment
                     if (isProduction) {
@@ -16512,12 +14381,8 @@ if (asOfDate) {
                       newQty = currentQty - quantity;
                       newValue = newQty > 0 ? newQty * currentRate : 0;
                       newRate = currentRate;
-                    });
-
-  
-                  });
-
-  
+                    }
+                  }
 
                   await tx.update(inventory)
                     .set({
@@ -16542,21 +14407,11 @@ if (asOfDate) {
                       totalValue: totalAmount.toFixed(2),
                       lastUpdated: new Date(),
                     });
-                  });
-
-  
-                });
-
-  
-              });
-
-  
-          });
-
-  
-          });
-
-  
+                  }
+                }
+              }
+          }
+          }
 
           // Update the optional field inside transaction
           await tx
@@ -16602,12 +14457,8 @@ if (asOfDate) {
               })),
               req.session.currentCompanyId
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Fetch updated voucher outside transaction
         const updated = await storage.getVoucherById(id);
@@ -16615,13 +14466,9 @@ if (asOfDate) {
       } catch (error: any) {
         if (error.name === 'ValidationError') {
           return res.status(400).json({ message: error.message });
-        });
-
-  
+        }
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -16631,9 +14478,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       const {
         voucherDate,
@@ -16649,26 +14494,20 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "At least one item is required" });
-      });
-
-  
+      }
 
       // Get the existing voucher to check company and permissions
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       // Verify this is a Sales voucher
       if (existingVoucher.voucherType !== "Sales") {
         return res
           .status(400)
           .json({ message: "This endpoint only updates Sales vouchers" });
-      });
-
-  
+      }
 
       // Verify voucher belongs to current company
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -16677,17 +14516,13 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Check edit permissions based on role
       const userRole = req.session.currentRole;
       if (!userRole) {
         return res.status(403).json({ message: "User role not found" });
-      });
-
-  
+      }
 
       // Admin and Owner can edit all vouchers
       if (userRole !== "Admin" && userRole !== "Owner") {
@@ -16703,9 +14538,7 @@ if (asOfDate) {
             return res
               .status(403)
               .json({ message: "Managers can only edit today's vouchers" });
-          });
-
-  
+          }
         } else {
           // POS users can edit if they have daybookEditDays permission > 0
           const daybookEditDays = req.session.daybookEditDays || 0;
@@ -16713,9 +14546,7 @@ if (asOfDate) {
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
-          });
-
-  
+          }
           // Check if voucher date is within allowed days
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -16728,15 +14559,9 @@ if (asOfDate) {
             return res
               .status(403)
               .json({ message: `You can only edit vouchers from the last ${daybookEditDays} day(s)` });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // Validate and authorize location if provided
       let validatedLocationId: number | null = null;
@@ -16744,9 +14569,7 @@ if (asOfDate) {
         const parsedLocationId = parseInt(locationId);
         if (isNaN(parsedLocationId) || parsedLocationId <= 0) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         // Verify location belongs to current company
         const [targetLocation] = await db
@@ -16756,9 +14579,7 @@ if (asOfDate) {
 
         if (!targetLocation) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         if (targetLocation.companyId !== req.session.currentCompanyId) {
           return res
@@ -16766,14 +14587,10 @@ if (asOfDate) {
             .json({
               message: "Access denied: Location belongs to a different company",
             });
-        });
-
-  
+        }
 
         validatedLocationId = parsedLocationId;
-      });
-
-  
+      }
 
       // Fetch stock items to calculate cost prices
       const stockItemIds = items.map((item) => item.stockItemId);
@@ -16792,9 +14609,7 @@ if (asOfDate) {
         const stockItem = stockItemsMap.get(item.stockItemId);
         if (!stockItem) {
           throw new Error(`Stock item ${item.stockItemId} not found`);
-        });
-
-  
+        }
 
         const quantity = parseFloat(item.quantity);
         const sellingPrice = parseFloat(item.sellingPrice);
@@ -16867,15 +14682,9 @@ if (asOfDate) {
               averageRate: costPrice.toFixed(2),
               totalValue: (quantity * costPrice).toFixed(2),
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // STEP 2: Delete existing sales items
       await db.delete(salesItems).where(eq(salesItems.voucherId, id));
@@ -16955,19 +14764,13 @@ if (asOfDate) {
               averageRate: actualCostPrice.toFixed(2),
               totalValue: (-quantity * actualCostPrice).toFixed(2),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         // Use the updated data with correct costPrice for insertion
         salesItemsData.length = 0;
         salesItemsData.push(...updatedSalesItemsData);
-      });
-
-  
+      }
 
       // STEP 4: Insert new sales items
       await db.insert(salesItems).values(salesItemsData);
@@ -17032,24 +14835,12 @@ if (asOfDate) {
                   finalIsCreditSale = true;
                   existingDebitEntry = entry;
                   break;
-                });
-
-  
-              });
-
-  
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+                }
+              }
+            }
+          }
+        }
+      }
 
       // Only proceed if we have payment account information
       if (finalPaymentAccountId && finalPaymentAccountType) {
@@ -17061,9 +14852,7 @@ if (asOfDate) {
           return res.status(400).json({
             message: `The SALES account is configured with type "${salesAccountCheck.accountType}" but must be type "Income" for POS sales to work correctly.`,
           });
-        });
-
-  
+        }
         
         // Delete old voucher entries
         await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
@@ -17091,9 +14880,7 @@ if (asOfDate) {
         } else {
           // For bank accounts, use bankAccountId
           debitEntry.bankAccountId = accountId;
-        });
-
-  
+        }
 
         await db.insert(voucherEntries).values(debitEntry);
 
@@ -17111,9 +14898,7 @@ if (asOfDate) {
             openingBalance: "0",
             active: true,
           });
-        });
-
-  
+        }
 
         await db.insert(voucherEntries).values({
           voucherId: id,
@@ -17126,9 +14911,7 @@ if (asOfDate) {
         throw new Error(
           "Unable to determine payment account for voucher update",
         );
-      });
-
-  
+      }
 
       // Update the voucher
       const voucherUpdates: any = {
@@ -17142,12 +14925,8 @@ if (asOfDate) {
         const location = await storage.getLocationById(validatedLocationId);
         if (location) {
           voucherUpdates.locationName = location.name;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const updated = await db
         .update(vouchers)
@@ -17158,9 +14937,7 @@ if (asOfDate) {
       res.json(updated[0]);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update a purchase voucher with line items
@@ -17173,9 +14950,7 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         const { voucherDate, description, items } = req.body;
 
@@ -17183,26 +14958,20 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "At least one item is required" });
-        });
-
-  
+        }
 
         // Get the existing voucher to check company and permissions
         const existingVoucher = await storage.getVoucherById(id);
         if (!existingVoucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Verify this is a Purchase voucher
         if (existingVoucher.voucherType !== "Purchase") {
           return res
             .status(400)
             .json({ message: "This endpoint only updates Purchase vouchers" });
-        });
-
-  
+        }
 
         // Verify voucher belongs to current company
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -17211,17 +14980,13 @@ if (asOfDate) {
             .json({
               message: "Access denied: Voucher belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check edit permissions based on role
         const userRole = req.session.currentRole;
         if (!userRole) {
           return res.status(403).json({ message: "User role not found" });
-        });
-
-  
+        }
 
         // Admin and Owner can edit all vouchers
         if (userRole !== "Admin" && userRole !== "Owner") {
@@ -17237,20 +15002,14 @@ if (asOfDate) {
               return res
                 .status(403)
                 .json({ message: "Managers can only edit today's vouchers" });
-            });
-
-  
+            }
           } else {
             // Other roles cannot edit
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Find the associated purchase order
         const [po] = await db
@@ -17263,9 +15022,7 @@ if (asOfDate) {
           return res
             .status(404)
             .json({ message: "Associated purchase order not found" });
-        });
-
-  
+        }
 
         // Store old total for container update calculation
         const oldPOTotal = parseFloat(po.itemsTotal || "0");
@@ -17279,9 +15036,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
         const poItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -17337,9 +15092,7 @@ if (asOfDate) {
               grandTotal: newContainerGrandTotal.toFixed(2),
             })
             .where(eq(containers.id, po.containerId));
-        });
-
-  
+        }
 
         // Update the voucher
         const voucherUpdates: any = {
@@ -17357,9 +15110,7 @@ if (asOfDate) {
         res.json(updated[0]);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -17373,9 +15124,7 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         const { voucherDate, description, locationId, items } = req.body;
 
@@ -17383,23 +15132,17 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "At least one item is required" });
-        });
-
-  
+        }
 
         if (!locationId) {
           return res.status(400).json({ message: "Location ID is required" });
-        });
-
-  
+        }
 
         // Get the existing voucher to check company and permissions
         const existingVoucher = await storage.getVoucherById(id);
         if (!existingVoucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Verify this is a Consumption, Production, or Mixed voucher
         if (
@@ -17413,9 +15156,7 @@ if (asOfDate) {
               message:
                 "This endpoint only updates Consumption, Production, or Mixed vouchers",
             });
-        });
-
-  
+        }
 
         // Verify voucher belongs to current company
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -17424,17 +15165,13 @@ if (asOfDate) {
             .json({
               message: "Access denied: Voucher belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check edit permissions
         const userRole = req.session.currentRole;
         if (!userRole) {
           return res.status(403).json({ message: "User role not found" });
-        });
-
-  
+        }
 
         if (userRole !== "Admin" && userRole !== "Owner") {
           if (userRole === "Manager") {
@@ -17448,19 +15185,13 @@ if (asOfDate) {
               return res
                 .status(403)
                 .json({ message: "Managers can only edit today's vouchers" });
-            });
-
-  
+            }
           } else {
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Find or create the associated adjustment voucher
         let adjustmentVoucher = await db
@@ -17488,9 +15219,7 @@ if (asOfDate) {
             })
             .returning();
           adjustmentVoucher = newAdjustment;
-        });
-
-  
+        }
 
         // Calculate totals and prepare items data
         let totalAmount = 0;
@@ -17501,9 +15230,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
         const adjustmentItemsData = items.map((item: any) => {
           const quantity = parseFloat(item.quantity);
           const rate = parseFloat(item.rate);
@@ -17565,12 +15292,8 @@ if (asOfDate) {
                 totalValue: newTotalValue.toFixed(2),
               })
               .where(eq(inventory.id, currentInventory.id));
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // STEP 2: Delete existing adjustment items
         await db
@@ -17624,12 +15347,8 @@ if (asOfDate) {
               averageRate: rate.toFixed(2),
               totalValue: Math.max(0, quantity * rate).toFixed(2),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // STEP 4: Insert new adjustment items
         await db.insert(stockAdjustmentItems).values(adjustmentItemsData);
@@ -17650,9 +15369,7 @@ if (asOfDate) {
         const location = await storage.getLocationById(parsedLocationId);
         if (location) {
           voucherUpdates.locationName = location.name;
-        });
-
-  
+        }
         if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
         if (description !== undefined) voucherUpdates.description = description;
 
@@ -17665,9 +15382,7 @@ if (asOfDate) {
         res.json(updated[0]);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -17681,9 +15396,7 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         const {
           voucherDate,
@@ -17697,25 +15410,19 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "At least one item is required" });
-        });
-
-  
+        }
 
         if (!sourceLocationId || !destinationLocationId) {
           return res
             .status(400)
             .json({ message: "Source and destination locations are required" });
-        });
-
-  
+        }
 
         // Get the existing voucher to check company and permissions
         const existingVoucher = await storage.getVoucherById(id);
         if (!existingVoucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Verify this is a Stock Transfer voucher
         if (existingVoucher.voucherType !== "Stock Transfer") {
@@ -17724,9 +15431,7 @@ if (asOfDate) {
             .json({
               message: "This endpoint only updates Stock Transfer vouchers",
             });
-        });
-
-  
+        }
 
         // Verify voucher belongs to current company
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -17735,17 +15440,13 @@ if (asOfDate) {
             .json({
               message: "Access denied: Voucher belongs to a different company",
             });
-        });
-
-  
+        }
 
         // Check edit permissions
         const userRole = req.session.currentRole;
         if (!userRole) {
           return res.status(403).json({ message: "User role not found" });
-        });
-
-  
+        }
 
         if (userRole !== "Admin" && userRole !== "Owner") {
           if (userRole === "Manager") {
@@ -17759,19 +15460,13 @@ if (asOfDate) {
               return res
                 .status(403)
                 .json({ message: "Managers can only edit today's vouchers" });
-            });
-
-  
+            }
           } else {
             return res
               .status(403)
               .json({ message: "Insufficient permissions to edit vouchers" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         console.log(`[Stock Transfer Edit] Starting update for voucher ${id}`);
 
@@ -17797,9 +15492,7 @@ if (asOfDate) {
               })
               .returning();
             transferVoucher = newTransfer;
-          });
-
-  
+          }
 
           // Calculate totals and prepare items data
           let totalAmount = 0;
@@ -17810,9 +15503,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
           const transferItemsData = items.map((item: any) => {
             const quantity = parseFloat(item.quantity);
             const rate = parseFloat(item.rate);
@@ -17879,9 +15570,7 @@ if (asOfDate) {
                 averageRate: rate.toFixed(2),
                 totalValue: (quantity * rate).toFixed(2),
               });
-            });
-
-  
+            }
 
             // Subtract from destination location
             const [destInventory] = await tx
@@ -17914,12 +15603,8 @@ if (asOfDate) {
                   totalValue: newTotalValue.toFixed(2),
                 })
                 .where(eq(inventory.id, destInventory.id));
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // STEP 2: Delete existing transfer items
           await tx
@@ -17965,9 +15650,7 @@ if (asOfDate) {
                   totalValue: newTotalValue.toFixed(2),
                 })
                 .where(eq(inventory.id, sourceInventory.id));
-            });
-
-  
+            }
 
             // Add to new destination location
             const [destInventory] = await tx
@@ -18004,12 +15687,8 @@ if (asOfDate) {
                 averageRate: rate.toFixed(2),
                 totalValue: (quantity * rate).toFixed(2),
               });
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // STEP 4: Insert new transfer items
           await tx.insert(stockTransferItems).values(transferItemsData);
@@ -18034,9 +15713,7 @@ if (asOfDate) {
           const sourceLocation = await storage.getLocationById(parsedSourceLocationId);
           if (sourceLocation) {
             voucherUpdates.locationName = sourceLocation.name;
-          });
-
-  
+          }
           if (voucherDate !== undefined)
             voucherUpdates.voucherDate = voucherDate;
           if (description !== undefined)
@@ -18055,9 +15732,7 @@ if (asOfDate) {
         res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -18067,9 +15742,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       const { voucher, entries } = req.body;
 
@@ -18082,17 +15755,13 @@ if (asOfDate) {
         return res
           .status(400)
           .json({ message: "Voucher and entries are required" });
-      });
-
-  
+      }
 
       // Get the existing voucher to check company and permissions
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       // Verify voucher belongs to current company
       if (existingVoucher.companyId !== req.session.currentCompanyId) {
@@ -18101,17 +15770,13 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Check edit permissions based on role
       const userRole = req.session.currentRole;
       if (!userRole) {
         return res.status(403).json({ message: "User role not found" });
-      });
-
-  
+      }
 
       // Admin and Owner can edit all vouchers
       if (userRole !== "Admin" && userRole !== "Owner") {
@@ -18126,20 +15791,14 @@ if (asOfDate) {
             return res
               .status(403)
               .json({ message: "Managers can only edit today's vouchers" });
-          });
-
-  
+          }
         } else {
           // Other roles cannot edit
           return res
             .status(403)
             .json({ message: "Insufficient permissions to edit vouchers" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Validate that debits equal credits (only for non-optional vouchers)
       const totalDebits = entries.reduce(
@@ -18160,9 +15819,7 @@ if (asOfDate) {
             message:
               "Total debits must equal total credits for active vouchers",
           });
-      });
-
-  
+      }
 
       // Update voucher with error handling
       let updatedVoucher;
@@ -18228,15 +15885,9 @@ if (asOfDate) {
                 totalValue: (quantity * costPrice).toFixed(2),
               });
               console.log(`[Sales Edit] Created inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty ${quantity}`);
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         // STEP 2: Deduct inventory at new location
         if (newLocationId && oldSalesItemsList.length > 0) {
@@ -18283,18 +15934,10 @@ if (asOfDate) {
                 totalValue: "0",
               });
               console.log(`[Sales Edit] Created negative inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity}`);
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
 
       try {
         // Backup old entries before deleting
@@ -18318,17 +15961,11 @@ if (asOfDate) {
             const location = await storage.getLocationById(voucher.locationId);
             if (location) {
               voucherUpdates.locationName = location.name;
-            });
-
-  
+            }
           } else {
             voucherUpdates.locationName = null;
-          });
-
-  
-        });
-
-  
+          }
+        }
         [updatedVoucher] = await db
           .update(vouchers)
           .set(voucherUpdates)
@@ -18355,9 +15992,7 @@ if (asOfDate) {
             })
             .returning();
           createdEntries.push(createdEntry);
-        });
-
-  
+        }
       } catch (error: any) {
         // Cleanup: Restore old entries if update failed after deletion
         if (oldEntries.length > 0 && createdEntries.length === 0) {
@@ -18376,16 +16011,10 @@ if (asOfDate) {
                 narration: oldEntry.narration,
               })
               .catch(() => {});
-          });
-
-  
-        });
-
-  
+          }
+        }
         throw error;
-      });
-
-  
+      }
 
       // Log the update to audit log
       await logAudit({
@@ -18407,9 +16036,7 @@ if (asOfDate) {
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Fix inventory for Sales vouchers that were edited with location changes
@@ -18419,16 +16046,12 @@ if (asOfDate) {
       // Admin only
       if (req.session.currentRole !== "Admin") {
         return res.status(403).json({ message: "Admin access required" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all Sales vouchers for this company
       const salesVouchers = await db
@@ -18475,12 +16098,8 @@ if (asOfDate) {
             saleQuantity: quantity,
             currentInventory: inv ? parseFloat(inv.quantity) : null,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Find inventory records with negative quantities that shouldn't have them
       const negativeInventory = await db
@@ -18538,12 +16157,8 @@ if (asOfDate) {
             oldQuantity: inv.quantity,
             action: "Reset to 0 (orphaned negative inventory)",
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         message: `Fixed ${cleaned.length} orphaned negative inventory records`,
@@ -18554,9 +16169,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("[Fix Sales Inventory] Error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get voucher entries for a specific voucher (for editing)
@@ -18565,17 +16178,13 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       // Verify voucher exists and belongs to current company
       const voucher = await storage.getVoucherById(id);
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       if (voucher.companyId !== req.session.currentCompanyId) {
         return res
@@ -18583,9 +16192,7 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Use storage method to get entries with account names from joins
       const entries = await storage.getVoucherEntriesByVoucher(id);
@@ -18607,9 +16214,7 @@ if (asOfDate) {
         } else if (entry.fixedAssetId) {
           accountType = "fixedAsset";
           accountId = entry.fixedAssetId;
-        });
-
-  
+        }
         
         return {
           ...entry,
@@ -18621,9 +16226,7 @@ if (asOfDate) {
       res.json(transformedEntries);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get voucher entries with full details for viewing (includes account names and stock items)
@@ -18632,17 +16235,13 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       // Verify voucher exists and belongs to current company
       const voucher = await storage.getVoucherById(id);
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       if (voucher.companyId !== req.session.currentCompanyId) {
         return res
@@ -18650,9 +16249,7 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Get regular voucher entries with account names
       const entries = await storage.getVoucherEntriesByVoucher(id);
@@ -18693,12 +16290,8 @@ if (asOfDate) {
             isStockItem: true,
           }));
           return res.json([...entries, ...itemsWithDetails]);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Check if user is a POS role (should not see cost prices)
       const userRole = req.session.currentRole;
@@ -18782,19 +16375,11 @@ if (asOfDate) {
                 documentCharges: isPOSUser ? null : purchaseOrder.documentCharges,
                 otherCharges: isPOSUser ? null : purchaseOrder.otherCharges,
                 discount: isPOSUser ? null : purchaseOrder.discount,
-              });
-
-  
+              }
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // For Production/Consumption/Mixed vouchers, get stock adjustment items
       if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") {
@@ -18849,15 +16434,9 @@ if (asOfDate) {
               };
             });
             return res.json(itemsWithDetails);
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // For Stock Transfer vouchers, get stock transfer items
       if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
@@ -18901,15 +16480,9 @@ if (asOfDate) {
               totalAmount: isPOSUser ? null : item.totalAmount,
             }));
             return res.json(itemsWithDetails);
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // SECURITY: Final fallback redaction for POS users - ensure no cost data leaks
       if (isPOSUser) {
@@ -18920,16 +16493,12 @@ if (asOfDate) {
           narration: entry.accountName || "Account entry",
         }));
         return res.json(redactedFallbackEntries);
-      });
-
-  
+      }
       
       res.json(entries);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Create a new voucher entry
@@ -18938,16 +16507,12 @@ if (asOfDate) {
       // Verify the voucher exists and belongs to current company
       if (!req.body.voucherId) {
         return res.status(400).json({ message: "Voucher ID is required" });
-      });
-
-  
+      }
 
       const voucher = await storage.getVoucherById(req.body.voucherId);
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       // Verify voucher belongs to current company
       if (voucher.companyId !== req.session.currentCompanyId) {
@@ -18956,17 +16521,13 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Check permissions based on role (same logic as voucher edit)
       const userRole = req.session.currentRole;
       if (!userRole) {
         return res.status(403).json({ message: "User role not found" });
-      });
-
-  
+      }
 
       // Admin and Owner can create entries for all vouchers
       if (userRole !== "Admin" && userRole !== "Owner") {
@@ -18984,9 +16545,7 @@ if (asOfDate) {
                 message:
                   "Managers can only create entries for today's vouchers",
               });
-          });
-
-  
+          }
         } else {
           // Other roles cannot create entries
           return res
@@ -18994,20 +16553,14 @@ if (asOfDate) {
             .json({
               message: "Insufficient permissions to create voucher entries",
             });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const entry = await storage.createVoucherEntry(req.body);
       res.json(entry);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update a voucher entry
@@ -19016,9 +16569,7 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher entry ID" });
-      });
-
-  
+      }
 
       // Get the existing entry to find its voucher
       const existingEntry = await db.query.voucherEntries.findFirst({
@@ -19027,9 +16578,7 @@ if (asOfDate) {
 
       if (!existingEntry) {
         return res.status(404).json({ message: "Voucher entry not found" });
-      });
-
-  
+      }
 
       // Get the voucher to check company and permissions
       const voucher = await storage.getVoucherById(existingEntry.voucherId);
@@ -19037,9 +16586,7 @@ if (asOfDate) {
         return res
           .status(404)
           .json({ message: "Associated voucher not found" });
-      });
-
-  
+      }
 
       // Verify voucher belongs to current company
       if (voucher.companyId !== req.session.currentCompanyId) {
@@ -19048,17 +16595,13 @@ if (asOfDate) {
           .json({
             message: "Access denied: Voucher belongs to a different company",
           });
-      });
-
-  
+      }
 
       // Check edit permissions based on role (same logic as voucher edit)
       const userRole = req.session.currentRole;
       if (!userRole) {
         return res.status(403).json({ message: "User role not found" });
-      });
-
-  
+      }
 
       // Admin and Owner can edit all vouchers
       if (userRole !== "Admin" && userRole !== "Owner") {
@@ -19073,9 +16616,7 @@ if (asOfDate) {
             return res
               .status(403)
               .json({ message: "Managers can only edit today's vouchers" });
-          });
-
-  
+          }
         } else {
           // Other roles cannot edit
           return res
@@ -19083,12 +16624,8 @@ if (asOfDate) {
             .json({
               message: "Insufficient permissions to edit voucher entries",
             });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Only allow updating debit/credit amounts and narration
       const allowedUpdates: Partial<any> = {};
@@ -19103,9 +16640,7 @@ if (asOfDate) {
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete a voucher (Admin only)
@@ -19118,23 +16653,17 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (isNaN(id)) {
           return res.status(400).json({ message: "Invalid voucher ID" });
-        });
-
-  
+        }
 
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         // Get voucher and entries before deleting for balance sync
         const voucher = await storage.getVoucherById(id);
         if (!voucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Wrap balance sync and deletion in a transaction
         await db.transaction(async (tx) => {
@@ -19205,9 +16734,7 @@ if (asOfDate) {
                     averageRate: transferRate.toString(),
                     totalValue: (qty * transferRate).toString(),
                   });
-                });
-
-  
+                }
 
                 // Remove from destination location (reverse the weighted average addition)
                 const [destInv] = await tx
@@ -19247,15 +16774,9 @@ if (asOfDate) {
                         totalValue: newValue.toString(),
                       })
                       .where(eq(inventory.id, destInv.id));
-                  });
-
-  
-                });
-
-  
-              });
-
-  
+                  }
+                }
+              }
 
               // Delete stock transfer items
               await tx
@@ -19266,12 +16787,8 @@ if (asOfDate) {
               await tx
                 .delete(stockTransferVouchers)
                 .where(eq(stockTransferVouchers.id, transferVoucher.id));
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption/Mixed) vouchers
           if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") && !voucher.optional) {
@@ -19340,12 +16857,8 @@ if (asOfDate) {
                           totalValue: newValue.toString(),
                         })
                         .where(eq(inventory.id, inv.id));
-                    });
-
-  
-                  });
-
-  
+                    }
+                  }
                 } else {
                   // Consumption subtracted inventory (kept rate), so add back at existing rate
                   if (inv) {
@@ -19372,15 +16885,9 @@ if (asOfDate) {
                       averageRate: adjustmentRate.toString(),
                       totalValue: (absoluteQty * adjustmentRate).toString(),
                     });
-                  });
-
-  
-                });
-
-  
-              });
-
-  
+                  }
+                }
+              }
 
               // Delete stock adjustment items
               await tx
@@ -19391,12 +16898,8 @@ if (asOfDate) {
               await tx
                 .delete(stockAdjustmentVouchers)
                 .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // IMPORTANT: Reverse inventory movements for POS Sales vouchers (Receipt type with sales items)
           // Also handle "Sales" voucher type for completeness
@@ -19468,30 +16971,20 @@ if (asOfDate) {
                       averageRate: costPrice.toString(),
                       totalValue: (qty * costPrice).toString(),
                     });
-                  });
-
-  
-                });
-
-  
+                  }
+                }
               } else {
                 // Log warning: can't reverse inventory without location
                 console.warn(`[POS Delete] Voucher ${id}: Cannot reverse inventory - no locationId on voucher`);
-              });
-
-  
+              }
 
               // Delete sales items regardless of whether inventory was reversed
               console.log(`[POS Delete] Deleting ${saleItems.length} sales items for voucher ${id}`);
               await tx
                 .delete(salesItems)
                 .where(eq(salesItems.voucherId, id));
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // IMPORTANT: Reverse inventory movements for Credit Note / Debit Note vouchers
           if ((voucher.voucherType === "Credit Note" || voucher.voucherType === "Debit Note") && !voucher.optional) {
@@ -19548,12 +17041,8 @@ if (asOfDate) {
                           totalValue: newValue.toString(),
                         })
                         .where(eq(inventory.id, inv.id));
-                    });
-
-  
-                  });
-
-  
+                    }
+                  }
                 } else {
                   // Debit Note forward: removed qty from inventory
                   // Reversal: add qty back to inventory
@@ -19592,30 +17081,18 @@ if (asOfDate) {
                         averageRate: inventoryCost.toString(),
                         totalValue: itemValue.toString(),
                       });
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
-              });
-
-  
+                    }
+                  }
+                }
+              }
 
               // Delete the credit note items
               console.log(`[Credit/Debit Note Delete] Deleting ${noteItems.length} credit_note_items for voucher ${id}`);
               await tx
                 .delete(creditNoteItems)
                 .where(eq(creditNoteItems.voucherId, id));
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           if (!voucher.optional) {
             const entries = await tx
@@ -19634,9 +17111,7 @@ if (asOfDate) {
               req.session.currentCompanyId!,
               true // reverse
             );
-          });
-
-  
+          }
 
           // Soft delete: Keep voucher entries but set deletedAt on voucher
           // This automatically excludes entries from balance calculations
@@ -19662,9 +17137,7 @@ if (asOfDate) {
         res.json({ message: "Voucher deleted successfully" });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -19679,17 +17152,13 @@ if (asOfDate) {
       const parseResult = bodySchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ message: parseResult.error.errors[0].message });
-      });
-
-  
+      }
       
       const { voucherIds } = parseResult.data;
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const currentCompanyId = req.session.currentCompanyId;
       let deletedCount = 0;
@@ -19701,9 +17170,7 @@ if (asOfDate) {
         if (isNaN(id)) {
           errors.push(`Invalid voucher ID: ${voucherId}`);
           continue;
-        });
-
-  
+        }
 
         try {
           // Get voucher and verify it belongs to current company
@@ -19711,16 +17178,12 @@ if (asOfDate) {
           if (!voucher) {
             errors.push(`Voucher ${id} not found`);
             continue;
-          });
-
-  
+          }
 
           if (voucher.companyId !== currentCompanyId) {
             errors.push(`Voucher ${id} does not belong to current company`);
             continue;
-          });
-
-  
+          }
 
           // Use the same transaction-wrapped deletion logic as the single delete endpoint
           await db.transaction(async (tx) => {
@@ -19772,9 +17235,7 @@ if (asOfDate) {
                       averageRate: transferRate.toString(),
                       totalValue: (qty * transferRate).toString(),
                     });
-                  });
-
-  
+                  }
 
                   // Remove from destination location
                   const [destInv] = await tx
@@ -19804,24 +17265,14 @@ if (asOfDate) {
                         averageRate: newAvgRate.toString(),
                         totalValue: newValue.toString(),
                       }).where(eq(inventory.id, destInv.id));
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
+                    }
+                  }
+                }
 
                 await tx.delete(stockTransferItems).where(eq(stockTransferItems.transferId, transferVoucher.id));
                 await tx.delete(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferVoucher.id));
-              });
-
-  
-            });
-
-  
+              }
+            }
 
             // IMPORTANT: Reverse inventory movements for Stock Adjustment (Production/Consumption/Mixed) vouchers
             if ((voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed") && !voucher.optional) {
@@ -19872,12 +17323,8 @@ if (asOfDate) {
                           averageRate: newRate.toString(),
                           totalValue: newValue.toString(),
                         }).where(eq(inventory.id, inv.id));
-                      });
-
-  
-                    });
-
-  
+                      }
+                    }
                   } else {
                     if (inv) {
                       const existingQty = parseFloat(inv.quantity);
@@ -19897,24 +17344,14 @@ if (asOfDate) {
                         averageRate: adjustmentRate.toString(),
                         totalValue: (absoluteQty * adjustmentRate).toString(),
                       });
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
+                    }
+                  }
+                }
 
                 await tx.delete(stockAdjustmentItems).where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
                 await tx.delete(stockAdjustmentVouchers).where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
-              });
-
-  
-            });
-
-  
+              }
+            }
 
             // IMPORTANT: Reverse inventory movements for POS Sales vouchers (Receipt/Sales with sales items)
             if ((voucher.voucherType === "Receipt" || voucher.voucherType === "Sales") && !voucher.optional) {
@@ -19959,24 +17396,14 @@ if (asOfDate) {
                         averageRate: costPrice.toString(),
                         totalValue: (qty * costPrice).toString(),
                       });
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
+                    }
+                  }
+                }
 
                 // Delete sales items regardless of whether inventory was reversed
                 await tx.delete(salesItems).where(eq(salesItems.voucherId, id));
-              });
-
-  
-            });
-
-  
+              }
+            }
 
             // IMPORTANT: Reverse inventory movements for Credit Note / Debit Note vouchers
             if ((voucher.voucherType === "Credit Note" || voucher.voucherType === "Debit Note") && !voucher.optional) {
@@ -20023,12 +17450,8 @@ if (asOfDate) {
                           averageRate: newRate.toString(),
                           totalValue: newValue.toString(),
                         }).where(eq(inventory.id, inv.id));
-                      });
-
-  
-                    });
-
-  
+                      }
+                    }
                   } else {
                     // Debit Note forward: removed qty from inventory
                     // Reversal: add qty back to inventory
@@ -20060,27 +17483,15 @@ if (asOfDate) {
                           averageRate: inventoryCost.toString(),
                           totalValue: itemValue.toString(),
                         });
-                      });
-
-  
-                    });
-
-  
-                  });
-
-  
-                });
-
-  
+                      }
+                    }
+                  }
+                }
 
                 // Delete the credit note items
                 await tx.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, id));
-              });
-
-  
-            });
-
-  
+              }
+            }
 
             // Reverse employee balance effects for non-optional vouchers
             if (!voucher.optional) {
@@ -20099,9 +17510,7 @@ if (asOfDate) {
                 currentCompanyId,
                 true // reverse
               );
-            });
-
-  
+            }
 
             // Soft delete: Set deletedAt instead of hard delete
             await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, id));
@@ -20122,12 +17531,8 @@ if (asOfDate) {
           deletedCount++;
         } catch (err: any) {
           errors.push(`Failed to delete voucher ${id}: ${err.message}`);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         message: `Deleted ${deletedCount} voucher(s)`,
@@ -20136,9 +17541,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Fiscal Period Closing
@@ -20151,15 +17554,11 @@ if (asOfDate) {
         return res.status(403).json({ 
           message: "Only Admins and Owners can close fiscal periods" 
         });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { 
         periodStartDate, 
@@ -20173,9 +17572,7 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Period start date, end date, and retained earnings account are required" 
         });
-      });
-
-  
+      }
 
       // Parse and validate retained earnings account ID
       const accountId = parseInt(retainedEarningsAccountId);
@@ -20183,9 +17580,7 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Invalid retained earnings account ID" 
         });
-      });
-
-  
+      }
 
       // Validate dates are valid and in correct order
       const startDate = new Date(periodStartDate);
@@ -20195,17 +17590,13 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Invalid date format. Use YYYY-MM-DD" 
         });
-      });
-
-  
+      }
 
       if (startDate > endDate) {
         return res.status(400).json({ 
           message: "Period start date must be before or equal to end date" 
         });
-      });
-
-  
+      }
 
       // Validate retained earnings account exists and is an Equity account
       const retainedEarningsAccount = await storage.getLedgerAccountById(accountId);
@@ -20213,23 +17604,17 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: "Retained earnings account not found" 
         });
-      });
-
-  
+      }
       if (retainedEarningsAccount.accountType !== "Equity") {
         return res.status(400).json({ 
           message: "Retained earnings account must be an Equity account" 
         });
-      });
-
-  
+      }
       if (retainedEarningsAccount.companyId !== req.session.currentCompanyId) {
         return res.status(403).json({ 
           message: "Retained earnings account belongs to a different company" 
         });
-      });
-
-  
+      }
 
       const closure = await storage.closeFiscalPeriod(
         req.session.currentCompanyId,
@@ -20243,9 +17628,7 @@ if (asOfDate) {
       res.json(closure);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get fiscal period closures for current company
@@ -20253,17 +17636,13 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const closures = await storage.getFiscalPeriodClosures(req.session.currentCompanyId);
       res.json(closures);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get POS sales grouped by location with optional date filtering
@@ -20271,9 +17650,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { startDate, endDate } = req.query;
 
@@ -20285,15 +17662,11 @@ if (asOfDate) {
 
       if (startDate) {
         conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      });
-
-  
+      }
 
       if (endDate) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      });
-
-  
+      }
 
       // Get all sales vouchers with location info
       const salesVouchers = await db
@@ -20318,9 +17691,7 @@ if (asOfDate) {
           locationCode: string;
           totalSales: number;
           totalTransactions: number;
-        });
-
-  
+        }
       >();
 
       for (const sale of salesVouchers) {
@@ -20340,19 +17711,13 @@ if (asOfDate) {
             totalSales: amount,
             totalTransactions: 1,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json(Array.from(salesByLocation.values()));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get detailed sales info for a specific location
@@ -20364,16 +17729,12 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         const { startDate, endDate } = req.query;
 
@@ -20386,15 +17747,11 @@ if (asOfDate) {
 
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        });
-
-  
+        }
 
         if (endDate) {
           conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        });
-
-  
+        }
 
         // Get all sales vouchers for this location
         const salesVouchers = await db
@@ -20413,9 +17770,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
 
         for (const voucher of salesVouchers) {
           totalAmount += parseFloat(voucher.totalAmount || "0");
@@ -20424,9 +17779,7 @@ if (asOfDate) {
           // This requires getting stock items from inventory updates
           // For now, we'll just count transactions as the quantity metric
           totalQuantity += 1; // Each voucher is one transaction
-        });
-
-  
+        }
 
         res.json({
           locationId,
@@ -20436,9 +17789,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -20451,16 +17802,12 @@ if (asOfDate) {
       try {
         if (!req.session.currentCompanyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const locationId = parseInt(req.params.locationId);
         if (isNaN(locationId)) {
           return res.status(400).json({ message: "Invalid location ID" });
-        });
-
-  
+        }
 
         const { startDate, endDate } = req.query;
 
@@ -20473,15 +17820,11 @@ if (asOfDate) {
 
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        });
-
-  
+        }
 
         if (endDate) {
           conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        });
-
-  
+        }
 
         // Get all sales vouchers for this location with details
         const salesVouchers = await db
@@ -20526,9 +17869,7 @@ if (asOfDate) {
         res.json(transactions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -20537,9 +17878,7 @@ if (asOfDate) {
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const {
         locationId,
@@ -20562,9 +17901,7 @@ if (asOfDate) {
           return res.status(400).json({
             message: "Customer account is required for credit sales",
           });
-        });
-
-  
+        }
 
         const [customerAccount] = await db
           .select()
@@ -20581,17 +17918,13 @@ if (asOfDate) {
           return res.status(400).json({
             message: "Invalid customer account - account not found or does not belong to this company",
           });
-        });
-
-  
+        }
 
         if (customerAccount.accountType !== "Asset") {
           return res.status(400).json({
             message: `Invalid customer account type: ${customerAccount.accountType}. Credit sales require Asset-type accounts (customer receivables).`,
           });
-        });
-
-  
+        }
 
         accountType = "credit";
         accountId = paymentAccountId;
@@ -20612,17 +17945,13 @@ if (asOfDate) {
           return res.status(400).json({
             message: "Invalid cash account - account not found or does not belong to this company",
           });
-        });
-
-  
+        }
 
         if (cashLedger.accountType !== "Cash") {
           return res.status(400).json({
             message: `Invalid cash account type: ${cashLedger.accountType}. The cashAccountId parameter must refer to a Cash-type ledger account.`,
           });
-        });
-
-  
+        }
 
         accountType = "cash";
         accountId = cashAccountId;
@@ -20655,9 +17984,7 @@ if (asOfDate) {
             return res.status(400).json({
               message: `Invalid payment account type: ${ledgerAccount.accountType}. POS sales require Cash accounts or Bank accounts for cash/bank payments, or Asset accounts for credit sales.`,
             });
-          });
-
-  
+          }
         } else {
           // Check if it's a bank account
           const [bankAccount] = await db
@@ -20678,19 +18005,13 @@ if (asOfDate) {
             return res.status(400).json({
               message: "Invalid payment account ID - account not found or does not belong to this company",
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
       } else {
         return res.status(400).json({
           message: "Payment account is required",
         });
-      });
-
-  
+      }
 
       console.log("[POS Sale] Payment info:", {
         provided: { paymentAccountType, paymentAccountId, cashAccountId, isCreditSale },
@@ -20700,9 +18021,7 @@ if (asOfDate) {
       // Validate required fields
       if (!locationId) {
         return res.status(400).json({ message: "Location is required" });
-      });
-
-  
+      }
       if (!accountId) {
         return res
           .status(400)
@@ -20711,16 +18030,12 @@ if (asOfDate) {
               ? "Customer is required"
               : "Payment account is required",
           });
-      });
-
-  
+      }
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res
           .status(400)
           .json({ message: "At least one item is required" });
-      });
-
-  
+      }
 
       // Validate and calculate total
       let grandTotal = 0;
@@ -20729,27 +18044,19 @@ if (asOfDate) {
           return res
             .status(400)
             .json({ message: "Stock item ID is required for all items" });
-        });
-
-  
+        }
         if (!item.quantity || parseFloat(item.quantity) <= 0) {
           return res
             .status(400)
             .json({ message: "Quantity must be positive for all items" });
-        });
-
-  
+        }
         if (!item.rate || parseFloat(item.rate) < 0) {
           return res
             .status(400)
             .json({ message: "Rate must be non-negative for all items" });
-        });
-
-  
+        }
         grandTotal += parseFloat(item.quantity) * parseFloat(item.rate);
-      });
-
-  
+      }
 
       // Get or create SALES revenue account (outside transaction for simplicity)
       const allAccounts = await storage.getAllLedgerAccounts(
@@ -20772,17 +18079,13 @@ if (asOfDate) {
         return res.status(400).json({
           message: `The SALES account is configured with type "${salesAccount.accountType}" but must be type "Income" for POS sales to work correctly. Please update the SALES account type in Accounts page.`,
         });
-      });
-
-  
+      }
 
       // Get location details
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
 
       // STEP 1: Validate inventory availability
       const voucherNumber = `SALES-${Date.now()}`;
@@ -20813,9 +18116,7 @@ if (asOfDate) {
           throw new Error(
             `Inventory not found for item ${item.stockItemId} at location ${locationId}`,
           );
-        });
-
-  
+        }
 
         const currentQty = parseFloat(inventoryRecord.quantity);
         const saleQty = parseFloat(item.quantity);
@@ -20827,9 +18128,7 @@ if (asOfDate) {
           throw new Error(
             `Insufficient stock for item ${item.stockItemId}. Available: ${currentQty}, Requested: ${saleQty}`,
           );
-        });
-
-  
+        }
 
         inventoryValidation.push({
           item,
@@ -20839,9 +18138,7 @@ if (asOfDate) {
           newQty: currentQty - saleQty,
           currentRate: parseFloat(inventoryRecord.averageRate),
         });
-      });
-
-  
+      }
 
       // STEP 1b: Create accounting records (voucher and entries)
       // Create Sales voucher
@@ -20887,9 +18184,7 @@ if (asOfDate) {
           // For bank accounts, use bankAccountId
           debitEntry.bankAccountId = accountId;
           console.log("[POS Sale] Using bankAccountId for bank:", accountId);
-        });
-
-  
+        }
 
         console.log("[POS Sale] Debit entry:", debitEntry);
         await db.insert(voucherEntries).values(debitEntry);
@@ -20958,9 +18253,7 @@ if (asOfDate) {
             stockItemCode: stockItem?.code || "",
             amount: totalSales.toFixed(2),
           });
-        });
-
-  
+        }
       } catch (error: any) {
         // Comprehensive cleanup: rollback all changes
         if (voucher?.id) {
@@ -20979,9 +18272,7 @@ if (asOfDate) {
             .delete(vouchers)
             .where(eq(vouchers.id, voucher.id))
             .catch(() => {});
-        });
-
-  
+        }
 
         // Restore inventory quantities
         for (let i = 0; i < updatedInventoryIds.length; i++) {
@@ -21000,14 +18291,10 @@ if (asOfDate) {
             })
             .where(eq(inventory.id, updatedInventoryIds[i]))
             .catch(() => {});
-        });
-
-  
+        }
 
         throw error; // Re-throw to be caught by outer error handler
-      });
-
-  
+      }
 
       const result = { voucher, saleItems };
 
@@ -21015,9 +18302,7 @@ if (asOfDate) {
       let customerAccount = null;
       if (isCreditSale) {
         customerAccount = await storage.getLedgerAccountById(accountId);
-      });
-
-  
+      }
 
       // Return complete sale details
       res.json({
@@ -21033,27 +18318,19 @@ if (asOfDate) {
               id: customerAccount.id,
               code: customerAccount.code,
               name: customerAccount.name,
-            });
-
-  
+            }
           : null,
       });
     } catch (error: any) {
       // Return appropriate status codes for different error types
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
-      });
-
-  
+      }
       if (error.message.includes("Insufficient stock")) {
         return res.status(400).json({ message: error.message });
-      });
-
-  
+      }
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update existing sales voucher
@@ -21062,23 +18339,17 @@ if (asOfDate) {
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
-      });
-
-  
+      }
 
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
-      });
-
-  
+      }
 
       // Validate all items have positive quantities and prices
       for (const item of items) {
@@ -21087,17 +18358,11 @@ if (asOfDate) {
         
         if (isNaN(qty) || qty <= 0) {
           throw new Error(`Invalid quantity: ${item.quantity}. Must be greater than 0.`);
-        });
-
-  
+        }
         if (isNaN(price) || price <= 0) {
           throw new Error(`Invalid price: ${item.sellingPrice}. Must be greater than 0.`);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get existing voucher to validate it's a Sales voucher in the current company
       const [existingVoucher] = await db
@@ -21113,15 +18378,11 @@ if (asOfDate) {
 
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       if (existingVoucher.voucherType !== "Sales") {
         return res.status(400).json({ message: "Only Sales vouchers can be updated with this endpoint" });
-      });
-
-  
+      }
 
       // Determine target location - use new location if provided, otherwise keep existing
       const oldLocationId = existingVoucher.locationId!;
@@ -21144,13 +18405,9 @@ if (asOfDate) {
         
         if (!newLocation) {
           return res.status(400).json({ message: "Invalid location or location not found" });
-        });
-
-  
+        }
         console.log(`[POS Sales Edit] Location changing from ${oldLocationId} to ${targetLocationId}`);
-      });
-
-  
+      }
 
       // Get old sales items to reverse inventory and preserve historical cost
       const oldSalesItems = await db
@@ -21214,12 +18471,8 @@ if (asOfDate) {
               totalValue: totalValue,
               lastUpdated: new Date(),
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Delete old sales items and voucher entries
         await tx.delete(salesItems).where(eq(salesItems.voucherId, voucherId));
@@ -21261,9 +18514,7 @@ if (asOfDate) {
               })
               .returning();
             inventoryRecord = newInvRecord;
-          });
-
-  
+          }
 
           const currentQty = parseFloat(inventoryRecord.quantity);
           const sellQty = parseFloat(quantity);
@@ -21271,9 +18522,7 @@ if (asOfDate) {
           // Only check stock if user cannot sell negative stock
           if (currentQty < sellQty && !canSellNegativeStock) {
             throw new Error(`Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`);
-          });
-
-  
+          }
 
           // Preserve historical cost from old sale line if it exists (by line ID), otherwise use current cost
           // Items with id field are existing items, items without id are new items
@@ -21315,9 +18564,7 @@ if (asOfDate) {
             .where(eq(inventory.id, inventoryRecord.id));
 
           grandTotal += totalSales;
-        });
-
-  
+        }
 
         // Update voucher description, total amount, location, and optionally date
         const voucherUpdate: any = {
@@ -21327,14 +18574,10 @@ if (asOfDate) {
         if (locationChanged) {
           voucherUpdate.locationId = targetLocationId;
           console.log(`[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`);
-        });
-
-  
+        }
         if (voucherDate) {
           voucherUpdate.voucherDate = new Date(voucherDate);
-        });
-
-  
+        }
         await tx
           .update(vouchers)
           .set(voucherUpdate)
@@ -21347,9 +18590,7 @@ if (asOfDate) {
 
         if (!paymentEntry || !revenueEntry) {
           throw new Error("Original voucher entries not found");
-        });
-
-  
+        }
 
         // Determine payment account - use new values if provided, otherwise preserve original
         let newDebitEntry: any = {
@@ -21367,9 +18608,7 @@ if (asOfDate) {
           } else if (paymentAccountType === "bank") {
             newDebitEntry.bankAccountId = parseInt(paymentAccountId);
             newDebitEntry.ledgerAccountId = null;
-          });
-
-  
+          }
           newDebitEntry.supplierId = null;
           newDebitEntry.employeeId = null;
           newDebitEntry.fixedAssetId = null;
@@ -21380,9 +18619,7 @@ if (asOfDate) {
           newDebitEntry.supplierId = paymentEntry.supplierId;
           newDebitEntry.employeeId = paymentEntry.employeeId;
           newDebitEntry.fixedAssetId = paymentEntry.fixedAssetId;
-        });
-
-  
+        }
 
         // Create new debit entry (payment account)
         await tx.insert(voucherEntries).values(newDebitEntry);
@@ -21405,18 +18642,12 @@ if (asOfDate) {
     } catch (error: any) {
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
-      });
-
-  
+      }
       if (error.message.includes("Insufficient stock")) {
         return res.status(400).json({ message: error.message });
-      });
-
-  
+      }
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get last sold prices for all stock items in the company
@@ -21426,23 +18657,17 @@ if (asOfDate) {
       const locationId = parseInt(req.query.locationId as string);
       if (!locationId) {
         return res.status(400).json({ message: "Location ID is required" });
-      });
-
-  
+      }
       // Get the location to find its company
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
       const prices = await storage.getLastSoldPrices(location.companyId);
       res.json(prices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -21453,18 +18678,14 @@ if (asOfDate) {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
-      });
-
-  
+      }
 
       const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : undefined;
       const drafts = await storage.getAllDraftPosSales(userId, locationId);
       res.json(drafts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get a specific draft by ID
@@ -21475,23 +18696,17 @@ if (asOfDate) {
       
       if (!draft) {
         return res.status(404).json({ message: "Draft not found" });
-      });
-
-  
+      }
 
       // Verify the draft belongs to the current user
       if (draft.userId !== req.user?.id) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       res.json(draft);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Create a new draft
@@ -21500,22 +18715,16 @@ if (asOfDate) {
       const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
-      });
-
-  
+      }
 
       const { locationId, paymentAccountType, paymentAccountId, isCreditSale, notes, items } = req.body;
 
       if (!locationId) {
         return res.status(400).json({ message: "Location is required" });
-      });
-
-  
+      }
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
-      });
-
-  
+      }
 
       const draftData: InsertDraftPosSale = {
         userId,
@@ -21530,9 +18739,7 @@ if (asOfDate) {
       res.status(201).json(draft);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Update an existing draft
@@ -21543,22 +18750,16 @@ if (asOfDate) {
       
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
-      });
-
-  
+      }
 
       // Verify the draft belongs to the current user
       const existingDraft = await storage.getDraftPosSaleById(id);
       if (!existingDraft) {
         return res.status(404).json({ message: "Draft not found" });
-      });
-
-  
+      }
       if (existingDraft.userId !== userId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const { locationId, paymentAccountType, paymentAccountId, isCreditSale, notes, items } = req.body;
 
@@ -21573,9 +18774,7 @@ if (asOfDate) {
       res.json(draft);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete a draft
@@ -21586,30 +18785,22 @@ if (asOfDate) {
       
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
-      });
-
-  
+      }
 
       // Verify the draft belongs to the current user
       const existingDraft = await storage.getDraftPosSaleById(id);
       if (!existingDraft) {
         return res.status(404).json({ message: "Draft not found" });
-      });
-
-  
+      }
       if (existingDraft.userId !== userId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       await storage.deleteDraftPosSale(id);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Transfers - GET endpoint
@@ -21623,18 +18814,14 @@ if (asOfDate) {
         
         if (!voucherId) {
           return res.status(400).json({ message: "voucherId query parameter is required" });
-        });
-
-  
+        }
 
         const transfer = await storage.getStockTransferByVoucherId(voucherId);
         res.json(transfer);
       } catch (error: any) {
         console.error("[Stock Transfer GET] Error:", error.message);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -21650,28 +18837,20 @@ if (asOfDate) {
         // Log if user confirmed negative inventory override
         if (allowNegativeInventory) {
           console.log(`[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`);
-        });
-
-  
+        }
         const companyId = req.session.currentCompanyId;
 
         // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
         if (!voucherId && (sourceLocationId || (items && items.length > 0 && items.every((i: any) => i.sourceLocationId)))) {
           if (!companyId) {
             return res.status(400).json({ message: "No company selected" });
-          });
-
-  
+          }
           if (!destinationLocationId) {
             return res.status(400).json({ message: "Destination location is required" });
-          });
-
-  
+          }
           if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: "Items are required" });
-          });
-
-  
+          }
           // Compute multi-source detection
           const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
           const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? [...uniqueSourceIds][0] : null;
@@ -21679,34 +18858,24 @@ if (asOfDate) {
           // Validate source/dest not the same (only for single-source mode)
           if (resolvedHeaderSourceId && resolvedHeaderSourceId === destinationLocationId) {
             return res.status(400).json({ message: "Source and destination must be different" });
-          });
-
-  
+          }
 
           // Validate destination location exists
           const destLocation = await storage.getLocationById(destinationLocationId);
           if (!destLocation) {
             return res.status(404).json({ message: "Destination location not found" });
-          });
-
-  
+          }
 
           // Validate each item has a valid source location
           for (const item of items) {
             const itemSourceId = item.sourceLocationId || sourceLocationId;
             if (!itemSourceId) {
               return res.status(400).json({ message: "Each item must have a source location" });
-            });
-
-  
+            }
             if (itemSourceId === destinationLocationId) {
               return res.status(400).json({ message: `Item ${item.stockItemId}: Source and destination cannot be the same` });
-            });
-
-  
-          });
-
-  
+            }
+          }
           // Create Stock Transfer voucher
           const voucherNumber = `ST-${Date.now()}`;
           const effectiveDate = voucherDate || format(new Date(), "yyyy-MM-dd");
@@ -21742,9 +18911,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
           const transferItems = [];
 
           for (const item of items) {
@@ -21797,9 +18964,7 @@ if (asOfDate) {
                     eq(inventory.stockItemId, item.stockItemId)
                   )
                 );
-            });
-
-  
+            }
 
             // Add to destination inventory (weighted average)
             const [destInv] = await db
@@ -21838,12 +19003,8 @@ if (asOfDate) {
                 averageRate: rate.toFixed(6),
                 totalValue: (quantity * rate).toFixed(2),
               });
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // Update voucher total amount
           await db
@@ -21856,28 +19017,20 @@ if (asOfDate) {
             items: transferItems,
             voucher: newVoucher,
           });
-        });
-
-  
+        }
 
         // Original flow: Use existing voucher (voucherId required)
         if (!voucherId) {
           return res.status(400).json({ message: "Either voucherId or sourceLocationId is required" });
-        });
-
-  
+        }
         if (!destinationLocationId) {
           return res
             .status(400)
             .json({ message: "Destination location is required" });
-        });
-
-  
+        }
         if (!items || !Array.isArray(items) || items.length === 0) {
           return res.status(400).json({ message: "Items are required" });
-        });
-
-  
+        }
 
         // Validate that destination location exists
         const destLocation = await storage.getLocationById(
@@ -21887,17 +19040,13 @@ if (asOfDate) {
           return res
             .status(404)
             .json({ message: "Destination location not found" });
-        });
-
-  
+        }
 
         // Validate that voucher exists
         const voucher = await storage.getVoucherById(voucherId);
         if (!voucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Validate items and their source locations
         for (const item of items) {
@@ -21905,30 +19054,22 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Source location is required for all items" });
-          });
-
-  
+          }
           if (!item.stockItemId) {
             return res
               .status(400)
               .json({ message: "Stock item ID is required for all items" });
-          });
-
-  
+          }
           if (!item.quantity || parseFloat(item.quantity) <= 0) {
             return res
               .status(400)
               .json({ message: "Quantity must be positive for all items" });
-          });
-
-  
+          }
           if (!item.rate || parseFloat(item.rate) < 0) {
             return res
               .status(400)
               .json({ message: "Rate must be non-negative for all items" });
-          });
-
-  
+          }
 
           // Validate that source and destination are different for each item
           if (item.sourceLocationId === destinationLocationId) {
@@ -21938,9 +19079,7 @@ if (asOfDate) {
                 message:
                   "Source and destination locations must be different for each item",
               });
-          });
-
-  
+          }
 
           // Validate that source location exists
           const sourceLocation = await storage.getLocationById(
@@ -21952,12 +19091,8 @@ if (asOfDate) {
               .json({
                 message: `Source location with ID ${item.sourceLocationId} not found`,
               });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         console.log("[Stock Transfer] Creating transfer:", {
           voucherId,
@@ -21984,9 +19119,7 @@ if (asOfDate) {
           error.stack,
         );
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -22000,9 +19133,7 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (!id) {
           return res.status(400).json({ message: "Transfer ID is required" });
-        });
-
-  
+        }
 
         // Validate request body using Zod
         const parseResult = updateStockTransferSchema.safeParse(req.body);
@@ -22011,9 +19142,7 @@ if (asOfDate) {
             message: "Invalid request data",
             errors: parseResult.error.errors,
           });
-        });
-
-  
+        }
 
         const { destinationLocationId, notes, items } = parseResult.data;
 
@@ -22021,9 +19150,7 @@ if (asOfDate) {
         const invalidItem = items.find(item => item.sourceLocationId === destinationLocationId);
         if (invalidItem) {
           return res.status(400).json({ message: "Source and destination locations must be different for each item" });
-        });
-
-  
+        }
 
         // Convert numbers back to strings with fixed precision for storage layer
         const itemsForStorage = items.map(item => ({
@@ -22049,14 +19176,10 @@ if (asOfDate) {
         // Check if this is a legacy transfer validation error (400) vs server error (500)
         if (error.message && error.message.includes("missing source location data")) {
           return res.status(400).json({ message: error.message });
-        });
-
-  
+        }
         
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -22071,18 +19194,14 @@ if (asOfDate) {
         
         if (!voucherId) {
           return res.status(400).json({ message: "voucherId query parameter is required" });
-        });
-
-  
+        }
 
         const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
         res.json(adjustment);
       } catch (error: any) {
         console.error("[Stock Adjustment GET] Error:", error.message);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -22099,21 +19218,15 @@ if (asOfDate) {
         // Validate required fields
         if (!voucherId) {
           return res.status(400).json({ message: "Voucher ID is required" });
-        });
-
-  
+        }
         if (!locationId) {
           return res.status(400).json({ message: "Location is required" });
-        });
-
-  
+        }
         if (!adjustmentType) {
           return res
             .status(400)
             .json({ message: "Adjustment type is required" });
-        });
-
-  
+        }
         if (
           adjustmentType !== "Production" &&
           adjustmentType !== "Consumption" &&
@@ -22125,30 +19238,22 @@ if (asOfDate) {
               message:
                 "Adjustment type must be 'Production', 'Consumption', or 'Mixed'",
             });
-        });
-
-  
+        }
         if (!items || !Array.isArray(items) || items.length === 0) {
           return res.status(400).json({ message: "Items are required" });
-        });
-
-  
+        }
 
         // Validate that location exists
         const location = await storage.getLocationById(locationId);
         if (!location) {
           return res.status(404).json({ message: "Location not found" });
-        });
-
-  
+        }
 
         // Validate that voucher exists
         const voucher = await storage.getVoucherById(voucherId);
         if (!voucher) {
           return res.status(404).json({ message: "Voucher not found" });
-        });
-
-  
+        }
 
         // Validate items
         for (const item of items) {
@@ -22156,27 +19261,19 @@ if (asOfDate) {
             return res
               .status(400)
               .json({ message: "Stock item ID is required for all items" });
-          });
-
-  
+          }
           if (!item.quantity || parseFloat(item.quantity) === 0) {
             return res
               .status(400)
               .json({ message: "Quantity cannot be zero for any items" });
-          });
-
-  
+          }
           // Note: Negative quantities are allowed for consumption items
           if (!item.rate || parseFloat(item.rate) < 0) {
             return res
               .status(400)
               .json({ message: "Rate must be non-negative for all items" });
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         console.log("[Stock Adjustment] Creating adjustment:", {
           voucherId,
@@ -22205,9 +19302,7 @@ if (asOfDate) {
           error.stack,
         );
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -22221,9 +19316,7 @@ if (asOfDate) {
         const id = parseInt(req.params.id);
         if (!id) {
           return res.status(400).json({ message: "Adjustment ID is required" });
-        });
-
-  
+        }
 
         // Validate request body using Zod
         const parseResult = updateStockAdjustmentSchema.safeParse(req.body);
@@ -22232,9 +19325,7 @@ if (asOfDate) {
             message: "Invalid request data",
             errors: parseResult.error.errors,
           });
-        });
-
-  
+        }
 
         const { locationId, adjustmentType, notes, items } = parseResult.data;
 
@@ -22258,9 +19349,7 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("[Stock Adjustment PUT] Error:", error.message);
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -22271,9 +19360,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all ledger accounts for this company
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
@@ -22306,12 +19393,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Calculate supplier balances from voucher entries
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
@@ -22324,12 +19407,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // ============ SIMPLIFIED NET POSITION CALCULATION ============
       // Logic: Positive balance = Asset (owed to us), Negative balance = Liability (we owe them)
@@ -22361,26 +19440,16 @@ if (asOfDate) {
         for (const acc of companyAccounts) {
           if (acc.parentId === importChargesParent.id) {
             excludedFromExpenses.add(acc.id);
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
       
       // Exclude PURCHASES accounts - these are inventory costs, not expenses
       for (const acc of companyAccounts) {
         if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
           excludedFromExpenses.add(acc.id);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Categorize accounts
       const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
@@ -22433,24 +19502,16 @@ if (asOfDate) {
           // This prevents double-counting inventory
           if (stockInventoryPatterns.some(pattern => nameLower.includes(pattern))) {
             return true;
-          });
-
-  
+          }
           if (stockInventoryCodes.some(code => codeLower === (code || "").toLowerCase() || codeLower.startsWith((code || "").toLowerCase() + "_"))) {
             return true;
-          });
-
-  
+          }
           
           // Exclude fixed assets by name pattern
           if (fixedAssetNamePatterns.some(pattern => nameLower.includes(pattern))) {
             return true;
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         return false;
       };
@@ -22497,9 +19558,7 @@ if (asOfDate) {
             // Also reduce categoryTotals so breakdown matches total
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
             incomeAccounts.push({ name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
-          });
-
-  
+          }
           continue;
         } else if (isAnyExpenseType) {
           // Skip PURCHASES / IMPORT_CHARGES (handled elsewhere)
@@ -22516,12 +19575,8 @@ if (asOfDate) {
               expensesTotal -= credit;
               categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
               expensesAccounts.push({ name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
-            });
-
-  
-          });
-
-  
+            }
+          }
           // Skip all expense-type accounts from asset/liability calculation
           continue;
         } else if (isExcludedFromNetPosition(acc)) {
@@ -22549,9 +19604,7 @@ if (asOfDate) {
               const category = acc.accountType || "Liability";
               categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
               onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            });
-
-  
+            }
           } else {
             // Asset-type accounts: positive = asset, negative = liability (overdraft)
             if (netBalance > 0) {
@@ -22564,18 +19617,10 @@ if (asOfDate) {
               const category = acc.accountType || "Other";
               categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
               onUsAccounts.push({ name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category });
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
 
       // Add Stock on Floor (current inventory value) - always positive asset
       const activeLocationsData = await db
@@ -22594,19 +19639,13 @@ if (asOfDate) {
           .execute();
         for (const inv of inventoryData) {
           stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
-        });
-
-  
-      });
-
-  
+        }
+      }
       if (stockOnFloor > 0) {
         forUsTotal += stockOnFloor;
         categoryTotals["asset_Stock In Hand"] = stockOnFloor;
         forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
-      });
-
-  
+      }
 
       // NOTE: Stock OTW (containers pending offload) is intentionally EXCLUDED
       // Containers in transit are not yet assets - they become assets only when offloaded
@@ -22621,9 +19660,7 @@ if (asOfDate) {
       let workerLiabilities = 0;
       for (const emp of companyEmployees) {
         workerLiabilities += parseFloat(emp.currentBalance || "0");
-      });
-
-  
+      }
       if (workerLiabilities !== 0) {
         if (workerLiabilities > 0) {
           onUsTotal += workerLiabilities;
@@ -22633,12 +19670,8 @@ if (asOfDate) {
           forUsTotal += Math.abs(workerLiabilities);
           categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + Math.abs(workerLiabilities);
           forUsAccounts.push({ name: "Worker Advances", code: "COMPUTED", value: Math.abs(workerLiabilities), category: "Worker Advances" });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Add Suppliers (only for parent company or if no parent set)
       if (shouldIncludeSuppliers) {
@@ -22659,31 +19692,19 @@ if (asOfDate) {
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
               forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
         
         if (supplierLiabilities > 0) {
           onUsTotal += supplierLiabilities;
           categoryTotals["liability_Suppliers"] = supplierLiabilities;
-        });
-
-  
+        }
         if (supplierAssets > 0) {
           forUsTotal += supplierAssets;
           categoryTotals["asset_Supplier Overpayment"] = supplierAssets;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Add OTW (On The Way) inventory value as an asset
       // Containers with OTW status represent goods we own that are in transit
@@ -22700,17 +19721,13 @@ if (asOfDate) {
         // Use grandTotal (items + charges) if available, otherwise use itemsTotal
         const containerValue = parseFloat(container.grandTotal || container.itemsTotal || "0");
         stockOtwValue += containerValue;
-      });
-
-  
+      }
       
       if (stockOtwValue > 0) {
         forUsTotal += stockOtwValue;
         categoryTotals["asset_Stock OTW"] = stockOtwValue;
         forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
-      });
-
-  
+      }
 
       // ============ ROUNDING HELPER ============
       // Helper to round currency values to 2 decimal places (prevents floating point noise)
@@ -22729,12 +19746,8 @@ if (asOfDate) {
           expensesBreakdown.push({ name: key.replace("exp_", ""), value: roundedValue });
         } else if (key.startsWith("income_")) {
           incomeBreakdown.push({ name: key.replace("income_", ""), value: roundedValue });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Round individual account values
       forUsAccounts.forEach(acc => acc.value = round2(acc.value));
@@ -22789,9 +19802,7 @@ if (asOfDate) {
         const opening = parseFloat(acc.openingBalance || "0");
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
         ownersCapital += opening + balance.credit - balance.debit;
-      });
-
-  
+      }
 
       // Net Worth and Profit for backward compatibility
       const netWorth = round2(forUsTotal - onUsTotal);
@@ -22854,9 +19865,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get monthly sales and profit data for Dashboard charts
@@ -22865,9 +19874,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all Sales vouchers for this company (excluding optional)
       const salesVouchers = await db
@@ -22999,9 +20006,7 @@ if (asOfDate) {
         );
         const monthKey = monthNames[date.getMonth()];
         monthlyData.set(monthKey, { sales: 0, profit: 0 });
-      });
-
-  
+      }
 
       // Calculate sales by month
       for (const voucher of salesVouchers) {
@@ -23012,12 +20017,8 @@ if (asOfDate) {
         if (monthlyData.has(monthKey)) {
           const data = monthlyData.get(monthKey)!;
           data.sales += amount;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Calculate profit by month (income - expenses)
       for (const entry of companyEntries) {
@@ -23039,9 +20040,7 @@ if (asOfDate) {
           data.profit +=
             parseFloat(entry.creditAmount || "0") -
             parseFloat(entry.debitAmount || "0");
-        });
-
-  
+        }
 
         // Expense accounts (including Purchases): debits decrease profit, credits increase it
         if (
@@ -23051,12 +20050,8 @@ if (asOfDate) {
           data.profit -=
             parseFloat(entry.debitAmount || "0") -
             parseFloat(entry.creditAmount || "0");
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Convert map to array
       const result = Array.from(monthlyData.entries()).map(([month, data]) => ({
@@ -23068,9 +20063,7 @@ if (asOfDate) {
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get stock summary stats for Dashboard
@@ -23079,9 +20072,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get total stock items count
       const stockItems = await storage.getAllStockItems(companyId);
@@ -23122,9 +20113,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get expense breakdown by account type for Dashboard donut chart
@@ -23133,9 +20122,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all expense-related ledger accounts
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
@@ -23152,26 +20139,16 @@ if (asOfDate) {
         for (const acc of allAccounts) {
           if (acc.parentId === importChargesParent.id) {
             excludedFromExpenses.add(acc.id);
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
       
       // Exclude PURCHASES accounts - these are inventory costs, not expenses
       for (const acc of allAccounts) {
         if (acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_")) {
           excludedFromExpenses.add(acc.id);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       const expenseAccounts = allAccounts.filter(acc => 
         (acc.accountType === "Expense" ||
@@ -23208,9 +20185,7 @@ if (asOfDate) {
       const accountTypeMap = new Map<number, string>();
       for (const acc of expenseAccounts) {
         accountTypeMap.set(acc.id, acc.accountType);
-      });
-
-  
+      }
 
       // Sum balances by expense type
       const expenseByType = new Map<string, number>();
@@ -23227,9 +20202,7 @@ if (asOfDate) {
 
         const current = expenseByType.get(accountType) || 0;
         expenseByType.set(accountType, current + amount);
-      });
-
-  
+      }
 
       // Convert to array format for chart
       const result = Array.from(expenseByType.entries())
@@ -23243,9 +20216,7 @@ if (asOfDate) {
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Import Cycle Balance - tracks the full import/offload cycle to ensure it balances to zero
@@ -23255,9 +20226,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Helper function to calculate account balance by account type
       const getAccountTypeBalance = async (accountType: string, isLiability: boolean = false) => {
@@ -23300,9 +20269,7 @@ if (asOfDate) {
           } else {
             // Asset/Expense accounts: Dr opening = positive, Cr opening = negative
             signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-          });
-
-  
+          }
           
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
@@ -23314,15 +20281,11 @@ if (asOfDate) {
             } else {
               // Asset/Expense accounts: Debits increase (positive), Credits decrease (negative)
               return sum + debit - credit;
-            });
-
-  
+            }
           }, signedOpening);
           
           totalBalance += balance;
-        });
-
-  
+        }
         return totalBalance;
       };
 
@@ -23455,9 +20418,7 @@ if (asOfDate) {
         
         if (!importChargesParent) {
           return 0; // No import charges yet
-        });
-
-  
+        }
         
         // Get all accounts under IMPORT_CHARGES parent (including the parent itself)
         const importChargeAccounts = await db
@@ -23476,9 +20437,7 @@ if (asOfDate) {
         
         if (importChargeAccounts.length === 0) {
           return 0;
-        });
-
-  
+        }
         
         const accountIds = importChargeAccounts.map(a => a.id);
         
@@ -23597,9 +20556,7 @@ if (asOfDate) {
         // Mixed: only count items with negative quantity (consumption items)
         if (adjustmentType === "consumption" || (adjustmentType === "mixed" && qty < 0)) {
           return sum + Math.abs(parseFloat(item.totalAmount || "0"));
-        });
-
-  
+        }
         return sum;
       }, 0);
 
@@ -23631,9 +20588,7 @@ if (asOfDate) {
         // Mixed: only count items with positive quantity (production items)
         if (adjustmentType === "production" || (adjustmentType === "mixed" && qty > 0)) {
           return sum + parseFloat(item.totalAmount || "0");
-        });
-
-  
+        }
         return sum;
       }, 0);
 
@@ -23690,9 +20645,7 @@ if (asOfDate) {
         }, 0);
 
         payrollExpenseBalance = openingTotal + transactionBalance;
-      });
-
-  
+      }
 
       // 14. Salary Advances - outstanding advances given to employees (asset - recoverable)
       const advancesData = await db
@@ -23781,12 +20734,8 @@ if (asOfDate) {
           totalDrOpenings += openingBalanceRaw;
         } else {
           totalCrOpenings += openingBalanceRaw;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Include employee opening balances in the equity offset calculation
       // Employee opening balances are liabilities (money owed to employees) - credit side
@@ -23932,9 +20881,7 @@ if (asOfDate) {
       let roundedBalance = Math.round(adjustedImportCycleBalance * 100) / 100;
       if (Math.abs(roundedBalance) <= ROUNDING_THRESHOLD) {
         roundedBalance = 0;
-      });
-
-  
+      }
       
       // Calculate precise discrepancy trace
       // Matches the exact formula used for netImportCycleBalance:
@@ -23967,9 +20914,7 @@ if (asOfDate) {
               supplierBalance, dutyAgentBalance, transporterAgentBalance, loansBalance, 
               liabilityBalance, profitBalance, incomeBalance, payrollLiabilitiesBalance,
               openingBalanceEquityOffset: openingBalanceEquity // positive value that reduces liabilities
-            });
-
-  
+            }
           },
         },
         rawNetBalance: netImportCycleBalance,
@@ -24015,9 +20960,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Import Cycle Diagnostics - analyze and explain what's causing imbalance
@@ -24026,9 +20969,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       interface DiagnosticIssue {
         id: string;
@@ -24038,9 +20979,7 @@ if (asOfDate) {
         impact: number;
         howToFix: string;
         category: string;
-      });
-
-  
+      }
 
       const issues: DiagnosticIssue[] = [];
 
@@ -24079,12 +21018,8 @@ if (asOfDate) {
             howToFix: "Go to Settings > System Tools > View Deleted Items > Locations. Either restore the deleted location(s) and transfer the inventory elsewhere, or permanently delete the location which will also remove the orphaned inventory.",
             category: "Orphaned Data"
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // 2. Check for negative inventory (should never happen)
       const negativeInventory = await db
@@ -24118,9 +21053,7 @@ if (asOfDate) {
           howToFix: "Create a Production voucher to add the missing quantity back, or review recent Consumption/Sales vouchers that may have removed more than available.",
           category: "Data Integrity"
         });
-      });
-
-  
+      }
 
       // 3. Check for stale OTW containers (in transit for too long)
       const staleContainers = await db
@@ -24152,9 +21085,7 @@ if (asOfDate) {
           howToFix: "Go to Containers, find the stale containers, and either Offload them to a location if they've arrived, or cancel them if they're lost.",
           category: "Pending Transactions"
         });
-      });
-
-  
+      }
 
       // 4. Check for unbalanced vouchers (debits != credits)
       const unbalancedVouchers = await db
@@ -24201,9 +21132,7 @@ if (asOfDate) {
           howToFix: "Edit these vouchers in the Daybook to correct the imbalance, ensuring total debits equal total credits.",
           category: "Data Integrity"
         });
-      });
-
-  
+      }
 
       // 5. Check if opening balance equity is significantly off
       const allLedgerAccounts = await db
@@ -24230,12 +21159,8 @@ if (asOfDate) {
           totalDrOpenings += openingBalanceRaw;
         } else {
           totalCrOpenings += openingBalanceRaw;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const openingImbalance = Math.abs(totalDrOpenings - totalCrOpenings);
       if (openingImbalance > 100) {
@@ -24248,9 +21173,7 @@ if (asOfDate) {
           howToFix: "This is often normal when importing data from another system. If you need to balance it, add an opening balance to an Equity or Capital account to offset the difference.",
           category: "Opening Balances"
         });
-      });
-
-  
+      }
 
       // 6. Check for payroll liabilities without matching expenses
       const employeesData = await db
@@ -24280,18 +21203,14 @@ if (asOfDate) {
           howToFix: "These balances are normal and represent wages owed. Pay employees through Payroll to reduce these liabilities.",
           category: "Liabilities"
         });
-      });
-
-  
+      }
 
       // Sort issues by impact (highest first), then by severity
       const severityOrder = { critical: 0, warning: 1, info: 2 };
       issues.sort((a, b) => {
         if (severityOrder[a.severity] !== severityOrder[b.severity]) {
           return severityOrder[a.severity] - severityOrder[b.severity];
-        });
-
-  
+        }
         return b.impact - a.impact;
       });
 
@@ -24307,15 +21226,11 @@ if (asOfDate) {
           criticalCount,
           warningCount,
           totalImpact,
-        });
-
-  
+        }
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Sales Report - gain/loss from POS transactions
@@ -24324,9 +21239,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { startDate, endDate, locationId, stockItemId } = req.query;
 
@@ -24335,28 +21248,20 @@ if (asOfDate) {
 
       if (startDate) {
         conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      });
-
-  
+      }
       if (endDate) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      });
-
-  
+      }
       if (locationId) {
         conditions.push(
           eq(vouchers.locationId, parseInt(locationId as string)),
         );
-      });
-
-  
+      }
       if (stockItemId) {
         conditions.push(
           eq(salesItems.stockItemId, parseInt(stockItemId as string)),
         );
-      });
-
-  
+      }
 
       const salesData = await db
         .select({
@@ -24421,9 +21326,7 @@ if (asOfDate) {
             configuredProfit,
             totalConfiguredCost,
           });
-        });
-
-  
+        }
         
         return {
           ...item,
@@ -24439,9 +21342,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Sales report error:", error);
       res.status(500).json({ message: error.message, details: error.toString() });
-    });
-
-  
+    }
   });
 
   // Recalculate cost prices for sales items using current inventory rates
@@ -24454,9 +21355,7 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { startDate, endDate, stockItemId, locationId } = req.body;
 
@@ -24465,24 +21364,16 @@ if (asOfDate) {
         
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        });
-
-  
+        }
         if (endDate) {
           conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        });
-
-  
+        }
         if (stockItemId) {
           conditions.push(eq(salesItems.stockItemId, stockItemId));
-        });
-
-  
+        }
         if (locationId) {
           conditions.push(eq(vouchers.locationId, locationId));
-        });
-
-  
+        }
 
         // Get all sales items that match the criteria
         const itemsToUpdate = await db
@@ -24521,12 +21412,8 @@ if (asOfDate) {
             
             if (invRecord) {
               newCostPrice = parseFloat(invRecord.averageRate || "0");
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           // If no inventory at location, try to get from any location
           if (newCostPrice === 0) {
@@ -24540,12 +21427,8 @@ if (asOfDate) {
             
             if (anyInvRecord) {
               newCostPrice = parseFloat(anyInvRecord.averageRate || "0");
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           const oldCostPrice = parseFloat(item.oldCostPrice || "0");
           
@@ -24581,12 +21464,8 @@ if (asOfDate) {
             });
 
             updatedCount++;
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         res.json({
           message: `Updated cost prices for ${updatedCount} sales items`,
@@ -24596,12 +21475,8 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // Reports API Endpoints
@@ -24616,9 +21491,7 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { startDate, endDate } = req.query;
 
@@ -24647,14 +21520,10 @@ if (asOfDate) {
         const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
         if (startDate) {
           conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        });
-
-  
+        }
         if (endDate) {
           conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        });
-
-  
+        }
 
         const companyVouchers = await db
           .select({ id: vouchers.id })
@@ -24687,12 +21556,8 @@ if (asOfDate) {
               entry.ledgerAccountId,
               currentBalance + credit - debit,
             );
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Build income statement
         const incomeItems = incomeAccounts
@@ -24736,9 +21601,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -24752,9 +21615,7 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { asOfDate } = req.query;
 
@@ -24769,9 +21630,7 @@ if (asOfDate) {
         const conditions = [eq(vouchers.companyId, companyId)];
         if (asOfDate) {
           conditions.push(lte(vouchers.voucherDate, asOfDate));
-        });
-
-  
+        }
 
         const companyVouchers = await db
           .select({ id: vouchers.id })
@@ -24825,9 +21684,7 @@ if (asOfDate) {
               debits: existing.debits + debit,
               credits: existing.credits + credit,
             });
-          });
-
-  
+          }
 
           if (entry.bankAccountId) {
             const existing = bankBalances.get(entry.bankAccountId) || {
@@ -24838,9 +21695,7 @@ if (asOfDate) {
               debits: existing.debits + debit,
               credits: existing.credits + credit,
             });
-          });
-
-  
+          }
 
           if (entry.fixedAssetId) {
             const existing = assetBalances.get(entry.fixedAssetId) || {
@@ -24851,9 +21706,7 @@ if (asOfDate) {
               debits: existing.debits + debit,
               credits: existing.credits + credit,
             });
-          });
-
-  
+          }
 
           if (entry.supplierId) {
             const existing = supplierBalances.get(entry.supplierId) || {
@@ -24872,15 +21725,9 @@ if (asOfDate) {
                 debits: existing.debits + debit,
                 credits: existing.credits,
               });
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         // Categorize and calculate net balances
         const assetAccounts = ledgers
@@ -24995,9 +21842,7 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
+      }
     },
   );
 
@@ -25007,9 +21852,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { startDate, endDate, locationId, stockGroupId } = req.query;
 
@@ -25017,21 +21860,15 @@ if (asOfDate) {
 
       if (startDate) {
         conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      });
-
-  
+      }
       if (endDate) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      });
-
-  
+      }
       if (locationId) {
         conditions.push(
           eq(vouchers.locationId, parseInt(locationId as string)),
         );
-      });
-
-  
+      }
 
       let salesQuery = db
         .select({
@@ -25063,9 +21900,7 @@ if (asOfDate) {
         salesData = salesData.filter(
           (s) => s.stockGroupId === parseInt(stockGroupId as string),
         );
-      });
-
-  
+      }
 
       const totalQuantity = salesData.reduce(
         (sum, item) => sum + parseFloat(item.quantity),
@@ -25103,9 +21938,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Movement Report
@@ -25114,9 +21947,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { startDate, endDate, locationId, stockGroupId } = req.query;
 
@@ -25137,9 +21968,7 @@ if (asOfDate) {
         inventoryConditions.push(
           eq(inventory.locationId, parseInt(locationId as string)),
         );
-      });
-
-  
+      }
 
       const inventoryRecords = await db
         .select({
@@ -25215,9 +22044,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Container Report
@@ -25226,9 +22053,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { status, supplierId, startDate, endDate } = req.query;
 
@@ -25236,26 +22061,18 @@ if (asOfDate) {
 
       if (status) {
         conditions.push(eq(containers.status, status as string));
-      });
-
-  
+      }
       if (supplierId) {
         conditions.push(
           eq(containers.supplierId, parseInt(supplierId as string)),
         );
-      });
-
-  
+      }
       if (startDate) {
         conditions.push(sql`${containers.importDate} >= ${startDate}`);
-      });
-
-  
+      }
       if (endDate) {
         conditions.push(sql`${containers.importDate} <= ${endDate}`);
-      });
-
-  
+      }
 
       const containerData = await db
         .select({
@@ -25303,9 +22120,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Ratio Analysis Report
@@ -25314,9 +22129,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { startDate, endDate } = req.query;
 
@@ -25340,14 +22153,10 @@ if (asOfDate) {
       const conditions = [eq(vouchers.companyId, companyId)];
       if (startDate) {
         conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      });
-
-  
+      }
       if (endDate) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      });
-
-  
+      }
 
       const companyVouchers = await db
         .select({ id: vouchers.id })
@@ -25379,43 +22188,27 @@ if (asOfDate) {
         if (entry.ledgerAccountId) {
           if (incomeAccountIds.includes(entry.ledgerAccountId)) {
             totalIncome += credit - debit;
-          });
-
-  
+          }
           if (expenseAccountIds.includes(entry.ledgerAccountId)) {
             totalExpenses += debit - credit;
-          });
-
-  
+          }
           if (assetAccountIds.includes(entry.ledgerAccountId)) {
             totalAssets += debit - credit;
-          });
-
-  
+          }
           if (liabilityAccountIds.includes(entry.ledgerAccountId)) {
             totalLiabilities += credit - debit;
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // Get sales data for gross profit calculation
       const salesConditions = [eq(vouchers.companyId, companyId)];
       if (startDate) {
         salesConditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      });
-
-  
+      }
       if (endDate) {
         salesConditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      });
-
-  
+      }
 
       const salesData = await db
         .select({
@@ -25475,9 +22268,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Opening Stock Summary Report - shows stock groups with opening/closing balances
@@ -25486,9 +22277,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { locationId, stockGroupId } = req.query;
 
@@ -25538,9 +22327,7 @@ if (asOfDate) {
             )
           )
           .execute();
-      });
-
-  
+      }
 
       // Create a map of stock item ID to inventory aggregated across locations
       // Calculate value dynamically as qty * averageRate
@@ -25559,12 +22346,8 @@ if (asOfDate) {
             quantity: qty,
             totalValue: val,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Build stock groups summary
       const stockGroupSummary = allStockGroups.map((group) => {
@@ -25591,12 +22374,8 @@ if (asOfDate) {
           if (inv) {
             closingQty += inv.quantity;
             closingValue += inv.totalValue;
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         return {
           id: group.id,
@@ -25643,9 +22422,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get stock items for a specific stock group (drill-down)
@@ -25654,9 +22431,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { stockGroupId } = req.params;
       const { locationId } = req.query;
@@ -25686,9 +22461,7 @@ if (asOfDate) {
         ];
         if (locationId && locationId !== "all") {
           conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
-        });
-
-  
+        }
         
         inventoryData = await db
           .select({
@@ -25700,9 +22473,7 @@ if (asOfDate) {
           .innerJoin(locations, eq(inventory.locationId, locations.id))
           .where(and(...conditions))
           .execute();
-      });
-
-  
+      }
 
       // Create inventory map aggregated by item
       // Calculate value dynamically as qty * averageRate
@@ -25721,12 +22492,8 @@ if (asOfDate) {
             quantity: qty,
             totalValue: val,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Build items with opening and closing balances
       const items = groupItems.map((item) => {
@@ -25783,9 +22550,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Debug endpoint: Check raw inventory records for a specific stock item
@@ -25794,9 +22559,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { stockItemId } = req.params;
 
@@ -25814,9 +22577,7 @@ if (asOfDate) {
 
       if (stockItem.length === 0) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
 
       // Get all inventory records for this item (including deleted/inactive locations for debugging)
       const inventoryRecords = await db
@@ -25856,12 +22617,8 @@ if (asOfDate) {
         if (rec.locationExists !== null && rec.locationActive === true) {
           activeQty += qty;
           activeValue += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         stockItem: {
@@ -25885,9 +22642,7 @@ if (asOfDate) {
           } else if (isInactive) {
             status = "INACTIVE";
             displayName = `[INACTIVE] ${r.locationName}`;
-          });
-
-  
+          }
           
           const qty = parseFloat(r.quantity);
           const rate = parseFloat(r.averageRate);
@@ -25915,9 +22670,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Import Cycle Diagnostics - Debug endpoint to find why import cycle balance isn't zero
@@ -25926,9 +22679,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Define issue types
       interface DiagnosticIssue {
@@ -25939,9 +22690,7 @@ if (asOfDate) {
         impact: number;
         details: any;
         fixGuidance?: string;
-      });
-
-  
+      }
 
       const issues: DiagnosticIssue[] = [];
       let issueCounter = 0;
@@ -25990,9 +22739,7 @@ if (asOfDate) {
           },
           fixGuidance: "Create a Production voucher to add missing inventory, or review sales/consumption vouchers for errors.",
         });
-      });
-
-  
+      }
 
       // ============ 2. Detect Orphaned Inventory (at deleted locations) ============
       const orphanedInventory = await db
@@ -26041,12 +22788,8 @@ if (asOfDate) {
             },
             fixGuidance: "Restore the location or transfer inventory to an active location before deleting.",
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // ============ 3. Detect Unbalanced Vouchers (debits ≠ credits) ============
       const voucherBalances = await db
@@ -26091,12 +22834,8 @@ if (asOfDate) {
             },
             fixGuidance: "Edit the voucher to ensure debits equal credits, or delete and recreate it.",
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // ============ 4. Detect Stale OTW Containers (older than 90 days) ============
       const ninetyDaysAgo = new Date();
@@ -26139,9 +22878,7 @@ if (asOfDate) {
           },
           fixGuidance: "Offload this container if goods have arrived, or cancel if the shipment was lost/cancelled.",
         });
-      });
-
-  
+      }
 
       // ============ 5. Detect Duplicate Inventory Records ============
       const duplicateInventory = await db
@@ -26169,9 +22906,7 @@ if (asOfDate) {
           },
           fixGuidance: "Merge duplicate records by summing quantities and recalculating average rate.",
         });
-      });
-
-  
+      }
 
       // ============ 6. Get Balance Totals (same as import-cycle-balance) ============
       // Reuse the calculation logic from import-cycle-balance
@@ -26212,9 +22947,7 @@ if (asOfDate) {
             signedOpening = openingSide === "Cr" ? openingBalanceRaw : -openingBalanceRaw;
           } else {
             signedOpening = openingSide === "Dr" ? openingBalanceRaw : -openingBalanceRaw;
-          });
-
-  
+          }
           
           const balance = entries.reduce((sum, entry) => {
             const credit = parseFloat(entry.creditAmount || "0");
@@ -26223,15 +22956,11 @@ if (asOfDate) {
               return sum + credit - debit;
             } else {
               return sum + debit - credit;
-            });
-
-  
+            }
           }, signedOpening);
           
           totalBalance += balance;
-        });
-
-  
+        }
         return totalBalance;
       };
 
@@ -26370,12 +23099,8 @@ if (asOfDate) {
           totalDrOpenings += openingBalanceRaw;
         } else {
           totalCrOpenings += openingBalanceRaw;
-        });
-
-  
-      });
-
-  
+        }
+      }
       let openingBalanceEquity = totalCrOpenings - totalDrOpenings;
 
       // Opening Stock Value - stock items with opening values
@@ -26421,9 +23146,7 @@ if (asOfDate) {
         parentType: string;
         bucket: string;
         balance: number;
-      });
-
-  
+      }
       
       const accountContributions: AccountContribution[] = [];
       
@@ -26520,12 +23243,8 @@ if (asOfDate) {
           if (parentType?.includes("EXPENSE")) {
             bucket = "payrollExpenseBalance";
             signedBalance = side === "Dr" ? balanceRaw : -balanceRaw;
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         reconBuckets[bucket] = round2((reconBuckets[bucket] || 0) + signedBalance);
         
@@ -26537,9 +23256,7 @@ if (asOfDate) {
           bucket,
           balance: round2(signedBalance),
         });
-      });
-
-  
+      }
       
       // Calculate variances between computed totals and bucket sums
       interface BucketVariance {
@@ -26548,9 +23265,7 @@ if (asOfDate) {
         fromAccounts: number;
         variance: number;
         accountsInBucket: number;
-      });
-
-  
+      }
       
       const variances: BucketVariance[] = [
         { bucket: "supplierBalance", computed: round2(supplierBalance), fromAccounts: reconBuckets.supplierBalance, variance: 0, accountsInBucket: 0 },
@@ -26572,9 +23287,7 @@ if (asOfDate) {
       for (const v of variances) {
         v.variance = round2(v.computed - v.fromAccounts);
         v.accountsInBucket = accountContributions.filter(a => a.bucket === v.bucket).length;
-      });
-
-  
+      }
       
       // Filter to only significant variances
       const significantVariances = variances.filter(v => Math.abs(v.variance) > 1);
@@ -26594,9 +23307,7 @@ if (asOfDate) {
           howToFix: "Review these accounts and ensure they have the correct parent type set: " + uncategorizedAccounts.map(a => a.accountName).join(", "),
           category: "Account Mapping"
         });
-      });
-
-  
+      }
       
       // Add issue for significant variances
       if (significantVariances.length > 0) {
@@ -26610,12 +23321,8 @@ if (asOfDate) {
             howToFix: "Check if any accounts are being counted in multiple buckets, or if there's a special calculation that's not reflected in the account balances.",
             category: "Reconciliation"
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // === COMPONENT AUDIT FOR DEBUGGING ===
       // Show ALL components with source information for debugging the $819.12 discrepancy
@@ -26628,9 +23335,7 @@ if (asOfDate) {
         ledgerVerified: boolean;
         ledgerSum?: number;
         variance?: number;
-      });
-
-  
+      }
       
       const componentAudit: ComponentAudit[] = [
         // Assets
@@ -26671,9 +23376,7 @@ if (asOfDate) {
           howToFix: "Check the account categorization for " + comp.label + " accounts. Some accounts may be miscategorized or double-counted.",
           category: "Reconciliation"
         });
-      });
-
-  
+      }
       const reconciliation = {
         buckets: variances,
         uncategorizedAccounts: uncategorizedAccounts.slice(0, 20), // Limit for response size
@@ -26699,9 +23402,7 @@ if (asOfDate) {
         difference: number;
         voucherCount: number;
         hasDiscrepancy: boolean;
-      });
-
-  
+      }
       
       const containerAudit: ContainerAuditEntry[] = [];
       
@@ -26762,9 +23463,7 @@ if (asOfDate) {
         for (const entry of relatedEntries) {
           totalDebits += parseFloat(entry.debitAmount || "0");
           totalCredits += parseFloat(entry.creditAmount || "0");
-        });
-
-  
+        }
         
         const difference = round2(totalDebits - totalCredits);
         
@@ -26782,9 +23481,7 @@ if (asOfDate) {
           voucherCount: relatedEntries.length,
           hasDiscrepancy: Math.abs(difference) > 1,
         });
-      });
-
-  
+      }
       
       // Find containers with discrepancies
       const containersWithDiscrepancy = containerAudit.filter(c => c.hasDiscrepancy);
@@ -26800,9 +23497,7 @@ if (asOfDate) {
           howToFix: `Review voucher entries for container ${c.containerNumber}. A correction journal entry of $${Math.abs(c.difference).toFixed(2)} is needed to balance the books.`,
           category: "Container Offload"
         });
-      });
-
-  
+      }
       
       // === END CONTAINER OFFLOAD AUDIT ===
 
@@ -26851,9 +23546,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Import cycle diagnostics error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Orphaned Charge Vouchers Diagnostics - Find charge vouchers for OTW containers
@@ -26868,9 +23561,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all OTW containers for this company that do NOT have an active offload record
       // This ensures we're only looking at containers that were reversed (orphaned)
@@ -26945,12 +23636,8 @@ if (asOfDate) {
             totalCredit,
             reason: "Container is OTW with no offload record but has charge vouchers (offload was reversed without cleanup)",
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         otwContainerCount: otwContainers.length,
@@ -26962,9 +23649,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Orphaned charge vouchers diagnostics error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete orphaned charge vouchers for OTW containers
@@ -26974,9 +23659,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all OTW containers that do NOT have an active offload record
       const otwContainers = await db
@@ -27030,12 +23713,8 @@ if (asOfDate) {
           });
           
           console.log(`Deleted orphaned voucher: ${v.voucherNumber} for container ${container.containerNumber}`);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         message: `Deleted ${deletedVouchers.length} orphaned charge vouchers`,
@@ -27046,9 +23725,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Fix orphaned charge vouchers error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Container Offload Diagnostics - Analyze PO line items for potential issues
@@ -27057,24 +23734,18 @@ if (asOfDate) {
       const containerId = parseInt(req.params.id);
       if (isNaN(containerId)) {
         return res.status(400).json({ message: "Invalid container ID" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get container
       const container = await storage.getContainerById(containerId);
       if (!container || container.companyId !== companyId) {
         return res.status(404).json({ message: "Container not found" });
-      });
-
-  
+      }
 
       // Get all POs for this container
       const pos = await storage.getPurchaseOrdersByContainer(containerId);
@@ -27109,9 +23780,7 @@ if (asOfDate) {
           if (!item.stockItemId || item.stockItemId === 0) {
             issues.push("No stock item assigned");
             invalidLineItems++;
-          });
-
-  
+          }
           
           if (isNaN(quantityParsed) || item.quantity === "" || item.quantity === null) {
             issues.push("Blank or invalid quantity");
@@ -27120,22 +23789,16 @@ if (asOfDate) {
             issues.push("Zero or negative quantity");
           } else {
             totalQuantity += quantityParsed;
-          });
-
-  
+          }
           
           // Track for duplicate detection
           if (item.stockItemId && item.stockItemId !== 0) {
             const key = `${po.id}-${item.stockItemId}`;
             if (!duplicateCheck.has(key)) {
               duplicateCheck.set(key, []);
-            });
-
-  
+            }
             duplicateCheck.get(key)!.push(item.id);
-          });
-
-  
+          }
           
           // Get stock item details
           let stockItemCode: string | null = null;
@@ -27145,12 +23808,8 @@ if (asOfDate) {
             if (stockItem) {
               stockItemCode = stockItem.code;
               stockItemName = stockItem.name;
-            });
-
-  
-          });
-
-  
+            }
+          }
           
           lineItemDetails.push({
             poId: po.id,
@@ -27165,12 +23824,8 @@ if (asOfDate) {
             isValid: issues.length === 0,
             issues,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Check for duplicates
       const duplicates: Array<{stockItemId: number; poId: number; lineItemIds: number[]}> = [];
@@ -27184,18 +23839,10 @@ if (asOfDate) {
             if (lineItemIds.includes(detail.lineItemId)) {
               detail.issues.push(`Duplicate: ${lineItemIds.length} entries for same stock item in same PO`);
               detail.isValid = false;
-            });
-
-  
-          });
-
-  
-        });
-
-  
-      });
-
-  
+            }
+          }
+        }
+      }
 
       // Check existing inventory for pre-sales
       const inventoryWarnings: Array<{stockItemId: number; stockItemCode: string; currentQty: number; incomingQty: number; resultQty: number}> = [];
@@ -27205,12 +23852,8 @@ if (asOfDate) {
       for (const item of lineItemDetails) {
         if (item.stockItemId && item.isValid) {
           stockItemTotals.set(item.stockItemId, (stockItemTotals.get(item.stockItemId) || 0) + item.quantityParsed);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         containerId,
@@ -27229,16 +23872,12 @@ if (asOfDate) {
         summary: {
           valid: lineItemDetails.filter(i => i.isValid).length,
           invalid: lineItemDetails.filter(i => !i.isValid).length,
-        });
-
-  
+        }
       });
     } catch (error: any) {
       console.error("Container offload diagnostics error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get all containers for diagnostics selection
@@ -27247,9 +23886,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const allContainers = await db
         .select({
@@ -27266,9 +23903,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Get containers for diagnostics error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Net Profit (P&L) Report - Tally Prime style
@@ -27277,9 +23912,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get date range filters (optional)
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
@@ -27298,14 +23931,10 @@ if (asOfDate) {
       // Add date filters if provided
       if (startDate) {
         voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
-      });
-
-  
+      }
       if (endDate) {
         voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
-      });
-
-  
+      }
 
       // Get all non-optional vouchers for this company within date range
       const companyVouchers = await db
@@ -27336,12 +23965,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // 1. Opening Stock - FROZEN value from stock items' opening values only
       // This value does not change with POS sales - it represents the initial inventory setup
@@ -27349,9 +23974,7 @@ if (asOfDate) {
       let openingStockValue = 0;
       for (const item of allStockItems) {
         openingStockValue += parseFloat(item.openingValue || "0");
-      });
-
-  
+      }
 
       // 2. Purchase Accounts - accounts with code starting with PURCHASES or related expense accounts
       const purchaseAccounts = companyAccounts.filter(
@@ -27408,13 +24031,9 @@ if (asOfDate) {
         companyAccounts.forEach(acc => {
           if (acc.parentId === importChargesParent.id) {
             importChargesAccountIds.add(acc.id);
-          });
-
-  
+          }
         });
-      });
-
-  
+      }
       
       const directExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Direct Expense" || 
@@ -27445,14 +24064,10 @@ if (asOfDate) {
       ];
       if (startDate) {
         salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
-      });
-
-  
+      }
       if (endDate) {
         salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
-      });
-
-  
+      }
       
       const salesData = await db
         .select({
@@ -27493,12 +24108,8 @@ if (asOfDate) {
           const qty = parseFloat(inv.quantity || "0");
           const rate = parseFloat(inv.averageRate || "0");
           closingStockValue += qty * rate;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // 7. Gross Profit Calculation - TALLY PRIME TRADING ACCOUNT STYLE
       // Trading Account format:
@@ -27628,9 +24239,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Closing Stock Summary - Current inventory values by stock group
@@ -27640,9 +24249,7 @@ if (asOfDate) {
       console.log("[closing-stock-summary] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get all stock groups for the company
       const allStockGroups = await storage.getAllStockGroups(companyId);
@@ -27689,12 +24296,8 @@ if (asOfDate) {
             quantity: qty,
             totalValue: val,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       console.log("[closing-stock-summary] Inventory by item map size:", inventoryByItem.size);
       console.log("[closing-stock-summary] Inventory by item entries:", Array.from(inventoryByItem.entries()));
@@ -27713,12 +24316,8 @@ if (asOfDate) {
           if (invData) {
             closingQuantity += invData.quantity;
             closingValue += invData.totalValue;
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
         console.log(`[closing-stock-summary] Group ${group.name} totals: qty=${closingQuantity}, value=${closingValue}`);
@@ -27756,9 +24355,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Transfer Closing Stock to Another Company as Opening Stock
@@ -27767,38 +24364,28 @@ if (asOfDate) {
       const sourceCompanyId = req.session.currentCompanyId;
       if (!sourceCompanyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { targetCompanyId: rawTargetId } = req.body;
       if (!rawTargetId) {
         return res.status(400).json({ message: "Target company is required" });
-      });
-
-  
+      }
       
       const targetCompanyId = typeof rawTargetId === 'string' ? parseInt(rawTargetId, 10) : rawTargetId;
       if (isNaN(targetCompanyId)) {
         return res.status(400).json({ message: "Invalid target company ID" });
-      });
-
-  
+      }
 
       if (sourceCompanyId === targetCompanyId) {
         return res.status(400).json({ message: "Cannot transfer to the same company" });
-      });
-
-  
+      }
 
       // Verify user has access to target company
       const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
       const hasAccessToTarget = userCompanies.some(uc => uc.companyId === targetCompanyId);
       if (!hasAccessToTarget) {
         return res.status(403).json({ message: "You don't have access to the target company" });
-      });
-
-  
+      }
 
       // Get source company inventory from active locations
       const sourceInventory = await db
@@ -27820,9 +24407,7 @@ if (asOfDate) {
 
       if (sourceInventory.length === 0) {
         return res.status(400).json({ message: "No inventory found in source company" });
-      });
-
-  
+      }
 
       // Aggregate by stock item (combine quantities from multiple locations)
       const aggregatedInventory = new Map<number, { quantity: number; totalValue: number }>();
@@ -27837,12 +24422,8 @@ if (asOfDate) {
           existing.totalValue += val;
         } else {
           aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Check if target company already has inventory
       const existingTargetInventory = await db
@@ -27853,17 +24434,13 @@ if (asOfDate) {
 
       if (existingTargetInventory.length > 0) {
         return res.status(400).json({ message: "Target company already has inventory. Please reset it first." });
-      });
-
-  
+      }
 
       // Get the first location in target company (or create a default one)
       let targetLocations = await storage.getAllLocations(targetCompanyId);
       if (targetLocations.length === 0) {
         return res.status(400).json({ message: "Target company has no locations. Please create at least one location first." });
-      });
-
-  
+      }
       const defaultLocation = targetLocations[0];
 
       // Get stock items that exist in source - we need to ensure they exist in target
@@ -27895,20 +24472,14 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: `Stock item "${sourceItem.name}" (code: ${sourceItem.code}) doesn't exist in target company. Please create matching stock items first.`
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Calculate total value for the opening balance voucher
       let totalTransferValue = 0;
       for (const [, data] of aggregatedInventory) {
         totalTransferValue += data.totalValue;
-      });
-
-  
+      }
 
       // Create opening inventory records in target company
       await db.transaction(async (tx) => {
@@ -27926,9 +24497,7 @@ if (asOfDate) {
             averageRate: avgRate.toFixed(2),
             totalValue: data.totalValue.toFixed(2),
           });
-        });
-
-  
+        }
       });
 
       // Get company names for response
@@ -27945,9 +24514,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error transferring closing stock:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Carry Forward Closing Stock to Opening Stock (same company)
@@ -27956,9 +24523,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { asOfDate } = req.body;
       const targetDate = asOfDate ? new Date(asOfDate) : new Date();
@@ -27995,12 +24560,8 @@ if (asOfDate) {
           existing.totalValue += val;
         } else {
           aggregatedInventory.set(inv.stockItemId, { quantity: qty, totalValue: val });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get sales items from vouchers AFTER the target date and add them back
       // (Sales reduce inventory, so we add them back to get historical inventory)
@@ -28032,12 +24593,8 @@ if (asOfDate) {
           existing.totalValue += val;
         } else {
           aggregatedInventory.set(sale.stockItemId, { quantity: qty, totalValue: val });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get stock adjustments AFTER the target date and reverse them
       // Production (positive qty) reduces historical inventory (subtract)
@@ -28076,12 +24633,8 @@ if (asOfDate) {
             quantity: -qty, 
             totalValue: qty >= 0 ? -val : val 
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Get container offloads AFTER the target date and subtract them
       // (Container offloads add inventory, so we subtract them to get historical inventory)
@@ -28115,29 +24668,19 @@ if (asOfDate) {
         } else {
           // If no current inventory, create with negative values (unlikely but handle it)
           aggregatedInventory.set(offload.stockItemId, { quantity: -qty, totalValue: -val });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // Filter out items with zero or negative quantities
       for (const [stockItemId, data] of aggregatedInventory) {
         if (data.quantity <= 0) {
           aggregatedInventory.delete(stockItemId);
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       if (aggregatedInventory.size === 0) {
         return res.status(400).json({ message: "No inventory found for the selected date" });
-      });
-
-  
+      }
 
       // Get all stock items for this company to update those with zero inventory
       const allStockItems = await db
@@ -28167,12 +24710,8 @@ if (asOfDate) {
                 openingValue: "0",
               })
               .where(eq(stockItems.id, item.id));
-          });
-
-  
-        });
-
-  
+          }
+        }
 
         // Then update items that have historical inventory
         for (const [stockItemId, data] of aggregatedInventory) {
@@ -28188,9 +24727,7 @@ if (asOfDate) {
           
           itemsUpdated++;
           totalValue += data.totalValue;
-        });
-
-  
+        }
       });
 
       const company = await storage.getCompanyById(companyId);
@@ -28205,9 +24742,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error carrying forward closing stock:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Closing Stock Detail - Items in a stock group
@@ -28218,9 +24753,7 @@ if (asOfDate) {
       console.log("[closing-stock-detail] Company ID:", companyId);
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { stockGroupId } = req.params;
       console.log("[closing-stock-detail] Stock Group ID param:", stockGroupId, "parsed:", parseInt(stockGroupId));
@@ -28279,12 +24812,8 @@ if (asOfDate) {
             quantity: qty,
             totalValue: val,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       console.log("[closing-stock-detail] Inventory data rows:", inventoryData.length);
       console.log("[closing-stock-detail] Inventory by item entries:", Array.from(inventoryByItem.entries()));
@@ -28326,9 +24855,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Net Profit Drill-down: Purchase Accounts
@@ -28337,9 +24864,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       const purchaseAccounts = companyAccounts.filter(
@@ -28379,12 +24904,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const accounts = purchaseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
@@ -28403,9 +24924,7 @@ if (asOfDate) {
       res.json({ accounts, total });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Net Profit Drill-down: Direct Incomes
@@ -28414,9 +24933,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       const directIncomeAccounts = companyAccounts.filter(
@@ -28455,12 +24972,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const accounts = directIncomeAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
@@ -28479,9 +24992,7 @@ if (asOfDate) {
       res.json({ accounts, total });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Net Profit Drill-down: Direct Expenses
@@ -28490,9 +25001,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       
@@ -28509,13 +25018,9 @@ if (asOfDate) {
         companyAccounts.forEach(acc => {
           if (acc.parentId === importChargesParent.id) {
             importChargesAccountIds.add(acc.id);
-          });
-
-  
+          }
         });
-      });
-
-  
+      }
       
       const directExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Direct Expense" || 
@@ -28555,12 +25060,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const accounts = directExpenseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
@@ -28579,9 +25080,7 @@ if (asOfDate) {
       res.json({ accounts, total });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Net Profit Drill-down: Indirect Expenses
@@ -28590,9 +25089,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId);
       const indirectExpenseAccounts = companyAccounts.filter(
@@ -28631,12 +25128,8 @@ if (asOfDate) {
             debit: current.debit + debit,
             credit: current.credit + credit,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const accounts = indirectExpenseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
@@ -28655,9 +25148,7 @@ if (asOfDate) {
       res.json({ accounts, total });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Ledger Monthly Summary - monthly breakdown for a ledger account
@@ -28666,9 +25157,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const accountId = parseInt(req.params.accountId);
       const { startDate, endDate } = req.query;
@@ -28683,9 +25172,7 @@ if (asOfDate) {
 
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
-      });
-
-  
+      }
 
       // Parse date range
       const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
@@ -28713,9 +25200,7 @@ if (asOfDate) {
       let openingBalance = parseFloat(account.openingBalance || "0");
       for (const entry of openingEntries) {
         openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
-      });
-
-  
+      }
 
       // Get all voucher entries in date range grouped by month
       const entries = await db
@@ -28759,9 +25244,7 @@ if (asOfDate) {
         for (const entry of monthEntries) {
           debit += parseFloat(entry.debit || "0");
           credit += parseFloat(entry.credit || "0");
-        });
-
-  
+        }
 
         runningBalance += debit - credit;
 
@@ -28772,9 +25255,7 @@ if (asOfDate) {
           credit,
           closingBalance: runningBalance,
         });
-      });
-
-  
+      }
 
       // Calculate grand totals
       const grandTotal = {
@@ -28799,9 +25280,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Ledger Vouchers - vouchers for a specific month
@@ -28810,9 +25289,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const accountId = parseInt(req.params.accountId);
       const year = parseInt(req.params.year);
@@ -28828,9 +25305,7 @@ if (asOfDate) {
 
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
-      });
-
-  
+      }
 
       const monthNames = [
         "", "January", "February", "March", "April", "May", "June",
@@ -28863,9 +25338,7 @@ if (asOfDate) {
       let openingBalance = parseFloat(account.openingBalance || "0");
       for (const entry of openingEntries) {
         openingBalance += parseFloat(entry.debit || "0") - parseFloat(entry.credit || "0");
-      });
-
-  
+      }
 
       // Get vouchers for the month
       const voucherEntriesData = await db
@@ -28933,9 +25406,7 @@ if (asOfDate) {
               )
               .execute();
             particulars = contraEntries[0]?.accountName || "Multiple Accounts";
-          });
-
-  
+          }
 
           return {
             id: entry.entryId,
@@ -28973,9 +25444,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Voucher Detail - full voucher with items/entries
@@ -28984,9 +25453,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const voucherId = parseInt(req.params.voucherId);
 
@@ -29000,9 +25467,7 @@ if (asOfDate) {
 
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
-      });
-
-  
+      }
 
       // Get party name from voucher entries (supplier)
       let partyName: string | null = null;
@@ -29021,9 +25486,7 @@ if (asOfDate) {
           .execute()
           .then((rows) => rows[0]);
         partyName = supplier?.legalName || null;
-      });
-
-  
+      }
 
       // Get location name
       const locationName = voucher.locationName || null;
@@ -29086,9 +25549,7 @@ if (asOfDate) {
               .where(eq(stockItems.id, item.stockItemId))
               .execute()
               .then((rows) => rows[0]);
-          });
-
-  
+          }
 
           return {
             id: item.id,
@@ -29127,9 +25588,7 @@ if (asOfDate) {
               .execute()
               .then((rows) => rows[0]);
             ledgerName = ledger?.name || "Unknown Account";
-          });
-
-  
+          }
 
           return {
             id: entry.id,
@@ -29169,9 +25628,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -29181,9 +25638,7 @@ if (asOfDate) {
       const userId = req.session.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
-      });
-
-  
+      }
 
       // Get all companies the user has access to
       const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
@@ -29191,9 +25646,7 @@ if (asOfDate) {
 
       if (companyIds.length === 0) {
         return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, byTransporter: {}, totals: { count: 0, amount: 0 } });
-      });
-
-  
+      }
 
       // Get all companies for names
       const allCompanies = await storage.getAllCompanies();
@@ -29220,14 +25673,10 @@ if (asOfDate) {
             offloadedContainers.push(enrichedContainer);
           } else if (c.status === "OTW") {
             otwContainers.push(enrichedContainer);
-          });
-
-  
+          }
           
         });
-      });
-
-  
+      }
 
       // Fetch agent ledger account balances from all companies
       const agentBalances: Record<string, number> = {};
@@ -29267,20 +25716,12 @@ if (asOfDate) {
             
             for (const entry of entries) {
               balance += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
-            });
-
-  
+            }
             
             agentBalances[agent] = (agentBalances[agent] || 0) + balance;
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // Group OTW containers by shopName (route)
       const byRoute: Record<string, any[]> = {};
@@ -29295,9 +25736,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
 
       for (const container of otwContainers) {
         // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
@@ -29316,9 +25755,7 @@ if (asOfDate) {
           if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
           byAgent[agent].containers.push(container);
           byAgent[agent].total += amount;
-        });
-
-  
+        }
 
         // Group by location
         if (!byLocation[location]) byLocation[location] = { count: 0, total: 0 };
@@ -29326,9 +25763,7 @@ if (asOfDate) {
         byLocation[location].total += amount;
 
         totalAmount += amount;
-      });
-
-  
+      }
 
       // Group by transporter (both OTW and offloaded)
       const byTransporter: Record<string, { otw: any[], offloaded: any[], otwTotal: number, offloadedTotal: number }> = {};
@@ -29339,27 +25774,19 @@ if (asOfDate) {
         const transporter = container.transporter || "Unassigned";
         if (!byTransporter[transporter]) {
           byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
-        });
-
-  
+        }
         byTransporter[transporter].otw.push(container);
         byTransporter[transporter].otwTotal += parseFloat(container.transportFee || "0");
-      });
-
-  
+      }
       
       for (const container of offloadedContainers) {
         const transporter = container.transporter || "Unassigned";
         if (!byTransporter[transporter]) {
           byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
-        });
-
-  
+        }
         byTransporter[transporter].offloaded.push(container);
         byTransporter[transporter].offloadedTotal += parseFloat(container.transportFee || "0");
-      });
-
-  
+      }
 
       res.json({
         containers: otwContainers,
@@ -29372,9 +25799,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Dashboard container tracking error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Dashboard Cash Accounts - user-selected accounts for dashboard display
@@ -29383,9 +25808,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardCashAccounts } = await import("@shared/schema");
       
@@ -29437,25 +25860,19 @@ if (asOfDate) {
             .execute();
         } else {
           entries = [];
-        });
-
-  
+        }
 
         // Calculate balance: opening + (debits - credits)
         let balance = parseFloat(openingBalance || "0");
         if (openingBalanceSide === "Cr") {
           balance = -balance;
-        });
-
-  
+        }
         
         for (const entry of entries) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           balance += debit - credit;
-        });
-
-  
+        }
         
         return balance;
       };
@@ -29479,9 +25896,7 @@ if (asOfDate) {
                 ledger.openingBalanceSide
               );
               accountDetails = { ...ledger, type: "Ledger", balance, currentBalance: balance };
-            });
-
-  
+            }
           } else if (account.accountType === "bank") {
             const { bankAccounts } = await import("@shared/schema");
             const [bank] = await db
@@ -29497,12 +25912,8 @@ if (asOfDate) {
                 bank.openingBalanceSide
               );
               accountDetails = { ...bank, type: "Bank", balance, currentBalance: balance };
-            });
-
-  
-          });
-
-  
+            }
+          }
 
           return {
             id: account.id,
@@ -29519,9 +25930,7 @@ if (asOfDate) {
       res.json(validAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/dashboard-cash-accounts", requireAuth, async (req, res) => {
@@ -29529,9 +25938,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardCashAccounts, insertDashboardCashAccountSchema } = await import("@shared/schema");
       
@@ -29549,9 +25956,7 @@ if (asOfDate) {
       res.json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/dashboard-cash-accounts/:id", requireAuth, async (req, res) => {
@@ -29559,9 +25964,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardCashAccounts } = await import("@shared/schema");
       const id = parseInt(req.params.id);
@@ -29579,9 +25982,7 @@ if (asOfDate) {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Dashboard Payable Accounts - user-selected payable accounts for dashboard display
@@ -29590,9 +25991,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardPayableAccounts, ledgerAccounts, vouchers: vouchersTable, voucherEntries } = await import("@shared/schema");
       
@@ -29626,17 +26025,13 @@ if (asOfDate) {
         let balance = parseFloat(openingBalance || "0");
         if (openingBalanceSide === "Cr") {
           balance = -balance;
-        });
-
-  
+        }
         
         for (const entry of entries) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
           balance += debit - credit;
-        });
-
-  
+        }
         
         return balance;
       };
@@ -29652,9 +26047,7 @@ if (asOfDate) {
           
           if (!ledgerAccount) {
             return null;
-          });
-
-  
+          }
           
           const balance = await calculateAccountBalance(
             ledgerAccount.id,
@@ -29677,9 +26070,7 @@ if (asOfDate) {
       res.json(validAccounts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/dashboard-payable-accounts", requireAuth, async (req, res) => {
@@ -29687,9 +26078,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardPayableAccounts, insertDashboardPayableAccountSchema } = await import("@shared/schema");
       
@@ -29707,9 +26096,7 @@ if (asOfDate) {
       res.json(account);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/dashboard-payable-accounts/:id", requireAuth, async (req, res) => {
@@ -29717,9 +26104,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { dashboardPayableAccounts } = await import("@shared/schema");
       const accountId = parseInt(req.params.id);
@@ -29737,9 +26122,7 @@ if (asOfDate) {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Dashboard Account Selections - for Available Cash and Cash to Pay widgets
@@ -29748,16 +26131,12 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const selectionType = req.params.type;
       if (!["availableCash", "cashToPay"].includes(selectionType)) {
         return res.status(400).json({ message: "Invalid selection type" });
-      });
-
-  
+      }
 
       const { dashboardAccountSelections } = await import("@shared/schema");
 
@@ -29774,9 +26153,7 @@ if (asOfDate) {
 
       if (!selection) {
         return res.json({ accountIds: [], accounts: [] });
-      });
-
-  
+      }
 
       // Fetch account details for the selected account IDs
       const accounts = [];
@@ -29809,9 +26186,7 @@ if (asOfDate) {
             for (const entry of entries) {
               totalDebits += parseFloat(entry.debitAmount || "0");
               totalCredits += parseFloat(entry.creditAmount || "0");
-            });
-
-  
+            }
 
             // Add opening balance
             const openingBalance = parseFloat(account.openingBalance || "0");
@@ -29825,22 +26200,14 @@ if (asOfDate) {
               accountType: account.accountType,
               balance: balance,
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({ accountIds: selection.accountIds || [], accounts });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.put("/api/dashboard-account-selections/:type", requireAuth, async (req, res) => {
@@ -29848,23 +26215,17 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const selectionType = req.params.type;
       if (!["availableCash", "cashToPay"].includes(selectionType)) {
         return res.status(400).json({ message: "Invalid selection type" });
-      });
-
-  
+      }
 
       const { accountIds } = req.body;
       if (!Array.isArray(accountIds)) {
         return res.status(400).json({ message: "accountIds must be an array" });
-      });
-
-  
+      }
 
       const { dashboardAccountSelections } = await import("@shared/schema");
 
@@ -29895,16 +26256,12 @@ if (asOfDate) {
             accountIds,
           })
           .execute();
-      });
-
-  
+      }
 
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bales API Routes
@@ -29913,18 +26270,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const bales = await storage.getAllBales(companyId);
       res.json(bales);
     } catch (error: any) {
       console.error("Error fetching bales:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/bales/:id", requireAuth, async (req, res) => {
@@ -29932,33 +26285,25 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       const bale = await storage.getBaleById(id);
       
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
-      });
-
-  
+      }
 
       // Check company ownership
       if (bale.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       res.json(bale);
     } catch (error: any) {
       console.error("Error fetching bale:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/bales/barcode/:barcode", requireAuth, async (req, res) => {
@@ -29966,26 +26311,20 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const barcode = req.params.barcode;
       const bale = await storage.getBaleByBarcode(barcode, companyId);
       
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
-      });
-
-  
+      }
 
       res.json(bale);
     } catch (error: any) {
       console.error("Error fetching bale by barcode:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bales", requireAuth, async (req, res) => {
@@ -29993,9 +26332,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertBaleSchema } = await import("@shared/schema");
       const data = insertBaleSchema.parse({ ...req.body, companyId });
@@ -30004,18 +26341,14 @@ if (asOfDate) {
       const existing = await storage.getBaleByBarcode(data.barcode, companyId);
       if (existing) {
         return res.status(409).json({ message: "Barcode already exists" });
-      });
-
-  
+      }
 
       const bale = await storage.createBale(data);
       res.json(bale);
     } catch (error: any) {
       console.error("Error creating bale:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/bales/:id", requireAuth, async (req, res) => {
@@ -30023,25 +26356,19 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       const existing = await storage.getBaleById(id);
       
       if (!existing) {
         return res.status(404).json({ message: "Bale not found" });
-      });
-
-  
+      }
 
       // Check company ownership
       if (existing.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       // Prevent companyId changes
       const { companyId: _, ...updateData } = req.body;
@@ -30050,9 +26377,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error updating bale:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/bales/:id", requireAuth, async (req, res) => {
@@ -30060,34 +26385,26 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       const existing = await storage.getBaleById(id);
       
       if (!existing) {
         return res.status(404).json({ message: "Bale not found" });
-      });
-
-  
+      }
 
       // Check company ownership
       if (existing.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       await storage.deleteBale(id);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting bale:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bales/import", requireAuth, async (req, res) => {
@@ -30095,18 +26412,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertBaleSchema } = await import("@shared/schema");
       const balesData = req.body.bales || [];
 
       if (!Array.isArray(balesData)) {
         return res.status(400).json({ message: "Invalid data format" });
-      });
-
-  
+      }
 
       const validatedBales = balesData.map((b: any) => 
         insertBaleSchema.parse({ ...b, companyId })
@@ -30117,9 +26430,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error importing bales:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -30129,17 +26440,13 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const barcodes = await storage.getAllPendingBarcodes(companyId);
       res.json(barcodes);
     } catch (error: any) {
       console.error("Error fetching pending barcodes:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/pending-barcodes/:barcode", requireAuth, async (req, res) => {
@@ -30147,22 +26454,16 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const barcode = await storage.getPendingBarcodeByCode(req.params.barcode, companyId);
       if (!barcode) {
         return res.status(404).json({ message: "Barcode not found" });
-      });
-
-  
+      }
       res.json(barcode);
     } catch (error: any) {
       console.error("Error fetching pending barcode:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/pending-barcodes", requireAuth, async (req, res) => {
@@ -30170,9 +26471,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const { insertPendingBarcodeSchema } = await import("@shared/schema");
       const data = insertPendingBarcodeSchema.parse({ ...req.body, companyId });
       const barcode = await storage.createPendingBarcode(data);
@@ -30180,9 +26479,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error creating pending barcode:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/pending-barcodes/import", requireAuth, async (req, res) => {
@@ -30190,15 +26487,11 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       const barcodes = req.body.barcodes || [];
       if (!Array.isArray(barcodes)) {
         return res.status(400).json({ message: "Invalid data format" });
-      });
-
-  
+      }
       const created = await storage.bulkCreatePendingBarcodes(
         barcodes.map((b: any) => ({
           companyId,
@@ -30214,9 +26507,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error importing pending barcodes:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
@@ -30227,9 +26518,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error updating pending barcode:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/pending-barcodes/mark-printed", requireAuth, async (req, res) => {
@@ -30237,17 +26526,13 @@ if (asOfDate) {
       const { ids } = req.body;
       if (!Array.isArray(ids)) {
         return res.status(400).json({ message: "ids must be an array" });
-      });
-
-  
+      }
       await storage.markBarcodesAsPrinted(ids);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error marking barcodes as printed:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/pending-barcodes/:id", requireAuth, async (req, res) => {
@@ -30257,9 +26542,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error deleting pending barcode:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
   // Bale Products API Routes
   app.get("/api/bale-products", requireAuth, async (req, res) => {
@@ -30267,18 +26550,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const products = await storage.getAllBaleProducts(companyId);
       res.json(products);
     } catch (error: any) {
       console.error("Error fetching bale products:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/bale-products/:id", requireAuth, async (req, res) => {
@@ -30286,24 +26565,18 @@ if (asOfDate) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid product ID" });
-      });
-
-  
+      }
 
       const product = await storage.getBaleProductById(id);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
-      });
-
-  
+      }
 
       res.json(product);
     } catch (error: any) {
       console.error("Error fetching bale product:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bale-products", requireAuth, async (req, res) => {
@@ -30311,9 +26584,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertBaleProductSchema } = await import("@shared/schema");
       const data = insertBaleProductSchema.parse({ ...req.body, companyId });
@@ -30322,18 +26593,14 @@ if (asOfDate) {
       const existing = await storage.getBaleProductByCode(data.code, companyId);
       if (existing) {
         return res.status(409).json({ message: "Product code already exists" });
-      });
-
-  
+      }
 
       const product = await storage.createBaleProduct(data);
       res.json(product);
     } catch (error: any) {
       console.error("Error creating bale product:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/bale-products/:id", requireAuth, async (req, res) => {
@@ -30341,29 +26608,21 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid product ID" });
-      });
-
-  
+      }
 
       const existing = await storage.getBaleProductById(id);
       if (!existing) {
         return res.status(404).json({ message: "Product not found" });
-      });
-
-  
+      }
 
       if (existing.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const { insertBaleProductSchema } = await import("@shared/schema");
       const data = insertBaleProductSchema.partial().parse(req.body);
@@ -30373,9 +26632,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error updating bale product:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/bale-products/:id", requireAuth, async (req, res) => {
@@ -30383,38 +26640,28 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid product ID" });
-      });
-
-  
+      }
 
       const existing = await storage.getBaleProductById(id);
       if (!existing) {
         return res.status(404).json({ message: "Product not found" });
-      });
-
-  
+      }
 
       if (existing.companyId !== companyId) {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       await storage.deleteBaleProduct(id);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting bale product:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bale-products/import-excel", requireAuth, upload.single("file"), async (req, res) => {
@@ -30422,15 +26669,11 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
-      });
-
-  
+      }
 
       // Parse Excel file
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -30459,21 +26702,15 @@ if (asOfDate) {
           return res.status(409).json({ 
             message: `Product code "${code}" already exists in your company` 
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const created = await storage.bulkCreateBaleProducts(productsData);
       res.json({ success: true, count: created.length, products: created });
     } catch (error: any) {
       console.error("Error importing bale products from Excel:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Company Settings API Routes
@@ -30485,18 +26722,14 @@ if (asOfDate) {
         : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const settings = await storage.getCompanySettings(companyId);
       res.json(settings || { companyId });
     } catch (error: any) {
       console.error("Error fetching company settings:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/company-settings", requireAuth, async (req, res) => {
@@ -30507,9 +26740,7 @@ if (asOfDate) {
         : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertCompanySettingsSchema } = await import("@shared/schema");
       const data = insertCompanySettingsSchema.parse({ ...req.body, companyId });
@@ -30519,9 +26750,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error updating company settings:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Mix Batches API Routes
@@ -30530,18 +26759,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const batches = await storage.getAllMixBatches(companyId);
       res.json(batches);
     } catch (error: any) {
       console.error("Error fetching mix batches:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/mix-batches/:id", requireAuth, async (req, res) => {
@@ -30549,32 +26774,24 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
-      });
-
-  
+      }
       
       const batch = await storage.getMixBatchById(id, companyId);
       
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
-      });
-
-  
+      }
 
       res.json(batch);
     } catch (error: any) {
       console.error("Error fetching mix batch:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/mix-batches", requireAuth, async (req, res) => {
@@ -30584,9 +26801,7 @@ if (asOfDate) {
       
       if (!companyId || !userId) {
         return res.status(400).json({ message: "No company or user session" });
-      });
-
-  
+      }
 
       const { insertMixBatchSchema } = await import("@shared/schema");
       const { sources, ...batchData } = req.body;
@@ -30614,25 +26829,17 @@ if (asOfDate) {
           const container = await storage.getContainerById(sourceData.containerId);
           if (!container || container.companyId !== companyId) {
             throw new Error(`Container ${sourceData.containerId} not found or doesn't belong to this company`);
-          });
-
-  
+          }
           
           await storage.addMixBatchSource(sourceData);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       res.json(batch);
     } catch (error: any) {
       console.error("Error creating mix batch:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/mix-batches/:id/sources", requireAuth, async (req, res) => {
@@ -30640,25 +26847,19 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
-      });
-
-  
+      }
       
       const sources = await storage.getMixBatchSources(id, companyId);
       res.json(sources);
     } catch (error: any) {
       console.error("Error fetching mix batch sources:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/mix-batches/:id/sources", requireAuth, async (req, res) => {
@@ -30666,24 +26867,18 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const mixBatchId = parseInt(req.params.id);
       if (isNaN(mixBatchId)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
-      });
-
-  
+      }
       
       // Verify the mix batch belongs to this company
       const batch = await storage.getMixBatchById(mixBatchId, companyId);
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
-      });
-
-  
+      }
       
       const { insertMixBatchSourceSchema } = await import("@shared/schema");
       const data = insertMixBatchSourceSchema.parse({ 
@@ -30696,9 +26891,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error adding mix batch source:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Production Bales API Routes
@@ -30707,9 +26900,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const filters: any = {};
       if (req.query.mixBatchId) filters.mixBatchId = parseInt(req.query.mixBatchId as string);
@@ -30722,9 +26913,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error fetching production bales:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/production-bales/barcode/:barcode", requireAuth, async (req, res) => {
@@ -30732,25 +26921,19 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const bale = await storage.getProductionBaleByBarcode(req.params.barcode, companyId);
       
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
-      });
-
-  
+      }
 
       res.json(bale);
     } catch (error: any) {
       console.error("Error fetching bale by barcode:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/production-bales/create-batch", requireAuth, async (req, res) => {
@@ -30758,49 +26941,37 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { mixBatchId, productId, locationId, quantity, weightPerBale } = req.body;
 
       if (!mixBatchId || !productId || !locationId || !quantity || !weightPerBale) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const numBales = parseInt(quantity);
       const weight = parseFloat(weightPerBale);
 
       if (isNaN(numBales) || numBales < 1 || numBales > 1000) {
         return res.status(400).json({ message: "Quantity must be between 1 and 1000" });
-      });
-
-  
+      }
 
       if (isNaN(weight) || weight <= 0 || weight > 500) {
         return res.status(400).json({ message: "Weight must be between 1 and 500 kg" });
-      });
-
-  
+      }
 
       // Get mix batch to verify and get cost info
       const batch = await storage.getMixBatchById(mixBatchId, companyId);
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
-      });
-
-  
+      }
 
       // Get product for bale code
       const { baleProducts } = await import("@shared/schema");
       const [product] = await db.select().from(baleProducts).where(eq(baleProducts.id, productId));
       if (!product || product.companyId !== companyId) {
         return res.status(404).json({ message: "Product not found" });
-      });
-
-  
+      }
 
       const totalWeight = weight * numBales;
       const costPerKg = parseFloat(batch.costPerKg);
@@ -30835,9 +27006,7 @@ if (asOfDate) {
               .update(baleSequences)
               .set({ nextNumber: sequence.nextNumber + 1 })
               .where(eq(baleSequences.id, sequence.id));
-          });
-
-  
+          }
 
           // Create bale within transaction
           const baleData = {
@@ -30860,9 +27029,7 @@ if (asOfDate) {
             .values(baleData)
             .returning();
           createdBales.push(bale);
-        });
-
-  
+        }
 
         // Update mix batch actual weight atomically within transaction
         await tx
@@ -30880,9 +27047,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error creating production bales:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/production-bales", requireAuth, async (req, res) => {
@@ -30890,9 +27055,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertProductionBaleSchema } = await import("@shared/schema");
       const data = insertProductionBaleSchema.parse({ ...req.body, companyId });
@@ -30902,9 +27065,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error creating production bale:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/production-bales/bulk", requireAuth, async (req, res) => {
@@ -30912,18 +27073,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { insertProductionBaleSchema } = await import("@shared/schema");
       const balesData = req.body.bales || [];
 
       if (!Array.isArray(balesData)) {
         return res.status(400).json({ message: "Invalid data format" });
-      });
-
-  
+      }
 
       const validatedBales = balesData.map((b: any) => 
         insertProductionBaleSchema.parse({ ...b, companyId })
@@ -30934,9 +27091,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error bulk creating bales:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/production-bales/next-barcode", requireAuth, async (req, res) => {
@@ -30944,18 +27099,14 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const barcode = await storage.getNextBaleBarcode(companyId);
       res.json({ barcode });
     } catch (error: any) {
       console.error("Error generating barcode:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/production-bales/scan", requireAuth, async (req, res) => {
@@ -30963,17 +27114,13 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const { barcodeValue, weightKg, category, grade, warehouseLocation } = req.body;
 
       if (!barcodeValue || !weightKg || !category || !grade) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
 
       const bale = await storage.updateProductionBaleFromScan(
         barcodeValue,
@@ -30985,9 +27132,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error updating bale from scan:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/generate-barcode", requireAuth, async (req, res) => {
@@ -30996,9 +27141,7 @@ if (asOfDate) {
       
       if (!text) {
         return res.status(400).json({ message: "Barcode text is required" });
-      });
-
-  
+      }
 
       // @ts-ignore - bwip-js types are incomplete
       const bwipjs = await import("bwip-js");
@@ -31019,9 +27162,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error generating barcode:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -31032,9 +27173,7 @@ if (asOfDate) {
       
       if (!code) {
         return res.status(400).json({ message: "Barcode code is required" });
-      });
-
-  
+      }
 
       // @ts-ignore - bwip-js types are incomplete
       const bwipjs = await import("bwip-js");
@@ -31055,9 +27194,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error generating barcode image:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.delete("/api/production-bales/:id", requireAuth, async (req, res) => {
@@ -31065,9 +27202,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const id = parseInt(req.params.id);
       await storage.deleteProductionBale(id, companyId);
@@ -31075,9 +27210,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error deleting production bale:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/production-bales/import-excel", requireAuth, upload.single("file"), async (req, res) => {
@@ -31085,15 +27218,11 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
-      });
-
-  
+      }
 
       // Parse Excel file
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -31126,9 +27255,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error importing Excel:", error);
       res.status(400).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Customer Balance API Routes
@@ -31137,25 +27264,19 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) {
         return res.status(400).json({ message: "Invalid customer ID" });
-      });
-
-  
+      }
 
       const balance = await storage.getCustomerBalance(customerId, companyId);
       res.json({ customerId, balance });
     } catch (error: any) {
       console.error("Error fetching customer balance:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/customers/:id/statement", requireAuth, async (req, res) => {
@@ -31163,16 +27284,12 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) {
         return res.status(400).json({ message: "Invalid customer ID" });
-      });
-
-  
+      }
 
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
@@ -31182,9 +27299,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error fetching customer statement:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Transfer Routes for POS Users
@@ -31242,21 +27357,15 @@ if (asOfDate) {
           // Also strip any voucher-level totals
           const { totalAmount: _, ...sanitizedTransfer } = transfer as any;
           return res.json({ ...sanitizedTransfer, items: sanitizedItems });
-        });
-
-  
+        }
         
         return res.json({ ...transfer, items });
-      });
-
-  
+      }
       
       res.json(transfers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/stock-transfers/:id", requireAuth, async (req, res) => {
@@ -31290,9 +27399,7 @@ if (asOfDate) {
       res.json({ ...transfer, items });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/stock-transfers", requireAuth, async (req, res) => {
@@ -31304,21 +27411,15 @@ if (asOfDate) {
       
       if (!destinationLocationId || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
-      });
-
-  
+      }
       
       // Validate all items have sourceLocationId (either from item or request level)
       for (const item of items) {
         const effectiveSourceId = item.sourceLocationId || sourceLocationId;
         if (!effectiveSourceId) {
           return res.status(400).json({ message: "Each item must have a source location" });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Detect multi-source transfers
       const uniqueSourceLocations = [...new Set(items.map((item: any) => item.sourceLocationId || sourceLocationId))];
@@ -31349,9 +27450,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
       const transferItems = [];
       
       for (const item of items) {
@@ -31386,9 +27485,7 @@ if (asOfDate) {
           .returning();
         
         transferItems.push(insertedItem);
-      });
-
-  
+      }
       
       // Create the stock transfer record
       const [transfer] = await db
@@ -31407,9 +27504,7 @@ if (asOfDate) {
           .update(stockTransferItems)
           .set({ transferId: transfer.id })
           .where(eq(stockTransferItems.id, item.id));
-      });
-
-  
+      }
       
       // Update voucher total amount
       await db
@@ -31438,9 +27533,7 @@ if (asOfDate) {
           const newQty = parseFloat(sourceInv.quantity) - quantity;
           if (newQty < 0) {
             throw new Error(`Insufficient stock for item ${item.stockItemId}`);
-          });
-
-  
+          }
           
           // Recalculate totalValue as newQty * averageRate
           const sourceRate = parseFloat(sourceInv.averageRate || "0");
@@ -31453,9 +27546,7 @@ if (asOfDate) {
               lastUpdated: new Date(),
             })
             .where(eq(inventory.id, sourceInv.id));
-        });
-
-  
+        }
         
         // Add to destination
         const [destInv] = await db
@@ -31496,19 +27587,13 @@ if (asOfDate) {
               totalValue: (quantity * rate).toFixed(2),
               lastUpdated: new Date(),
             });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       res.json({ success: true, transferId: transfer.id });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/inventory-by-location/:locationId", requireAuth, async (req, res) => {
@@ -31548,9 +27633,7 @@ if (asOfDate) {
       res.json(sanitizedItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bale Transfer Routes
@@ -31562,9 +27645,7 @@ if (asOfDate) {
       res.json(transfers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/bale-transfers/:id", requireAuth, async (req, res) => {
@@ -31575,9 +27656,7 @@ if (asOfDate) {
       res.json({ ...transfer, items });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/bale-transfers", requireAuth, async (req, res) => {
@@ -31606,16 +27685,12 @@ if (asOfDate) {
           costPerKg: item.costPerKg.toString(),
           totalCost: item.totalCost.toString()
         });
-      });
-
-  
+      }
 
       res.json({ success: true, transferId: transfer.id });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.patch("/api/bale-transfers/:id", requireAuth, async (req, res) => {
@@ -31646,22 +27721,14 @@ if (asOfDate) {
               costPerKg: item.costPerKg.toString(),
               totalCost: item.totalCost.toString()
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.get("/api/bales-by-location/:locationId", requireAuth, async (req, res) => {
@@ -31681,9 +27748,7 @@ if (asOfDate) {
       })));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Orphaned Records Cleanup API - Find and reassign vouchers with deleted locations + unbalanced vouchers
@@ -31754,9 +27819,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   app.post("/api/orphaned-records/reassign", requireAuth, requireNonPOS, async (req, res) => {
@@ -31768,23 +27831,17 @@ if (asOfDate) {
       
       if (!voucherIds || !Array.isArray(voucherIds) || voucherIds.length === 0) {
         return res.status(400).json({ message: "No vouchers selected" });
-      });
-
-  
+      }
       
       if (!newLocationId) {
         return res.status(400).json({ message: "New location is required" });
-      });
-
-  
+      }
       
       // Verify the new location exists and belongs to current company
       const newLocation = await storage.getLocationById(newLocationId);
       if (!newLocation || newLocation.companyId !== companyId) {
         return res.status(400).json({ message: "Invalid location" });
-      });
-
-  
+      }
       
       // Verify all vouchers belong to current company
       const vouchersToUpdate = await db
@@ -31799,9 +27856,7 @@ if (asOfDate) {
       
       if (vouchersToUpdate.length !== voucherIds.length) {
         return res.status(400).json({ message: "Some vouchers not found or belong to different company" });
-      });
-
-  
+      }
       
       // Update vouchers with new location
       await db
@@ -31815,9 +27870,7 @@ if (asOfDate) {
       res.json({ success: true, updated: voucherIds.length, newLocationName: newLocation.name });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete all orphaned vouchers permanently
@@ -31847,18 +27900,14 @@ if (asOfDate) {
       console.log("[DELETE-ALL] Found orphaned vouchers:", orphanedVouchers.length);
       if (orphanedVouchers.length > 0) {
         console.log("[DELETE-ALL] First 3 vouchers:", JSON.stringify(orphanedVouchers.slice(0, 3)));
-      });
-
-  
+      }
       
       if (orphanedVouchers.length === 0) {
         // Debug: check what vouchers exist for this company at all
         const allVouchers = await db.select({ id: vouchers.id, locationId: vouchers.locationId }).from(vouchers).where(eq(vouchers.companyId, companyId)).limit(5);
         console.log("[DELETE-ALL] Sample vouchers for company:", JSON.stringify(allVouchers));
         return res.json({ success: true, deleted: 0, message: "No orphaned vouchers found", debug: { companyId, sampleVouchers: allVouchers.length } });
-      });
-
-  
+      }
       
       const orphanedIds = orphanedVouchers.map(v => v.id);
       
@@ -31883,9 +27932,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Error deleting orphaned vouchers:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Stock Item Monthly Summary - Get aggregated monthly data for a stock item
@@ -31897,17 +27944,13 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       // Get the stock item info
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
       
       // Initialize monthly data
       const monthlyData: Array<{
@@ -32007,18 +28050,14 @@ if (asOfDate) {
       const monthBuckets: Record<number, { inQty: number; inVal: number; outQty: number; outVal: number }> = {};
       for (let m = 1; m <= 12; m++) {
         monthBuckets[m] = { inQty: 0, inVal: 0, outQty: 0, outVal: 0 };
-      });
-
-  
+      }
       
       // Process PO Inwards
       for (const row of poInwards) {
         const month = Number(row.month);
         monthBuckets[month].inQty += parseFloat(row.quantity);
         monthBuckets[month].inVal += parseFloat(row.lineTotal);
-      });
-
-  
+      }
       
       // Process Stock Transfers (all count as movement - inward if receiving, outward if sending)
       for (const row of stockTransfers) {
@@ -32031,9 +28070,7 @@ if (asOfDate) {
         // Transfer IN to destination (inward)
         monthBuckets[month].inQty += qty;
         monthBuckets[month].inVal += val;
-      });
-
-  
+      }
       
       // Process Stock Adjustments
       for (const row of stockAdjustments) {
@@ -32046,21 +28083,15 @@ if (asOfDate) {
         } else {
           monthBuckets[month].outQty += qty;
           monthBuckets[month].outVal += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Process Sales (always outward)
       for (const row of salesData) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
         monthBuckets[month].outVal += parseFloat(row.totalCost);
-      });
-
-  
+      }
       
       // Calculate running closing balance
       let runningQty = 0;
@@ -32084,9 +28115,7 @@ if (asOfDate) {
           closingQty: runningQty,
           closingValue: runningVal,
         });
-      });
-
-  
+      }
       
       // Calculate grand totals
       const grandTotal = {
@@ -32107,9 +28136,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error('Stock item monthly summary error:', error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
   
   // Stock Item Monthly Vouchers - Get detailed transactions for a specific month
@@ -32122,16 +28149,12 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
       
       // Calculate the first day of the selected month for opening balance cutoff
       const monthStart = new Date(year, month - 1, 1);
@@ -32159,9 +28182,7 @@ if (asOfDate) {
       for (const item of priorPOItems) {
         openingQty += parseFloat(item.quantity);
         openingValue += parseFloat(item.lineTotal);
-      });
-
-  
+      }
       
       // Opening from Stock Transfers (net effect - transfers IN minus transfers OUT)
       const priorTransfers = await db
@@ -32195,9 +28216,7 @@ if (asOfDate) {
         openingQty += qty;
         openingValue += val;
         // Net effect: 0 (correct for company-wide view)
-      });
-
-  
+      }
       
       // Opening from Stock Adjustments (Production adds, Consumption subtracts)
       const priorAdjustments = await db
@@ -32221,9 +28240,7 @@ if (asOfDate) {
       for (const item of priorAdjustments) {
         openingQty += parseFloat(item.quantity);
         openingValue += parseFloat(item.totalAmount);
-      });
-
-  
+      }
       
       // Opening from Sales (reduces stock)
       const priorSales = await db
@@ -32244,9 +28261,7 @@ if (asOfDate) {
       for (const item of priorSales) {
         openingQty -= parseFloat(item.quantity);
         openingValue -= parseFloat(item.totalCost);
-      });
-
-  
+      }
       
       const openingRate = openingQty > 0 ? openingValue / openingQty : 0;
       
@@ -32305,9 +28320,7 @@ if (asOfDate) {
           outwardRate: 0,
           outwardValue: 0,
         });
-      });
-
-  
+      }
       
       // 2. Stock Transfers
       const transferItems = await db
@@ -32340,17 +28353,13 @@ if (asOfDate) {
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
         if (item.destinationLocationId) locationIds.add(item.destinationLocationId);
-      });
-
-  
+      }
       
       const locationMap: Record<number, string> = {};
       for (const locId of Array.from(locationIds)) {
         const loc = await storage.getLocationById(locId);
         if (loc) locationMap[locId] = loc.name;
-      });
-
-  
+      }
       
       for (const item of transferItems) {
         const qty = parseFloat(item.quantity);
@@ -32386,9 +28395,7 @@ if (asOfDate) {
           outwardRate: 0,
           outwardValue: 0,
         });
-      });
-
-  
+      }
       
       // 3. Stock Adjustments
       const adjustmentItems = await db
@@ -32437,9 +28444,7 @@ if (asOfDate) {
           outwardRate: isProduction ? 0 : rate,
           outwardValue: isProduction ? 0 : value, // Use absolute value for consumption
         });
-      });
-
-  
+      }
       
       // 4. Sales (Outwards) - show each line item individually for this stock item
       const salesData = await db
@@ -32491,9 +28496,7 @@ if (asOfDate) {
           posSellingRate: sellingRate,
           posSellingValue: totalSalesValue,
         });
-      });
-
-  
+      }
       
       // Sort transactions by date
       transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -32539,9 +28542,7 @@ if (asOfDate) {
           closingValue: openingValue,
           isOpeningBalance: true,
         });
-      });
-
-  
+      }
       
       // Calculate running balance for each transaction
       // Using weighted average cost method: outward items are valued at the current average rate for closing balance
@@ -32576,9 +28577,7 @@ if (asOfDate) {
           closingRate: avgClosingRate,
           closingValue: runningValue,
         });
-      });
-
-  
+      }
       
       // Calculate totals from processed transactions (all now using cost basis)
       const processedTransactions = transactionsWithBalance.filter(t => !t.isOpeningBalance);
@@ -32619,9 +28618,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error('Stock item monthly vouchers error:', error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Location Stock Item Monthly Summary - Get aggregated monthly data for a stock item at a specific location
@@ -32634,24 +28631,18 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       // Get the stock item and location info
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
       
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
       
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                           'July', 'August', 'September', 'October', 'November', 'December'];
@@ -32660,9 +28651,7 @@ if (asOfDate) {
       const monthBuckets: Record<number, { inQty: number; inVal: number; outQty: number; outVal: number }> = {};
       for (let m = 1; m <= 12; m++) {
         monthBuckets[m] = { inQty: 0, inVal: 0, outQty: 0, outVal: 0 };
-      });
-
-  
+      }
       
       // 1. Stock Transfers - In and Out based on source/destination matching this location
       const stockTransfers = await db
@@ -32697,19 +28686,13 @@ if (asOfDate) {
         if (row.sourceLocationId === locationId) {
           monthBuckets[month].outQty += qty;
           monthBuckets[month].outVal += val;
-        });
-
-  
+        }
         // Transfer IN to this location (destination = this location)
         if (row.destinationLocationId === locationId) {
           monthBuckets[month].inQty += qty;
           monthBuckets[month].inVal += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // 2. Stock Adjustments at this location
       const stockAdjustments = await db
@@ -32741,12 +28724,8 @@ if (asOfDate) {
         } else {
           monthBuckets[month].outQty += qty;
           monthBuckets[month].outVal += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // 3. Sales at this location (Outwards)
       const salesData = await db
@@ -32770,9 +28749,7 @@ if (asOfDate) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
         monthBuckets[month].outVal += parseFloat(row.totalCost);
-      });
-
-  
+      }
       
       // 4. Container Offloads at this location (Inwards - from PO imports)
       const containerOffloadData = await db
@@ -32802,9 +28779,7 @@ if (asOfDate) {
         
         monthBuckets[month].inQty += qty;
         monthBuckets[month].inVal += landedValue;
-      });
-
-  
+      }
       
       // Get ACTUAL current inventory for this location and item (source of truth)
       const currentInventoryResult = await db
@@ -32848,9 +28823,7 @@ if (asOfDate) {
         // For past years, start from 0 (no inventory history available)
         derivedOpeningQty = 0;
         derivedOpeningVal = 0;
-      });
-
-  
+      }
       
       // Calculate running closing balance starting from derived opening
       let runningQty = derivedOpeningQty;
@@ -32882,18 +28855,14 @@ if (asOfDate) {
           closingQty: Math.round(runningQty * 1000) / 1000,
           closingValue: runningVal,
         });
-      });
-
-  
+      }
       
       // For current year: force December closing to match actual inventory
       // This ensures the final closing reconciles to inventory
       if (year === currentYear) {
         monthlyData[11].closingQty = Math.round(actualQty * 1000) / 1000;
         monthlyData[11].closingValue = actualValue;
-      });
-
-  
+      }
       
       // Grand total closing should match actual inventory for current year
       const grandTotal = {
@@ -32915,9 +28884,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error('Location stock item monthly summary error:', error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
   
   // Location Stock Item Monthly Vouchers - Get detailed transactions for a specific month at a location
@@ -32931,23 +28898,17 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
       
       const stockItem = await storage.getStockItemById(stockItemId);
       if (!stockItem) {
         return res.status(404).json({ message: "Stock item not found" });
-      });
-
-  
+      }
       
       const location = await storage.getLocationById(locationId);
       if (!location) {
         return res.status(404).json({ message: "Location not found" });
-      });
-
-  
+      }
       
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 0); // Last day of month
@@ -32990,18 +28951,12 @@ if (asOfDate) {
         if (item.sourceLocationId === locationId) {
           priorOutwardQty += qty;
           priorOutwardValue += val;
-        });
-
-  
+        }
         if (item.destinationLocationId === locationId) {
           priorInwardQty += qty;
           priorInwardValue += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Prior Stock Adjustments (production adds, consumption subtracts)
       const priorAdjustments = await db
@@ -33030,12 +28985,8 @@ if (asOfDate) {
         } else {
           priorOutwardQty += Math.abs(qty);
           priorOutwardValue += Math.abs(val);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Prior Sales
       const priorSales = await db
@@ -33058,9 +29009,7 @@ if (asOfDate) {
       for (const item of priorSales) {
         priorOutwardQty += parseFloat(item.quantity);
         priorOutwardValue += parseFloat(item.totalCost);
-      });
-
-  
+      }
       
       // Prior Container Offloads
       const priorOffloads = await db
@@ -33086,9 +29035,7 @@ if (asOfDate) {
         const additionalCost = parseFloat(item.additionalCostPerBale) * qty;
         priorInwardQty += qty;
         priorInwardValue += baseValue + additionalCost;
-      });
-
-  
+      }
       
       // ============ GET CURRENT INVENTORY (to check for unexplained stock from imports) ============
       const [currentInventory] = await db
@@ -33146,18 +29093,12 @@ if (asOfDate) {
         if (item.sourceLocationId === locationId) {
           afterMonthNetQty -= qty;
           afterMonthNetValue -= val;
-        });
-
-  
+        }
         if (item.destinationLocationId === locationId) {
           afterMonthNetQty += qty;
           afterMonthNetValue += val;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // After-month Stock Adjustments
       const afterAdjustments = await db
@@ -33180,9 +29121,7 @@ if (asOfDate) {
       for (const item of afterAdjustments) {
         afterMonthNetQty += parseFloat(item.quantity);
         afterMonthNetValue += parseFloat(item.totalAmount);
-      });
-
-  
+      }
       
       // After-month Sales
       const afterSales = await db
@@ -33204,9 +29143,7 @@ if (asOfDate) {
       for (const item of afterSales) {
         afterMonthNetQty -= parseFloat(item.quantity);
         afterMonthNetValue -= parseFloat(item.totalCost);
-      });
-
-  
+      }
       
       // After-month Container Offloads
       const afterOffloads = await db
@@ -33232,9 +29169,7 @@ if (asOfDate) {
         const additionalCost = parseFloat(item.additionalCostPerBale) * qty;
         afterMonthNetQty += qty;
         afterMonthNetValue += baseValue + additionalCost;
-      });
-
-  
+      }
       
       // Calculate expected end-of-month closing from inventory (working backwards)
       const expectedClosingQty = currentQty - afterMonthNetQty;
@@ -33292,17 +29227,13 @@ if (asOfDate) {
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
         if (item.destinationLocationId) locationIds.add(item.destinationLocationId);
-      });
-
-  
+      }
       
       const locationMap: Record<number, string> = {};
       for (const locId of Array.from(locationIds)) {
         const loc = await storage.getLocationById(locId);
         if (loc) locationMap[locId] = loc.name;
-      });
-
-  
+      }
       
       for (const item of transferItems) {
         const qty = parseFloat(item.quantity);
@@ -33325,9 +29256,7 @@ if (asOfDate) {
             outwardRate: rate,
             outwardValue: val,
           });
-        });
-
-  
+        }
         
         // Transfer IN to this location
         if (item.destinationLocationId === locationId) {
@@ -33343,12 +29272,8 @@ if (asOfDate) {
             outwardRate: 0,
             outwardValue: 0,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // 2. Stock Adjustments at this location
       const adjustmentItems = await db
@@ -33394,9 +29319,7 @@ if (asOfDate) {
           outwardRate: isProduction ? 0 : rate,
           outwardValue: isProduction ? 0 : value,
         });
-      });
-
-  
+      }
       
       // 3. Sales at this location
       const salesData = await db
@@ -33442,9 +29365,7 @@ if (asOfDate) {
           posSellingRate: sellingRate,
           posSellingValue: totalSalesValue,
         });
-      });
-
-  
+      }
       
       // 4. Container Offloads at this location (Inwards from PO imports)
       const offloadData = await db
@@ -33498,9 +29419,7 @@ if (asOfDate) {
           outwardRate: 0,
           outwardValue: 0,
         });
-      });
-
-  
+      }
       
       // Sort transactions by date, with inward transactions before outward on same date
       transactions.sort((a, b) => {
@@ -33521,9 +29440,7 @@ if (asOfDate) {
         inMonthInwardQty += t.inwardQty;
         inMonthInwardValue += t.inwardValue;
         inMonthOutwardQty += t.outwardQty;
-      });
-
-  
+      }
       
       // Calculate what the opening balance SHOULD be based on:
       // expectedClosing = expectedOpening + inMonthInward - inMonthOutward
@@ -33551,9 +29468,7 @@ if (asOfDate) {
         openingQty = 0;
         openingValue = 0;
         openingRate = 0;
-      });
-
-  
+      }
       
       // Calculate running balance - start with the full expected opening (includes imports)
       let runningQty = openingQty;
@@ -33598,9 +29513,7 @@ if (asOfDate) {
           closingValue: openingValue,
           isOpeningBalance: true,
         });
-      });
-
-  
+      }
       
       // Calculate running balance for each transaction using weighted average cost
       for (const t of transactions) {
@@ -33621,9 +29534,7 @@ if (asOfDate) {
           closingRate: avgClosingRate,
           closingValue: runningValue,
         });
-      });
-
-  
+      }
       
       // Use expected closing values (derived from inventory) for totals to ensure reconciliation
       // This guarantees the report's closing balance matches actual inventory
@@ -33637,9 +29548,7 @@ if (asOfDate) {
         lastTx.closingQty = finalClosingQty;
         lastTx.closingRate = finalClosingRate;
         lastTx.closingValue = finalClosingValue;
-      });
-
-  
+      }
       
       const processedTransactions = transactionsWithBalance.filter(t => !t.isOpeningBalance);
       const totals = {
@@ -33676,9 +29585,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error('Location stock item monthly vouchers error:', error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Location Summary - Matrix view of all stock groups/items across selected locations
@@ -33690,15 +29597,11 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "Company ID is required" });
-      });
-
-  
+      }
       
       if (locationIds.length === 0) {
         return res.json({ stockGroups: [], grandTotals: {} });
-      });
-
-  
+      }
       
       // Get all stock groups for the company
       const allStockGroups = await db
@@ -33741,9 +29644,7 @@ if (asOfDate) {
           rate: rate,
           value: qty * rate,
         });
-      });
-
-  
+      }
       
       // Build response structure with stock groups containing items
       const result: Array<{
@@ -33768,18 +29669,12 @@ if (asOfDate) {
         if (item.stockGroupId) {
           if (!itemsByGroup.has(item.stockGroupId)) {
             itemsByGroup.set(item.stockGroupId, []);
-          });
-
-  
+          }
           itemsByGroup.get(item.stockGroupId)!.push(item);
         } else {
           ungroupedItems.push(item);
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Build stock groups with their items and location data
       for (const group of allStockGroups) {
@@ -33801,9 +29696,7 @@ if (asOfDate) {
         // Initialize location totals for the group
         for (const locId of locationIds) {
           groupLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
-        });
-
-  
+        }
         
         const itemsData: Array<{
           id: number;
@@ -33830,12 +29723,8 @@ if (asOfDate) {
               groupLocationData[locId].value += inv.value;
             } else {
               itemLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
-            });
-
-  
-          });
-
-  
+            }
+          }
           
           if (itemHasInventory) {
             itemsData.push({
@@ -33845,23 +29734,15 @@ if (asOfDate) {
               uom: item.uom,
               locationData: itemLocationData,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         // Calculate average rate for group totals
         for (const locId of locationIds) {
           if (groupLocationData[locId].quantity > 0) {
             groupLocationData[locId].rate = groupLocationData[locId].value / groupLocationData[locId].quantity;
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         result.push({
           id: group.id,
@@ -33870,18 +29751,14 @@ if (asOfDate) {
           locationData: groupLocationData,
           items: itemsData,
         });
-      });
-
-  
+      }
       
       // Handle ungrouped items
       if (ungroupedItems.length > 0) {
         const ungroupedLocationData: Record<number, { quantity: number; rate: number; value: number }> = {};
         for (const locId of locationIds) {
           ungroupedLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
-        });
-
-  
+        }
         
         const ungroupedItemsData: Array<{
           id: number;
@@ -33906,12 +29783,8 @@ if (asOfDate) {
               ungroupedLocationData[locId].value += inv.value;
             } else {
               itemLocationData[locId] = { quantity: 0, rate: 0, value: 0 };
-            });
-
-  
-          });
-
-  
+            }
+          }
           
           if (itemHasInventory) {
             ungroupedItemsData.push({
@@ -33921,23 +29794,15 @@ if (asOfDate) {
               uom: item.uom,
               locationData: itemLocationData,
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         if (ungroupedItemsData.length > 0) {
           for (const locId of locationIds) {
             if (ungroupedLocationData[locId].quantity > 0) {
               ungroupedLocationData[locId].rate = ungroupedLocationData[locId].value / ungroupedLocationData[locId].quantity;
-            });
-
-  
-          });
-
-  
+            }
+          }
           
           result.push({
             id: 0,
@@ -33946,42 +29811,28 @@ if (asOfDate) {
             locationData: ungroupedLocationData,
             items: ungroupedItemsData,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Calculate grand totals per location
       const grandTotals: Record<number, { quantity: number; rate: number; value: number }> = {};
       for (const locId of locationIds) {
         grandTotals[locId] = { quantity: 0, rate: 0, value: 0 };
-      });
-
-  
+      }
       
       for (const group of result) {
         for (const locId of locationIds) {
           grandTotals[locId].quantity += group.locationData[locId]?.quantity || 0;
           grandTotals[locId].value += group.locationData[locId]?.value || 0;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       // Calculate average rate for grand totals
       for (const locId of locationIds) {
         if (grandTotals[locId].quantity > 0) {
           grandTotals[locId].rate = grandTotals[locId].value / grandTotals[locId].quantity;
-        });
-
-  
-      });
-
-  
+        }
+      }
       
       res.json({
         stockGroups: result,
@@ -33991,9 +29842,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error('Location summary error:', error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Cleanup endpoint to remove orphaned charge vouchers (no auth required for cleanup operations)
@@ -34024,12 +29873,8 @@ if (asOfDate) {
           await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, chargeVoucher.id));
           await db.delete(vouchers).where(eq(vouchers.id, chargeVoucher.id));
           deletedCount++;
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       res.json({
         message: `Cleaned up ${deletedCount} orphaned charge vouchers`,
@@ -34037,9 +29882,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // ============================================================
@@ -34052,9 +29895,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Get deleted locations
       const deletedLocations = await db
@@ -34178,9 +30019,7 @@ if (asOfDate) {
       } catch (err) {
         console.error("Error fetching orphaned POS sales:", err);
         orphanedPosSales = [];
-      });
-
-  
+      }
 
       res.json({
         locations: deletedLocations.map(l => ({
@@ -34267,9 +30106,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Restore a deleted item
@@ -34279,16 +30116,12 @@ if (asOfDate) {
       const itemId = parseInt(id);
       if (isNaN(itemId)) {
         return res.status(400).json({ message: "Invalid item ID" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       switch (type) {
         case "location":
@@ -34338,16 +30171,12 @@ if (asOfDate) {
           break;
         default:
           return res.status(400).json({ message: "Invalid item type" });
-      });
-
-  
+      }
 
       res.json({ message: `${type} restored successfully` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Permanently delete an item
@@ -34357,16 +30186,12 @@ if (asOfDate) {
       const itemId = parseInt(id);
       if (isNaN(itemId)) {
         return res.status(400).json({ message: "Invalid item ID" });
-      });
-
-  
+      }
 
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       switch (type) {
         case "location":
@@ -34421,16 +30246,12 @@ if (asOfDate) {
           break;
         default:
           return res.status(400).json({ message: "Invalid item type" });
-      });
-
-  
+      }
 
       res.json({ message: `${type} permanently deleted` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // ============ AI Chatbot API Endpoints ============
@@ -34444,9 +30265,7 @@ if (asOfDate) {
       
       if (!userId || !companyId) {
         return res.json({ enabled: false });
-      });
-
-  
+      }
 
       // Get user chatbot status
       const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
@@ -34467,9 +30286,7 @@ if (asOfDate) {
       } else {
         hasApiKey = !!process.env.GEMINI_API_KEY;
         providerName = "Gemini";
-      });
-
-  
+      }
 
       res.json({
         enabled: user?.chatbotEnabled || false,
@@ -34480,9 +30297,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Send a chat message
@@ -34493,16 +30308,12 @@ if (asOfDate) {
       const userRole = req.session.currentRole;
       if (userRole !== "Admin" && userRole !== "Owner") {
         return res.status(403).json({ message: "Only admins can change AI provider" });
-      });
-
-  
+      }
 
       const { provider } = req.body;
       if (!provider || !["gemini", "chatgpt", "grok"].includes(provider.toLowerCase())) {
         return res.status(400).json({ message: "Invalid provider. Must be gemini, chatgpt, or grok" });
-      });
-
-  
+      }
 
       const normalizedProvider = provider.toLowerCase();
       
@@ -34519,16 +30330,12 @@ if (asOfDate) {
           value: normalizedProvider,
           description: "AI provider for chatbot: gemini, chatgpt, or grok",
         });
-      });
-
-  
+      }
 
       res.json({ success: true, provider: normalizedProvider });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
   app.post("/api/chatbot/message", requireAuth, async (req, res) => {
     try {
@@ -34540,9 +30347,7 @@ if (asOfDate) {
       if (!userId || !companyId) {
         console.log("[Chatbot] Error: No company selected");
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Check if user has chatbot enabled
       const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
@@ -34552,17 +30357,13 @@ if (asOfDate) {
       if (!user?.chatbotEnabled) {
         console.log("[Chatbot] Error: Chatbot not enabled for user");
         return res.status(403).json({ message: "Chatbot is not enabled for your account" });
-      });
-
-  
+      }
 
       const { message, sessionId } = req.body;
       if (!message || !sessionId) {
         console.log("[Chatbot] Error: Missing message or sessionId");
         return res.status(400).json({ message: "Message and sessionId are required" });
-      });
-
-  
+      }
 
       console.log("[Chatbot] Processing message for session:", sessionId);
 
@@ -34588,9 +30389,7 @@ if (asOfDate) {
       console.error("[Chatbot] ERROR:", error.message);
       console.error("[Chatbot] Stack:", error.stack);
       res.status(500).json({ message: "Chat error: " + error.message });
-    });
-
-  
+    }
   });
 
   // Get chat history for current session
@@ -34602,9 +30401,7 @@ if (asOfDate) {
       if (!userId) {
         console.log("[Chatbot] History error: Not authenticated");
         return res.status(401).json({ message: "Not authenticated" });
-      });
-
-  
+      }
 
       // Check if user has chatbot enabled
       const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
@@ -34614,9 +30411,7 @@ if (asOfDate) {
       if (!user?.chatbotEnabled) {
         console.log("[Chatbot] History error: Chatbot not enabled");
         return res.status(403).json({ message: "Chatbot is not enabled for your account" });
-      });
-
-  
+      }
 
       const { sessionId } = req.params;
       // Pass userId to ensure users can only access their own chat history
@@ -34627,9 +30422,7 @@ if (asOfDate) {
       console.error("[Chatbot] History ERROR:", error.message);
       console.error("[Chatbot] History Stack:", error.stack);
       res.status(500).json({ message: "History error: " + error.message });
-    });
-
-  
+    }
   });
 
   // Get all chat history (Admin/Owner only)
@@ -34640,16 +30433,12 @@ if (asOfDate) {
       
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Only Admin/Owner can view all chat history
       if (userRole !== "Admin" && userRole !== "Owner") {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const history = await getAllChatHistory(companyId, 200);
       
@@ -34671,9 +30460,7 @@ if (asOfDate) {
       res.json(enrichedHistory);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Toggle chatbot for a user (Admin/Owner only)
@@ -34684,9 +30471,7 @@ if (asOfDate) {
       // Only Admin/Owner can toggle chatbot
       if (userRole !== "Admin" && userRole !== "Owner") {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const { userId } = req.params;
       const { enabled } = req.body;
@@ -34698,9 +30483,7 @@ if (asOfDate) {
       res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get users with their chatbot status (Admin/Owner only)
@@ -34710,9 +30493,7 @@ if (asOfDate) {
       
       if (userRole !== "Admin" && userRole !== "Owner") {
         return res.status(403).json({ message: "Access denied" });
-      });
-
-  
+      }
 
       const allUsers = await db.select({
         id: users.id,
@@ -34726,9 +30507,7 @@ if (asOfDate) {
       res.json(allUsers);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // ============================================================
@@ -34742,9 +30521,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Find all EMP-* ledger accounts (both active and soft-deleted)
       const allAccounts = await db
@@ -34799,9 +30576,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Migrate voucher entries from EMP-* ledger account to use employeeId directly
@@ -34810,34 +30585,24 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const accountId = parseInt(req.params.accountId);
       if (isNaN(accountId)) {
         return res.status(400).json({ message: "Invalid account ID" });
-      });
-
-  
+      }
 
       // Get the EMP-* account
       const account = await storage.getLedgerAccountById(accountId);
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
-      });
-
-  
+      }
       if (!account.code || !account.code.startsWith("EMP-")) {
         return res.status(400).json({ message: "Not an EMP-* legacy account" });
-      });
-
-  
+      }
       if (account.companyId !== companyId) {
         return res.status(403).json({ message: "Account belongs to a different company" });
-      });
-
-  
+      }
 
       // Extract employee code and find matching employee in the same company
       const employeeCode = account.code.replace("EMP-", "");
@@ -34846,16 +30611,12 @@ if (asOfDate) {
         return res.status(400).json({ 
           message: `Cannot migrate: No employee found with code "${employeeCode}"` 
         });
-      });
-
-  
+      }
       if (employee.companyId !== companyId) {
         return res.status(400).json({ 
           message: `Cannot migrate: Employee "${employeeCode}" belongs to a different company` 
         });
-      });
-
-  
+      }
 
       // Migrate all voucher entries from ledgerAccountId to employeeId
       const result = await db
@@ -34882,9 +30643,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Bulk migrate and cleanup all EMP-* accounts for the current company
@@ -34893,9 +30652,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Find all active EMP-* ledger accounts
       const empAccounts = await db
@@ -34978,12 +30735,8 @@ if (asOfDate) {
             status: "skipped",
             message: `Skipped: No matching employee found for code "${employeeCode}"`,
           });
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       const migrated = results.filter(r => r.status === "migrated").length;
       const deleted = results.filter(r => r.status === "deleted").length;
@@ -34996,9 +30749,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Recalculate Opening Balance Equity adjustment
@@ -35008,17 +30759,13 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Frontend passes the current displayed import cycle balance
       const { currentBalance } = req.body;
       if (typeof currentBalance !== 'number') {
         return res.status(400).json({ message: "currentBalance is required" });
-      });
-
-  
+      }
 
       // Get current equity adjustment (if any)
       const settingKey = `equity_adjustment_${companyId}`;
@@ -35047,9 +30794,7 @@ if (asOfDate) {
           key: settingKey,
           value: newAdjustment.toFixed(2),
         });
-      });
-
-  
+      }
 
       res.json({
         success: true,
@@ -35061,9 +30806,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Recalculate equity adjustment error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Fix orphaned POS data that might be causing Import Cycle imbalance
@@ -35073,9 +30816,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const results: any[] = [];
 
@@ -35125,9 +30866,7 @@ if (asOfDate) {
           })
           .from(salesItems)
           .where(inArray(salesItems.voucherId, trulyOrphanedVoucherIds));
-      });
-
-  
+      }
 
       const allOrphanedSalesItems = [...orphanedSalesItemsForCompany, ...trulyOrphanedSalesItems];
 
@@ -35144,12 +30883,8 @@ if (asOfDate) {
         // Delete orphaned sales items
         for (const item of allOrphanedSalesItems) {
           await db.delete(salesItems).where(eq(salesItems.id, item.id));
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // 2. Find orphaned voucherEntries for THIS COMPANY (voucher is deleted but companyId matches)
       const orphanedEntriesForCompany = await db
@@ -35188,9 +30923,7 @@ if (asOfDate) {
           })
           .from(voucherEntries)
           .where(inArray(voucherEntries.voucherId, trulyOrphanedEntryVoucherIds as number[]));
-      });
-
-  
+      }
 
       const allOrphanedEntries = [...orphanedEntriesForCompany, ...trulyOrphanedEntries];
 
@@ -35210,12 +30943,8 @@ if (asOfDate) {
         // Delete orphaned entries
         for (const entry of allOrphanedEntries) {
           await db.delete(voucherEntries).where(eq(voucherEntries.id, entry.id));
-        });
-
-  
-      });
-
-  
+        }
+      }
 
       // 3. Check for negative inventory and log (don't fix automatically)
       const negativeInventory = await db
@@ -35240,9 +30969,7 @@ if (asOfDate) {
           warning: "These need manual review - might indicate overselling or data issues",
           items: negativeInventory.slice(0, 10),
         });
-      });
-
-  
+      }
 
       res.json({
         message: `Cleanup complete: Fixed ${allOrphanedSalesItems.length} orphaned sales items, ${allOrphanedEntries.length} orphaned entries. Found ${negativeInventory.length} negative inventory items.`,
@@ -35250,9 +30977,7 @@ if (asOfDate) {
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Get orphaned POS sales (vouchers at deleted locations)
@@ -35261,9 +30986,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Find all vouchers with locationId pointing to deleted or non-existent locations
       const orphanedVouchers = await db
@@ -35330,9 +31053,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Orphaned POS sales check error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Delete orphaned POS sales (vouchers at deleted locations)
@@ -35341,9 +31062,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       // Find all vouchers with locationId pointing to deleted or non-existent locations
       const orphanedVouchers = await db
@@ -35367,9 +31086,7 @@ if (asOfDate) {
 
       if (orphanedVouchers.length === 0) {
         return res.json({ message: "No orphaned POS sales found", deleted: 0 });
-      });
-
-  
+      }
 
       const voucherIds = orphanedVouchers.map(v => v.id);
 
@@ -35396,9 +31113,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Delete orphaned POS sales error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Role Feature Permissions API
@@ -35412,20 +31127,14 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const permissions = await storage.getRoleFeaturePermissions(companyId);
         res.json(permissions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // Update role permissions (bulk upsert)
@@ -35438,16 +31147,12 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { permissions } = req.body;
         if (!Array.isArray(permissions)) {
           return res.status(400).json({ message: "permissions must be an array" });
-        });
-
-  
+        }
 
         // Add companyId to each permission
         const permissionsWithCompany = permissions.map((p: any) => ({
@@ -35459,12 +31164,8 @@ if (asOfDate) {
         res.json({ message: "Permissions updated successfully", permissions: results });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // Get permissions for the current user's role (used by sidebar)
@@ -35478,9 +31179,7 @@ if (asOfDate) {
 
         if (!companyId || !role) {
           return res.status(400).json({ message: "No company or role selected" });
-        });
-
-  
+        }
 
         // Get all permissions for this company and role
         const allPermissions = await storage.getRoleFeaturePermissions(companyId);
@@ -35489,12 +31188,8 @@ if (asOfDate) {
         res.json(rolePermissions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // ==========================================
@@ -35511,41 +31206,31 @@ if (asOfDate) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) {
           return res.status(400).json({ message: "No company selected" });
-        });
-
-  
+        }
 
         const { date, debitAccountId, creditAccountId, amount, description } = req.body;
 
         // Validate required fields
         if (!date || !debitAccountId || !creditAccountId || !amount) {
           return res.status(400).json({ message: "Missing required fields: date, debitAccountId, creditAccountId, amount" });
-        });
-
-  
+        }
 
         const parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount) || parsedAmount <= 0) {
           return res.status(400).json({ message: "Amount must be a positive number" });
-        });
-
-  
+        }
 
         // Verify debit account exists and belongs to current company
         const debitAccount = await storage.getLedgerAccountById(debitAccountId);
         if (!debitAccount || debitAccount.companyId !== companyId) {
           return res.status(404).json({ message: "Debit account not found or doesn't belong to current company" });
-        });
-
-  
+        }
 
         // Verify credit account exists and belongs to current company
         const creditAccount = await storage.getLedgerAccountById(creditAccountId);
         if (!creditAccount || creditAccount.companyId !== companyId) {
           return res.status(404).json({ message: "Credit account not found or doesn't belong to current company" });
-        });
-
-  
+        }
 
         // Generate a unique voucher number with TEST- prefix
         const voucherNumber = `TEST-${Date.now()}`;
@@ -35588,12 +31273,8 @@ if (asOfDate) {
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // ==========================================
@@ -35612,17 +31293,13 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: "Please select a subsidiary company to process." 
           });
-        });
-
-  
+        }
         
         if (!parentCompanyId) {
           return res.status(400).json({ 
             message: "Please select a parent company." 
           });
-        });
-
-  
+        }
         
         const allCompanies = await storage.getAllCompanies();
         
@@ -35632,9 +31309,7 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: "Selected parent company not found." 
           });
-        });
-
-  
+        }
         
         // Find the selected subsidiary company
         const selectedCompany = allCompanies.find(c => c.id === companyId);
@@ -35643,17 +31318,13 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: "Selected subsidiary company not found." 
           });
-        });
-
-  
+        }
         
         if (selectedCompany.id === parentCompany.id) {
           return res.status(400).json({ 
             message: "Subsidiary and parent company cannot be the same." 
           });
-        });
-
-  
+        }
         
         // Process only the selected subsidiary
         const companiesToProcess = [selectedCompany];
@@ -35667,9 +31338,7 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
         const details: Array<{ company: string; poNumber: string; amount: number }> = [];
         
         // Process each company
@@ -35701,9 +31370,7 @@ if (asOfDate) {
               openingBalanceSide: "Cr",
             }).returning();
             creditAccount = [newAccount];
-          });
-
-  
+          }
           
           // Get all purchase orders for this company
           const companyPOs = await db
@@ -35720,9 +31387,7 @@ if (asOfDate) {
             
             if (!container || container.status !== "OFFLOADED") {
               continue; // Skip non-offloaded containers
-            });
-
-  
+            }
             
             // Check if credit entry already exists for this PO
             // For OLD fixed POs: fix endpoint uses INTERCO-* in subsidiary and INTERCO-LUB-* in Lubumbashi
@@ -35745,9 +31410,7 @@ if (asOfDate) {
             
             if (existingSubsidiaryVoucher.length > 0) {
               continue; // Skip - already has credit entry in subsidiary for this container
-            });
-
-  
+            }
             
             // Check for existing INTERCO-PARENT vouchers in parent company for this container
             const existingParentVoucher = await db
@@ -35767,9 +31430,7 @@ if (asOfDate) {
             
             if (existingParentVoucher.length > 0) {
               continue; // Skip - already has credit entry in parent company for this container
-            });
-
-  
+            }
             
             // Calculate PO total: items + freight + charges
             const poItemsTotal = parseFloat(po.itemsTotal || "0");
@@ -35784,9 +31445,7 @@ if (asOfDate) {
             const poSupplier = po.supplierId ? await db.query.suppliers.findFirst({ where: eq(suppliers.id, po.supplierId) }) : null;
             if (poTotal <= 0) {
               continue; // Skip zero or negative amounts
-            });
-
-  
+            }
             
             // Get offload date from container offload record
             const [offloadRecord] = await db
@@ -35821,9 +31480,7 @@ if (asOfDate) {
                 creditAmount: "0",
                 narration: `Transfer to ${parentCompany.name} Credit - PO ${po.poNumber}`,
               });
-            });
-
-  
+            }
             
             // Credit: Parent Credit account (we owe parent company, who paid the supplier)
             await db.insert(voucherEntries).values({
@@ -35864,9 +31521,7 @@ if (asOfDate) {
                 openingBalanceSide: "Dr",
               }).returning();
               subsidiaryReceivableAccount = [newAccount];
-            });
-
-  
+            }
             
             // Create Journal voucher in parent company
             const parentVoucherNumber = `INTERCO-PARENT-${po.poNumber}-${Date.now()}`;
@@ -35897,9 +31552,7 @@ if (asOfDate) {
                 creditAmount: poTotal.toFixed(2),
                 narration: `PO ${po.poNumber} - Supplier payment`,
               });
-            });
-
-  
+            }
             
             totalFixed++;
             totalAmount += poTotal;
@@ -35908,12 +31561,8 @@ if (asOfDate) {
               poNumber: po.poNumber,
               amount: poTotal
             });
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         res.json({
           message: `Fixed ${totalFixed} POs for ${selectedCompany.name} (parent: ${parentCompany.name})`,
@@ -35925,12 +31574,8 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Fix old PO credits error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // ==========================================
@@ -35949,17 +31594,13 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: "No parent company configured. Please set the parent company in Settings first." 
           });
-        });
-
-  
+        }
         
         // Get the parent company
         const parentCompany = await storage.getCompanyById(parentCompanyId);
         if (!parentCompany) {
           return res.status(404).json({ message: "Parent company not found" });
-        });
-
-  
+        }
         
         // Find all POs in the parent company
         const allPOs = await db
@@ -35977,18 +31618,14 @@ if (asOfDate) {
         if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      });
-
-  
+      }
         const details: any[] = [];
         
         for (const po of allPOs) {
           if (!po.voucherId || !po.supplierId) {
             skipped++;
             continue;
-          });
-
-  
+          }
           
           // Calculate PO total
           const itemsTotal = parseFloat(po.itemsTotal || "0");
@@ -36004,17 +31641,13 @@ if (asOfDate) {
           if (poTotal <= 0) {
             skipped++;
             continue;
-          });
-
-  
+          }
           
           // Get or create Purchases account
           let purchasesAccount = await storage.getLedgerAccountByName("Purchases", parentCompanyId);
           if (!purchasesAccount) {
             purchasesAccount = await storage.getLedgerAccountByCode("PURCHASES", parentCompanyId);
-          });
-
-  
+          }
           if (!purchasesAccount) {
             purchasesAccount = await storage.createLedgerAccount({
               companyId: parentCompanyId,
@@ -36023,9 +31656,7 @@ if (asOfDate) {
               accountType: "Expense",
               subType: "Direct Expense",
             });
-          });
-
-  
+          }
           
           // Check if voucher already has purchase entry
           const existingPurchaseEntry = await db
@@ -36051,9 +31682,7 @@ if (asOfDate) {
           if (existingPurchaseEntry.length > 0 && existingSupplierEntry.length > 0) {
             skipped++;
             continue;
-          });
-
-  
+          }
           
           let fixedThisPO = false;
           
@@ -36067,9 +31696,7 @@ if (asOfDate) {
               narration: `PO ${po.poNumber} - Fix missing entry`,
             });
             fixedThisPO = true;
-          });
-
-  
+          }
           
           // Add CR Supplier entry if missing
           if (existingSupplierEntry.length === 0) {
@@ -36081,9 +31708,7 @@ if (asOfDate) {
               narration: `PO ${po.poNumber} - Fix missing supplier entry`,
             });
             fixedThisPO = true;
-          });
-
-  
+          }
           
           if (fixedThisPO) {
             fixed++;
@@ -36096,12 +31721,8 @@ if (asOfDate) {
             });
           } else {
             skipped++;
-          });
-
-  
-        });
-
-  
+          }
+        }
         
         res.json({
           message: `Fixed ${fixed} POs in ${parentCompany.name}. Skipped ${skipped} (already had entries or invalid).`,
@@ -36113,12 +31734,8 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Fix parent PO supplier entries error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // ==========================================
@@ -36137,17 +31754,13 @@ if (asOfDate) {
           return res.status(400).json({ 
             message: "Please select a subsidiary company to reverse." 
           });
-        });
-
-  
+        }
         
         if (!parentCompanyId) {
           return res.status(400).json({ 
             message: "Please select a parent company." 
           });
-        });
-
-  
+        }
         
         const allCompanies = await storage.getAllCompanies();
         const company = allCompanies.find(c => c.id === companyId);
@@ -36155,25 +31768,19 @@ if (asOfDate) {
         
         if (!company) {
           return res.status(400).json({ message: "Subsidiary company not found." });
-        });
-
-  
+        }
         
         if (!parentCompany) {
           return res.status(400).json({ 
             message: "Parent company not found." 
           });
-        });
-
-  
+        }
         
         if (company.id === parentCompany.id) {
           return res.status(400).json({ 
             message: "Subsidiary and parent company cannot be the same." 
           });
-        });
-
-  
+        }
         
         // Process only the selected subsidiary
         const targetCompany = company;
@@ -36199,9 +31806,7 @@ if (asOfDate) {
           await db.delete(vouchers).where(eq(vouchers.id, v.id));
           totalReversed++;
           details.push({ company: targetCompany.name, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
-        });
-
-  
+        }
         
         // Also delete corresponding INTERCO-PARENT vouchers in parent company for this subsidiary
         const parentIntercoVouchers = await db
@@ -36223,9 +31828,7 @@ if (asOfDate) {
           await db.delete(vouchers).where(eq(vouchers.id, v.id));
           totalReversed++;
           details.push({ company: `${parentCompany.name} (for ${targetCompany.name})`, voucherNumber: v.voucherNumber, amount: v.totalAmount || "0" });
-        });
-
-  
+        }
         
         res.json({
           message: `Reversed ${totalReversed} inter-company vouchers for ${company.name} (parent: ${parentCompany.name})`,
@@ -36236,12 +31839,8 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Reverse PO credits error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // ==========================================
@@ -36259,16 +31858,12 @@ if (asOfDate) {
         
         if (!companyId) {
           return res.status(400).json({ message: "Please select a company to reset." });
-        });
-
-  
+        }
         
         const company = await storage.getCompanyById(companyId);
         if (!company) {
           return res.status(400).json({ message: "Company not found." });
-        });
-
-  
+        }
         
         // Define voucher types to DELETE (Payment, Receipt, Journal - excluding POS, Production, Consumption, Stock Transfer)
         const voucherTypesToDelete = ["Payment", "Receipt", "Journal"];
@@ -36310,9 +31905,7 @@ if (asOfDate) {
             voucherNumber: v.voucherNumber,
             amount: v.totalAmount || "0"
           });
-        });
-
-  
+        }
         
         // Summary by type
         const typeSummary = voucherTypesToDelete.map(type => ({
@@ -36330,12 +31923,8 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Reset company data error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // System Settings - Parent Company (Admin only)
@@ -36349,12 +31938,8 @@ if (asOfDate) {
       } catch (error: any) {
         console.error("Get parent company error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   app.post(
@@ -36366,9 +31951,7 @@ if (asOfDate) {
         const userRole = req.session.currentRole;
         if (userRole !== "Admin") {
           return res.status(403).json({ message: "Only Admin users can change the parent company setting" });
-        });
-
-  
+        }
 
         const { parentCompanyId } = req.body;
         
@@ -36377,17 +31960,13 @@ if (asOfDate) {
           const numericId = typeof parentCompanyId === 'string' ? parseInt(parentCompanyId, 10) : parentCompanyId;
           if (typeof numericId !== 'number' || isNaN(numericId)) {
             return res.status(400).json({ message: "Invalid parent company ID: must be a number or null" });
-          });
-
-  
+          }
           
           // Validate the company exists
           const company = await storage.getCompanyById(numericId);
           if (!company) {
             return res.status(400).json({ message: "Company not found" });
-          });
-
-  
+          }
           
           await storage.setParentCompanyId(numericId);
           res.json({ success: true, parentCompanyId: numericId });
@@ -36395,18 +31974,12 @@ if (asOfDate) {
           // Setting to null (clear the parent company)
           await storage.setParentCompanyId(null);
           res.json({ success: true, parentCompanyId: null });
-        });
-
-  
+        }
       } catch (error: any) {
         console.error("Set parent company error:", error);
         res.status(500).json({ message: error.message });
-      });
-
-  
-    });
-
-  
+      }
+    }
   );
 
   // Company Data Reset - Delete vouchers (keep OTW container vouchers only) and clear opening balances
@@ -36416,9 +31989,7 @@ if (asOfDate) {
 
       if (!companyId || !Array.isArray(accountIds)) {
         return res.status(400).json({ message: "companyId and accountIds array are required" });
-      });
-
-  
+      }
 
       const results = {
         vouchersDeleted: 0,
@@ -36480,9 +32051,7 @@ if (asOfDate) {
           if (interCompanyVoucherIds.has(v.id)) {
             console.log("Preserving inter-company voucher:", v.id, v.voucherType, v.description);
             return false; // Don't delete
-          });
-
-  
+          }
           
           // If it's a Purchase voucher, check if it belongs to an OTW container
           if (v.voucherType === "Purchase") {
@@ -36493,12 +32062,8 @@ if (asOfDate) {
             if (belongsToOtw) {
               console.log("Preserving OTW voucher:", v.id, v.description);
               return false; // Don't delete - it's for an OTW container
-            });
-
-  
-          });
-
-  
+            }
+          }
           return true; // Delete all other vouchers
         });
         const voucherIdsToDelete = vouchersToDelete.map(v => v.id);
@@ -36517,9 +32082,7 @@ if (asOfDate) {
             .where(sql.raw(`"vouchers"."id" = ANY(${voucherIdsArray})`));
           
           results.vouchersDeleted = voucherIdsToDelete.length;
-        });
-
-  
+        }
 
         // 4. Clear opening balances for selected accounts
         if (accountIds.length > 0) {
@@ -36536,9 +32099,7 @@ if (asOfDate) {
             );
           
           results.openingBalancesCleared = accountIds.length;
-        });
-
-  
+        }
 
         // 5. Clear stock item opening balances if requested
         if (clearStockOpeningBalances) {
@@ -36554,9 +32115,7 @@ if (asOfDate) {
             .update(stockItems)
             .set({ openingQty: "0", openingRate: "0", openingValue: "0" })
             .where(eq(stockItems.companyId, companyId));
-        });
-
-  
+        }
       });
 
       console.log(`Company data reset completed for company ${companyId}:`, results);
@@ -36564,9 +32123,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Company data reset error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // Undo Last Reset - Restore soft-deleted vouchers for a company
@@ -36576,9 +32133,7 @@ if (asOfDate) {
 
       if (!companyId) {
         return res.status(400).json({ message: "companyId is required" });
-      });
-
-  
+      }
 
       // Restore soft-deleted vouchers by clearing deletedAt
       const result = await db
@@ -36603,9 +32158,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Undo company reset error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
 
@@ -36616,9 +32169,7 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const {
         noteType, // "Credit Note" or "Debit Note"
@@ -36631,27 +32182,19 @@ if (asOfDate) {
 
       if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
         return res.status(400).json({ message: "Invalid note type. Must be 'Credit Note' or 'Debit Note'" });
-      });
-
-  
+      }
 
       if (!voucherDate) {
         return res.status(400).json({ message: "Voucher date is required" });
-      });
-
-  
+      }
 
       if (!cashAccountId || !cashAccountType) {
         return res.status(400).json({ message: "Cash/Bank account is required" });
-      });
-
-  
+      }
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
-      });
-
-  
+      }
 
       // Calculate totals - refund amount (customer gets) and inventory value (goes to stock)
       let totalRefundAmount = 0;
@@ -36662,19 +32205,13 @@ if (asOfDate) {
         const inventoryCost = parseFloat(item.inventoryCost || item.rate || "0");
         if (isNaN(qty) || qty <= 0) {
           return res.status(400).json({ message: "Invalid quantity for item" });
-        });
-
-  
+        }
         if (isNaN(refundRate) || refundRate < 0) {
           return res.status(400).json({ message: "Invalid refund rate for item" });
-        });
-
-  
+        }
         totalRefundAmount += qty * refundRate;
         totalInventoryValue += qty * inventoryCost;
-      });
-
-  
+      }
 
       // Generate voucher number
       const timestamp = Date.now();
@@ -36713,9 +32250,7 @@ if (asOfDate) {
           creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
           narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
         });
-      });
-
-  
+      }
 
       // For each item, process inventory (using inventoryCost) and track refund amounts
       for (const item of items) {
@@ -36733,9 +32268,7 @@ if (asOfDate) {
 
         if (!location) {
           throw new Error(`Location ${locationId} not found`);
-        });
-
-  
+        }
 
         // Check if inventory record exists for this item at this location
         const [existingInventory] = await db
@@ -36779,9 +32312,7 @@ if (asOfDate) {
               totalValue: inventoryValue.toFixed(2),
               lastUpdated: new Date(),
             });
-          });
-
-  
+          }
 
           // For balanced accounting: Debit Inventory at INVENTORY COST
           let inventoryAccount = await db
@@ -36803,9 +32334,7 @@ if (asOfDate) {
               creditAmount: "0",
               narration: `Inventory restored - ${noteType}`,
             });
-          });
-
-  
+          }
         } else {
           // Debit Note: Remove items from inventory
           if (existingInventory) {
@@ -36846,15 +32375,9 @@ if (asOfDate) {
                 creditAmount: inventoryValue.toFixed(2),
                 narration: `Inventory reduced - ${noteType}`,
               });
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         // Create credit note item record with both rates
         await db.insert(creditNoteItems).values({
@@ -36866,9 +32389,7 @@ if (asOfDate) {
           inventoryCost: inventoryCostVal.toFixed(2),
           totalValue: (qty * refundRateVal).toFixed(2),
         });
-      });
-
-  
+      }
 
       // Handle variance between refund amount and inventory value with Sales Returns/Adjustments account
       const variance = totalRefundAmount - totalInventoryValue;
@@ -36897,9 +32418,7 @@ if (asOfDate) {
               )
             )
             .limit(1);
-        });
-
-  
+        }
 
         if (salesReturnsAccount.length > 0) {
           if (noteType === "Credit Note") {
@@ -36921,15 +32440,9 @@ if (asOfDate) {
               creditAmount: variance > 0 ? variance.toFixed(2) : "0",
               narration: `Variance between debit note amount and inventory cost`,
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -36940,9 +32453,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Credit/Debit note error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // GET credit note details for editing
@@ -36951,16 +32462,12 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid credit note ID" });
-      });
-
-  
+      }
 
       // Get voucher
       const [voucher] = await db
@@ -36970,15 +32477,11 @@ if (asOfDate) {
 
       if (!voucher) {
         return res.status(404).json({ message: "Credit note not found" });
-      });
-
-  
+      }
 
       if (!["Credit Note", "Debit Note"].includes(voucher.voucherType || "")) {
         return res.status(400).json({ message: "Not a credit/debit note" });
-      });
-
-  
+      }
 
       // Get voucher entries
       const entries = await db
@@ -37023,15 +32526,9 @@ if (asOfDate) {
             cashAccountId = entry.ledgerAccountId;
             cashAccountType = "ledger";
             break;
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
       // Fetch current inventory costs for each item at its location
       // Fallback order: 1) Specific location, 2) Any location, 3) Container offload history
       const itemsWithCosts = await Promise.all(
@@ -37073,15 +32570,9 @@ if (asOfDate) {
               
               if (offloadItem?.rate && parseFloat(offloadItem.rate) > 0) {
                 costRate = offloadItem.rate;
-              });
-
-  
-            });
-
-  
-          });
-
-  
+              }
+            }
+          }
           
           return {
             stockItemId: item.stockItemId,
@@ -37113,9 +32604,7 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Get credit note error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
+    }
   });
 
   // PATCH credit note - reverse old entries and apply new ones
@@ -37124,16 +32613,12 @@ if (asOfDate) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
-      });
-
-  
+      }
 
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid credit note ID" });
-      });
-
-  
+      }
 
       const { voucherDate, cashAccountId, cashAccountType, description, items } = req.body;
 
@@ -37145,16 +32630,12 @@ if (asOfDate) {
 
       if (!voucher) {
         return res.status(404).json({ message: "Credit note not found" });
-      });
-
-  
+      }
 
       const noteType = voucher.voucherType;
       if (!["Credit Note", "Debit Note"].includes(noteType || "")) {
         return res.status(400).json({ message: "Not a credit/debit note" });
-      });
-
-  
+      }
 
       // Get existing credit note items to reverse inventory
       const existingItems = await db
@@ -37212,15 +32693,9 @@ if (asOfDate) {
                 lastUpdated: new Date(),
               })
               .where(eq(inventory.id, existingInventory.id));
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       // Delete old voucher entries and credit note items
       await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
@@ -37235,9 +32710,7 @@ if (asOfDate) {
         const inventoryCost = parseFloat(item.inventoryCost || "0");
         totalRefundAmount += qty * refundRate;
         totalInventoryValue += qty * inventoryCost;
-      });
-
-  
+      }
 
       // Update voucher
       await db
@@ -37266,9 +32739,7 @@ if (asOfDate) {
           creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
           narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
         });
-      });
-
-  
+      }
 
       // Apply new items
       for (const item of items) {
@@ -37285,9 +32756,7 @@ if (asOfDate) {
 
         if (!location) {
           throw new Error(`Location ${locationId} not found`);
-        });
-
-  
+        }
 
         const [existingInventory] = await db
           .select()
@@ -37327,9 +32796,7 @@ if (asOfDate) {
               totalValue: inventoryValue.toFixed(2),
               lastUpdated: new Date(),
             });
-          });
-
-  
+          }
 
           // Debit Inventory
           let inventoryAccount = await db
@@ -37351,9 +32818,7 @@ if (asOfDate) {
               creditAmount: "0",
               narration: `Inventory restored - ${noteType}`,
             });
-          });
-
-  
+          }
         } else {
           // Debit Note: Remove from inventory
           if (existingInventory) {
@@ -37393,15 +32858,9 @@ if (asOfDate) {
                 creditAmount: inventoryValue.toFixed(2),
                 narration: `Inventory reduced - ${noteType}`,
               });
-            });
-
-  
-          });
-
-  
-        });
-
-  
+            }
+          }
+        }
 
         // Create credit note item
         await db.insert(creditNoteItems).values({
@@ -37413,9 +32872,7 @@ if (asOfDate) {
           inventoryCost: inventoryCostVal.toFixed(2),
           totalValue: (qty * refundRateVal).toFixed(2),
         });
-      });
-
-  
+      }
 
       // Handle variance
       const variance = totalRefundAmount - totalInventoryValue;
@@ -37442,9 +32899,7 @@ if (asOfDate) {
               )
             )
             .limit(1);
-        });
-
-  
+        }
 
         if (salesReturnsAccount.length > 0) {
           if (noteType === "Credit Note") {
@@ -37463,15 +32918,9 @@ if (asOfDate) {
               creditAmount: variance > 0 ? variance.toFixed(2) : "0",
               narration: `Variance between debit note amount and inventory cost`,
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -37481,11 +32930,9 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Update credit note error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
-
+    }
   });
+
   const httpServer = createServer(app);
 
   return httpServer;
