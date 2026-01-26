@@ -37442,9 +37442,7 @@ if (asOfDate) {
               )
             )
             .limit(1);
-        });
-
-  
+        }
 
         if (salesReturnsAccount.length > 0) {
           if (noteType === "Credit Note") {
@@ -37463,15 +37461,9 @@ if (asOfDate) {
               creditAmount: variance > 0 ? variance.toFixed(2) : "0",
               narration: `Variance between debit note amount and inventory cost`,
             });
-          });
-
-  
-        });
-
-  
-      });
-
-  
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -37481,11 +37473,9 @@ if (asOfDate) {
     } catch (error: any) {
       console.error("Update credit note error:", error);
       res.status(500).json({ message: error.message });
-    });
-
-  
-
+    }
   });
+
   const httpServer = createServer(app);
 
   return httpServer;
