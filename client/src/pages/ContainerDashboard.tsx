@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Building2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Truck, Package, MapPin, Users, DollarSign, FileCheck, AlertTriangle, ChevronDown, ChevronRight, ArrowLeft, Loader2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -101,7 +104,7 @@ export default function ContainerDashboard() {
   const { selectCompany, companies } = useCompany();
   const [, navigate] = useLocation();
   const [filterAgent, setFilterAgent] = useState<string>("all");
-  const [filterCompany, setFilterCompany] = useState<string>("all");
+  const [filterCompany, setFilterCompany] = useState<string[]>([]);
   const [filterTransporter, setFilterTransporter] = useState<string>("all");
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
   const [mainTab, setMainTab] = useState<string>("tracking");
@@ -194,8 +197,8 @@ export default function ContainerDashboard() {
     if (filterAgent !== "all") {
       containers = containers.filter(c => c.agent === filterAgent);
     }
-    if (filterCompany !== "all") {
-      containers = containers.filter(c => c.companyCode === filterCompany);
+    if (filterCompany.length > 0) {
+      containers = containers.filter(c => filterCompany.includes(c.companyCode));
     }
     if (filterTransporter !== "all") {
       containers = containers.filter(c => c.transporter === filterTransporter);
@@ -250,8 +253,8 @@ export default function ContainerDashboard() {
           byTransporter[transporter] = { otw: [], offloaded: [], otwTotal: 0, offloadedTotal: 0 };
         }
         let offloaded = tData.offloaded;
-        if (filterCompany !== "all") {
-          offloaded = offloaded.filter(c => c.companyCode === filterCompany);
+        if (filterCompany.length > 0) {
+          offloaded = offloaded.filter(c => filterCompany.includes(c.companyCode));
         }
         if (filterAgent !== "all") {
           offloaded = offloaded.filter(c => c.agent === filterAgent);
@@ -469,17 +472,61 @@ export default function ContainerDashboard() {
 
         <TabsContent value="tracking" className="mt-3">
           <div className="flex flex-wrap gap-2 items-center mb-3">
-            <Select value={filterCompany} onValueChange={setFilterCompany}>
-              <SelectTrigger className="w-full sm:w-[140px] h-8 text-xs" data-testid="select-filter-company">
-                <SelectValue placeholder="All Companies" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Companies</SelectItem>
-                {companyFilterOptions.map(([code, name]) => (
-                  <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-[180px] h-8 text-xs justify-between"
+                  data-testid="select-filter-company"
+                >
+                  <div className="flex items-center gap-1 truncate">
+                    <Building2 className="h-3 w-3" />
+                    {filterCompany.length === 0 
+                      ? "All Companies" 
+                      : filterCompany.length === 1 
+                        ? filterCompany[0]
+                        : `${filterCompany.length} Companies`}
+                  </div>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-2" align="start">
+                <div className="space-y-1">
+                  <div 
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                    onClick={() => setFilterCompany([])}
+                    data-testid="option-all-companies"
+                  >
+                    <Checkbox 
+                      checked={filterCompany.length === 0} 
+                      className="h-4 w-4"
+                    />
+                    <span className="text-xs font-medium">All Companies</span>
+                  </div>
+                  <div className="border-t my-1" />
+                  {companyFilterOptions.map(([code, name]) => (
+                    <div 
+                      key={code}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                      onClick={() => {
+                        setFilterCompany(prev => 
+                          prev.includes(code) 
+                            ? prev.filter(c => c !== code)
+                            : [...prev, code]
+                        );
+                      }}
+                      data-testid={`option-company-${code}`}
+                    >
+                      <Checkbox 
+                        checked={filterCompany.includes(code)} 
+                        className="h-4 w-4"
+                      />
+                      <span className="text-xs">{code} - {name}</span>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Select value={filterAgent} onValueChange={setFilterAgent}>
               <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs" data-testid="select-filter-agent">
@@ -505,14 +552,14 @@ export default function ContainerDashboard() {
               </SelectContent>
             </Select>
 
-            {(filterAgent !== "all" || filterCompany !== "all" || filterTransporter !== "all") && (
+            {(filterAgent !== "all" || filterCompany.length > 0 || filterTransporter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-8 text-xs"
                 onClick={() => {
                   setFilterAgent("all");
-                  setFilterCompany("all");
+                  setFilterCompany([]);
                   setFilterTransporter("all");
                 }}
                 data-testid="button-clear-filters"
@@ -808,6 +855,20 @@ export default function ContainerDashboard() {
                 <div>
                   <span className="text-muted-foreground">Total:</span>
                   <span className="ml-2 font-bold">${formatNumber(parseFloat(poData.container.grandTotal || "0"))}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total Qty:</span>
+                  <span className="ml-2 font-bold" data-testid="text-total-qty">
+                    {poData.purchaseOrders.reduce((sum, po) => 
+                      sum + po.lineItems.reduce((itemSum, item) => 
+                        itemSum + parseFloat(item.quantity || "0"), 0), 0).toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Items:</span>
+                  <span className="ml-2 font-medium">
+                    {poData.purchaseOrders.reduce((sum, po) => sum + po.lineItems.length, 0)} line items
+                  </span>
                 </div>
               </div>
 
