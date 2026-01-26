@@ -1600,6 +1600,10 @@ export class DbStorage implements IStorage {
         }
         
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         // ============================================================
         // PARENT COMPANY (or no parent set) - Standard purchase voucher
         // DR Purchases, CR Supplier
@@ -1976,7 +1980,16 @@ export class DbStorage implements IStorage {
         eq(schema.inventory.stockItemId, stockItemId)
       ));
 
+
+    const numericQuantity = parseFloat(quantity);
     if (existing) {
+      // If quantity is zero, delete the record instead of updating
+      if (numericQuantity === 0) {
+        await db
+          .delete(schema.inventory)
+          .where(eq(schema.inventory.id, existing.id));
+        return;
+      }
       // Update existing record
       await db
         .update(schema.inventory)
@@ -1988,6 +2001,10 @@ export class DbStorage implements IStorage {
         })
         .where(eq(schema.inventory.id, existing.id));
     } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
       // Create new record
       await db.insert(schema.inventory).values({
         companyId: location.companyId,
@@ -2036,6 +2053,10 @@ export class DbStorage implements IStorage {
             .where(eq(schema.inventory.id, inventory.id));
           updated++;
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           errors.push(`Item not found in inventory for barcode: ${update.barcode}`);
         }
       } catch (err: any) {
@@ -2130,6 +2151,10 @@ export class DbStorage implements IStorage {
         existing.totalQuantity += quantity;
         existing.weightedRateSum += rate * quantity;
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         itemsMap.set(stockItemId, {
           stockItemId,
           totalQuantity: quantity,
@@ -2176,6 +2201,13 @@ export class DbStorage implements IStorage {
         ));
 
       if (existing) {
+      // If quantity is zero, delete the record instead of updating
+      if (numericQuantity === 0) {
+        await db
+          .delete(schema.inventory)
+          .where(eq(schema.inventory.id, existing.id));
+        return;
+      }
         // Add to existing inventory with weighted average rate
         const existingQty = parseFloat(existing.quantity);
         const existingRate = parseFloat(existing.averageRate);
@@ -2207,6 +2239,10 @@ export class DbStorage implements IStorage {
           newTotalValue = newQty * newRate; // Will be negative (represents owed value)
           console.warn(`Still negative inventory after offload for stock item ${stockItemId}: existing ${existingQty} + received ${data.totalQuantity} = ${newQty}`);
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Normal case: positive quantity - calculate weighted average
           // Total value = existing value + incoming value, divided by total quantity
           const incomingValue = data.totalQuantity * newRate;
@@ -2229,6 +2265,10 @@ export class DbStorage implements IStorage {
           })
           .where(eq(schema.inventory.id, existing.id));
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         // Create new inventory record
         const [location] = await db
           .select()
@@ -2463,6 +2503,10 @@ export class DbStorage implements IStorage {
         }
         // Otherwise, use the user-selected account (Transporter Agent, Liability, etc.)
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         // No transporter selected, use Transport Fees Payable liability
         creditAccountId = await getTransportPayableAccount();
       }
@@ -3140,6 +3184,10 @@ export class DbStorage implements IStorage {
             })
             .where(eq(schema.inventory.id, currentInventory.id));
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Create new inventory record (shouldn't normally happen, but handle it)
           await db.insert(schema.inventory).values({
             companyId: voucher.companyId,
@@ -3201,6 +3249,10 @@ export class DbStorage implements IStorage {
               })
               .where(eq(schema.inventory.id, sourceInventory.id));
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             await db.insert(schema.inventory).values({
               companyId: voucher.companyId,
               locationId: sourceLocationId,
@@ -3291,6 +3343,10 @@ export class DbStorage implements IStorage {
               newTotalValue = (currentQty * currentRate) + (quantity * rate);
               newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
             } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
               // Removing produced items: just reduce value proportionally
               newTotalValue = Math.max(0, newQuantity * currentRate);
               newAverageRate = currentRate;
@@ -3387,6 +3443,10 @@ export class DbStorage implements IStorage {
             await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
             await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             await db
               .update(schema.containers)
               .set({
@@ -3503,6 +3563,10 @@ export class DbStorage implements IStorage {
             balance: -balance, // Store as positive for income
           });
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           totalExpense += balance; // Expense accounts have debit balances (positive)
           accountBalances.push({
             accountId: account.id,
@@ -3542,6 +3606,10 @@ export class DbStorage implements IStorage {
             narration: `Close ${account.accountName} for period ending ${periodEndDate}`,
           });
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Credit Expense accounts to zero them out
           await tx.insert(schema.voucherEntries).values({
             voucherId: closingVoucher.id,
@@ -3565,6 +3633,10 @@ export class DbStorage implements IStorage {
             narration: `Net Income for period ending ${periodEndDate}`,
           });
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Loss: Debit Retained Earnings
           await tx.insert(schema.voucherEntries).values({
             voucherId: closingVoucher.id,
@@ -3735,6 +3807,10 @@ export class DbStorage implements IStorage {
               })
               .where(eq(schema.inventory.id, destInventory.id));
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             // Create new inventory record at destination
             const [destLocation] = await tx
               .select()
@@ -3911,6 +3987,10 @@ export class DbStorage implements IStorage {
               actualValueChange = Math.abs(quantity) * rate;
               totalProductionValue += actualValueChange;
             } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
               // Consumption - subtract from inventory (use absolute value to ensure reduction)
               newQty = currentQty - Math.abs(quantity);
               newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -3946,6 +4026,10 @@ export class DbStorage implements IStorage {
             // Track value for new inventory
             totalProductionValue += actualTotalAmount;
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             // Consumption without existing inventory - use stock item's costPrice as fallback
             // This allows consumption even when no inventory exists at this location
             const [stockItem] = await tx
@@ -4162,6 +4246,10 @@ export class DbStorage implements IStorage {
             })
             .where(eq(schema.inventory.id, sourceInventory.id));
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Create new inventory record at source (it may have been deleted if quantity reached 0)
           const [sourceLocation] = await tx
             .select()
@@ -4283,6 +4371,10 @@ export class DbStorage implements IStorage {
             })
             .where(eq(schema.inventory.id, sourceInventory.id));
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           throw new Error(`Insufficient inventory at source location ${item.sourceLocationId} for stock item ${item.stockItemId}`);
         }
 
@@ -4318,6 +4410,10 @@ export class DbStorage implements IStorage {
             })
             .where(eq(schema.inventory.id, destInventory.id));
         } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
           // Create new inventory record at destination
           const [destLocation] = await tx
             .select()
@@ -4435,6 +4531,10 @@ export class DbStorage implements IStorage {
             newValue = newQty > 0 ? newQty * currentRate : 0;
             newRate = currentRate;
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             // REVERSE Consumption: Add back the quantity that was subtracted
             // Use weighted average: (existing qty * existing rate + returning qty * returning rate) / total qty
             newQty = currentQty + Math.abs(quantity);
@@ -4649,6 +4749,10 @@ export class DbStorage implements IStorage {
               actualValueChange = Math.abs(quantity) * rate;
               totalProductionValue += actualValueChange;
             } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
               // Consumption - subtract from inventory (use absolute value to ensure reduction)
               newQty = currentQty - Math.abs(quantity);
               newValue = newQty > 0 ? newQty * currentRate : 0;
@@ -4684,6 +4788,10 @@ export class DbStorage implements IStorage {
             // Track value for new inventory
             totalProductionValue += actualTotalAmount;
           } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
             // Consumption requires existing inventory - cannot consume what doesn't exist
             // This guard ensures we never store user-input rates for consumption items
             throw new Error(`Insufficient inventory at location ${locationId} for stock item ${item.stockItemId}. Cannot consume items that don't exist in inventory.`);
@@ -5210,6 +5318,13 @@ export class DbStorage implements IStorage {
     const existing = await this.getCompanySettings(settings.companyId);
     
     if (existing) {
+      // If quantity is zero, delete the record instead of updating
+      if (numericQuantity === 0) {
+        await db
+          .delete(schema.inventory)
+          .where(eq(schema.inventory.id, existing.id));
+        return;
+      }
       const [updated] = await db
         .update(schema.companySettings)
         .set({ ...settings, updatedAt: sql`now()` })
@@ -5217,6 +5332,10 @@ export class DbStorage implements IStorage {
         .returning();
       return updated;
     } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
       const [created] = await db
         .insert(schema.companySettings)
         .values(settings)
@@ -5979,6 +6098,10 @@ export class DbStorage implements IStorage {
       }
       stockGroupName = stockGroup[0].name;
     } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
       // When stockGroupId is null, find the "Uncategorized" stock group for this company
       // Items may be assigned to this group OR have null stockGroupId
       const uncategorizedGroup = await db
@@ -6012,6 +6135,10 @@ export class DbStorage implements IStorage {
           isNull(schema.stockItems.deletedAt)
         ));
     } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
       // For uncategorized items: find items with null stockGroupId OR in the Uncategorized group
       if (uncategorizedGroupId !== null) {
         stockItems = await db
@@ -6026,6 +6153,10 @@ export class DbStorage implements IStorage {
             isNull(schema.stockItems.deletedAt)
           ));
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         // No Uncategorized group exists, just look for null stockGroupId
         stockItems = await db
           .select()
@@ -6181,6 +6312,13 @@ export class DbStorage implements IStorage {
         ));
 
       if (existing) {
+      // If quantity is zero, delete the record instead of updating
+      if (numericQuantity === 0) {
+        await db
+          .delete(schema.inventory)
+          .where(eq(schema.inventory.id, existing.id));
+        return;
+      }
         // Add back the archived quantity using weighted average
         const existingQty = parseFloat(existing.quantity);
         const existingValue = parseFloat(existing.totalValue);
@@ -6201,6 +6339,10 @@ export class DbStorage implements IStorage {
           })
           .where(eq(schema.inventory.id, existing.id));
       } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
         // Create new inventory record
         await db
           .insert(schema.inventory)
@@ -6267,6 +6409,13 @@ export class DbStorage implements IStorage {
   async setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting> {
     const existing = await this.getSystemSetting(key);
     if (existing) {
+      // If quantity is zero, delete the record instead of updating
+      if (numericQuantity === 0) {
+        await db
+          .delete(schema.inventory)
+          .where(eq(schema.inventory.id, existing.id));
+        return;
+      }
       const [updated] = await db
         .update(schema.systemSettings)
         .set({ value, updatedAt: sql`now()` })
@@ -6274,6 +6423,10 @@ export class DbStorage implements IStorage {
         .returning();
       return updated;
     } else {
+      // Don't create new record if quantity is zero
+      if (numericQuantity === 0) {
+        return;
+      }
       const [created] = await db
         .insert(schema.systemSettings)
         .values({ key, value })
