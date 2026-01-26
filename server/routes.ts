@@ -1784,19 +1784,6 @@ if (asOfDate) {
           req.session.currentCompanyId,
         );
 
-        // Find or create "Uncategorized" stock group
-        let uncategorizedGroup = await storage.getStockGroupByCode(
-          "UNCATEGORIZED",
-          req.session.currentCompanyId,
-        );
-        if (!uncategorizedGroup) {
-          uncategorizedGroup = await storage.createStockGroup({
-            companyId: req.session.currentCompanyId,
-            code: "UNCATEGORIZED",
-            name: "Uncategorized",
-            active: true,
-          });
-        }
 
         const results = {
           created: [] as any[],
@@ -1816,7 +1803,7 @@ if (asOfDate) {
             // If stock item doesn't exist, create it
             if (!stockItem) {
               // Auto-detect stock group from item code prefix (first 2-3 uppercase letters)
-              let stockGroupId = uncategorizedGroup.id;
+              let stockGroupId: number | null = null;
 
               // Normalize and try to extract prefix from Item_barcode
               const normalizedCode = item.Item_barcode.trim().toUpperCase();
@@ -1840,7 +1827,7 @@ if (asOfDate) {
 
               // Fall back to stockGroupCode column if provided and prefix didn't match
               if (
-                stockGroupId === uncategorizedGroup.id &&
+                !stockGroupId &&
                 item.stockGroupCode
               ) {
                 const stockGroup = allStockGroups.find(
@@ -1850,6 +1837,15 @@ if (asOfDate) {
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
                 }
+              }
+
+              // Require valid stock group - reject if none found
+              if (!stockGroupId) {
+                results.errors.push({
+                  code: item.Item_barcode,
+                  reason: `No matching stock group found for code prefix. Please create stock item "${item.Item_barcode}" manually with a valid stock group first.`,
+                });
+                continue;
               }
 
               // Create the stock item
@@ -5956,19 +5952,6 @@ if (asOfDate) {
           return res.status(400).json({ message: "Items must be an array" });
         }
 
-        // Find or create "Uncategorized" stock group for this company
-        let uncategorizedGroup = await storage.getStockGroupByCode(
-          "UNCATEGORIZED",
-          req.session.currentCompanyId,
-        );
-        if (!uncategorizedGroup) {
-          uncategorizedGroup = await storage.createStockGroup({
-            companyId: req.session.currentCompanyId,
-            code: "UNCATEGORIZED",
-            name: "Uncategorized",
-            active: true,
-          });
-        }
 
         // Fetch all valid stock groups for this company for validation
         const validStockGroups = await storage.getAllStockGroups(
@@ -5990,14 +5973,17 @@ if (asOfDate) {
               companyId: req.session.currentCompanyId,
             };
 
-            // Validate and assign stock group:
-            // - If no stockGroupId provided, assign to Uncategorized
-            // - If stockGroupId is provided but invalid (doesn't exist), assign to Uncategorized
+            // Validate stock group - require valid stockGroupId, reject if missing or invalid
             if (
               !itemWithCompany.stockGroupId ||
               !validStockGroupIds.has(itemWithCompany.stockGroupId)
             ) {
-              itemWithCompany.stockGroupId = uncategorizedGroup.id;
+              results.errors.push({
+                code: item.code,
+                name: item.name,
+                error: "Missing or invalid stock group. All stock items must have a valid stock group.",
+              });
+              continue;
             }
 
             const parsed = insertStockItemSchema.parse(itemWithCompany);
