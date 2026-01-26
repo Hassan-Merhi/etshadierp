@@ -359,6 +359,14 @@ export interface IStorage {
   setSystemSetting(key: string, value: string | null): Promise<schema.SystemSetting>;
   getParentCompanyId(): Promise<number | null>;
   setParentCompanyId(companyId: number | null): Promise<void>;
+
+  // POS Shifts
+  getCurrentShift(userId: string, locationId: number): Promise<schema.PosShift | undefined>;
+  getShiftById(id: number): Promise<schema.PosShift | undefined>;
+  getShiftsByLocation(locationId: number, limit?: number): Promise<schema.PosShift[]>;
+  openShift(shift: schema.InsertPosShift): Promise<schema.PosShift>;
+  closeShift(id: number, closingCash: string, notes?: string): Promise<schema.PosShift>;
+  updateShiftStats(id: number, salesCount: number, salesTotal: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -6446,6 +6454,103 @@ export class DbStorage implements IStorage {
 
   async setParentCompanyId(companyId: number | null): Promise<void> {
     await this.setSystemSetting("parentCompanyId", companyId?.toString() ?? null);
+  }
+
+  // POS Shifts implementation
+  async getCurrentShift(userId: string, locationId: number): Promise<schema.PosShift | undefined> {
+    const [shift] = await db
+      .select()
+      .from(schema.posShifts)
+      .where(
+        and(
+          eq(schema.posShifts.userId, userId),
+          eq(schema.posShifts.locationId, locationId),
+          eq(schema.posShifts.status, "open")
+        )
+      )
+      .orderBy(desc(schema.posShifts.openedAt))
+      .limit(1);
+    return shift;
+  }
+
+  async getShiftById(id: number): Promise<schema.PosShift | undefined> {
+    const [shift] = await db
+      .select()
+      .from(schema.posShifts)
+      .where(eq(schema.posShifts.id, id));
+    return shift;
+  }
+
+  async getShiftsByLocation(locationId: number, limit: number = 50): Promise<schema.PosShift[]> {
+    return await db
+      .select()
+      .from(schema.posShifts)
+      .where(eq(schema.posShifts.locationId, locationId))
+      .orderBy(desc(schema.posShifts.openedAt))
+      .limit(limit);
+  }
+
+  async openShift(shift: schema.InsertPosShift): Promise<schema.PosShift> {
+    const [created] = await db
+      .insert(schema.posShifts)
+      .values(shift)
+      .returning();
+    return created;
+  }
+
+  async closeShift(id: number, closingCash: string, notes?: string): Promise<schema.PosShift> {
+    // Calculate sales during this shift
+    const shift = await this.getShiftById(id);
+    if (!shift) {
+      throw new Error("Shift not found");
+    }
+
+    // Get sales vouchers created during this shift
+    const salesVouchers = await db
+      .select()
+      .from(schema.vouchers)
+      .where(
+        and(
+          eq(schema.vouchers.shiftId, id),
+          eq(schema.vouchers.voucherType, "Sales"),
+          isNull(schema.vouchers.deletedAt)
+        )
+      );
+
+    const salesCount = salesVouchers.length;
+    const salesTotal = salesVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount || "0"), 0);
+    
+    // Calculate expected cash (opening + sales)
+    const openingCash = parseFloat(shift.openingCash || "0");
+    const expectedCash = openingCash + salesTotal;
+    const actualClosing = parseFloat(closingCash);
+    const variance = actualClosing - expectedCash;
+
+    const [updated] = await db
+      .update(schema.posShifts)
+      .set({
+        status: "closed",
+        closedAt: sql`now()`,
+        closingCash: closingCash,
+        expectedCash: expectedCash.toFixed(2),
+        variance: variance.toFixed(2),
+        salesCount: salesCount,
+        salesTotal: salesTotal.toFixed(2),
+        notes: notes || null,
+      })
+      .where(eq(schema.posShifts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateShiftStats(id: number, salesCount: number, salesTotal: string): Promise<void> {
+    await db
+      .update(schema.posShifts)
+      .set({
+        salesCount: salesCount,
+        salesTotal: salesTotal,
+      })
+      .where(eq(schema.posShifts.id, id));
   }
 }
 

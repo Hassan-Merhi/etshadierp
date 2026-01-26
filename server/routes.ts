@@ -1700,6 +1700,49 @@ if (asOfDate) {
     }
   });
 
+  // Get today vouchers for a location (for POS dashboard)
+  app.get("/api/locations/:locationId/vouchers/today", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      // Verify location belongs to current company
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Get today date range
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      // Get vouchers created today at this location
+      const todayVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.locationId, locationId),
+            gte(vouchers.createdAt, startOfDay),
+            lt(vouchers.createdAt, endOfDay),
+            isNull(vouchers.deletedAt)
+          )
+        )
+        .orderBy(desc(vouchers.createdAt));
+
+      res.json(todayVouchers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Update cost prices by barcode for a location
   app.post(
     "/api/locations/:locationId/import-cost-prices",
@@ -17889,6 +17932,7 @@ if (asOfDate) {
         notes,
         isCreditSale,
         voucherDate: providedVoucherDate,
+        shiftId,
       } = req.body;
 
       // Determine account type and ID by validating against actual database records
@@ -18021,6 +18065,26 @@ if (asOfDate) {
       // Validate required fields
       if (!locationId) {
         return res.status(400).json({ message: "Location is required" });
+      }
+
+      // Validate shiftId if provided - must be open, owned by user, and in same company
+      if (shiftId) {
+        const shift = await storage.getShiftById(shiftId);
+        if (!shift) {
+          return res.status(400).json({ message: "Invalid shift ID" });
+        }
+        if (shift.companyId !== req.session.currentCompanyId) {
+          return res.status(403).json({ message: "Shift does not belong to current company" });
+        }
+        if (shift.locationId !== locationId) {
+          return res.status(400).json({ message: "Shift location does not match sale location" });
+        }
+        if (shift.status !== "open") {
+          return res.status(400).json({ message: "Cannot add sale to closed shift" });
+        }
+        if (shift.userId !== req.user?.id) {
+          return res.status(403).json({ message: "Cannot add sale to another user's shift" });
+        }
       }
       if (!accountId) {
         return res
@@ -18158,6 +18222,7 @@ if (asOfDate) {
             voucherDate,
             description: notes || `POS Sale at ${location.name}`,
             totalAmount: grandTotal.toFixed(2),
+            shiftId: shiftId || null,
           })
           .returning();
 
@@ -18646,6 +18711,168 @@ if (asOfDate) {
       if (error.message.includes("Insufficient stock")) {
         return res.status(400).json({ message: error.message });
       }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POS Shift Management Routes
+  // Get current open shift for user at location
+  app.get("/api/pos/shifts/current", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.query.locationId as string);
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
+      }
+
+      // Verify location belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location || location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const shift = await storage.getCurrentShift(userId, locationId);
+      res.json(shift || null);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get shift history for a location
+  app.get("/api/pos/shifts/history", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.query.locationId as string);
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
+      }
+
+      // Verify location belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location || location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const shifts = await storage.getShiftsByLocation(locationId, limit);
+      res.json(shifts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get shift by ID with report data
+  app.get("/api/pos/shifts/:id", requireAuth, async (req, res) => {
+    try {
+      const shiftId = parseInt(req.params.id);
+      const shift = await storage.getShiftById(shiftId);
+      
+      if (!shift) {
+        return res.status(404).json({ message: "Shift not found" });
+      }
+
+      // Verify shift belongs to current company
+      if (shift.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(shift);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Open a new shift
+  app.post("/api/pos/shifts/open", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const username = req.user?.username;
+      
+      if (!userId || !username) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { locationId, cashAccountId, openingCash, posStation } = req.body;
+
+      if (!locationId) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+
+      // Verify location belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location || location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Invalid location" });
+      }
+
+      // Check if user already has an open shift at this location
+      const existingShift = await storage.getCurrentShift(userId, locationId);
+      if (existingShift) {
+        return res.status(400).json({ 
+          message: "You already have an open shift at this location. Please close it first.",
+          existingShiftId: existingShift.id
+        });
+      }
+
+      const shift = await storage.openShift({
+        companyId: req.session.currentCompanyId,
+        locationId,
+        userId,
+        username,
+        cashAccountId: cashAccountId || null,
+        posStation: posStation || null,
+        openingCash: openingCash || "0",
+        status: "open",
+      });
+
+      res.json(shift);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Close a shift
+  app.post("/api/pos/shifts/:id/close", requireAuth, async (req, res) => {
+    try {
+      const shiftId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const shift = await storage.getShiftById(shiftId);
+      if (!shift) {
+        return res.status(404).json({ message: "Shift not found" });
+      }
+
+      // Verify user owns this shift and it belongs to current company
+      if (shift.userId !== userId) {
+        return res.status(403).json({ message: "You can only close your own shifts" });
+      }
+      if (shift.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (shift.status === "closed") {
+        return res.status(400).json({ message: "Shift is already closed" });
+      }
+
+      const { closingCash, notes } = req.body;
+      
+      if (closingCash === undefined || closingCash === null) {
+        return res.status(400).json({ message: "Closing cash amount is required" });
+      }
+
+      const closedShift = await storage.closeShift(shiftId, closingCash.toString(), notes);
+      res.json(closedShift);
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

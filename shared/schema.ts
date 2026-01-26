@@ -667,6 +667,7 @@ export const vouchers = pgTable("vouchers", {
   description: text("description"),
   totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull(),
   optional: boolean("optional").notNull().default(false),
+  shiftId: integer("shift_id"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -683,6 +684,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   voucherDate: z.string().min(1, "Voucher date is required"),
   totalAmount: z.string().min(1, "Total amount is required"),
   optional: z.boolean().optional().default(false),
+  shiftId: z.number().optional(),
 });
 
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
@@ -1863,3 +1865,75 @@ export const updatePresenceSchema = z.object({
 });
 
 export type UpdatePresence = z.infer<typeof updatePresenceSchema>;
+
+// POS Shifts table - tracks POS user work sessions
+export const posShifts = pgTable("pos_shifts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  username: text("username").notNull(),
+  cashAccountId: integer("cash_account_id"),
+  posStation: integer("pos_station"),
+  status: text("status").notNull().default("open"),
+  openedAt: timestamp("opened_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+  openingCash: decimal("opening_cash", { precision: 20, scale: 2 }).notNull().default("0"),
+  closingCash: decimal("closing_cash", { precision: 20, scale: 2 }),
+  expectedCash: decimal("expected_cash", { precision: 20, scale: 2 }),
+  variance: decimal("variance", { precision: 20, scale: 2 }),
+  salesCount: integer("sales_count").default(0),
+  salesTotal: decimal("sales_total", { precision: 20, scale: 2 }).default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPosShiftSchema = createInsertSchema(posShifts).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  locationId: z.number().min(1, "Location is required"),
+  userId: z.string().min(1, "User ID is required"),
+  username: z.string().min(1, "Username is required"),
+  cashAccountId: z.number().optional(),
+  posStation: z.number().optional(),
+  openingCash: z.string().default("0"),
+  status: z.enum(["open", "closed"]).default("open"),
+});
+
+export type InsertPosShift = z.infer<typeof insertPosShiftSchema>;
+export type PosShift = typeof posShifts.$inferSelect;
+
+export const closePosShiftSchema = z.object({
+  closingCash: z.string().min(1, "Closing cash is required"),
+  notes: z.string().optional(),
+});
+
+export type ClosePosShift = z.infer<typeof closePosShiftSchema>;
+
+// Offline POS Queue - stores transactions for offline sync
+export const posOfflineQueue = pgTable("pos_offline_queue", {
+  id: serial("id").primaryKey(),
+  clientId: varchar("client_id", { length: 100 }).notNull(),
+  companyId: integer("company_id").notNull(),
+  locationId: integer("location_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending"),
+  errorMessage: text("error_message"),
+  retries: integer("retries").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+}, (t) => ({
+  uniqueClientId: uniqueIndex("pos_offline_queue_client_unique").on(t.clientId),
+}));
+
+export const insertPosOfflineQueueSchema = createInsertSchema(posOfflineQueue).omit({
+  id: true,
+  createdAt: true,
+  processedAt: true,
+});
+
+export type InsertPosOfflineQueue = z.infer<typeof insertPosOfflineQueueSchema>;
+export type PosOfflineQueue = typeof posOfflineQueue.$inferSelect;

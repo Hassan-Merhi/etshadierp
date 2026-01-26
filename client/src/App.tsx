@@ -41,6 +41,7 @@ import StockQuery from "@/pages/StockQuery";
 import StockItemDetail from "@/pages/StockItemDetail";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
+import POSDashboard from "@/pages/POSDashboard";
 import EditSupplier from "@/pages/EditSupplier";
 import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
@@ -94,6 +95,7 @@ function Router({ user }: { user: any }) {
         <Route path="/pos/edit/:id">{(params) => <POS posUser={user} editVoucherId={params.id} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
+        <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>

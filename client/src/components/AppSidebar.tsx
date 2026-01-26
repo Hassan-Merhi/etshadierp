@@ -98,6 +98,7 @@ const menuGroups: MenuGroup[] = [
     title: "Sales & POS",
     icon: Store,
     items: [
+      { title: "Dashboard", url: "/pos-dashboard", icon: LayoutDashboard },
       { title: "POS", url: "/pos", icon: ShoppingCart },
       { title: "POS Daybook", url: "/pos-daybook", icon: Book },
     ],
@@ -173,7 +174,7 @@ export function AppSidebar({ user }: { user?: any }) {
     }
 
     if (isPOSUser) {
-      return ["/pos", "/pos-daybook", "/location-inventory"].includes(item.url);
+      return ["/pos", "/pos-dashboard", "/pos-daybook", "/location-inventory"].includes(item.url);
     }
 
     if (item.url === "/settings") return false;
