@@ -26013,14 +26013,49 @@ if (asOfDate) {
       const otwContainers: any[] = [];
       const offloadedContainers: any[] = [];
       
+      // Pre-fetch item counts for all containers
+      const { purchaseOrders, purchaseOrderLineItems } = await import("@shared/schema");
+      const containerItemCounts: Record<number, number> = {};
+      
       for (const companyId of companyIds) {
         const containers = await storage.getAllContainers(companyId);
+        const containerIds = containers.map(c => c.id);
+        
+        if (containerIds.length > 0) {
+          // Get PO counts per container
+          const posByContainer = await db
+            .select({ containerId: purchaseOrders.containerId, poId: purchaseOrders.id })
+            .from(purchaseOrders)
+            .where(inArray(purchaseOrders.containerId, containerIds));
+          
+          const poIds = posByContainer.map(p => p.poId);
+          if (poIds.length > 0) {
+            // Get line item counts per PO
+            const lineItemCounts = await db
+              .select({ 
+                purchaseOrderId: purchaseOrderLineItems.purchaseOrderId,
+                count: sql`count(*)`
+              })
+              .from(purchaseOrderLineItems)
+              .where(inArray(purchaseOrderLineItems.purchaseOrderId, poIds))
+              .groupBy(purchaseOrderLineItems.purchaseOrderId);
+            
+            // Map PO counts to containers
+            const poCountMap = new Map(lineItemCounts.map(l => [l.purchaseOrderId, Number(l.count)]));
+            for (const po of posByContainer) {
+              const containerId = po.containerId as number;
+              containerItemCounts[containerId] = (containerItemCounts[containerId] || 0) + (poCountMap.get(po.poId) || 0);
+            }
+          }
+        }
+        
         containers.forEach(c => {
           const enrichedContainer = {
             ...c,
             companyName: companyMap.get(c.companyId)?.name || "Unknown",
             companyCode: companyMap.get(c.companyId)?.code || "",
             supplierName: supplierMap.get(c.supplierId)?.legalName || "Unknown",
+            itemCount: containerItemCounts[c.id] || 0,
           };
           if (c.status === "OFFLOADED") {
             offloadedContainers.push(enrichedContainer);
@@ -26141,13 +26176,16 @@ if (asOfDate) {
         byTransporter[transporter].offloadedTotal += parseFloat(container.transportFee || "0");
       }
 
+      // Calculate total items from container itemCounts
+      const totalItems = otwContainers.reduce((sum, c) => sum + (c.itemCount || 0), 0);
+
       res.json({
         containers: otwContainers,
         byRoute,
         byAgent,
         byLocation,
         byTransporter,
-        totals: { count: otwContainers.length, amount: totalAmount },
+        totals: { count: otwContainers.length, amount: totalAmount, totalItems },
       });
     } catch (error: any) {
       console.error("Dashboard container tracking error:", error);
