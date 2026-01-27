@@ -56,13 +56,14 @@
   import { useToast } from "@/hooks/use-toast";
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database } from "lucide-react";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp } from "lucide-react";
 import * as XLSX from "xlsx";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
   import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
   import { useCompany } from "@/contexts/CompanyContext";
+  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
   import { formatNumber } from "@/lib/formatNumber";
   
   const userFormSchema = insertUserSchema;
@@ -1957,6 +1958,10 @@ function EditLogTable({ companyId }: { companyId?: number }) {
               <Database className="h-4 w-4 mr-2" />
               Data Tools
             </TabsTrigger>
+            <TabsTrigger value="exchange-rates" data-testid="tab-exchange-rates">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Exchange Rates
+            </TabsTrigger>
           </TabsList>
   
           {/* Companies Tab */}
@@ -3710,6 +3715,9 @@ function EditLogTable({ companyId }: { companyId?: number }) {
 
           <TabsContent value="data-tools" className="space-y-4">
             <DataToolsTab />
+          </TabsContent>
+          <TabsContent value="exchange-rates" className="space-y-4">
+            <ExchangeRateSettings />
           </TabsContent>
         </Tabs>
 

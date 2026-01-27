@@ -87,10 +87,30 @@ import {
   userPresence,
   updatePresenceSchema,
   auditLog,
+  insertExchangeRateSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
 import { format } from "date-fns";
+
+// Helper function to get current exchange rate for a company
+async function getCurrentExchangeRate(companyId: number): Promise<string | null> {
+  try {
+    const company = await storage.getCompanyById(companyId);
+    if (!company || !company.displayCurrency || !company.baseCurrency) {
+      return null;
+    }
+    const rate = await storage.getLatestExchangeRate(
+      companyId,
+      company.baseCurrency,
+      company.displayCurrency
+    );
+    return rate?.rate || null;
+  } catch (error) {
+    console.error("Error fetching exchange rate:", error);
+    return null;
+  }
+}
 
 
 
@@ -1295,6 +1315,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+
+  // Exchange Rates - Get all rates for current company
+  app.get("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "Company not selected" });
+      }
+      const rates = await storage.getExchangeRates(companyId);
+      res.json(rates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get latest exchange rate for a currency pair
+  app.get("/api/exchange-rates/latest", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "Company not selected" });
+      }
+      const { fromCurrency, toCurrency } = req.query;
+      if (!fromCurrency || !toCurrency) {
+        return res.status(400).json({ message: "fromCurrency and toCurrency are required" });
+      }
+      const rate = await storage.getLatestExchangeRate(
+        companyId, 
+        fromCurrency as string, 
+        toCurrency as string
+      );
+      res.json(rate || null);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create a new exchange rate
+  app.post("/api/exchange-rates", requireAuth, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "Company not selected" });
+      }
+      const rateData = {
+        ...req.body,
+        companyId
+      };
+      
+      // Validate input with Zod schema
+      const validationResult = insertExchangeRateSchema.safeParse(rateData);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const rate = await storage.createExchangeRate(validationResult.data);
+      res.json(rate);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
   // Set current company in session
   app.post("/api/auth/set-company", requireAuth, async (req, res) => {
     try {
@@ -12742,12 +12826,66 @@ if (asOfDate) {
 
   // Create a new voucher
   app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const voucher = await storage.createVoucher(req.body);
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
       res.json(voucher);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
+  });
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
+      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
+      res.json(voucher);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
   });
 
   // Create a voucher with entries in one transaction
@@ -12802,6 +12940,8 @@ if (asOfDate) {
         let createdEntries = [];
 
         try {
+          // Get current exchange rate for multi-currency companies
+          const exchangeRate = await getCurrentExchangeRate(req.session.currentCompanyId!);
           [createdVoucher] = await db
             .insert(vouchers)
             .values({
@@ -12813,6 +12953,7 @@ if (asOfDate) {
               description: voucher.description || null,
               totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
               optional: voucher.optional ?? false,
+              exchangeRate: exchangeRate,
             })
             .returning();
 
@@ -15995,6 +16136,7 @@ if (asOfDate) {
           voucherDate: voucher.voucherDate,
           description: voucher.description || null,
           optional: voucher.optional ?? false,
+              exchangeRate: exchangeRate,
           totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
         };
         // If locationId is being updated, also save the location name

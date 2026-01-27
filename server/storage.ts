@@ -240,6 +240,12 @@ export interface IStorage {
   ): Promise<schema.FiscalPeriodClosure>;
   getFiscalPeriodClosures(companyId: number): Promise<schema.FiscalPeriodClosure[]>;
 
+  // Exchange Rates
+  getExchangeRates(companyId: number): Promise<schema.ExchangeRate[]>;
+  getLatestExchangeRate(companyId: number, fromCurrency: string, toCurrency: string): Promise<schema.ExchangeRate | undefined>;
+  getExchangeRateForDate(companyId: number, fromCurrency: string, toCurrency: string, date: string): Promise<schema.ExchangeRate | undefined>;
+  createExchangeRate(rate: schema.InsertExchangeRate): Promise<schema.ExchangeRate>;
+
   // Stock Transfers
   createStockTransfer(voucherId: number, destinationLocationId: number, notes: string, items: Array<{sourceLocationId: number, stockItemId: number, quantity: string, rate: string}>): Promise<any>;
   getStockTransferByVoucherId(voucherId: number): Promise<any | null>;
@@ -3626,6 +3632,52 @@ export class DbStorage implements IStorage {
       .from(schema.fiscalPeriodClosures)
       .where(eq(schema.fiscalPeriodClosures.companyId, companyId))
       .orderBy(sql`${schema.fiscalPeriodClosures.periodEndDate} DESC`);
+  }
+
+  // Exchange Rates
+  async getExchangeRates(companyId: number): Promise<schema.ExchangeRate[]> {
+    return await db
+      .select()
+      .from(schema.exchangeRates)
+      .where(eq(schema.exchangeRates.companyId, companyId))
+      .orderBy(sql`${schema.exchangeRates.effectiveDate} DESC`);
+  }
+
+  async getLatestExchangeRate(companyId: number, fromCurrency: string, toCurrency: string): Promise<schema.ExchangeRate | undefined> {
+    const results = await db
+      .select()
+      .from(schema.exchangeRates)
+      .where(and(
+        eq(schema.exchangeRates.companyId, companyId),
+        eq(schema.exchangeRates.fromCurrency, fromCurrency),
+        eq(schema.exchangeRates.toCurrency, toCurrency)
+      ))
+      .orderBy(sql`${schema.exchangeRates.effectiveDate} DESC`)
+      .limit(1);
+    return results[0];
+  }
+
+  async getExchangeRateForDate(companyId: number, fromCurrency: string, toCurrency: string, date: string): Promise<schema.ExchangeRate | undefined> {
+    const results = await db
+      .select()
+      .from(schema.exchangeRates)
+      .where(and(
+        eq(schema.exchangeRates.companyId, companyId),
+        eq(schema.exchangeRates.fromCurrency, fromCurrency),
+        eq(schema.exchangeRates.toCurrency, toCurrency),
+        sql`${schema.exchangeRates.effectiveDate} <= ${date}`
+      ))
+      .orderBy(sql`${schema.exchangeRates.effectiveDate} DESC`)
+      .limit(1);
+    return results[0];
+  }
+
+  async createExchangeRate(rate: schema.InsertExchangeRate): Promise<schema.ExchangeRate> {
+    const [result] = await db
+      .insert(schema.exchangeRates)
+      .values(rate)
+      .returning();
+    return result;
   }
 
   // Stock Transfers
