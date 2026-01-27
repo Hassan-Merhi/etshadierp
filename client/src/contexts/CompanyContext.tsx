@@ -40,13 +40,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       index === self.findIndex((c) => c.id === company.id)
     );
 
-  // Auto-select first company if none selected and companies are loaded
-  useEffect(() => {
-    if (!selectedCompany && companies.length > 0) {
-      setSelectedCompany(companies[0]);
-    }
-  }, [companies, selectedCompany]);
-
   const selectCompany = (company: Company) => {
     setSelectedCompany(company);
     // Store in localStorage for persistence
@@ -66,16 +59,22 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Restore selected company from localStorage on mount
+  // Initialize selected company once when companies are loaded
+  // Priority: 1) localStorage saved preference, 2) first company in list
   useEffect(() => {
-    const savedCompanyId = localStorage.getItem("selectedCompanyId");
-    if (savedCompanyId && companies.length > 0) {
-      const company = companies.find((c) => c.id === parseInt(savedCompanyId));
-      if (company) {
-        setSelectedCompany(company);
+    if (companies.length > 0 && !selectedCompany) {
+      const savedCompanyId = localStorage.getItem("selectedCompanyId");
+      if (savedCompanyId) {
+        const savedCompany = companies.find((c) => c.id === parseInt(savedCompanyId));
+        if (savedCompany) {
+          setSelectedCompany(savedCompany);
+          return;
+        }
       }
+      // Fall back to first company if no valid saved preference
+      setSelectedCompany(companies[0]);
     }
-  }, [companies]);
+  }, [companies, selectedCompany]);
 
   return (
     <CompanyContext.Provider
