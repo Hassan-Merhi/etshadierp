@@ -26014,7 +26014,7 @@ if (asOfDate) {
       const offloadedContainers: any[] = [];
       
       // Pre-fetch item counts for all containers
-      const { purchaseOrders, purchaseOrderLineItems } = await import("@shared/schema");
+      const { purchaseOrders, poLineItems } = await import("@shared/schema");
       const containerItemCounts: Record<number, number> = {};
       
       for (const companyId of companyIds) {
@@ -26033,15 +26033,15 @@ if (asOfDate) {
             // Get line item counts per PO
             const lineItemCounts = await db
               .select({ 
-                purchaseOrderId: purchaseOrderLineItems.purchaseOrderId,
+                purchaseOrderId: poLineItems.poId,
                 count: sql`count(*)`
               })
-              .from(purchaseOrderLineItems)
-              .where(inArray(purchaseOrderLineItems.purchaseOrderId, poIds))
-              .groupBy(purchaseOrderLineItems.purchaseOrderId);
+              .from(poLineItems)
+              .where(inArray(poLineItems.poId, poIds))
+              .groupBy(poLineItems.poId);
             
             // Map PO counts to containers
-            const poCountMap = new Map(lineItemCounts.map(l => [l.purchaseOrderId, Number(l.count)]));
+            const poCountMap = new Map(lineItemCounts.filter(l => l.purchaseOrderId != null).map(l => [l.purchaseOrderId, Number(l.count)]));
             for (const po of posByContainer) {
               const containerId = po.containerId as number;
               containerItemCounts[containerId] = (containerItemCounts[containerId] || 0) + (poCountMap.get(po.poId) || 0);
