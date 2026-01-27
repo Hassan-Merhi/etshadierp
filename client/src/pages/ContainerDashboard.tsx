@@ -915,8 +915,14 @@ export default function ContainerDashboard() {
                           </tbody>
                           <tfoot className="bg-muted/30">
                             <tr className="border-t font-medium">
+                              <td className="py-1 px-2 text-right">Total Qty:</td>
+                              <td className="py-1 px-2 text-right" data-testid="text-total-qty">{formatNumber(po.lineItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0))}</td>
+                              <td className="py-1 px-2 text-right"></td>
+                              <td className="py-1 px-2 text-right"></td>
+                            </tr>
+                            <tr className="font-medium">
                               <td colSpan={3} className="py-1 px-2 text-right">Items Total:</td>
-                              <td className="py-1 px-2 text-right">${formatNumber(parseFloat(po.itemsTotal || "0"))}</td>
+                              <td className="py-1 px-2 text-right" data-testid="text-items-total">${formatNumber(parseFloat(po.itemsTotal || "0"))}</td>
                             </tr>
                             {parseFloat(po.freight || "0") > 0 && (
                               <tr>
