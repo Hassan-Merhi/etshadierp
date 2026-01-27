@@ -21572,6 +21572,132 @@ if (asOfDate) {
     }
   });
 
+  // Sales Report - All Companies (cross-company view like container tracking)
+  app.get("/api/dashboard/sales-report-all", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      // Get all companies the user has access to
+      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
+      const companyIds = userCompanyRoles.map(r => r.companyId);
+
+      if (companyIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get all companies for names
+      const allCompanies = await storage.getAllCompanies();
+      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+
+      const { startDate, endDate, locationId, stockItemId, companyFilter } = req.query;
+
+      // Parse company filter if provided
+      let filteredCompanyIds = companyIds;
+      if (companyFilter && typeof companyFilter === 'string' && companyFilter.length > 0) {
+        const filterCodes = companyFilter.split(',');
+        filteredCompanyIds = companyIds.filter(id => {
+          const company = companyMap.get(id);
+          return company && filterCodes.includes(company.code);
+        });
+      }
+
+      const allSalesData: any[] = [];
+
+      for (const companyId of filteredCompanyIds) {
+        const company = companyMap.get(companyId);
+        
+        // Apply filters
+        const conditions = [eq(vouchers.companyId, companyId)];
+
+        if (startDate) {
+          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        }
+        if (endDate) {
+          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        }
+        if (locationId) {
+          conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+        }
+        if (stockItemId) {
+          conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
+        }
+
+        const salesData = await db
+          .select({
+            id: salesItems.id,
+            voucherId: salesItems.voucherId,
+            voucherNumber: vouchers.voucherNumber,
+            voucherDate: vouchers.voucherDate,
+            locationId: vouchers.locationId,
+            locationName: sql<string>`COALESCE(${locations.name}, ${vouchers.locationName})`.as("location_name"),
+            stockItemId: salesItems.stockItemId,
+            stockItemCode: stockItems.code,
+            stockItemName: stockItems.name,
+            quantity: salesItems.quantity,
+            actualSellingPrice: salesItems.sellingPrice,
+            configuredSellingPrice: stockItemLocationPrices.sellingPrice,
+            costPrice: salesItems.costPrice,
+            totalSales: salesItems.totalSales,
+            totalCost: salesItems.totalCost,
+            costProfit: salesItems.profit,
+            createdAt: salesItems.createdAt,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+          .leftJoin(locations, eq(vouchers.locationId, locations.id))
+          .leftJoin(
+            stockItemLocationPrices,
+            and(
+              eq(stockItemLocationPrices.stockItemId, salesItems.stockItemId),
+              eq(stockItemLocationPrices.locationId, vouchers.locationId)
+            )
+          )
+          .where(and(...conditions))
+          .orderBy(vouchers.voucherDate);
+
+        // Enhance with computed values and company info
+        for (const item of salesData) {
+          const configuredPrice = parseFloat(item.configuredSellingPrice || "0") > 0 
+            ? parseFloat(item.configuredSellingPrice || "0")
+            : parseFloat(item.actualSellingPrice || "0");
+          
+          const actualPrice = parseFloat(item.actualSellingPrice || "0");
+          const totalSales = parseFloat(item.totalSales || "0");
+          const costProfit = parseFloat(item.costProfit || "0");
+          const quantity = parseFloat(item.quantity || "0");
+          
+          const configuredProfit = (actualPrice - configuredPrice) * quantity;
+          const totalConfiguredCost = configuredPrice * quantity;
+          
+          const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
+          const configuredProfitPercentage = totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
+          
+          allSalesData.push({
+            ...item,
+            companyId,
+            companyCode: company?.code || '',
+            companyName: company?.name || 'Unknown',
+            configuredSellingPrice: configuredPrice.toString(),
+            configuredProfit,
+            totalConfiguredCost,
+            costProfitPercentage,
+            configuredProfitPercentage,
+          });
+        }
+      }
+
+      res.json(allSalesData);
+    } catch (error: any) {
+      console.error("All companies sales report error:", error);
+      res.status(500).json({ message: error.message, details: error.toString() });
+    }
+  });
+
+
   // Recalculate cost prices for sales items using current inventory rates
   app.post(
     "/api/sales-report/recalculate-costs",

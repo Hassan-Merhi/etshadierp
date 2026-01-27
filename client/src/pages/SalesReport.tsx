@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, RefreshCw, ChevronDown, Download, Building2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +69,10 @@ interface SalesReportItem {
   configuredProfit: number;
   configuredProfitPercentage: number;
   createdAt: string;
+  // Multi-company fields (only present in all-companies view)
+  companyId?: number;
+  companyCode?: string;
+  companyName?: string;
 }
 
 interface DailySummary {
@@ -74,6 +84,7 @@ interface DailySummary {
   costProfit: number;
   configuredProfit: number;
   itemCount: number;
+  totalQty: number;
   items: SalesReportItem[];
 }
 
@@ -115,6 +126,8 @@ export default function SalesReport() {
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
   const [selectedDaySummary, setSelectedDaySummary] = useState<DailySummary | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
 
@@ -155,7 +168,7 @@ export default function SalesReport() {
     queryKey: ["/api/stock-items"],
   });
 
-  // Build query params
+  // Build query params for single-company mode
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.append("startDate", startDate);
   if (endDate) queryParams.append("endDate", endDate);
@@ -163,12 +176,48 @@ export default function SalesReport() {
   if (selectedStockItem && selectedStockItem !== "all") queryParams.append("stockItemId", selectedStockItem);
 
   const queryString = queryParams.toString();
-  const queryKey = queryString ? `/api/sales-report?${queryString}` : "/api/sales-report";
+  const singleCompanyQueryKey = queryString ? `/api/sales-report?${queryString}` : "/api/sales-report";
 
-  // Fetch sales report data
-  const { data: salesData = [], isLoading } = useQuery<SalesReportItem[]>({
-    queryKey: [queryKey],
+  // Build query params for multi-company mode
+  const multiCompanyParams = new URLSearchParams();
+  if (startDate) multiCompanyParams.append("startDate", startDate);
+  if (endDate) multiCompanyParams.append("endDate", endDate);
+  if (selectedLocation && selectedLocation !== "all") multiCompanyParams.append("locationId", selectedLocation);
+  if (selectedStockItem && selectedStockItem !== "all") multiCompanyParams.append("stockItemId", selectedStockItem);
+  if (selectedCompanies.length > 0) multiCompanyParams.append("companyFilter", selectedCompanies.join(","));
+
+  const multiCompanyQueryString = multiCompanyParams.toString();
+  const multiCompanyQueryKey = multiCompanyQueryString 
+    ? `/api/dashboard/sales-report-all?${multiCompanyQueryString}` 
+    : "/api/dashboard/sales-report-all";
+
+  // Fetch sales report data (single company)
+  const { data: singleCompanySalesData = [], isLoading: isLoadingSingle } = useQuery<SalesReportItem[]>({
+    queryKey: [singleCompanyQueryKey],
+    enabled: !isMultiCompanyMode,
   });
+
+  // Fetch sales report data (all companies)
+  const { data: allCompaniesSalesData = [], isLoading: isLoadingMulti } = useQuery<SalesReportItem[]>({
+    queryKey: [multiCompanyQueryKey],
+    enabled: isMultiCompanyMode,
+  });
+
+  // Use the appropriate data based on mode
+  const salesData = isMultiCompanyMode ? allCompaniesSalesData : singleCompanySalesData;
+  const isLoading = isMultiCompanyMode ? isLoadingMulti : isLoadingSingle;
+
+  // Extract unique companies from multi-company data
+  const companyFilterOptions = useMemo(() => {
+    if (!isMultiCompanyMode || !allCompaniesSalesData.length) return [];
+    const uniqueCompanies = new Map<string, string>();
+    allCompaniesSalesData.forEach((item) => {
+      if (item.companyCode && item.companyName) {
+        uniqueCompanies.set(item.companyCode, item.companyName);
+      }
+    });
+    return Array.from(uniqueCompanies.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [isMultiCompanyMode, allCompaniesSalesData]);
 
   // Group sales by date/month/year
   const groupedData: DailySummary[] = salesData.reduce((acc: DailySummary[], item) => {
@@ -203,6 +252,8 @@ export default function SalesReport() {
     const costProfit = parseFloat(item.costProfit);
     const configuredProfit = item.configuredProfit;
 
+    const qty = parseFloat(item.quantity);
+
     if (existing) {
       existing.totalSales += totalSales;
       existing.totalCost += totalCost;
@@ -210,6 +261,7 @@ export default function SalesReport() {
       existing.costProfit += costProfit;
       existing.configuredProfit += configuredProfit;
       existing.itemCount += 1;
+      existing.totalQty += qty;
       existing.items.push(item);
     } else {
       acc.push({
@@ -221,6 +273,7 @@ export default function SalesReport() {
         costProfit,
         configuredProfit,
         itemCount: 1,
+        totalQty: qty,
         items: [item],
       });
     }
@@ -247,8 +300,9 @@ export default function SalesReport() {
       totalConfiguredCost: acc.totalConfiguredCost + group.totalConfiguredCost,
       costProfit: acc.costProfit + group.costProfit,
       configuredProfit: acc.configuredProfit + group.configuredProfit,
+      totalQty: acc.totalQty + group.totalQty,
     }),
-    { totalSales: 0, totalCost: 0, totalConfiguredCost: 0, costProfit: 0, configuredProfit: 0 }
+    { totalSales: 0, totalCost: 0, totalConfiguredCost: 0, costProfit: 0, configuredProfit: 0, totalQty: 0 }
   );
 
   const handleClearFilters = () => {
@@ -258,6 +312,7 @@ export default function SalesReport() {
     setSelectedStockItem("");
     setSearchTerm("");
     setProfitFilter("all");
+    setSelectedCompanies([]);
   };
 
   const handleRowClick = (summary: DailySummary) => {
@@ -269,6 +324,7 @@ export default function SalesReport() {
     const exportData = groupedData.map((group) => ({
       "Date": group.displayDate,
       "Items Sold": group.itemCount,
+      "Total Qty": formatNumber(group.totalQty),
       "Total Sales": formatNumber(group.totalSales),
       "Total Cost": formatNumber(group.totalCost),
       "Cost Profit": formatNumber(group.costProfit),
@@ -280,6 +336,7 @@ export default function SalesReport() {
     exportData.push({
       "Date": "TOTAL",
       "Items Sold": salesData.length,
+      "Total Qty": formatNumber(totals.totalQty),
       "Total Sales": formatNumber(totals.totalSales),
       "Total Cost": formatNumber(totals.totalCost),
       "Cost Profit": formatNumber(totals.costProfit),
@@ -301,14 +358,81 @@ export default function SalesReport() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold">Sales Report</h1>
           <p className="text-muted-foreground">
             Analyze profit and loss from POS transactions
+            {isMultiCompanyMode && " (All Companies)"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Multi-company mode toggle */}
+          <Button
+            variant={isMultiCompanyMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setIsMultiCompanyMode(!isMultiCompanyMode);
+              setSelectedCompanies([]);
+            }}
+            className="gap-2"
+            data-testid="button-toggle-multi-company"
+          >
+            <Building2 className="w-4 h-4" />
+            {isMultiCompanyMode ? "All Companies" : "Current Company"}
+          </Button>
+
+          {/* Company filter (only in multi-company mode) */}
+          {isMultiCompanyMode && companyFilterOptions.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2" data-testid="button-company-filter">
+                  <Building2 className="w-4 h-4" />
+                  {selectedCompanies.length === 0 
+                    ? "All Companies" 
+                    : `${selectedCompanies.length} selected`}
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="end">
+                <div className="space-y-1">
+                  <div 
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                    onClick={() => setSelectedCompanies([])}
+                    data-testid="option-all-companies"
+                  >
+                    <Checkbox 
+                      checked={selectedCompanies.length === 0} 
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm font-medium">All Companies</span>
+                  </div>
+                  <div className="border-t my-1" />
+                  {companyFilterOptions.map(([code, name]) => (
+                    <div 
+                      key={code}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                      onClick={() => {
+                        setSelectedCompanies(prev => 
+                          prev.includes(code) 
+                            ? prev.filter(c => c !== code)
+                            : [...prev, code]
+                        );
+                      }}
+                      data-testid={`option-company-${code}`}
+                    >
+                      <Checkbox 
+                        checked={selectedCompanies.includes(code)} 
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">{code} - {name}</span>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
@@ -517,6 +641,7 @@ export default function SalesReport() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Items</TableHead>
+                    <TableHead className="text-right">Total Qty</TableHead>
                     <TableHead className="text-right">Total Sales</TableHead>
                     <TableHead className="text-right">Cost Price Total</TableHead>
                     <TableHead className="text-right">Cost Profit</TableHead>
@@ -536,6 +661,9 @@ export default function SalesReport() {
                       <TableCell className="font-medium">{group.displayDate}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(group.itemCount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatNumber(group.totalQty)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(group.totalSales)}
@@ -562,6 +690,9 @@ export default function SalesReport() {
                     <TableCell>TOTAL</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatNumber(salesData.length)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatNumber(totals.totalQty)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(totals.totalSales)}
@@ -673,7 +804,12 @@ export default function SalesReport() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedDaySummary.items.map((item) => {
+                    {/* Sort items by location name to group same locations together */}
+                    {[...selectedDaySummary.items].sort((a, b) => {
+                      const locA = a.locationName || '';
+                      const locB = b.locationName || '';
+                      return locA.localeCompare(locB);
+                    }).map((item) => {
                       const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
                       return (
                         <TableRow key={item.id}>
