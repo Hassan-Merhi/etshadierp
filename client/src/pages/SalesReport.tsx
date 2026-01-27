@@ -425,7 +425,7 @@ export default function SalesReport() {
                         checked={selectedCompanies.includes(code)} 
                         className="h-4 w-4"
                       />
-                      <span className="text-sm">{code} - {name}</span>
+                      <span className="text-sm">{name}</span>
                     </div>
                   ))}
                 </div>
