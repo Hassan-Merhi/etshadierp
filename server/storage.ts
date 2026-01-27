@@ -77,7 +77,7 @@ export interface IStorage {
   deleteLocation(id: number): Promise<void>;
 
   // Ledger Accounts
-  getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]>;
+  getAllLedgerAccounts(companyId: number, includeHidden?: boolean): Promise<LedgerAccount[]>;
   getLedgerAccountById(id: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByCode(code: string, companyId: number): Promise<LedgerAccount | undefined>;
   getLedgerAccountByName(name: string, companyId: number): Promise<LedgerAccount | undefined>;
@@ -679,12 +679,16 @@ export class DbStorage implements IStorage {
   }
 
   // Ledger Accounts
-  async getAllLedgerAccounts(companyId: number): Promise<LedgerAccount[]> {
+  async getAllLedgerAccounts(companyId: number, includeHidden: boolean = false): Promise<LedgerAccount[]> {
+    const conditions = [
+      eq(schema.ledgerAccounts.companyId, companyId),
+      isNull(schema.ledgerAccounts.deletedAt)
+    ];
+    if (!includeHidden) {
+      conditions.push(eq(schema.ledgerAccounts.isHidden, false));
+    }
     return await db.select().from(schema.ledgerAccounts).where(
-      and(
-        eq(schema.ledgerAccounts.companyId, companyId),
-        isNull(schema.ledgerAccounts.deletedAt)
-      )
+      and(...conditions)
     ).orderBy(asc(schema.ledgerAccounts.code));
   }
 

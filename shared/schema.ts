@@ -126,6 +126,7 @@ export const ledgerAccounts = pgTable("ledger_accounts", {
   openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
   openingBalanceSide: text("opening_balance_side"),
   active: boolean("active").notNull().default(true),
+  isHidden: boolean("is_hidden").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({

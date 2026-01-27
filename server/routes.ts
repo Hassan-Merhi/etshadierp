@@ -19590,7 +19590,7 @@ if (asOfDate) {
       }
 
       // Get all ledger accounts for this company
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
       // Get all non-optional vouchers for this company
       const companyVouchers = await db
@@ -20118,7 +20118,7 @@ if (asOfDate) {
         .execute();
 
       // Get all Income and Expense ledger accounts
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       const incomeAccountIds = companyAccounts
         .filter((acc) => acc.accountType === "Income")
         .map((acc) => acc.id);
@@ -21849,7 +21849,7 @@ if (asOfDate) {
         const { startDate, endDate } = req.query;
 
         // Get all ledger accounts for this company
-        const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+        const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
         const incomeAccounts = companyAccounts.filter(
           (acc) => acc.accountType === "Income",
@@ -22487,7 +22487,7 @@ if (asOfDate) {
       const { startDate, endDate } = req.query;
 
       // Get all ledger accounts
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
       const incomeAccountIds = companyAccounts
         .filter((acc) => acc.accountType === "Income")
@@ -24272,7 +24272,7 @@ if (asOfDate) {
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
 
       // Get all ledger accounts for this company
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
       // Build voucher filter conditions
       const voucherConditions = [
@@ -25219,7 +25219,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       const purchaseAccounts = companyAccounts.filter(
         (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
       );
@@ -25288,7 +25288,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       const directIncomeAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Income" && acc.subType === "Direct Income"
       );
@@ -25356,7 +25356,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       
       // Direct Expenses - include accounts that are Direct Expenses in any form:
       // - accountType === "Direct Expense"
@@ -25444,7 +25444,7 @@ if (asOfDate) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const companyAccounts = await storage.getAllLedgerAccounts(companyId);
+      const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
       const indirectExpenseAccounts = companyAccounts.filter(
         (acc) => acc.accountType === "Indirect Expense"
       );
