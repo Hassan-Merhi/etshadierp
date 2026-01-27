@@ -521,7 +521,7 @@ export default function ContainerDashboard() {
                         checked={filterCompany.includes(code)} 
                         className="h-4 w-4"
                       />
-                      <span className="text-xs">{code} - {name}</span>
+                      <span className="text-xs">{name}</span>
                     </div>
                   ))}
                 </div>
