@@ -10,6 +10,8 @@ export const companies = pgTable("companies", {
   name: text("name").notNull(),
   companyType: text("company_type").notNull().default("erp"),
   active: boolean("active").notNull().default(true),
+  baseCurrency: varchar("base_currency", { length: 10 }).default("USD"),
+  displayCurrency: varchar("display_currency", { length: 10 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -20,7 +22,34 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
   code: z.string().min(1, "Code is required"),
   name: z.string().min(1, "Name is required"),
   companyType: z.enum(["erp", "factory"]).default("erp"),
+  baseCurrency: z.string().optional(),
+  displayCurrency: z.string().optional(),
 });
+
+// Exchange rates table - stores historical exchange rates for multi-currency companies
+export const exchangeRates = pgTable("exchange_rates", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  fromCurrency: varchar("from_currency", { length: 10 }).notNull(),
+  toCurrency: varchar("to_currency", { length: 10 }).notNull(),
+  rate: decimal("rate", { precision: 20, scale: 6 }).notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyId: z.number().min(1, "Company is required"),
+  fromCurrency: z.string().min(1, "From currency is required"),
+  toCurrency: z.string().min(1, "To currency is required"),
+  rate: z.string().min(1, "Rate is required"),
+  effectiveDate: z.string().min(1, "Effective date is required"),
+});
+
+export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
 
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
@@ -669,6 +698,7 @@ export const vouchers = pgTable("vouchers", {
   totalAmount: decimal("total_amount", { precision: 20, scale: 2 }).notNull(),
   optional: boolean("optional").notNull().default(false),
   shiftId: integer("shift_id"),
+  exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -686,6 +716,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   totalAmount: z.string().min(1, "Total amount is required"),
   optional: z.boolean().optional().default(false),
   shiftId: z.number().optional(),
+  exchangeRate: z.string().optional(),
 });
 
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
