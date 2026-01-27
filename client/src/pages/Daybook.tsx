@@ -212,6 +212,7 @@ interface Voucher {
   totalAmount: string;
   optional: boolean;
   createdAt: string;
+  locationName?: string;
 }
 
 interface VoucherEntry {
@@ -224,6 +225,26 @@ interface VoucherEntry {
   debitAmount: string;
   creditAmount: string;
   narration: string | null;
+}
+
+interface ViewVoucherEntry {
+  id: number;
+  accountName: string;
+  debitAmount: string;
+  creditAmount: string;
+  narration: string | null;
+  isStockItem?: boolean;
+  stockItemId?: number;
+  stockItemName?: string;
+  ledgerAccountId?: number;
+  bankAccountId?: number;
+  isPurchaseItem?: boolean;
+  quantity?: string;
+  rate?: string;
+  totalAmount?: string;
+  sellingPrice?: string;
+  totalSales?: string;
+  adjustmentType?: string;
 }
 
 // Account Combobox Component
@@ -393,7 +414,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     });
 
   // Handle the response which can be either array (most types) or object with entries/purchaseOrder (Purchase type)
-  const viewVoucherEntries = useMemo(() => {
+  const viewVoucherEntries: ViewVoucherEntry[] = useMemo(() => {
     if (!viewVoucherEntriesRaw) return [];
     if (Array.isArray(viewVoucherEntriesRaw)) {
       return viewVoucherEntriesRaw;
@@ -429,10 +450,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
       selectedVoucher.voucherType === "POS"
     ) {
       const ledgerEntries = viewVoucherEntries.filter(
-        (e) => !e.isStockItem && !e.stockItemId,
+        (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
       );
       const cashEntry = ledgerEntries.find(
-        (e) => parseFloat(e.debitAmount || "0") > 0,
+        (e: ViewVoucherEntry) => parseFloat(e.debitAmount || "0") > 0,
       );
       // Use ledgerAccountId or bankAccountId (the actual field names from storage)
       return cashEntry?.ledgerAccountId || cashEntry?.bankAccountId || null;
@@ -441,7 +462,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     // For Payment vouchers, find the source account (credit > 0 - money going out)
     if (selectedVoucher.voucherType === "Payment") {
       const sourceEntry = viewVoucherEntries.find(
-        (e) => parseFloat(e.creditAmount || "0") > 0,
+        (e: ViewVoucherEntry) => parseFloat(e.creditAmount || "0") > 0,
       );
       return sourceEntry?.ledgerAccountId || sourceEntry?.bankAccountId || null;
     }
@@ -449,7 +470,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     // For Receipt vouchers, find the source account (debit > 0 - money going in)
     if (selectedVoucher.voucherType === "Receipt") {
       const sourceEntry = viewVoucherEntries.find(
-        (e) => parseFloat(e.debitAmount || "0") > 0,
+        (e: ViewVoucherEntry) => parseFloat(e.debitAmount || "0") > 0,
       );
       return sourceEntry?.ledgerAccountId || sourceEntry?.bankAccountId || null;
     }
@@ -457,7 +478,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     // For Journal vouchers, find the first account (any debit or credit)
     if (selectedVoucher.voucherType === "Journal") {
       const firstEntry = viewVoucherEntries.find(
-        (e) => !e.isStockItem && !e.stockItemId,
+        (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
       );
       return firstEntry?.ledgerAccountId || firstEntry?.bankAccountId || null;
     }
@@ -1569,18 +1590,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   (() => {
                     // Separate ledger entries (cash/revenue) from sales items
                     const ledgerEntries = viewVoucherEntries.filter(
-                      (e) => !e.isStockItem && !e.stockItemId,
+                      (e: ViewVoucherEntry) => !e.isStockItem && !e.stockItemId,
                     );
                     const salesItems = viewVoucherEntries.filter(
-                      (e) => e.isStockItem || e.stockItemId,
+                      (e: ViewVoucherEntry) => e.isStockItem || e.stockItemId,
                     );
 
                     // Find cash entry (debit) and revenue entry (credit)
                     const cashEntry = ledgerEntries.find(
-                      (e) => parseFloat(e.debitAmount || "0") > 0,
+                      (e: ViewVoucherEntry) => parseFloat(e.debitAmount || "0") > 0,
                     );
                     const revenueEntry = ledgerEntries.find(
-                      (e) => parseFloat(e.creditAmount || "0") > 0,
+                      (e: ViewVoucherEntry) => parseFloat(e.creditAmount || "0") > 0,
                     );
 
                     return (
@@ -1625,7 +1646,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {salesItems.map((item) => {
+                                {salesItems.map((item: ViewVoucherEntry) => {
                                   const qty = parseFloat(item.quantity || "0");
                                   const rate = parseFloat(
                                     item.rate || item.sellingPrice || "0",
@@ -1659,7 +1680,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableCell className="text-right font-mono">
                                     {formatAmount(
                                       salesItems.reduce(
-                                        (sum, item) =>
+                                        (sum: number, item: ViewVoucherEntry) =>
                                           sum +
                                           parseFloat(item.quantity || "0"),
                                         0,
@@ -1671,7 +1692,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     $
                                     {formatAmount(
                                       salesItems.reduce(
-                                        (sum, item) =>
+                                        (sum: number, item: ViewVoucherEntry) =>
                                           sum +
                                           parseFloat(
                                             item.totalSales ||
@@ -1709,7 +1730,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       "customs",
                       "duty",
                     ];
-                    const ledgerEntries = viewVoucherEntries.filter((e) => {
+                    const ledgerEntries = viewVoucherEntries.filter((e: ViewVoucherEntry) => {
                       if (e.isPurchaseItem || e.isStockItem) return false;
                       const name = (e.accountName || "").toLowerCase();
                       // Keep only entries that start with known charge types
@@ -1718,7 +1739,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                       );
                     });
                     const purchaseItems = viewVoucherEntries.filter(
-                      (e) => e.isPurchaseItem || e.isStockItem,
+                      (e: ViewVoucherEntry) => e.isPurchaseItem || e.isStockItem,
                     );
 
                     return (
@@ -1798,7 +1819,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               </TableHeader>
                               <TableBody>
                                 {/* Purchase Items */}
-                                {purchaseItems.map((item) => {
+                                {purchaseItems.map((item: ViewVoucherEntry) => {
                                   const qty = parseFloat(item.quantity || "0");
                                   const rate =
                                     item.rate != null
@@ -1842,7 +1863,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     <TableCell className="text-right font-mono">
                                       {Math.round(
                                         purchaseItems.reduce(
-                                          (sum, item) =>
+                                          (sum: number, item: ViewVoucherEntry) =>
                                             sum +
                                             parseFloat(item.quantity || "0"),
                                           0,
@@ -1856,7 +1877,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                           $
                                           {formatNumber(
                                             purchaseItems.reduce(
-                                              (sum, item) =>
+                                              (sum: number, item: ViewVoucherEntry) =>
                                                 sum +
                                                 (item.totalAmount != null
                                                   ? parseFloat(item.totalAmount)
@@ -1944,7 +1965,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableCell className="text-right font-mono">
                                     {Math.round(
                                       purchaseItems.reduce(
-                                        (sum, item) =>
+                                        (sum: number, item: ViewVoucherEntry) =>
                                           sum +
                                           parseFloat(item.quantity || "0"),
                                         0,
@@ -1958,7 +1979,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                         $
                                         {formatNumber(
                                           purchaseItems.reduce(
-                                            (sum, item) =>
+                                            (sum: number, item: ViewVoucherEntry) =>
                                               sum +
                                               (item.totalAmount != null
                                                 ? parseFloat(item.totalAmount)
@@ -2019,7 +2040,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {ledgerEntries.map((entry) => (
+                                {ledgerEntries.map((entry: ViewVoucherEntry) => (
                                   <TableRow key={entry.id}>
                                     <TableCell>
                                       <div className="font-medium">
@@ -2112,7 +2133,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             selectedVoucher.voucherType === "Stock Transfer" ||
                             selectedVoucher.voucherType === "StockTransfer"
                           ) {
-                            return viewVoucherEntries.map((entry) => {
+                            return viewVoucherEntries.map((entry: ViewVoucherEntry) => {
                               const qty = parseFloat(entry.quantity || "0");
                               const rate =
                                 entry.rate != null ? parseFloat(entry.rate) : 0;
@@ -2166,7 +2187,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                             selectedVoucher.voucherType === "Payment" ||
                             selectedVoucher.voucherType === "Receipt" ||
                             selectedVoucher.voucherType === "Journal"
-                              ? viewVoucherEntries.filter((entry) => {
+                              ? viewVoucherEntries.filter((entry: ViewVoucherEntry) => {
                                   // Payment: show only debit entries (accounts being paid)
                                   // Receipt: show only credit entries (accounts receiving)
                                   // Journal: show all entries (no filtering)
@@ -2189,7 +2210,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 })
                               : viewVoucherEntries;
 
-                          return displayEntries.map((entry) => (
+                          return displayEntries.map((entry: ViewVoucherEntry) => (
                             <TableRow key={entry.id}>
                               <TableCell>
                                 <div className="font-medium">
@@ -2239,7 +2260,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <TableCell className="text-right font-mono">
                                 {viewVoucherEntries
                                   .reduce(
-                                    (sum, e) =>
+                                    (sum: number, e: ViewVoucherEntry) =>
                                       sum +
                                       Math.abs(parseFloat(e.quantity || "0")),
                                     0,
@@ -2252,7 +2273,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                   <TableCell className="text-right font-mono">
                                     $
                                     {formatNumber(
-                                      viewVoucherEntries.reduce((sum, e) => {
+                                      viewVoucherEntries.reduce((sum: number, e: ViewVoucherEntry) => {
                                         if (e.totalAmount != null) {
                                           return (
                                             sum +
@@ -2283,12 +2304,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 {formatAmount(
                                   Math.max(
                                     viewVoucherEntries.reduce(
-                                      (sum, e) =>
+                                      (sum: number, e: ViewVoucherEntry) =>
                                         sum + parseFloat(e.debitAmount || "0"),
                                       0,
                                     ),
                                     viewVoucherEntries.reduce(
-                                      (sum, e) =>
+                                      (sum: number, e: ViewVoucherEntry) =>
                                         sum + parseFloat(e.creditAmount || "0"),
                                       0,
                                     ),
@@ -2303,7 +2324,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 $
                                 {formatAmount(
                                   viewVoucherEntries.reduce(
-                                    (sum, e) =>
+                                    (sum: number, e: ViewVoucherEntry) =>
                                       sum + parseFloat(e.debitAmount || "0"),
                                     0,
                                   ),
@@ -2313,7 +2334,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                 $
                                 {formatAmount(
                                   viewVoucherEntries.reduce(
-                                    (sum, e) =>
+                                    (sum: number, e: ViewVoucherEntry) =>
                                       sum + parseFloat(e.creditAmount || "0"),
                                     0,
                                   ),

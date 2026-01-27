@@ -3967,10 +3967,10 @@ export class DbStorage implements IStorage {
               throw new Error(`Stock item ${item.stockItemId} not found.`);
             }
             
-            // Use costPrice as the rate for consumption when no inventory exists
-            const fallbackRate = parseFloat(stockItem.costPrice || "0");
+            // Use openingRate as the rate for consumption when no inventory exists
+            const fallbackRate = parseFloat(stockItem.openingRate || "0");
             if (fallbackRate <= 0) {
-              throw new Error(`Stock item "${stockItem.name}" has no cost price set. Please set a cost price before consuming items without existing inventory.`);
+              throw new Error(`Stock item "${stockItem.name}" has no opening rate set. Please set an opening rate before consuming items without existing inventory.`);
             }
             
             actualRate = fallbackRate;
