@@ -1344,6 +1344,8 @@ function EditLogTable({ companyId }: { companyId?: number }) {
         name: "",
         code: "",
         companyType: "erp",
+        baseCurrency: "USD",
+        displayCurrency: "",
         active: true,
       },
     });
@@ -1430,6 +1432,8 @@ function EditLogTable({ companyId }: { companyId?: number }) {
           name: "",
           code: "",
           companyType: "erp",
+          baseCurrency: "USD",
+          displayCurrency: "",
           active: true,
         });
       },
@@ -1830,6 +1834,8 @@ function EditLogTable({ companyId }: { companyId?: number }) {
         name: company.name,
         code: company.code,
         companyType: company.companyType || "erp",
+        baseCurrency: company.baseCurrency || "USD",
+        displayCurrency: company.displayCurrency || "",
         active: company.active,
       });
       setIsCompanyDialogOpen(true);
@@ -2053,6 +2059,55 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                         </FormItem>
                       )}
                     />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={companyForm.control}
+                        name="baseCurrency"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Base Currency</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || "USD"}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-base-currency">
+                                  <SelectValue placeholder="Select currency" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={companyForm.control}
+                        name="displayCurrency"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Display Currency</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-display-currency">
+                                  <SelectValue placeholder="None (single currency)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="CFA">CFA</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <FormField
                       control={companyForm.control}

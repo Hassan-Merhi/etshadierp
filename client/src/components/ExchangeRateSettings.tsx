@@ -87,6 +87,7 @@ export function ExchangeRateSettings() {
     onSuccess: () => {
       toast({ title: "Exchange rate saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/latest"] });
       form.reset({ rate: "", effectiveDate: format(new Date(), "yyyy-MM-dd") });
       setShowForm(false);
     },
@@ -150,7 +151,7 @@ export function ExchangeRateSettings() {
               <div>
                 <p className="text-sm text-muted-foreground">Current Rate</p>
                 <p className="text-2xl font-bold">
-                  1 {company?.displayCurrency} = {parseFloat(latestRate.rate).toLocaleString()} {company?.baseCurrency}
+                  $1 {company?.baseCurrency} = {parseFloat(latestRate.rate).toLocaleString()} {company?.displayCurrency}
                 </p>
               </div>
               <Badge variant="secondary">
@@ -171,12 +172,12 @@ export function ExchangeRateSettings() {
                       name="rate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Rate (1 {company?.displayCurrency} = X {company?.baseCurrency})</FormLabel>
+                          <FormLabel>$1 {company?.baseCurrency} = X {company?.displayCurrency}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
                               type="number"
-                              step="0.000001"
+                              step="0.01"
                               placeholder="e.g., 600"
                               data-testid="input-exchange-rate"
                             />
@@ -244,7 +245,7 @@ export function ExchangeRateSettings() {
                     <TableCell>{format(new Date(rate.effectiveDate), "MMM d, yyyy")}</TableCell>
                     <TableCell className="font-mono">{parseFloat(rate.rate).toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      1 {rate.toCurrency} = {parseFloat(rate.rate).toLocaleString()} {rate.fromCurrency}
+                      $1 {rate.fromCurrency} = {parseFloat(rate.rate).toLocaleString()} {rate.toCurrency}
                     </TableCell>
                   </TableRow>
                 ))}
