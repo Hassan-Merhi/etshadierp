@@ -2125,6 +2125,11 @@ export class DbStorage implements IStorage {
     // Calculate additional cost per bale
     // Round to 2 decimal places to prevent floating-point accumulation errors
     const additionalCostPerBale = totalBales > 0 ? Math.round((totalCharges / totalBales) * 100) / 100 : 0;
+    
+    // Calculate rounding difference to distribute to last item
+    // This ensures total charges added to inventory exactly matches voucher entries
+    const expectedChargesApplied = additionalCostPerBale * totalBales;
+    const roundingDifference = Math.round((totalCharges - expectedChargesApplied) * 100) / 100;
 
     // Group line items by stock item and calculate new rates
     const itemsMap = new Map<number, { 
@@ -2161,8 +2166,15 @@ export class DbStorage implements IStorage {
     // Track offload items for exact reversal later
     const offloadItemsToStore: Array<{stockItemId: number; quantity: number; rate: number; totalValue: number}> = [];
 
+    // Convert itemsMap to array to identify last item for rounding adjustment
+    const itemsArray = Array.from(itemsMap.entries());
+    const lastItemIndex = itemsArray.length - 1;
+
     // Add inventory to destination location with weighted average cost
-    for (const [stockItemId, data] of Array.from(itemsMap.entries())) {
+    for (let i = 0; i < itemsArray.length; i++) {
+      const [stockItemId, data] = itemsArray[i];
+      const isLastItem = i === lastItemIndex;
+      
       // Safety check for division by zero
       if (data.totalQuantity === 0) {
         console.error("Skipping item with zero quantity:", stockItemId);
@@ -2170,14 +2182,30 @@ export class DbStorage implements IStorage {
       }
       
       const averageOriginalRate = data.weightedRateSum / data.totalQuantity;
+      
+      // Calculate base new rate with standard additional cost
       const newRate = averageOriginalRate + additionalCostPerBale;
       
+      // Calculate offload value in cents for precise rounding
+      // This ensures inventory totals exactly match voucher entries (no cents imbalance)
+      let offloadValueCents = Math.round(data.totalQuantity * newRate * 100);
+      if (isLastItem && roundingDifference !== 0) {
+        // Add rounding difference in cents to last item
+        offloadValueCents += Math.round(roundingDifference * 100);
+      }
+      
+      // Convert back to dollars, now precisely rounded
+      const offloadValue = offloadValueCents / 100;
+      
+      // Calculate adjusted rate from the corrected total value (for reversals)
+      const adjustedRate = offloadValue / data.totalQuantity;
+      
       // Store the EXACT values added for this item (for lossless reversal)
-      const offloadValue = data.totalQuantity * newRate;
+      // Use the already-rounded offloadValue to ensure reversals match exactly
       offloadItemsToStore.push({
         stockItemId,
         quantity: data.totalQuantity,
-        rate: newRate,
+        rate: adjustedRate,
         totalValue: offloadValue,
       });
       
@@ -2216,21 +2244,20 @@ export class DbStorage implements IStorage {
         let newTotalValue: number;
         
         if (newQty === 0) {
-          // Sold exactly what arrived - no inventory left, use incoming rate for tracking
-          weightedAvgRate = newRate;
+          // Sold exactly what arrived - no inventory left, use adjusted rate for tracking
+          weightedAvgRate = adjustedRate;
           newTotalValue = 0;
           console.log(`Zero inventory after offload for stock item ${stockItemId}: sold ${Math.abs(existingQty)}, received ${data.totalQuantity}`);
         } else if (newQty < 0) {
           // Oversold more than arrived - still negative inventory
-          // Use the incoming rate for tracking (this is an unusual situation)
-          weightedAvgRate = newRate;
-          newTotalValue = newQty * newRate; // Will be negative (represents owed value)
+          // Use the adjusted rate for tracking (this is an unusual situation)
+          weightedAvgRate = adjustedRate;
+          newTotalValue = newQty * adjustedRate; // Will be negative (represents owed value)
           console.warn(`Still negative inventory after offload for stock item ${stockItemId}: existing ${existingQty} + received ${data.totalQuantity} = ${newQty}`);
         } else {
           // Normal case: positive quantity - calculate weighted average
-          // Total value = existing value + incoming value, divided by total quantity
-          const incomingValue = data.totalQuantity * newRate;
-          newTotalValue = existingValue + incomingValue;
+          // Total value = existing value + incoming value (with rounding adjustment), divided by total quantity
+          newTotalValue = existingValue + offloadValue;
           weightedAvgRate = newTotalValue / newQty;
         }
         
@@ -2255,14 +2282,14 @@ export class DbStorage implements IStorage {
           .from(schema.locations)
           .where(eq(schema.locations.id, locationId));
 
-        const totalValue = data.totalQuantity * newRate;
+        // Use offloadValue which includes rounding adjustment for last item
         await db.insert(schema.inventory).values({
           companyId: location.companyId,
           locationId,
           stockItemId,
           quantity: data.totalQuantity.toString(),
-          averageRate: newRate.toFixed(2),
-          totalValue: totalValue.toFixed(2),
+          averageRate: adjustedRate.toFixed(2),
+          totalValue: offloadValue.toFixed(2),
           lastUpdated: new Date(),
         });
       }
