@@ -32,13 +32,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   });
 
   const baseCurrency = company?.baseCurrency || "USD";
-  const displayCurrency = company?.displayCurrency || null;
+  // Treat "none" as no display currency
+  const displayCurrency = company?.displayCurrency && company.displayCurrency !== "none" ? company.displayCurrency : null;
 
   // Fetch the latest exchange rate using company's currencies
   const { data: rateData, isLoading: isLoadingRate } = useQuery<any>({
     queryKey: ["/api/exchange-rates/latest", baseCurrency, displayCurrency],
     queryFn: async () => {
-      if (!displayCurrency) return null;
+      if (!displayCurrency || displayCurrency === "none") return null;
       const res = await fetch(
         `/api/exchange-rates/latest?fromCurrency=${baseCurrency}&toCurrency=${displayCurrency}`,
         { credentials: "include" }

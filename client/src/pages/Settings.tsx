@@ -1345,7 +1345,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
         code: "",
         companyType: "erp",
         baseCurrency: "USD",
-        displayCurrency: "",
+        displayCurrency: "none",
         active: true,
       },
     });
@@ -1433,7 +1433,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
           code: "",
           companyType: "erp",
           baseCurrency: "USD",
-          displayCurrency: "",
+          displayCurrency: "none",
           active: true,
         });
       },
@@ -1835,7 +1835,7 @@ function EditLogTable({ companyId }: { companyId?: number }) {
         code: company.code,
         companyType: company.companyType || "erp",
         baseCurrency: company.baseCurrency || "USD",
-        displayCurrency: company.displayCurrency || "",
+        displayCurrency: company.displayCurrency || "none",
         active: company.active,
       });
       setIsCompanyDialogOpen(true);
@@ -2090,14 +2090,14 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Display Currency</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <Select onValueChange={field.onChange} value={field.value || "none"}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-display-currency">
                                   <SelectValue placeholder="None (single currency)" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="none">None</SelectItem>
                                 <SelectItem value="CFA">CFA</SelectItem>
                                 <SelectItem value="EUR">EUR</SelectItem>
                                 <SelectItem value="GBP">GBP</SelectItem>

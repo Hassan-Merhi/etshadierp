@@ -96,7 +96,7 @@ export function ExchangeRateSettings() {
     },
   });
 
-  if (!company?.displayCurrency) {
+  if (!company?.displayCurrency || company.displayCurrency === "none") {
     return (
       <Card>
         <CardHeader>
