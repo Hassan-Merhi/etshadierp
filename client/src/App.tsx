@@ -7,6 +7,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
@@ -229,6 +230,7 @@ function AuthenticatedApp() {
               <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                 <LogOut className="h-4 w-4" />
               </Button>
+              <CurrencyToggle />
               <ThemeToggle />
             </div>
           </div>
@@ -298,6 +300,7 @@ function AuthenticatedApp() {
                 <LogOut className="h-4 w-4" />
               </Button>
               <CompanySelector />
+              <CurrencyToggle />
               <ThemeToggle />
             </div>
           </header>
