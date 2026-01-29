@@ -508,6 +508,7 @@ export default function VoucherEdit() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { exchangeRate } = useCurrencyContext();
   const [formInitialized, setFormInitialized] = useState(false);
 
   // Reset form initialization when voucher ID changes
@@ -1167,19 +1168,34 @@ export default function VoucherEdit() {
     },
   });
 
+  // Helper to convert CFA amount to USD
+  const convertAmountToUSD = (amount: string, currency: string): string => {
+    if (currency === "CFA" && exchangeRate) {
+      const cfaAmount = parseFloat(amount || "0");
+      return (cfaAmount / exchangeRate).toFixed(2);
+    }
+    return amount;
+  };
+
   // Submit handlers
   const onSubmitPaymentReceipt = (data: VoucherFormData) => {
     const voucherUpdates = {
       voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
       voucherType: voucherType,
       description: data.notes,
-      currency: data.currency,
+      currency: "USD", // Always store in USD
     };
 
     // Build the payment account entry (source account)
     // For Payment: source is CREDITED (money leaves this account)
     // For Receipt: source is DEBITED (money comes into this account)
-    const total = data.entries.reduce((sum, e) => sum + parseFloat(e.amount || "0"), 0).toFixed(2);
+    // Convert amounts from CFA to USD if needed
+    const total = data.entries.reduce((sum, e) => {
+      const amt = parseFloat(e.amount || "0");
+      const usdAmt = data.currency === "CFA" && exchangeRate ? amt / exchangeRate : amt;
+      return sum + usdAmt;
+    }, 0).toFixed(2);
+    
     const paymentEntry = {
       ledgerAccountId: data.paymentAccountType === "ledger" ? data.paymentAccountId : null,
       bankAccountId: data.paymentAccountType === "bank" ? data.paymentAccountId : null,
@@ -1191,13 +1207,16 @@ export default function VoucherEdit() {
     // Build the contra entries (destination accounts)
     // For Payment: destinations are DEBITED (money goes TO these accounts)
     // For Receipt: destinations are CREDITED (money comes FROM these accounts)
-    const contraEntries = data.entries.map((entry) => ({
-      ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
-      bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
-      supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-      debitAmount: voucherType === "Payment" ? entry.amount : "0",
-      creditAmount: voucherType === "Receipt" ? entry.amount : "0",
-    }));
+    const contraEntries = data.entries.map((entry) => {
+      const usdAmount = convertAmountToUSD(entry.amount, data.currency);
+      return {
+        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        debitAmount: voucherType === "Payment" ? usdAmount : "0",
+        creditAmount: voucherType === "Receipt" ? usdAmount : "0",
+      };
+    });
 
     const entries = [paymentEntry, ...contraEntries];
     updateMutation.mutate({ voucherUpdates, entries });
@@ -1208,16 +1227,19 @@ export default function VoucherEdit() {
       voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
       voucherType: "Journal",
       description: data.notes,
-      currency: data.currency,
+      currency: "USD", // Always store in USD
     };
 
-    const entries = data.entries.map((entry) => ({
-      ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
-      bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
-      supplierId: entry.accountType === "supplier" ? entry.accountId : null,
-      debitAmount: entry.type === "DR" ? entry.amount : "0",
-      creditAmount: entry.type === "CR" ? entry.amount : "0",
-    }));
+    const entries = data.entries.map((entry) => {
+      const usdAmount = convertAmountToUSD(entry.amount, data.currency);
+      return {
+        ledgerAccountId: entry.accountType === "ledger" ? entry.accountId : null,
+        bankAccountId: entry.accountType === "bank" ? entry.accountId : null,
+        supplierId: entry.accountType === "supplier" ? entry.accountId : null,
+        debitAmount: entry.type === "DR" ? usdAmount : "0",
+        creditAmount: entry.type === "CR" ? usdAmount : "0",
+      };
+    });
 
     updateMutation.mutate({ voucherUpdates, entries });
   };

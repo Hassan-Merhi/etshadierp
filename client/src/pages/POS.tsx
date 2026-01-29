@@ -169,7 +169,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
-  const { selectedCurrency } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate, convertToUSD } = useCurrencyContext();
   const [saleCurrency, setSaleCurrency] = useState<Currency>(selectedCurrency);
   
   const [rows, setRows] = useState<SaleRow[]>([
@@ -1071,7 +1071,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
-    // Prepare sale data
+    // Prepare sale data - convert CFA amounts to USD if entering in CFA
     const saleData = {
       locationId: activeLocation.id,
       paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
@@ -1079,13 +1079,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       isCreditSale,
       notes,
       voucherDate: saleDate,
-      currency: saleCurrency,
-      items: validItems.map(row => ({
-        stockItemId: row.stockItemId,
-        salesItemId: row.salesItemId, // Preserve for edit mode
-        quantity: row.quantity.toString(),
-        rate: row.rate.toString(),
-      })),
+      currency: "USD", // Always store in USD
+      items: validItems.map(row => {
+        // If user entered in CFA, convert to USD for storage
+        const rateInUSD = saleCurrency === "CFA" && exchangeRate 
+          ? row.rate / exchangeRate 
+          : row.rate;
+        return {
+          stockItemId: row.stockItemId,
+          salesItemId: row.salesItemId, // Preserve for edit mode
+          quantity: row.quantity.toString(),
+          rate: rateInUSD.toFixed(2),
+        };
+      }),
     };
 
     saveMutation.mutate(saleData);
