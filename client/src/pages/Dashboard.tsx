@@ -2,7 +2,6 @@ import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import { CurrencySelector } from "@/components/CurrencySelector";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import {
   Dialog,
@@ -363,14 +362,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <PageHeader
-          title="Dashboard"
-          subtitle="Overview of your business performance"
-          showHomeButton={false}
-        />
-        <CurrencySelector />
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Overview of your business performance"
+        showHomeButton={false}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KPICard
