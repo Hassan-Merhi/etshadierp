@@ -715,7 +715,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers).omit({
   voucherType: z.enum(["Payment", "Receipt", "Journal", "Sales", "Purchase", "Contra", "Stock Transfer", "Credit Note", "Debit Note"]),
   voucherDate: z.string().min(1, "Voucher date is required"),
   totalAmount: z.string().min(1, "Total amount is required"),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   optional: z.boolean().optional().default(false),
   shiftId: z.number().optional(),
   exchangeRate: z.string().optional(),

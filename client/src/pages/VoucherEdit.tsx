@@ -298,21 +298,21 @@ const voucherFormSchema = z.object({
   paymentAccountId: z.number().min(1, "Please select an account"),
   paymentAccountName: z.string(),
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   entries: z.array(voucherEntrySchema).min(1, "Add at least one entry"),
   notes: z.string().optional(),
 });
 
 const journalFormSchema = z.object({
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   entries: z.array(journalEntrySchema).min(1, "Add at least one entry"),
   notes: z.string().optional(),
 });
 
 const salesFormSchema = z.object({
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   locationId: z.number().min(1, "Location is required"),
   items: z.array(salesLineItemSchema).min(1, "Add at least one item"),
   notes: z.string().optional(),
@@ -320,14 +320,14 @@ const salesFormSchema = z.object({
 
 const purchaseFormSchema = z.object({
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   items: z.array(purchaseLineItemSchema).min(1, "Add at least one item"),
   notes: z.string().optional(),
 });
 
 const adjustmentFormSchema = z.object({
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   locationId: z.number().min(1, "Location is required"),
   items: z.array(adjustmentLineItemSchema).min(1, "Add at least one item"),
   notes: z.string().optional(),
@@ -335,7 +335,7 @@ const adjustmentFormSchema = z.object({
 
 const transferFormSchema = z.object({
   voucherDate: z.date(),
-  currency: z.enum(["USD", "CDF"]).default("USD"),
+  currency: z.enum(["USD", "CFA"]).default("USD"),
   sourceLocationId: z.number().min(1, "Source location is required"),
   destinationLocationId: z.number().min(1, "Destination location is required"),
   items: z.array(transferLineItemSchema).min(1, "Add at least one item"),
@@ -852,7 +852,7 @@ export default function VoucherEdit() {
           paymentAccountId: paymentAccount.id,
           paymentAccountName: paymentAccount.name,
           voucherDate: parseISO(voucher.voucherDate),
-          currency: (voucher.currency as "USD" | "CDF") || "USD",
+          currency: (voucher.currency as "USD" | "CFA") || "USD",
           entries: voucherEntries.map(entry => {
             const account = findAccountDetails(entry);
             // For Payment: destinations have debit amounts
@@ -882,7 +882,7 @@ export default function VoucherEdit() {
     } else if (isJournal) {
       journalForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        currency: (voucher.currency as "USD" | "CDF") || "USD",
+        currency: (voucher.currency as "USD" | "CFA") || "USD",
         entries: voucher.entries.map(entry => {
           const account = findAccountDetails(entry);
           const isDR = parseFloat(entry.debitAmount || "0") > 0;

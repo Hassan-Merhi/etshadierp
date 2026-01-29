@@ -352,7 +352,7 @@ export default function PurchaseOrderEdit() {
                   <SelectItem value="USD">USD</SelectItem>
                   <SelectItem value="EUR">EUR</SelectItem>
                   <SelectItem value="GBP">GBP</SelectItem>
-                  <SelectItem value="CDF">CDF</SelectItem>
+                  <SelectItem value="CFA">CFA</SelectItem>
                 </SelectContent>
               </Select>
             </div>

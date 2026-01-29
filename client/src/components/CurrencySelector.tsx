@@ -35,13 +35,13 @@ export function CurrencySelector({ value, onChange, className }: CurrencySelecto
       </Button>
       <Button
         type="button"
-        variant={currentValue === "CDF" ? "default" : "ghost"}
+        variant={currentValue === "CFA" ? "default" : "ghost"}
         size="sm"
         className="rounded-l-none"
-        onClick={() => handleChange("CDF")}
-        data-testid="button-currency-cdf"
+        onClick={() => handleChange("CFA")}
+        data-testid="button-currency-cfa"
       >
-        CDF
+        CFA
       </Button>
     </div>
   );

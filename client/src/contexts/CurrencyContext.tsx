@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type Currency = "USD" | "CDF";
+export type Currency = "USD" | "CFA";
 
 interface CurrencyContextType {
   selectedCurrency: Currency;
@@ -13,7 +13,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(() => {
     const stored = localStorage.getItem("selectedCurrency");
-    return (stored === "USD" || stored === "CDF") ? stored : "USD";
+    return (stored === "USD" || stored === "CFA") ? stored : "USD";
   });
 
   const setCurrency = (currency: Currency) => {
@@ -29,7 +29,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (curr === "USD") {
       return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     } else {
-      return `CDF ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      return `CFA ${numAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }
   };
 
