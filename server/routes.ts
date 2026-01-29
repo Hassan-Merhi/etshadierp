@@ -18075,6 +18075,7 @@ if (asOfDate) {
         isCreditSale,
         voucherDate: providedVoucherDate,
         shiftId,
+        currency,
       } = req.body;
 
       // Determine account type and ID by validating against actual database records
@@ -18365,6 +18366,7 @@ if (asOfDate) {
             description: notes || `POS Sale at ${location.name}`,
             totalAmount: grandTotal.toFixed(2),
             shiftId: shiftId || null,
+            currency: currency || "USD",
           })
           .returning();
 

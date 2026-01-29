@@ -1,3 +1,5 @@
+export type CurrencyCode = "USD" | "CDF";
+
 /**
  * Format a number to remove unnecessary .00 decimals and add comma separators
  * @param num - The number to format
@@ -18,6 +20,23 @@ export function formatNumber(num: number, maxDecimals: number = 2): string {
  */
 export function formatCurrency(num: number): string {
   return formatNumber(num, 2);
+}
+
+/**
+ * Format a currency value with currency label
+ * @param num - The number to format
+ * @param currency - The currency code (USD or CDF)
+ * @returns Formatted string with currency symbol/label
+ */
+export function formatCurrencyWithLabel(num: number | string, currency: CurrencyCode = "USD"): string {
+  const numValue = typeof num === "string" ? parseFloat(num) : num;
+  if (isNaN(numValue)) return "";
+  
+  if (currency === "USD") {
+    return `$ ${numValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else {
+    return `CDF ${numValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  }
 }
 
 /**

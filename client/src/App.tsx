@@ -12,6 +12,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
+import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
 import { usePresence } from "@/hooks/use-presence";
@@ -319,14 +320,16 @@ export default function App() {
           <CompanyProvider>
             <LocationProvider>
               <DateFormatProvider>
-                <Switch>
-                  <Route path="/login" component={Login} />
-                  <Route>
-                    <AuthenticatedApp />
-                  </Route>
-                </Switch>
-                <Toaster />
-                <ChatWidget />
+                <CurrencyProvider>
+                  <Switch>
+                    <Route path="/login" component={Login} />
+                    <Route>
+                      <AuthenticatedApp />
+                    </Route>
+                  </Switch>
+                  <Toaster />
+                  <ChatWidget />
+                </CurrencyProvider>
               </DateFormatProvider>
             </LocationProvider>
           </CompanyProvider>

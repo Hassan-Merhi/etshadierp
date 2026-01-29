@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CurrencySelector } from "@/components/CurrencySelector";
+import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
 import { formatNumber } from "@/lib/formatNumber";
@@ -167,6 +169,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
+  const { selectedCurrency } = useCurrencyContext();
+  const [saleCurrency, setSaleCurrency] = useState<Currency>(selectedCurrency);
+  
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
   ]);
@@ -270,6 +275,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         setSaleDate(editVoucher.voucherDate);
       }
 
+      // Populate currency from voucher
+      if (editVoucher.currency) {
+        setSaleCurrency(editVoucher.currency);
+      }
+
       // Populate payment account and credit sale info from voucher entries
       if (editVoucher.entries && editVoucher.entries.length > 0) {
         console.log('[POS Edit] Voucher entries:', editVoucher.entries);
@@ -371,6 +381,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           paymentAccountId: saleData.paymentAccountId,
           isCreditSale: saleData.isCreditSale,
           voucherDate: saleData.voucherDate,
+          currency: saleData.currency,
           items: saleData.items.map((item: any) => ({
             id: item.salesItemId, // Preserve original sales item ID for cost tracking
             stockItemId: item.stockItemId,
@@ -1068,6 +1079,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       isCreditSale,
       notes,
       voucherDate: saleDate,
+      currency: saleCurrency,
       items: validItems.map(row => ({
         stockItemId: row.stockItemId,
         salesItemId: row.salesItemId, // Preserve for edit mode
@@ -1245,6 +1257,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             )}
           </div>
         )}
+
+        {/* Currency Selector */}
+        <CurrencySelector 
+          value={saleCurrency} 
+          onChange={setSaleCurrency} 
+        />
 
         {/* Credit Sale Toggle */}
         <div className="flex items-center gap-2">
