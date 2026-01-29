@@ -2,6 +2,7 @@ import { KPICard } from "@/components/KPICard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
+import { CurrencySelector } from "@/components/CurrencySelector";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import {
   Dialog,
@@ -133,7 +134,7 @@ type PayableAccount = {
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const { selectedCurrency, formatAmount } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate } = useCurrencyContext();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
@@ -353,20 +354,30 @@ export default function Dashboard() {
 
   const formatCurrency = (value: number, currency?: Currency) => {
     const curr = currency || selectedCurrency;
+    let displayValue = value;
+    
+    // If displaying in CFA, convert USD to CFA using exchange rate
+    if (curr === "CFA" && exchangeRate) {
+      displayValue = value * exchangeRate;
+    }
+    
     if (curr === "USD") {
       return `$ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     } else {
-      return `CFA ${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      return `CFA ${Math.round(displayValue).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }
   };
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Overview of your business performance"
-        showHomeButton={false}
-      />
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Overview of your business performance"
+          showHomeButton={false}
+        />
+        <CurrencySelector />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KPICard
