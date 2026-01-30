@@ -321,27 +321,38 @@ export default function SalesReport() {
   };
 
   const handleExportExcel = () => {
-    // Detailed export: export all individual sales items
-    const detailedExportData = salesData.map((item) => ({
-      "Location": item.locationName || "N/A",
-      "Item Code": item.stockItemCode,
-      "Item Name": item.stockItemName,
-      "Quantity": parseFloat(item.quantity),
-      "Selling Price": parseFloat(item.actualSellingPrice),
-      "Total Sales": parseFloat(item.totalSales),
-      "Cost Price": parseFloat(item.costPrice),
-      "Total Cost": parseFloat(item.totalCost),
-      "Cost Profit": parseFloat(item.costProfit),
-      "Configured Cost": item.totalConfiguredCost,
-      "Configured Profit": item.configuredProfit,
-    }));
+    // Detailed export: export all individual sales items with all profit columns
+    const detailedExportData = salesData.map((item) => {
+      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+      return {
+        "Location": item.locationName || "N/A",
+        "Item Code": item.stockItemCode,
+        "Item Name": item.stockItemName,
+        "Quantity": parseFloat(item.quantity),
+        "Sold Price": parseFloat(item.actualSellingPrice),
+        "Cost Price": parseFloat(item.costPrice),
+        "Hassan's Price": parseFloat(item.configuredSellingPrice),
+        "Unit Profit": unitProfit,
+        "Total Sales": parseFloat(item.totalSales),
+        "Total Cost": parseFloat(item.totalCost),
+        "Cost Profit": parseFloat(item.costProfit),
+        "Cost %": item.costProfitPercentage,
+        "Hassan's Profit": item.configuredProfit,
+        "Hassan's %": item.configuredProfitPercentage,
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(detailedExportData);
     
     // Apply currency formatting and conditional colors
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    const currencyCols = [4, 5, 6, 7, 8, 9, 10]; // E through K (0-indexed): Selling Price, Total Sales, Cost Price, Total Cost, Cost Profit, Configured Cost, Configured Profit
-    const profitCols = [8, 10]; // Cost Profit (I) and Configured Profit (K)
+    // Column indices (0-based): 
+    // 0=Location, 1=Item Code, 2=Item Name, 3=Quantity, 4=Sold Price, 5=Cost Price, 
+    // 6=Hassan's Price, 7=Unit Profit, 8=Total Sales, 9=Total Cost, 10=Cost Profit, 
+    // 11=Cost %, 12=Hassan's Profit, 13=Hassan's %
+    const currencyCols = [4, 5, 6, 7, 8, 9, 10, 12]; // Currency columns
+    const percentCols = [11, 13]; // Percentage columns (Cost % and Hassan's %)
+    const profitCols = [7, 10, 11, 12, 13]; // All profit-related columns that need red/green
 
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -349,24 +360,28 @@ export default function SalesReport() {
         const cell = ws[cellRef];
         if (!cell) continue;
 
-        // Add currency formatting to specific columns
+        const val = typeof cell.v === 'number' ? cell.v : parseFloat(cell.v);
+
+        // Add currency formatting to currency columns
         if (currencyCols.includes(C)) {
           cell.z = '"$"#,##0.00';
-          
-          // Apply conditional colors for profit columns
-          if (profitCols.includes(C)) {
-            const val = typeof cell.v === 'number' ? cell.v : parseFloat(cell.v);
-            if (!isNaN(val)) {
-              if (val < 0) {
-                cell.s = { 
-                  font: { color: { rgb: "CC0000" } }
-                };
-              } else if (val > 0) {
-                cell.s = { 
-                  font: { color: { rgb: "006600" } }
-                };
-              }
-            }
+        }
+        
+        // Add percentage formatting to percentage columns
+        if (percentCols.includes(C)) {
+          cell.z = '0.0"%"';
+        }
+
+        // Apply conditional colors for profit columns (red for loss, green for profit)
+        if (profitCols.includes(C) && !isNaN(val)) {
+          if (val < 0) {
+            cell.s = { 
+              font: { color: { rgb: "CC0000" } }
+            };
+          } else if (val > 0) {
+            cell.s = { 
+              font: { color: { rgb: "006600" } }
+            };
           }
         }
       }
