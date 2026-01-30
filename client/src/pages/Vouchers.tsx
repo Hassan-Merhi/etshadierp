@@ -227,9 +227,9 @@ const journalFormSchema = z.object({
 });
 
 const stockTransferEntrySchema = z.object({
-  sourceLocationId: z.number(), // Allow 0 for incomplete rows - validated in onStockTransferSubmit
+  sourceLocationId: z.coerce.number(), // Coerce to handle strings, validated in onStockTransferSubmit
   sourceLocationName: z.string(),
-  stockItemId: z.number(), // Allow 0 for incomplete rows - validated in onStockTransferSubmit
+  stockItemId: z.coerce.number(), // Coerce to handle strings, validated in onStockTransferSubmit
   stockItemName: z.string(),
   quantity: z.string(), // Allow empty - validated in onStockTransferSubmit
   rate: z.string(), // Allow empty - validated in onStockTransferSubmit
@@ -4223,13 +4223,24 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       const item = filteredInventory[transferHighlightedIndex] || filteredInventory[0];
                                       const stockItem = stockItems.find(s => s.id === item.stockItemId);
                                       if (stockItem) {
-                                        // Set source location from transferInventorySource if not already set
-                                        if (transferInventorySource && !transferEntries[index]?.sourceLocationId) {
-                                          const sourceLocation = locations.find(l => l.id === transferInventorySource);
-                                          stockTransferForm.setValue(`entries.${index}.sourceLocationId`, transferInventorySource);
-                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, sourceLocation?.name || "");
+                                        // Ensure we have a valid source location
+                                        const sourceId = Number(transferInventorySource);
+                                        if (!(sourceId > 0)) {
+                                          toast({
+                                            title: "Select a source location first",
+                                            description: "Please select a source location from the inventory sidebar before adding items.",
+                                            variant: "destructive",
+                                          });
+                                          return;
                                         }
-                                        stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
+                                        
+                                        // Set source location - always set it from the current inventory source
+                                        const sourceLocation = locations.find(l => l.id === sourceId);
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationId`, sourceId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                                        stockTransferForm.setValue(`entries.${index}.sourceLocationName`, sourceLocation?.name || "");
+                                        
+                                        // Set item details
+                                        stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                                         stockTransferForm.setValue(`entries.${index}.stockItemName`, stockItem.name);
                                         stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
                                         setTransferSearchTerm("");
@@ -4506,13 +4517,24 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 if (activeTransferRow !== null) {
                                   const stockItem = stockItems.find(s => s.id === item.stockItemId);
                                   if (stockItem) {
-                                    // Set source location from transferInventorySource if not already set
-                                    if (transferInventorySource && !transferEntries[activeTransferRow]?.sourceLocationId) {
-                                      const sourceLocation = locations.find(l => l.id === transferInventorySource);
-                                      stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationId`, transferInventorySource);
-                                      stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, sourceLocation?.name || "");
+                                    // Ensure we have a valid source location
+                                    const sourceId = Number(transferInventorySource);
+                                    if (!(sourceId > 0)) {
+                                      toast({
+                                        title: "Select a source location first",
+                                        description: "Please select a source location from the inventory sidebar before adding items.",
+                                        variant: "destructive",
+                                      });
+                                      return;
                                     }
-                                    stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
+                                    
+                                    // Set source location - always set it from the current inventory source
+                                    const sourceLocation = locations.find(l => l.id === sourceId);
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationId`, sourceId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, sourceLocation?.name || "");
+                                    
+                                    // Set item details
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
                                     setTransferSearchTerm("");
