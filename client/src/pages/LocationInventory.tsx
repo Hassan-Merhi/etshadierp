@@ -141,28 +141,19 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     refetchOnMount: true, // Refetch when component mounts
   });
 
-  // For POS users, automatically set their assigned location
-  useEffect(() => {
-    if (posUser?.assignedLocationId && locations.length > 0) {
-      const assignedLocation = locations.find(loc => loc.id === posUser.assignedLocationId);
-      if (assignedLocation) {
-        setSelectedLocationLocal(assignedLocation);
-      }
-    }
-  }, [posUser, locations]);
-
   // If POS user, fetch their specific location
-  const { data: posLocation } = useQuery<Location>({
+  const { data: posLocation, isLoading: posLocationLoading } = useQuery<Location>({
     queryKey: posUser?.assignedLocationId ? [`/api/locations/${posUser.assignedLocationId}`] : [],
     enabled: !!posUser?.assignedLocationId,
   });
 
-  // Auto-select location for POS users
+  // Auto-select location for POS users (use posLocation directly)
   useEffect(() => {
-    if (posUser && posLocation && !selectedLocationLocal) {
+    if (posUser && posLocation) {
+      console.log('[LocationInventory] Setting POS user location:', posLocation);
       setSelectedLocationLocal(posLocation);
     }
-  }, [posUser, posLocation, selectedLocationLocal]);
+  }, [posUser, posLocation]);
 
   // Debug: Log when asOfDate changes
   useEffect(() => {
