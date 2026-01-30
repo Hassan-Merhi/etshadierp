@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard } from "lucide-react";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +44,7 @@ interface Customer {
 export default function POSImport() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
+  const { displayCurrency, exchangeRate } = useCurrencyContext();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -52,6 +54,7 @@ export default function POSImport() {
   const [isCreditSale, setIsCreditSale] = useState(false);
   const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -65,6 +68,8 @@ export default function POSImport() {
     queryKey: ["/api/customers"],
     enabled: isCreditSale,
   });
+
+  const showCurrencySelector = displayCurrency === "CFA";
 
   const parseMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -241,19 +246,28 @@ export default function POSImport() {
   };
 
   const doImport = () => {
+    // Convert CFA rates to USD if needed
+    let itemsToImport = validationResult.validatedItems;
+    if (saleCurrency === "CFA" && exchangeRate) {
+      itemsToImport = validationResult.validatedItems.map((item: any) => ({
+        ...item,
+        sellingRate: (parseFloat(item.sellingRate) / exchangeRate).toFixed(2),
+      }));
+    }
+
     if (isCreditSale) {
       creditImportMutation.mutate({
         locationId: parseInt(selectedLocation),
         customerId: parseInt(selectedCustomer),
         saleDate,
-        items: validationResult.validatedItems,
+        items: itemsToImport,
       });
     } else {
       importMutation.mutate({
         locationId: parseInt(selectedLocation),
         cashAccountId: parseInt(selectedCashAccount),
         saleDate,
-        items: validationResult.validatedItems,
+        items: itemsToImport,
       });
     }
   };
@@ -281,6 +295,15 @@ export default function POSImport() {
       toast({
         title: "Customer required",
         description: "Please select a customer for credit sale",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (saleCurrency === "CFA" && !exchangeRate) {
+      toast({
+        title: "Exchange rate required",
+        description: "Please set an exchange rate in Settings before importing CFA sales",
         variant: "destructive",
       });
       return;
@@ -425,6 +448,33 @@ export default function POSImport() {
               />
             </div>
           </div>
+
+          {showCurrencySelector && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency (Excel rates are in)</Label>
+                <Select value={saleCurrency} onValueChange={(v) => setSaleCurrency(v as "USD" | "CFA")}>
+                  <SelectTrigger id="currency" data-testid="select-currency">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="CFA">CFA</SelectItem>
+                  </SelectContent>
+                </Select>
+                {saleCurrency === "CFA" && exchangeRate && (
+                  <p className="text-sm text-muted-foreground">
+                    Rate: 1 USD = {formatNumber(exchangeRate)} CFA. Amounts will be converted to USD.
+                  </p>
+                )}
+                {saleCurrency === "CFA" && !exchangeRate && (
+                  <p className="text-sm text-destructive">
+                    No exchange rate set. Please set a rate in Settings before importing CFA sales.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">

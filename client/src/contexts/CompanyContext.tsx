@@ -8,6 +8,7 @@ interface Company {
   name: string;
   active: boolean;
   companyType: "erp" | "factory";
+  displayCurrency?: string | null;
 }
 
 interface CompanyContextType {

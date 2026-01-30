@@ -195,6 +195,7 @@ interface VoucherData {
   description: string | null;
   totalAmount: string;
   optional: boolean;
+  currency?: string | null;
   entries: VoucherEntry[];
   purchaseOrder?: PurchaseOrderData | null;
   salesItems?: SalesItem[] | null;
