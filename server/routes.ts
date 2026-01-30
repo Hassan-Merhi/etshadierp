@@ -19297,13 +19297,6 @@ if (asOfDate) {
 
           let totalAmount = 0;
 
-      // First, group offloaded containers by agent
-      for (const container of offloadedContainers) {
-        const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
-        byAgent[agent].offloadedContainers.push(container);
-        byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
-      }
           const transferItems = [];
 
           for (const item of items) {

@@ -2126,25 +2126,20 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return await voucherRes.json();
       } else {
         // CREATE MODE: Create new voucher and stock transfer
-        console.log("[StockTransfer] CREATE MODE - About to create voucher");
-        try {
-          const voucherRes = await apiRequest("POST", "/api/vouchers", {
-            companyId: selectedCompany?.id,
-            voucherType: "StockTransfer",
-            voucherNumber: `TRANSFER-${Date.now()}`,
-            voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
-            description: `Stock transfer from ${sourceNames} to ${destName}`,
-            totalAmount: transferTotal.toString(),
-            optional: data.optional,
-          });
-          console.log("[StockTransfer] Voucher created, response:", voucherRes);
-          const voucher = await voucherRes.json();
-          console.log("[StockTransfer] Voucher JSON:", voucher);
+        const voucherRes = await apiRequest("POST", "/api/vouchers", {
+          companyId: selectedCompany?.id,
+          voucherType: "StockTransfer",
+          voucherNumber: `TRANSFER-${Date.now()}`,
+          voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+          description: `Stock transfer from ${sourceNames} to ${destName}`,
+          totalAmount: transferTotal.toString(),
+          optional: data.optional,
+        });
+        const voucher = await voucherRes.json();
 
-          // Create stock transfer with items (including per-item source locations)
-          console.log("[StockTransfer] About to create stock transfer");
-          await apiRequest("POST", "/api/stock-transfers", {
-            voucherId: voucher.id,
+        // Create stock transfer with items (including per-item source locations)
+        await apiRequest("POST", "/api/stock-transfers", {
+          voucherId: voucher.id,
           destinationLocationId: data.destinationLocationId,
           notes: data.notes || "",
           allowNegativeInventory: allowNegativeInventory || false,
@@ -2155,13 +2150,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             rate: entry.rate,
           })),
         });
-          console.log("[StockTransfer] Stock transfer created successfully");
 
-          return voucher;
-        } catch (err) {
-          console.error("[StockTransfer] Error in mutation:", err);
-          throw err;
-        }
+        return voucher;
       }
     },
     onSuccess: () => {
