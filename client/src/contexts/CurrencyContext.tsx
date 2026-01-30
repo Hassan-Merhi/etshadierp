@@ -27,7 +27,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Fetch company details to get baseCurrency and displayCurrency
   const { data: company } = useQuery<any>({
-    queryKey: ["/api/companies", selectedCompany?.id],
+    queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
 
