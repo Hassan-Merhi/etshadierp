@@ -2086,12 +2086,32 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     return item;
   };
 
+  // Define the mutation input type with all required data passed explicitly
+  type StockTransferMutationInput = StockTransferFormData & {
+    allowNegativeInventory?: boolean;
+    _companyId: number | undefined;
+    _transferTotal: number;
+    _voucherIdToEdit: number | null;
+    _stockTransferToEditId: number | null;
+    _locations: typeof locations;
+  };
+
   // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
-    mutationFn: async (formData: StockTransferFormData & { allowNegativeInventory?: boolean }) => {
+    mutationFn: async (input: StockTransferMutationInput) => {
       try {
-        const { allowNegativeInventory, ...data } = formData;
-        const isEditMode = !!voucherIdToEdit;
+        // Extract all data from input (not from closures)
+        const { 
+          allowNegativeInventory, 
+          _companyId,
+          _transferTotal,
+          _voucherIdToEdit,
+          _stockTransferToEditId,
+          _locations,
+          ...data 
+        } = input;
+        
+        const isEditMode = !!_voucherIdToEdit;
         
         // Validate required data before proceeding
         if (!data.entries || !Array.isArray(data.entries)) {
@@ -2100,28 +2120,28 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         if (!data.destinationLocationId) {
           throw new Error("Destination location is required");
         }
-        if (!selectedCompany?.id && !isEditMode) {
+        if (!_companyId && !isEditMode) {
           throw new Error("No company selected");
         }
         
         // Get unique source locations for description
         const validEntries = data.entries.filter(e => e.sourceLocationId > 0 && e.stockItemId > 0);
         const uniqueSources = Array.from(new Set(validEntries.map(e => e.sourceLocationId)));
-        const sourceNames = uniqueSources.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(", ") || "Unknown";
-        const destName = locations.find(l => l.id === data.destinationLocationId)?.name || "Unknown";
+        const sourceNames = uniqueSources.map(id => _locations.find(l => l.id === id)?.name).filter(Boolean).join(", ") || "Unknown";
+        const destName = _locations.find(l => l.id === data.destinationLocationId)?.name || "Unknown";
         
         if (isEditMode) {
           // UPDATE MODE: Use PATCH to update existing voucher and stock transfer
-          const voucherRes = await apiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
+          const voucherRes = await apiRequest("PATCH", `/api/vouchers/${_voucherIdToEdit}`, {
             voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
             description: `Stock transfer from ${sourceNames} to ${destName}`,
-            totalAmount: transferTotal.toString(),
+            totalAmount: _transferTotal.toString(),
             optional: data.optional,
           });
           
-          // Update stock transfer (assuming stockTransferToEdit has an id)
-          if (stockTransferToEdit?.id) {
-            await apiRequest("PUT", `/api/stock-transfers/${stockTransferToEdit.id}`, {
+          // Update stock transfer
+          if (_stockTransferToEditId) {
+            await apiRequest("PUT", `/api/stock-transfers/${_stockTransferToEditId}`, {
               destinationLocationId: data.destinationLocationId,
               notes: data.notes || "",
               items: validEntries.map(entry => ({
@@ -2137,12 +2157,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         } else {
           // CREATE MODE: Create new voucher and stock transfer
           const voucherRes = await apiRequest("POST", "/api/vouchers", {
-            companyId: selectedCompany?.id,
+            companyId: _companyId,
             voucherType: "StockTransfer",
             voucherNumber: `TRANSFER-${Date.now()}`,
             voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
             description: `Stock transfer from ${sourceNames} to ${destName}`,
-            totalAmount: transferTotal.toString(),
+            totalAmount: _transferTotal.toString(),
             optional: data.optional,
           });
           const voucher = await voucherRes.json();
@@ -2399,7 +2419,16 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
 
-    stockTransferMutation.mutate({ ...data, allowNegativeInventory: userConfirmedNegativeInventory });
+    // Pass all required data explicitly to avoid stale closure issues
+    stockTransferMutation.mutate({ 
+      ...data, 
+      allowNegativeInventory: userConfirmedNegativeInventory,
+      _companyId: selectedCompany?.id,
+      _transferTotal: transferTotal,
+      _voucherIdToEdit: voucherIdToEdit,
+      _stockTransferToEditId: stockTransferToEdit?.id || null,
+      _locations: locations,
+    });
   };
 
   // Stock Adjustment form
