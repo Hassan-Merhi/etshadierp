@@ -374,10 +374,10 @@ export default function SalesReport() {
 
         // Define border style
         const borderStyle = {
-          top: { style: "thin", color: { rgb: "CCCCCC" } },
-          bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-          left: { style: "thin", color: { rgb: "CCCCCC" } },
-          right: { style: "thin", color: { rgb: "CCCCCC" } },
+          top: { style: "medium", color: { rgb: "999999" } },
+          bottom: { style: "medium", color: { rgb: "999999" } },
+          left: { style: "medium", color: { rgb: "999999" } },
+          right: { style: "medium", color: { rgb: "999999" } },
         };
 
         // Apply conditional colors for profit columns (red for loss, green for profit)
@@ -411,10 +411,10 @@ export default function SalesReport() {
           font: { bold: true },
           fill: { fgColor: { rgb: "F5F5F5" } },
           border: {
-            top: { style: "thin", color: { rgb: "CCCCCC" } },
-            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-            left: { style: "thin", color: { rgb: "CCCCCC" } },
-            right: { style: "thin", color: { rgb: "CCCCCC" } },
+            top: { style: "medium", color: { rgb: "999999" } },
+            bottom: { style: "medium", color: { rgb: "999999" } },
+            left: { style: "medium", color: { rgb: "999999" } },
+            right: { style: "medium", color: { rgb: "999999" } },
           }
         };
       }
