@@ -237,8 +237,8 @@ const stockTransferEntrySchema = z.object({
 
 const stockTransferFormSchema = z.object({
   voucherDate: z.date(),
-  destinationLocationId: z.number().min(1, "Destination location required"),
-  entries: z.array(stockTransferEntrySchema).min(1),
+  destinationLocationId: z.number(), // Allow 0 - validated in onStockTransferSubmit
+  entries: z.array(stockTransferEntrySchema), // Allow empty - validated in onStockTransferSubmit
   notes: z.string().optional(),
   optional: z.boolean().default(false),
 });
@@ -2231,15 +2231,27 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   });
 
   const onStockTransferSubmit = async (data: StockTransferFormData) => {
+    console.log("onStockTransferSubmit called with data:", data);
+    
+    // Validate destination location
+    if (!data.destinationLocationId || data.destinationLocationId <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a destination location",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Validate entries
     const validEntries = data.entries.filter(
-      (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) > 0
+      (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity || "0") > 0
     );
 
     if (validEntries.length === 0) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid entry with source location",
+        description: "Please add at least one valid entry with source location, item, and quantity",
         variant: "destructive",
       });
       return;
@@ -3880,7 +3892,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         <TabsContent value="transfer" className="space-y-4">
           <Form {...stockTransferForm}>
-            <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit)}>
+            <form onSubmit={stockTransferForm.handleSubmit(onStockTransferSubmit, (errors) => {
+              console.error("Stock Transfer Form Validation Errors:", errors);
+              toast({
+                title: "Form Validation Error",
+                description: Object.values(errors).map((e: any) => e?.message || JSON.stringify(e)).join(", ") || "Please check all fields",
+                variant: "destructive",
+              });
+            })}>
               {/* Header Row */}
               <div className="flex items-center gap-4 mb-4">
                 {isPOS && (
