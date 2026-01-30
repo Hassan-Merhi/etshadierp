@@ -326,7 +326,6 @@ export default function SalesReport() {
       const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
       return {
         "Location": item.locationName || "N/A",
-        "Item Code": item.stockItemCode,
         "Item Name": item.stockItemName,
         "Quantity": parseFloat(item.quantity),
         "Sold Price": parseFloat(item.actualSellingPrice),
@@ -347,12 +346,12 @@ export default function SalesReport() {
     // Apply currency formatting and conditional colors
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     // Column indices (0-based): 
-    // 0=Location, 1=Item Code, 2=Item Name, 3=Quantity, 4=Sold Price, 5=Cost Price, 
-    // 6=Hassan's Price, 7=Unit Profit, 8=Total Sales, 9=Total Cost, 10=Cost Profit, 
-    // 11=Cost %, 12=Hassan's Profit, 13=Hassan's %
-    const currencyCols = [4, 5, 6, 7, 8, 9, 10, 12]; // Currency columns
-    const percentCols = [11, 13]; // Percentage columns (Cost % and Hassan's %)
-    const profitCols = [7, 10, 11, 12, 13]; // All profit-related columns that need red/green
+    // 0=Location, 1=Item Name, 2=Quantity, 3=Sold Price, 4=Cost Price, 
+    // 5=Hassan's Price, 6=Unit Profit, 7=Total Sales, 8=Total Cost, 9=Cost Profit, 
+    // 10=Cost %, 11=Hassan's Profit, 12=Hassan's %
+    const currencyCols = [3, 4, 5, 6, 7, 8, 9, 11]; // Currency columns
+    const percentCols = [10, 12]; // Percentage columns (Cost % and Hassan's %)
+    const profitCols = [6, 9, 10, 11, 12]; // All profit-related columns that need red/green
 
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -423,7 +422,6 @@ export default function SalesReport() {
     // Set column widths based on content (auto-fit simulation)
     const colWidths = [
       { wch: 15 },  // Location
-      { wch: 12 },  // Item Code
       { wch: 30 },  // Item Name
       { wch: 10 },  // Quantity
       { wch: 12 },  // Sold Price
