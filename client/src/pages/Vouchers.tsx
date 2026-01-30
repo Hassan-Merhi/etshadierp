@@ -2089,16 +2089,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
     mutationFn: async (formData: StockTransferFormData & { allowNegativeInventory?: boolean }) => {
-      console.log("[StockTransfer] Mutation started with formData:", formData);
       const { allowNegativeInventory, ...data } = formData;
       const isEditMode = !!voucherIdToEdit;
-      console.log("[StockTransfer] isEditMode:", isEditMode, "selectedCompany:", selectedCompany);
       
       // Get unique source locations for description
       const uniqueSources = Array.from(new Set(data.entries.map(e => e.sourceLocationId)));
       const sourceNames = uniqueSources.map(id => locations.find(l => l.id === id)?.name).filter(Boolean).join(", ");
       const destName = locations.find(l => l.id === data.destinationLocationId)?.name;
-      console.log("[StockTransfer] sourceNames:", sourceNames, "destName:", destName);
       
       if (isEditMode) {
         // UPDATE MODE: Use PATCH to update existing voucher and stock transfer
