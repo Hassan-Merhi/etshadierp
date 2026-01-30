@@ -257,9 +257,10 @@ export default function POSImport() {
     // Convert CFA rates to USD if needed
     let itemsToImport = validationResult.validatedItems;
     if (saleCurrency === "CFA" && exchangeRate) {
+      // Convert CFA to USD: CFA_amount / rate = USD_amount
       itemsToImport = validationResult.validatedItems.map((item: any) => ({
         ...item,
-        sellingRate: (parseFloat(item.sellingRate) / exchangeRate).toFixed(2),
+        rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
       }));
     }
 
