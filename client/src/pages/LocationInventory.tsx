@@ -1212,7 +1212,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             <style>{`
               @page {
                 size: A4;
-                margin: 12mm 10mm;
+                margin: 12mm 14mm;
               }
               @media print {
                 body {
@@ -1222,52 +1222,64 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   print-color-adjust: exact;
                 }
                 .print-header {
-                  margin-bottom: 8px !important;
-                  padding-bottom: 6px !important;
-                  border-bottom: 2px solid #333 !important;
+                  margin-bottom: 10px !important;
                   text-align: center !important;
                 }
+                .print-header h1 {
+                  font-size: 16pt !important;
+                  font-weight: bold !important;
+                  margin: 0 0 4px 0 !important;
+                  text-decoration: underline !important;
+                }
                 .print-header h2 {
-                  font-size: 14pt !important;
+                  font-size: 12pt !important;
                   font-weight: bold !important;
                   margin: 0 0 2px 0 !important;
                 }
                 .print-header p {
                   font-size: 9pt !important;
                   margin: 0 !important;
-                  color: #444 !important;
+                  color: #333 !important;
+                }
+                .print-meta {
+                  display: flex !important;
+                  justify-content: space-between !important;
+                  font-size: 8pt !important;
+                  color: #666 !important;
+                  margin-top: 8px !important;
+                  padding-top: 4px !important;
+                  border-top: 1px solid #ccc !important;
                 }
                 .print-inventory-table {
                   width: 100% !important;
                   border-collapse: collapse !important;
                   font-size: 9pt !important;
-                  line-height: 1.2 !important;
+                  line-height: 1.15 !important;
+                  margin-top: 8px !important;
                 }
                 .print-inventory-table thead {
                   display: table-header-group !important;
                 }
-                .print-inventory-table thead tr {
-                  background-color: #f5f5f5 !important;
-                }
                 .print-inventory-table th {
                   font-size: 10pt !important;
                   font-weight: bold !important;
-                  padding: 4px 6px !important;
+                  padding: 4px 8px !important;
                   border-bottom: 2px solid #333 !important;
                   text-align: left !important;
+                  background-color: #f8f8f8 !important;
                 }
                 .print-inventory-table th.qty-col {
                   text-align: right !important;
-                  width: 80px !important;
+                  width: 100px !important;
                 }
                 .print-inventory-table tbody tr {
                   break-inside: avoid !important;
                   page-break-inside: avoid !important;
                 }
                 .print-inventory-table td {
-                  padding: 2px 6px !important;
-                  border-bottom: 1px solid #bbb !important;
-                  vertical-align: top !important;
+                  padding: 3px 8px !important;
+                  border-bottom: 1px solid #999 !important;
+                  vertical-align: middle !important;
                 }
                 .print-inventory-table td.qty-col {
                   text-align: right !important;
@@ -1281,12 +1293,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 .print-inventory-table tr.group-row td {
                   font-weight: bold !important;
                   font-size: 10pt !important;
-                  background-color: #e8e8e8 !important;
-                  padding: 3px 6px !important;
-                  border-bottom: 1px solid #999 !important;
+                  background-color: #eaeaea !important;
+                  padding: 4px 8px !important;
+                  border-bottom: 1px solid #666 !important;
+                  border-top: 1px solid #666 !important;
                 }
                 .print-inventory-table tr.item-row td {
-                  padding-left: 12px !important;
+                  padding-left: 16px !important;
+                  font-size: 9pt !important;
+                }
+                .print-inventory-table tr.item-row td.qty-col {
+                  padding-right: 8px !important;
                 }
                 .print-inventory-table tr.total-row {
                   break-inside: avoid !important;
@@ -1295,8 +1312,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   font-weight: bold !important;
                   font-size: 10pt !important;
                   border-top: 2px solid #333 !important;
-                  border-bottom: none !important;
-                  padding: 4px 6px !important;
+                  border-bottom: 2px solid #333 !important;
+                  padding: 5px 8px !important;
                   background-color: #f0f0f0 !important;
                 }
                 .screen-only {
@@ -1314,10 +1331,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             `}</style>
             {/* Print header */}
             <div className="print-header mb-6">
-              <h2 className="text-xl font-bold">{selectedLocationLocal.name}</h2>
-              <p className="text-xs">
-                Inventory Report - {new Date().toLocaleDateString()}
-              </p>
+              <h1>{selectedLocationLocal.name}</h1>
+              <h2>Godown Summary</h2>
+              <p>{format(asOfDate ? new Date(asOfDate) : new Date(), "dd-MMM-yy")}</p>
+              <div className="print-meta">
+                <span>Printed: {format(new Date(), "dd-MMM-yy HH:mm")}</span>
+                <span>Page 1</span>
+              </div>
             </div>
 
             {inventoryLoading ? (
@@ -1431,35 +1451,45 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         </Card>
                       </div>
 
-                      {/* Print view - Compact two-column layout */}
-                      <div className="print-inventory-list">
-                        {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
-                          const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
-                          const firstItemUom = items[0]?.stockItemUom || "";
-                          
-                          return (
-                            <div key={groupCode} className="print-group-section">
-                              {/* Group header with total */}
-                              <div className="print-group-header">
-                                <span>{name}</span>
-                                <span>{Math.floor(groupTotal).toLocaleString()} {firstItemUom}</span>
-                              </div>
-                              
-                              {/* Group items */}
-                              {items.map((item) => (
-                                <div key={item.inventoryId} className="print-item-row">
-                                  <span className="print-item-name">
-                                    {item.stockItemName}
-                                  </span>
-                                  <span className="print-item-qty">
-                                    {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      {/* Print view - Proper table layout */}
+                      <table className="print-inventory-table">
+                        <thead>
+                          <tr>
+                            <th>Particulars</th>
+                            <th className="qty-col">Closing Balance<br/><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
+                            const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
+                            const firstItemUom = items[0]?.stockItemUom || "";
+                            
+                            return (
+                              <>
+                                {/* Group header row */}
+                                <tr key={`group-${groupCode}`} className="group-row">
+                                  <td>{name}</td>
+                                  <td className="qty-col">{Math.floor(groupTotal).toLocaleString()} {firstItemUom}</td>
+                                </tr>
+                                {/* Group items */}
+                                {items.map((item) => (
+                                  <tr key={`item-${item.inventoryId}`} className="item-row">
+                                    <td>{item.stockItemName}</td>
+                                    <td className="qty-col">{Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}</td>
+                                  </tr>
+                                ))}
+                              </>
+                            );
+                          })}
+                          {/* Grand Total row */}
+                          <tr className="total-row">
+                            <td>Grand Total</td>
+                            <td className="qty-col">
+                              {Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} {inventory[0]?.stockItemUom || ""}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </>
                   );
                 })()}
