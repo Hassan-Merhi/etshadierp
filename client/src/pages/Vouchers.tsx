@@ -227,12 +227,12 @@ const journalFormSchema = z.object({
 });
 
 const stockTransferEntrySchema = z.object({
-  sourceLocationId: z.number().min(1, "Please select a source location"),
+  sourceLocationId: z.number(), // Allow 0 for incomplete rows - validated in onStockTransferSubmit
   sourceLocationName: z.string(),
-  stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemId: z.number(), // Allow 0 for incomplete rows - validated in onStockTransferSubmit
   stockItemName: z.string(),
-  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
-  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
+  quantity: z.string(), // Allow empty - validated in onStockTransferSubmit
+  rate: z.string(), // Allow empty - validated in onStockTransferSubmit
 });
 
 const stockTransferFormSchema = z.object({
