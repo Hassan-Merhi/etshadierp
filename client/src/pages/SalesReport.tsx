@@ -376,11 +376,11 @@ export default function SalesReport() {
         if (profitCols.includes(C) && !isNaN(val)) {
           if (val < 0) {
             cell.s = { 
-              font: { color: { rgb: "CC0000" } }
+              font: { color: { rgb: "E57373" } }
             };
           } else if (val > 0) {
             cell.s = { 
-              font: { color: { rgb: "006600" } }
+              font: { color: { rgb: "4CAF50" } }
             };
           }
         }
