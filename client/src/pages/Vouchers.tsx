@@ -4223,6 +4223,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                       const item = filteredInventory[transferHighlightedIndex] || filteredInventory[0];
                                       const stockItem = stockItems.find(s => s.id === item.stockItemId);
                                       if (stockItem) {
+                                        // Set source location from transferInventorySource if not already set
+                                        if (transferInventorySource && !transferEntries[index]?.sourceLocationId) {
+                                          const sourceLocation = locations.find(l => l.id === transferInventorySource);
+                                          stockTransferForm.setValue(`entries.${index}.sourceLocationId`, transferInventorySource);
+                                          stockTransferForm.setValue(`entries.${index}.sourceLocationName`, sourceLocation?.name || "");
+                                        }
                                         stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
                                         stockTransferForm.setValue(`entries.${index}.stockItemName`, stockItem.name);
                                         stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
@@ -4500,6 +4506,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                 if (activeTransferRow !== null) {
                                   const stockItem = stockItems.find(s => s.id === item.stockItemId);
                                   if (stockItem) {
+                                    // Set source location from transferInventorySource if not already set
+                                    if (transferInventorySource && !transferEntries[activeTransferRow]?.sourceLocationId) {
+                                      const sourceLocation = locations.find(l => l.id === transferInventorySource);
+                                      stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationId`, transferInventorySource);
+                                      stockTransferForm.setValue(`entries.${activeTransferRow}.sourceLocationName`, sourceLocation?.name || "");
+                                    }
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId);
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
