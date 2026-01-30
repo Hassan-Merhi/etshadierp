@@ -248,12 +248,24 @@ export default function POSImport() {
 
   const doImport = () => {
     // Convert CFA rates to USD if needed
+    console.log("[doImport] saleCurrency:", saleCurrency);
+    console.log("[doImport] exchangeRate:", exchangeRate);
+    console.log("[doImport] validatedItems sample:", validationResult?.validatedItems?.[0]);
+    
     let itemsToImport = validationResult.validatedItems;
     if (saleCurrency === "CFA" && exchangeRate) {
-      itemsToImport = validationResult.validatedItems.map((item: any) => ({
-        ...item,
-        sellingRate: (parseFloat(item.sellingRate) / exchangeRate).toFixed(2),
-      }));
+      console.log("[doImport] Converting CFA to USD with rate:", exchangeRate);
+      itemsToImport = validationResult.validatedItems.map((item: any) => {
+        const originalRate = parseFloat(item.sellingRate);
+        const convertedRate = (originalRate / exchangeRate).toFixed(2);
+        console.log(`[doImport] Item ${item.barcode}: ${originalRate} CFA -> ${convertedRate} USD`);
+        return {
+          ...item,
+          sellingRate: convertedRate,
+        };
+      });
+    } else {
+      console.log("[doImport] NOT converting - saleCurrency:", saleCurrency, "exchangeRate:", exchangeRate);
     }
 
     if (isCreditSale) {
