@@ -372,20 +372,72 @@ export default function SalesReport() {
           cell.z = '0.0"%"';
         }
 
+        // Define border style
+        const borderStyle = {
+          top: { style: "thin", color: { rgb: "CCCCCC" } },
+          bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+          left: { style: "thin", color: { rgb: "CCCCCC" } },
+          right: { style: "thin", color: { rgb: "CCCCCC" } },
+        };
+
         // Apply conditional colors for profit columns (red for loss, green for profit)
         if (profitCols.includes(C) && !isNaN(val)) {
           if (val < 0) {
             cell.s = { 
-              font: { color: { rgb: "E57373" } }
+              font: { color: { rgb: "E57373" } },
+              border: borderStyle
             };
           } else if (val > 0) {
             cell.s = { 
-              font: { color: { rgb: "4CAF50" } }
+              font: { color: { rgb: "4CAF50" } },
+              border: borderStyle
             };
+          } else {
+            cell.s = { border: borderStyle };
           }
+        } else {
+          // Apply borders to all cells
+          cell.s = { ...cell.s, border: borderStyle };
         }
       }
     }
+
+    // Apply borders to header row
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
+      const cell = ws[cellRef];
+      if (cell) {
+        cell.s = {
+          font: { bold: true },
+          fill: { fgColor: { rgb: "F5F5F5" } },
+          border: {
+            top: { style: "thin", color: { rgb: "CCCCCC" } },
+            bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+            left: { style: "thin", color: { rgb: "CCCCCC" } },
+            right: { style: "thin", color: { rgb: "CCCCCC" } },
+          }
+        };
+      }
+    }
+
+    // Set column widths based on content (auto-fit simulation)
+    const colWidths = [
+      { wch: 15 },  // Location
+      { wch: 12 },  // Item Code
+      { wch: 30 },  // Item Name
+      { wch: 10 },  // Quantity
+      { wch: 12 },  // Sold Price
+      { wch: 12 },  // Cost Price
+      { wch: 14 },  // Hassan's Price
+      { wch: 12 },  // Unit Profit
+      { wch: 12 },  // Total Sales
+      { wch: 12 },  // Total Cost
+      { wch: 12 },  // Cost Profit
+      { wch: 10 },  // Cost %
+      { wch: 14 },  // Hassan's Profit
+      { wch: 12 },  // Hassan's %
+    ];
+    ws['!cols'] = colWidths;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Detailed Sales Report");
