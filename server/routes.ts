@@ -1285,6 +1285,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get single company by ID
+  app.get(
+    "/api/companies/:id",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const company = await storage.getCompanyById(parseInt(id));
+        if (!company) {
+          return res.status(404).json({ message: "Company not found" });
+        }
+        res.json(company);
+      } catch (error: any) {
+        res.status(400).json({ message: error.message });
+      }
+    },
+  );
+
   app.patch(
     "/api/companies/:id",
     requireAuth,

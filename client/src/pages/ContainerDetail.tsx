@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,21 @@ export default function ContainerDetail() {
   const [_location, setLocation] = useLocation();
   const { selectedCompany } = useCompany();
   const companyId = selectedCompany?.id;
+  const printRef = useRef<HTMLDivElement>(null);
+  
+  // Check for auto-print query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('print') === 'true') {
+      // Remove the print param from URL to prevent re-printing on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      // Trigger print after a short delay to allow content to load
+      setTimeout(() => {
+        handlePrint();
+      }, 1000);
+    }
+  }, []);
 
   const { data: containerData, isLoading } = useQuery<ContainerDetailData>({
     queryKey: [`/api/containers/${containerId}`],
@@ -236,6 +251,10 @@ export default function ContainerDetail() {
     sellContainerMutation.mutate(data);
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   const saleCustomer = customers.find((c) => c.id === containerSale?.customerId);
 
   if (isLoading) {
@@ -343,6 +362,15 @@ export default function ContainerDetail() {
             </Button>
           </>
         )}
+        <Button
+          variant="outline"
+          onClick={handlePrint}
+          className="gap-2 print:hidden"
+          data-testid="button-print-container"
+        >
+          <Printer className="w-4 h-4" />
+          Print
+        </Button>
         <Button
           variant="outline"
           onClick={handleExportContainer}
