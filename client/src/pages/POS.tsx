@@ -1637,7 +1637,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 </div>
               )}
 
-              <table className="w-full mb-4 border-collapse" style={{ tableLayout: 'fixed' }}>
+              <table className="w-full mb-4" style={{ tableLayout: 'fixed', borderCollapse: 'collapse', border: '2px solid black' }}>
                 <colgroup>
                   <col style={{ width: '8%' }} />
                   <col style={{ width: '42%' }} />
@@ -1646,21 +1646,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   <col style={{ width: '18%' }} />
                 </colgroup>
                 <thead>
-                  <tr className="border-b-2 border-black">
-                    <th className="text-left py-1 px-1">#</th>
-                    <th className="text-left py-1 px-1">Item</th>
-                    <th className="text-right py-1 px-1">Qty</th>
-                    <th className="text-right py-1 px-1">Rate</th>
+                  <tr style={{ borderBottom: '2px solid black' }}>
+                    <th className="text-left py-1 px-1" style={{ borderRight: '2px solid black' }}>#</th>
+                    <th className="text-left py-1 px-1" style={{ borderRight: '2px solid black' }}>Item</th>
+                    <th className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>Qty</th>
+                    <th className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>Rate</th>
                     <th className="text-right py-1 px-1">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {savedSale?.items.map((item: any, idx: number) => (
-                    <tr key={idx} className="border-b">
-                      <td className="py-1 px-1">{idx + 1}</td>
-                      <td className="py-1 px-1">{item.stockItemName}</td>
-                      <td className="text-right py-1 px-1">{item.quantity}</td>
-                      <td className="text-right py-1 px-1">${formatNumber(parseFloat(item.rate))}</td>
+                    <tr key={idx} style={{ borderBottom: '2px solid black' }}>
+                      <td className="py-1 px-1" style={{ borderRight: '2px solid black' }}>{idx + 1}</td>
+                      <td className="py-1 px-1" style={{ borderRight: '2px solid black' }}>{item.stockItemName}</td>
+                      <td className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>{item.quantity}</td>
+                      <td className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>${formatNumber(parseFloat(item.rate))}</td>
                       <td className="text-right py-1 px-1">${item.amount}</td>
                     </tr>
                   ))}
@@ -1668,8 +1668,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </table>
 
               <div className="flex justify-end mb-4">
-                <div className="w-48">
-                  <div className="flex justify-between py-1 text-lg font-bold border-t-2 border-black">
+                <div className="w-64">
+                  <div className="flex justify-between py-1 text-base" style={{ borderBottom: '2px solid black' }}>
+                    <span className="font-semibold">Total Qty:</span>
+                    <span className="font-bold">{(savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 text-lg font-bold" style={{ borderBottom: '2px solid black' }}>
                     <span>TOTAL:</span>
                     <span>${savedSale?.grandTotal}</span>
                   </div>
