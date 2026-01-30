@@ -326,17 +326,48 @@ export default function SalesReport() {
       "Location": item.locationName || "N/A",
       "Item Code": item.stockItemCode,
       "Item Name": item.stockItemName,
-      "Quantity": formatNumber(parseFloat(item.quantity)),
-      "Selling Price": `$${formatNumber(parseFloat(item.actualSellingPrice))}`,
-      "Total Sales": `$${formatNumber(parseFloat(item.totalSales))}`,
-      "Cost Price": `$${formatNumber(parseFloat(item.costPrice))}`,
-      "Total Cost": `$${formatNumber(parseFloat(item.totalCost))}`,
-      "Cost Profit": `$${formatNumber(parseFloat(item.costProfit))}`,
-      "Configured Cost": `$${formatNumber(item.totalConfiguredCost)}`,
-      "Configured Profit": `$${formatNumber(item.configuredProfit)}`,
+      "Quantity": parseFloat(item.quantity),
+      "Selling Price": parseFloat(item.actualSellingPrice),
+      "Total Sales": parseFloat(item.totalSales),
+      "Cost Price": parseFloat(item.costPrice),
+      "Total Cost": parseFloat(item.totalCost),
+      "Cost Profit": parseFloat(item.costProfit),
+      "Configured Cost": item.totalConfiguredCost,
+      "Configured Profit": item.configuredProfit,
     }));
 
     const ws = XLSX.utils.json_to_sheet(detailedExportData);
+    
+    // Apply currency formatting and conditional colors
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    const currencyCols = [4, 5, 6, 7, 8, 9, 10]; // E through K (0-indexed)
+    const profitCols = [8, 10]; // Cost Profit and Configured Profit
+
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[cellRef];
+        if (!cell) continue;
+
+        // Add currency formatting to specific columns
+        if (currencyCols.includes(C)) {
+          cell.z = '"$"#,##0.00';
+          
+          // Apply conditional colors for profit columns
+          if (profitCols.includes(C)) {
+            const val = parseFloat(cell.v);
+            if (!isNaN(val)) {
+              if (val < 0) {
+                cell.s = { font: { color: { rgb: "FF0000" } } }; // Red for loss
+              } else if (val > 0) {
+                cell.s = { font: { color: { rgb: "008000" } } }; // Green for profit
+              }
+            }
+          }
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Detailed Sales Report");
     
