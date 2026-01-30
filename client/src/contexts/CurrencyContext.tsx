@@ -37,11 +37,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Fetch the latest exchange rate using company's currencies
   const { data: rateData, isLoading: isLoadingRate } = useQuery<any>({
-    queryKey: ["/api/exchange-rates/latest", baseCurrency, displayCurrency],
+    queryKey: ["/api/exchange-rates/latest", selectedCompany?.id, baseCurrency, displayCurrency],
     queryFn: async () => {
-      if (!displayCurrency || displayCurrency === "none") return null;
+      if (!selectedCompany?.id || !displayCurrency || displayCurrency === "none") return null;
       const res = await fetch(
-        `/api/exchange-rates/latest?fromCurrency=${baseCurrency}&toCurrency=${displayCurrency}`,
+        `/api/exchange-rates/latest?companyId=${selectedCompany.id}&fromCurrency=${baseCurrency}&toCurrency=${displayCurrency}`,
         { credentials: "include" }
       );
       if (!res.ok) return null;

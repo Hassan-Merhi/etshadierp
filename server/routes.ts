@@ -1351,7 +1351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get latest exchange rate for a currency pair
   app.get("/api/exchange-rates/latest", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
+      // Allow companyId from query param (for frontend context) or fall back to session
+      const companyId = req.query.companyId 
+        ? parseInt(req.query.companyId as string) 
+        : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "Company not selected" });
       }
