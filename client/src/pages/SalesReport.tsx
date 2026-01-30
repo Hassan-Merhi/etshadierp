@@ -323,20 +323,17 @@ export default function SalesReport() {
   const handleExportExcel = () => {
     // Detailed export: export all individual sales items
     const detailedExportData = salesData.map((item) => ({
-      "Voucher Date": formatDisplayDate(parseISO(item.voucherDate)),
-      "Voucher No": item.voucherNumber,
       "Location": item.locationName || "N/A",
       "Item Code": item.stockItemCode,
       "Item Name": item.stockItemName,
       "Quantity": formatNumber(parseFloat(item.quantity)),
-      "Selling Price": formatNumber(parseFloat(item.actualSellingPrice)),
-      "Total Sales": formatNumber(parseFloat(item.totalSales)),
-      "Cost Price": formatNumber(parseFloat(item.costPrice)),
-      "Total Cost": formatNumber(parseFloat(item.totalCost)),
-      "Cost Profit": formatNumber(parseFloat(item.costProfit)),
-      "Configured Cost": formatNumber(item.totalConfiguredCost),
-      "Configured Profit": formatNumber(item.configuredProfit),
-      "Company": item.companyName || "Current",
+      "Selling Price": `$${formatNumber(parseFloat(item.actualSellingPrice))}`,
+      "Total Sales": `$${formatNumber(parseFloat(item.totalSales))}`,
+      "Cost Price": `$${formatNumber(parseFloat(item.costPrice))}`,
+      "Total Cost": `$${formatNumber(parseFloat(item.totalCost))}`,
+      "Cost Profit": `$${formatNumber(parseFloat(item.costProfit))}`,
+      "Configured Cost": `$${formatNumber(item.totalConfiguredCost)}`,
+      "Configured Profit": `$${formatNumber(item.configuredProfit)}`,
     }));
 
     const ws = XLSX.utils.json_to_sheet(detailedExportData);
