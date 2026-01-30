@@ -1210,63 +1210,94 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           {/* Printable area */}
           <div ref={printRef}>
             <style>{`
+              @page {
+                size: A4;
+                margin: 12mm 10mm;
+              }
               @media print {
                 body {
-                  margin: 0.3in;
+                  margin: 0;
+                  font-family: Arial, Helvetica, sans-serif;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
                 }
                 .print-header {
-                  margin-bottom: 0.3rem !important;
-                  padding-bottom: 0.2rem !important;
-                  border-bottom: 2px solid #000 !important;
+                  margin-bottom: 8px !important;
+                  padding-bottom: 6px !important;
+                  border-bottom: 2px solid #333 !important;
+                  text-align: center !important;
                 }
                 .print-header h2 {
-                  font-size: 16pt !important;
-                  margin: 0 !important;
+                  font-size: 14pt !important;
+                  font-weight: bold !important;
+                  margin: 0 0 2px 0 !important;
                 }
                 .print-header p {
                   font-size: 9pt !important;
                   margin: 0 !important;
+                  color: #444 !important;
                 }
-                .print-inventory-list {
-                  font-size: 10pt !important;
-                  line-height: 1.2 !important;
-                  column-count: 2 !important;
-                  column-gap: 1rem !important;
-                }
-                .print-group-section {
-                  break-inside: avoid !important;
-                  margin-bottom: 0.4rem !important;
-                }
-                .print-group-header {
-                  font-weight: bold !important;
-                  font-size: 11pt !important;
-                  margin: 0 !important;
-                  padding: 0.15rem 0 !important;
-                  display: flex !important;
-                  justify-content: space-between !important;
-                  background-color: #f0f0f0 !important;
-                  padding-left: 0.2rem !important;
-                  padding-right: 0.2rem !important;
-                }
-                .print-item-row {
-                  display: flex !important;
-                  justify-content: space-between !important;
-                  padding: 0.08rem 0 !important;
-                  margin-left: 0.3rem !important;
+                .print-inventory-table {
+                  width: 100% !important;
+                  border-collapse: collapse !important;
                   font-size: 9pt !important;
+                  line-height: 1.2 !important;
                 }
-                .print-item-name {
-                  flex: 1 !important;
-                  padding-right: 0.5rem !important;
-                  overflow: hidden !important;
-                  text-overflow: ellipsis !important;
-                  text-decoration: underline !important;
+                .print-inventory-table thead {
+                  display: table-header-group !important;
                 }
-                .print-item-qty {
+                .print-inventory-table thead tr {
+                  background-color: #f5f5f5 !important;
+                }
+                .print-inventory-table th {
+                  font-size: 10pt !important;
+                  font-weight: bold !important;
+                  padding: 4px 6px !important;
+                  border-bottom: 2px solid #333 !important;
+                  text-align: left !important;
+                }
+                .print-inventory-table th.qty-col {
                   text-align: right !important;
-                  white-space: nowrap !important;
+                  width: 80px !important;
+                }
+                .print-inventory-table tbody tr {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                }
+                .print-inventory-table td {
+                  padding: 2px 6px !important;
+                  border-bottom: 1px solid #bbb !important;
+                  vertical-align: top !important;
+                }
+                .print-inventory-table td.qty-col {
+                  text-align: right !important;
                   font-weight: 500 !important;
-                  min-width: 60px !important;
+                  white-space: nowrap !important;
+                }
+                .print-inventory-table tr.group-row {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                }
+                .print-inventory-table tr.group-row td {
+                  font-weight: bold !important;
+                  font-size: 10pt !important;
+                  background-color: #e8e8e8 !important;
+                  padding: 3px 6px !important;
+                  border-bottom: 1px solid #999 !important;
+                }
+                .print-inventory-table tr.item-row td {
+                  padding-left: 12px !important;
+                }
+                .print-inventory-table tr.total-row {
+                  break-inside: avoid !important;
+                }
+                .print-inventory-table tr.total-row td {
+                  font-weight: bold !important;
+                  font-size: 10pt !important;
+                  border-top: 2px solid #333 !important;
+                  border-bottom: none !important;
+                  padding: 4px 6px !important;
+                  background-color: #f0f0f0 !important;
                 }
                 .screen-only {
                   display: none !important;
@@ -1276,7 +1307,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 .print-header {
                   display: none !important;
                 }
-                .print-inventory-list {
+                .print-inventory-table {
                   display: none !important;
                 }
               }
