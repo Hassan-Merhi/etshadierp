@@ -52,7 +52,7 @@ export function ExchangeRateSettings() {
   });
 
   const { data: company } = useQuery<any>({
-    queryKey: ["/api/companies", selectedCompany?.id],
+    queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
 
