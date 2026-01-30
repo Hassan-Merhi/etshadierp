@@ -9,6 +9,7 @@ interface CurrencyContextType {
   setCurrency: (currency: Currency) => void;
   exchangeRate: number | null;
   isLoadingRate: boolean;
+  isLoadingCompany: boolean;
   displayCurrency: string | null;
   formatAmount: (amount: number | string, currency?: Currency) => string;
   convertToDisplay: (usdAmount: number) => number;
@@ -26,7 +27,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   });
 
   // Fetch company details to get baseCurrency and displayCurrency
-  const { data: company } = useQuery<any>({
+  const { data: company, isLoading: isLoadingCompany } = useQuery<any>({
     queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
@@ -101,6 +102,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       setCurrency, 
       exchangeRate,
       isLoadingRate,
+      isLoadingCompany,
       displayCurrency,
       formatAmount,
       convertToDisplay,

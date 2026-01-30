@@ -44,7 +44,7 @@ interface Customer {
 export default function POSImport() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
-  const { displayCurrency, exchangeRate } = useCurrencyContext();
+  const { displayCurrency, exchangeRate, isLoadingCompany } = useCurrencyContext();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -69,7 +69,8 @@ export default function POSImport() {
     enabled: isCreditSale,
   });
 
-  const showCurrencySelector = displayCurrency === "CFA";
+  // Show currency selector when company has displayCurrency = "CFA" and data has loaded
+  const showCurrencySelector = !isLoadingCompany && displayCurrency === "CFA";
 
   const parseMutation = useMutation({
     mutationFn: async (formData: FormData) => {
