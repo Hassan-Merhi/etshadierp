@@ -45,6 +45,7 @@ interface SaleRow {
   itemName: string;
   quantity: number;
   rate: number;
+  rateUSD: number; // Canonical USD rate for storage (never converted)
   amount: number;
   stockItemId?: number;
   salesItemId?: number; // Original sales item ID for edit mode
@@ -169,11 +170,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
-  const { selectedCurrency, exchangeRate, convertToUSD } = useCurrencyContext();
-  const [saleCurrency, setSaleCurrency] = useState<Currency>(selectedCurrency);
+  const { selectedCurrency, exchangeRate, convertToUSD, displayCurrency } = useCurrencyContext();
+  // Force USD if company doesn't have dual-currency enabled
+  const [saleCurrency, setSaleCurrency] = useState<Currency>(displayCurrency ? selectedCurrency : "USD");
   
   const [rows, setRows] = useState<SaleRow[]>([
-    { id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 },
+    { id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 },
   ]);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number }>({
     row: 0,
@@ -250,6 +252,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         salesItemId: item.id, // Preserve original sales item ID for proper cost tracking
         quantity: parseFloat(item.quantity),
         rate: parseFloat(item.sellingPrice),
+        rateUSD: parseFloat(item.sellingPrice), // Stored rates are in USD
         amount: parseFloat(item.totalSales),
       }));
       
@@ -259,6 +262,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         itemName: "",
         quantity: 0,
         rate: 0,
+        rateUSD: 0,
         amount: 0,
       });
       
@@ -409,7 +413,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         navigate("/pos-daybook");
       } else {
         // Clear the form for new sales
-        setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, amount: 0 }]);
+        setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
         setNotes("");
         
         // Auto-show print dialog
@@ -729,17 +733,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
     // Use last sold price from any location if available, otherwise use configured price
     const lastSoldPrice = lastSoldPrices[item.stockItemId];
-    const rate = lastSoldPrice ? parseFloat(lastSoldPrice) : item.price;
+    const rateUSD = lastSoldPrice ? parseFloat(lastSoldPrice) : item.price;
+    
+    // Convert rate for display if CFA is selected
+    const displayRate = saleCurrency === "CFA" && exchangeRate
+      ? Math.round(rateUSD * exchangeRate)
+      : rateUSD;
 
     const newRows = [...rows];
+    const qty = newRows[activeRow].quantity || 1;
     newRows[activeRow] = {
       ...newRows[activeRow],
       itemName: item.name,
-      rate: rate,
-      quantity: newRows[activeRow].quantity || 1,
+      rate: displayRate,
+      rateUSD: rateUSD, // Store canonical USD rate for storage
+      quantity: qty,
       stockItemId: item.stockItemId,
+      amount: qty * displayRate,
     };
-    newRows[activeRow].amount = (newRows[activeRow].quantity || 1) * rate;
     
     setRows(newRows);
     setSearchTerm("");
@@ -754,6 +765,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           itemName: "",
           quantity: 0,
           rate: 0,
+          rateUSD: 0,
           amount: 0,
         },
       ]);
@@ -773,6 +785,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     if (field === "quantity" || field === "rate") {
       const numValue = value === "" || value === "-" ? 0 : parseFloat(String(value)) || 0;
       newRows[index] = { ...newRows[index], [field]: numValue };
+      
+      // When rate is manually changed, update rateUSD accordingly
+      if (field === "rate") {
+        // If in CFA mode, convert back to USD for storage
+        const rateUSD = saleCurrency === "CFA" && exchangeRate
+          ? numValue / exchangeRate
+          : numValue;
+        newRows[index].rateUSD = rateUSD;
+      }
       
       // Auto-calculate amount
       const qty = field === "quantity" ? numValue : newRows[index].quantity;
@@ -799,6 +820,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           itemName: "",
           quantity: 0,
           rate: 0,
+          rateUSD: 0,
           amount: 0,
         },
       ]);
@@ -827,6 +849,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         itemName: "",
         quantity: 0,
         rate: 0,
+        rateUSD: 0,
         amount: 0,
       });
     }
@@ -905,6 +928,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 itemName: "",
                 quantity: 0,
                 rate: 0,
+                rateUSD: 0,
                 amount: 0,
               }]);
               // Focus on item name field of new row after state updates
@@ -1081,15 +1105,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       voucherDate: saleDate,
       currency: "USD", // Always store in USD
       items: validItems.map(row => {
-        // If user entered in CFA, convert to USD for storage
-        const rateInUSD = saleCurrency === "CFA" && exchangeRate 
-          ? row.rate / exchangeRate 
-          : row.rate;
+        // Use canonical USD rate directly (no conversion needed)
         return {
           stockItemId: row.stockItemId,
           salesItemId: row.salesItemId, // Preserve for edit mode
           quantity: row.quantity.toString(),
-          rate: rateInUSD.toFixed(2),
+          rate: row.rateUSD.toFixed(2),
         };
       }),
     };
@@ -1264,11 +1285,36 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
         )}
 
-        {/* Currency Selector */}
-        <CurrencySelector 
-          value={saleCurrency} 
-          onChange={setSaleCurrency} 
-        />
+        {/* Currency Selector - only show if company has dual-currency enabled */}
+        {displayCurrency && (
+          <CurrencySelector 
+            value={saleCurrency} 
+            onChange={(newCurrency) => {
+              if (newCurrency === saleCurrency) return;
+              
+              // Convert existing rows when currency changes using canonical USD rate
+              if (exchangeRate && rows.some(r => r.rateUSD > 0)) {
+                const convertedRows = rows.map(row => {
+                  if (row.rateUSD === 0) return row;
+                  
+                  // Always convert from the canonical USD rate
+                  const newRate = newCurrency === "CFA"
+                    ? Math.round(row.rateUSD * exchangeRate)
+                    : row.rateUSD;
+                  
+                  return {
+                    ...row,
+                    rate: newRate,
+                    amount: row.quantity * newRate,
+                  };
+                });
+                setRows(convertedRows);
+              }
+              
+              setSaleCurrency(newCurrency);
+            }} 
+          />
+        )}
 
         {/* Credit Sale Toggle */}
         <div className="flex items-center gap-2">
@@ -1426,7 +1472,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm sm:text-lg font-semibold">Total:</span>
-                <span className="text-xl sm:text-2xl font-bold font-mono" data-testid="text-grand-total">${formatNumber(total)}</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono" data-testid="text-grand-total">
+                  {saleCurrency === "USD" ? "$" : "CFA "}{formatNumber(total)}
+                </span>
               </div>
             </div>
           </div>
