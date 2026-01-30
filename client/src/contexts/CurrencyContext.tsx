@@ -27,10 +27,13 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   });
 
   // Fetch company details to get baseCurrency and displayCurrency
-  const { data: company, isLoading: isLoadingCompany } = useQuery<any>({
+  const { data: company, isLoading: isLoadingCompanyQuery } = useQuery<any>({
     queryKey: [`/api/companies/${selectedCompany?.id}`],
     enabled: !!selectedCompany?.id,
   });
+
+  // Consider loading if: no selectedCompany yet, OR query is actively loading, OR no company data yet
+  const isLoadingCompany = !selectedCompany?.id || isLoadingCompanyQuery || !company;
 
   const baseCurrency = company?.baseCurrency || "USD";
   // Treat "none" as no display currency
