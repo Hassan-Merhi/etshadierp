@@ -952,6 +952,7 @@ export default function VoucherEdit() {
     } else if (isStockTransfer) {
       transferForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
+        currency: "USD",
         sourceLocationId: voucher.transferData?.sourceLocationId || voucher.locationId || 0,
         destinationLocationId: voucher.transferData?.destinationLocationId || 0,
         items: (voucher.transferData?.items || []).map(item => ({
