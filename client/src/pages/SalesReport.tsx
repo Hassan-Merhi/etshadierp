@@ -321,34 +321,29 @@ export default function SalesReport() {
   };
 
   const handleExportExcel = () => {
-    const exportData = groupedData.map((group) => ({
-      "Date": group.displayDate,
-      "Items Sold": group.itemCount,
-      "Total Qty": formatNumber(group.totalQty),
-      "Total Sales": formatNumber(group.totalSales),
-      "Total Cost": formatNumber(group.totalCost),
-      "Cost Profit": formatNumber(group.costProfit),
-      "Configured Cost": formatNumber(group.totalConfiguredCost),
-      "Configured Profit": formatNumber(group.configuredProfit),
+    // Detailed export: export all individual sales items
+    const detailedExportData = salesData.map((item) => ({
+      "Voucher Date": formatDisplayDate(parseISO(item.voucherDate)),
+      "Voucher No": item.voucherNumber,
+      "Location": item.locationName || "N/A",
+      "Item Code": item.stockItemCode,
+      "Item Name": item.stockItemName,
+      "Quantity": formatNumber(parseFloat(item.quantity)),
+      "Selling Price": formatNumber(parseFloat(item.actualSellingPrice)),
+      "Total Sales": formatNumber(parseFloat(item.totalSales)),
+      "Cost Price": formatNumber(parseFloat(item.costPrice)),
+      "Total Cost": formatNumber(parseFloat(item.totalCost)),
+      "Cost Profit": formatNumber(parseFloat(item.costProfit)),
+      "Configured Cost": formatNumber(item.totalConfiguredCost),
+      "Configured Profit": formatNumber(item.configuredProfit),
+      "Company": item.companyName || "Current",
     }));
 
-    // Add totals row
-    exportData.push({
-      "Date": "TOTAL",
-      "Items Sold": salesData.length,
-      "Total Qty": formatNumber(totals.totalQty),
-      "Total Sales": formatNumber(totals.totalSales),
-      "Total Cost": formatNumber(totals.totalCost),
-      "Cost Profit": formatNumber(totals.costProfit),
-      "Configured Cost": formatNumber(totals.totalConfiguredCost),
-      "Configured Profit": formatNumber(totals.configuredProfit),
-    });
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
+    const ws = XLSX.utils.json_to_sheet(detailedExportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
+    XLSX.utils.book_append_sheet(wb, ws, "Detailed Sales Report");
     
-    const fileName = `sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    const fileName = `detailed-sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
