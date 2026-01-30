@@ -1085,6 +1085,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
 
+    // Validate exchange rate is available when selling in CFA
+    if (saleCurrency === "CFA" && !exchangeRate) {
+      toast({
+        title: "Error",
+        description: "No exchange rate set for this date. Please set an exchange rate in Settings before selling in CFA.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
     if (validItems.length === 0) {
       toast({
