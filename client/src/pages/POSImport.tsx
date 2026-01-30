@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
@@ -71,6 +71,13 @@ export default function POSImport() {
 
   // Show currency selector when company has displayCurrency = "CFA" and data has loaded
   const showCurrencySelector = !isLoadingCompany && displayCurrency === "CFA";
+
+  // Default to CFA when company has displayCurrency = CFA
+  useEffect(() => {
+    if (displayCurrency === "CFA") {
+      setSaleCurrency("CFA");
+    }
+  }, [displayCurrency]);
 
   const parseMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -248,24 +255,12 @@ export default function POSImport() {
 
   const doImport = () => {
     // Convert CFA rates to USD if needed
-    console.log("[doImport] saleCurrency:", saleCurrency);
-    console.log("[doImport] exchangeRate:", exchangeRate);
-    console.log("[doImport] validatedItems sample:", validationResult?.validatedItems?.[0]);
-    
     let itemsToImport = validationResult.validatedItems;
     if (saleCurrency === "CFA" && exchangeRate) {
-      console.log("[doImport] Converting CFA to USD with rate:", exchangeRate);
-      itemsToImport = validationResult.validatedItems.map((item: any) => {
-        const originalRate = parseFloat(item.sellingRate);
-        const convertedRate = (originalRate / exchangeRate).toFixed(2);
-        console.log(`[doImport] Item ${item.barcode}: ${originalRate} CFA -> ${convertedRate} USD`);
-        return {
-          ...item,
-          sellingRate: convertedRate,
-        };
-      });
-    } else {
-      console.log("[doImport] NOT converting - saleCurrency:", saleCurrency, "exchangeRate:", exchangeRate);
+      itemsToImport = validationResult.validatedItems.map((item: any) => ({
+        ...item,
+        sellingRate: (parseFloat(item.sellingRate) / exchangeRate).toFixed(2),
+      }));
     }
 
     if (isCreditSale) {
@@ -603,7 +598,12 @@ export default function POSImport() {
           <CardHeader>
             <CardTitle>Preview ({preview.items.length} items)</CardTitle>
             <CardDescription>
-              Total Sales Value: ${formatNumber(preview.totalValue)}
+              Total Sales Value: {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(preview.totalValue)}
+              {saleCurrency === "CFA" && exchangeRate && (
+                <span className="ml-2 text-muted-foreground">
+                  (≈ ${formatNumber(preview.totalValue / exchangeRate)} USD after conversion)
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -614,8 +614,8 @@ export default function POSImport() {
                     <TableHead>Barcode</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Rate ({saleCurrency})</TableHead>
+                    <TableHead className="text-right">Total ({saleCurrency})</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -633,9 +633,11 @@ export default function POSImport() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">${formatNumber(item.rate)}</TableCell>
+                        <TableCell className="text-right">
+                          {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(item.rate)}
+                        </TableCell>
                         <TableCell className="text-right font-medium">
-                          ${formatNumber(item.quantity * item.rate)}
+                          {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(item.quantity * item.rate)}
                         </TableCell>
                         <TableCell>
                           {validation ? (
