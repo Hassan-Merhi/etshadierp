@@ -42,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { formatNumber } from "@/lib/formatNumber";
@@ -340,8 +340,8 @@ export default function SalesReport() {
     
     // Apply currency formatting and conditional colors
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    const currencyCols = [4, 5, 6, 7, 8, 9, 10]; // E through K (0-indexed)
-    const profitCols = [8, 10]; // Cost Profit and Configured Profit
+    const currencyCols = [4, 5, 6, 7, 8, 9, 10]; // E through K (0-indexed): Selling Price, Total Sales, Cost Price, Total Cost, Cost Profit, Configured Cost, Configured Profit
+    const profitCols = [8, 10]; // Cost Profit (I) and Configured Profit (K)
 
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -355,12 +355,16 @@ export default function SalesReport() {
           
           // Apply conditional colors for profit columns
           if (profitCols.includes(C)) {
-            const val = parseFloat(cell.v);
+            const val = typeof cell.v === 'number' ? cell.v : parseFloat(cell.v);
             if (!isNaN(val)) {
               if (val < 0) {
-                cell.s = { font: { color: { rgb: "FF0000" } } }; // Red for loss
+                cell.s = { 
+                  font: { color: { rgb: "CC0000" } }
+                };
               } else if (val > 0) {
-                cell.s = { font: { color: { rgb: "008000" } } }; // Green for profit
+                cell.s = { 
+                  font: { color: { rgb: "006600" } }
+                };
               }
             }
           }
