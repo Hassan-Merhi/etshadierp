@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, Redirect, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
@@ -85,6 +86,7 @@ interface Location {
 
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
+  const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
 
   // For POS users, fetch their assigned location
@@ -1606,17 +1608,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           
           {/* Hidden Print Template - POS/Thermal Style */}
           <div className="hidden">
-            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
+            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
               {/* Title */}
-              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '16pt', letterSpacing: '2px', marginBottom: '6px' }}>
+              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>
                 POS INVOICE
               </div>
 
               {/* Bill Info - Single line: Bill No/Date left, Time/User right */}
-              <div style={{ fontSize: '10pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                 <span>Bill No: {savedSale?.voucher?.voucherNumber} | Date: {savedSale?.saleDate}</span>
                 <span>Time: {printTime} | User: {posUser?.name || 'Admin'}</span>
               </div>
+
+              {/* Daily Exchange Rate - Only for Mali company */}
+              {selectedCompany?.name?.toLowerCase().includes('mali') && exchangeRate && (
+                <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
+                  <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(exchangeRate)} CFA
+                </div>
+              )}
 
               {/* Credit Sale Customer Info */}
               {savedSale?.isCreditSale && savedSale?.customer && (
@@ -1627,7 +1636,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               )}
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt', marginBottom: '0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid black' }}>
                     <th style={{ textAlign: 'left', padding: '3px 2px', width: '6%', fontWeight: '900' }}>Sl</th>
@@ -1644,7 +1653,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                       <td style={{ padding: '3px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600' }}>{item.stockItemName}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${formatNumber(parseFloat(item.rate))}</td>
-                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{item.amount}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${item.amount}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1655,13 +1664,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     <td style={{ padding: '4px 2px' }}></td>
                     <td style={{ textAlign: 'right', padding: '4px 2px' }}>{(savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</td>
                     <td style={{ padding: '4px 2px' }}></td>
-                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>{savedSale?.grandTotal}</td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>${savedSale?.grandTotal}</td>
                   </tr>
                 </tfoot>
               </table>
 
               {/* Payment Summary */}
-              <div style={{ fontSize: '10pt', fontWeight: '700', marginTop: '6px', paddingTop: '6px', borderTop: '2px solid black' }}>
+              <div style={{ fontSize: '11pt', fontWeight: '700', marginTop: '6px', paddingTop: '6px', borderTop: '2px solid black' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                   <span>Cash:</span>
                   <span>${savedSale?.grandTotal}</span>
@@ -1674,7 +1683,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   <span>Balance:</span>
                   <span>$0.00</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginTop: '4px', borderTop: '2px solid black', fontWeight: '900', fontSize: '12pt' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginTop: '4px', borderTop: '2px solid black', fontWeight: '900', fontSize: '14pt' }}>
                   <span>TOTAL PAID:</span>
                   <span>${savedSale?.grandTotal}</span>
                 </div>

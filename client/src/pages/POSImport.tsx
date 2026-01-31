@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard, Printer } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +47,7 @@ export default function POSImport() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { displayCurrency, exchangeRate, isLoadingCompany } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -756,17 +758,24 @@ export default function POSImport() {
           
           {/* Hidden Print Template - POS/Thermal Style */}
           <div className="hidden">
-            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
+            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
               {/* Title */}
-              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '16pt', letterSpacing: '2px', marginBottom: '6px' }}>
+              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>
                 POS INVOICE
               </div>
 
               {/* Bill Info - Single line: Bill No/Date left, Time/User right */}
-              <div style={{ fontSize: '10pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                 <span>Bill No: {importedSale?.voucher?.voucherNumber} | Date: {importedSale?.saleDate}</span>
                 <span>Time: {printTime} | User: Import</span>
               </div>
+
+              {/* Daily Exchange Rate - Only for Mali company */}
+              {selectedCompany?.name?.toLowerCase().includes('mali') && exchangeRate && (
+                <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
+                  <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(exchangeRate)} CFA
+                </div>
+              )}
 
               {/* Credit Sale Customer Info */}
               {importedSale?.isCreditSale && importedSale?.customer && (
@@ -777,7 +786,7 @@ export default function POSImport() {
               )}
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt', marginBottom: '0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid black' }}>
                     <th style={{ textAlign: 'left', padding: '3px 2px', width: '6%', fontWeight: '900' }}>Sl</th>
@@ -794,7 +803,7 @@ export default function POSImport() {
                       <td style={{ padding: '3px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600' }}>{item.stockItemName || item.itemCode}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${formatNumber(parseFloat(item.rate))}</td>
-                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{formatNumber(parseFloat(item.quantity) * parseFloat(item.rate))}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${formatNumber(parseFloat(item.quantity) * parseFloat(item.rate))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -805,13 +814,13 @@ export default function POSImport() {
                     <td style={{ padding: '4px 2px' }}></td>
                     <td style={{ textAlign: 'right', padding: '4px 2px' }}>{(importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</td>
                     <td style={{ padding: '4px 2px' }}></td>
-                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>{importedSale?.grandTotal}</td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>${importedSale?.grandTotal}</td>
                   </tr>
                 </tfoot>
               </table>
 
               {/* Payment Summary */}
-              <div style={{ fontSize: '10pt', fontWeight: '700', marginTop: '6px', paddingTop: '6px', borderTop: '2px solid black' }}>
+              <div style={{ fontSize: '11pt', fontWeight: '700', marginTop: '6px', paddingTop: '6px', borderTop: '2px solid black' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                   <span>Cash:</span>
                   <span>${importedSale?.grandTotal}</span>
@@ -824,7 +833,7 @@ export default function POSImport() {
                   <span>Balance:</span>
                   <span>$0.00</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginTop: '4px', borderTop: '2px solid black', fontWeight: '900', fontSize: '12pt' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginTop: '4px', borderTop: '2px solid black', fontWeight: '900', fontSize: '14pt' }}>
                   <span>TOTAL PAID:</span>
                   <span>${importedSale?.grandTotal}</span>
                 </div>
