@@ -1602,93 +1602,92 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </AlertDialogDescription>
           </AlertDialogHeader>
           
-          {/* Hidden Print Template */}
+          {/* Hidden Print Template - POS/Thermal Style */}
           <div className="hidden">
-            <div ref={printRef} className="p-6 bg-white text-black">
-              <div className="text-center mb-4">
-                <h1 className="text-2xl font-bold mb-1">SALES INVOICE</h1>
-                <p className="text-sm text-gray-600">Invoice #{savedSale?.voucher?.voucherNumber}</p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                <div>
-                  <p className="font-semibold mb-0.5">Location:</p>
-                  <p>{savedSale?.location?.name}</p>
-                  <p>{savedSale?.location?.city}, {savedSale?.location?.state}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold mb-0.5">Date:</p>
-                  <p>{savedSale?.saleDate}</p>
-                </div>
+            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%' }}>
+              {/* Title */}
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14pt', letterSpacing: '2px', marginBottom: '6px' }}>
+                POS INVOICE
               </div>
 
-              {posUser && (
-                <div className="mb-4 p-2 bg-gray-50 border border-gray-200 text-sm">
-                  <p className="font-semibold mb-0.5">Printed by:</p>
-                  <p>{posUser.name} at {printTime}</p>
-                </div>
-              )}
+              {/* Bill Info - Single line: Bill No/Date left, Time/User right */}
+              <div style={{ fontSize: '9pt', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed black', borderBottom: '1px dashed black', padding: '4px 0', marginBottom: '6px' }}>
+                <span>Bill No: {savedSale?.voucher?.voucherNumber} | Date: {savedSale?.saleDate}</span>
+                <span>Time: {printTime} | User: {posUser?.name || 'Admin'}</span>
+              </div>
 
+              {/* Credit Sale Customer Info */}
               {savedSale?.isCreditSale && savedSale?.customer && (
-                <div className="mb-4 p-2 bg-gray-100 border border-gray-300">
-                  <p className="font-semibold mb-0.5">Customer (Credit Sale):</p>
-                  <p className="text-base">{savedSale.customer.name}</p>
-                  <p className="text-sm text-gray-600">Account: {savedSale.customer.code}</p>
+                <div style={{ fontSize: '9pt', marginBottom: '6px', padding: '3px', border: '1px solid black' }}>
+                  <div style={{ fontWeight: 'bold' }}>CREDIT SALE</div>
+                  <div>Customer: {savedSale.customer.name}</div>
                 </div>
               )}
 
-              <table className="w-full mb-4" style={{ tableLayout: 'fixed', borderCollapse: 'collapse', border: '2px solid black' }}>
-                <colgroup>
-                  <col style={{ width: '8%' }} />
-                  <col style={{ width: '42%' }} />
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '17%' }} />
-                  <col style={{ width: '18%' }} />
-                </colgroup>
+              {/* Items Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9pt', marginBottom: '0' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid black' }}>
-                    <th className="text-left py-1 px-1" style={{ borderRight: '2px solid black' }}>#</th>
-                    <th className="text-left py-1 px-1" style={{ borderRight: '2px solid black' }}>Item</th>
-                    <th className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>Qty</th>
-                    <th className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>Rate</th>
-                    <th className="text-right py-1 px-1">Amount</th>
+                  <tr style={{ borderBottom: '1px solid black' }}>
+                    <th style={{ textAlign: 'left', padding: '2px 1px', width: '6%' }}>Sl</th>
+                    <th style={{ textAlign: 'left', padding: '2px 1px', width: '42%' }}>Description</th>
+                    <th style={{ textAlign: 'right', padding: '2px 1px', width: '12%' }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '2px 1px', width: '18%' }}>Rate</th>
+                    <th style={{ textAlign: 'right', padding: '2px 1px', width: '22%' }}>Amt</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {savedSale?.items.map((item: any, idx: number) => (
-                    <tr key={idx} style={{ borderBottom: '2px solid black' }}>
-                      <td className="py-1 px-1" style={{ borderRight: '2px solid black' }}>{idx + 1}</td>
-                      <td className="py-1 px-1" style={{ borderRight: '2px solid black' }}>{item.stockItemName}</td>
-                      <td className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>{item.quantity}</td>
-                      <td className="text-right py-1 px-1" style={{ borderRight: '2px solid black' }}>${formatNumber(parseFloat(item.rate))}</td>
-                      <td className="text-right py-1 px-1">${item.amount}</td>
+                  {(savedSale?.items ?? []).map((item: any, idx: number) => (
+                    <tr key={idx} style={{ borderBottom: '1px dotted #999' }}>
+                      <td style={{ padding: '2px 1px', verticalAlign: 'top' }}>{idx + 1}</td>
+                      <td style={{ padding: '2px 1px', verticalAlign: 'top', wordBreak: 'break-word' }}>{item.stockItemName}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 1px', verticalAlign: 'top' }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 1px', verticalAlign: 'top' }}>{formatNumber(parseFloat(item.rate))}</td>
+                      <td style={{ textAlign: 'right', padding: '2px 1px', verticalAlign: 'top' }}>{item.amount}</td>
                     </tr>
                   ))}
                 </tbody>
+                {/* Totals Row - Total Qty under Qty, Total Amt under Amt */}
+                <tfoot>
+                  <tr style={{ borderTop: '1px solid black', fontWeight: 'bold' }}>
+                    <td style={{ padding: '3px 1px' }}></td>
+                    <td style={{ padding: '3px 1px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '3px 1px' }}>{(savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</td>
+                    <td style={{ padding: '3px 1px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '3px 1px' }}>{savedSale?.grandTotal}</td>
+                  </tr>
+                </tfoot>
               </table>
 
-              <div className="flex justify-end mb-4">
-                <div className="w-64">
-                  <div className="flex justify-between py-1 text-base" style={{ borderBottom: '2px solid black' }}>
-                    <span className="font-semibold">Total Qty:</span>
-                    <span className="font-bold">{(savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 text-lg font-bold" style={{ borderBottom: '2px solid black' }}>
-                    <span>TOTAL:</span>
-                    <span>${savedSale?.grandTotal}</span>
-                  </div>
+              {/* Payment Summary */}
+              <div style={{ fontSize: '9pt', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed black' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                  <span>Cash:</span>
+                  <span>${savedSale?.grandTotal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                  <span>Cash Tendered:</span>
+                  <span>${savedSale?.grandTotal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
+                  <span>Balance:</span>
+                  <span>$0.00</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', marginTop: '3px', borderTop: '1px solid black', fontWeight: 'bold', fontSize: '11pt' }}>
+                  <span>TOTAL PAID:</span>
+                  <span>${savedSale?.grandTotal}</span>
                 </div>
               </div>
 
+              {/* Notes */}
               {savedSale?.voucher?.description && (
-                <div className="mb-4">
-                  <p className="font-semibold mb-0.5">Notes:</p>
-                  <p className="text-sm">{savedSale.voucher.description}</p>
+                <div style={{ fontSize: '8pt', marginTop: '6px', padding: '3px', border: '1px dotted #666' }}>
+                  <span style={{ fontWeight: 'bold' }}>Note:</span> {savedSale.voucher.description}
                 </div>
               )}
 
-              <div className="text-center text-sm text-gray-600 mt-4 pt-3 border-t">
-                <p>Thank you for your business!</p>
+              {/* Footer */}
+              <div style={{ textAlign: 'center', fontSize: '8pt', marginTop: '10px', paddingTop: '4px', borderTop: '1px dashed black' }}>
+                <div>Thank you for your business!</div>
               </div>
             </div>
           </div>
