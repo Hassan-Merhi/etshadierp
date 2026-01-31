@@ -17875,6 +17875,7 @@ if (asOfDate) {
       const conditions = [
         eq(vouchers.companyId, req.session.currentCompanyId),
         eq(vouchers.voucherType, "Sales"),
+        isNull(vouchers.deletedAt),
       ];
 
       if (startDate) {
@@ -17960,6 +17961,7 @@ if (asOfDate) {
           eq(vouchers.companyId, req.session.currentCompanyId),
           eq(vouchers.voucherType, "Sales"),
           eq(vouchers.locationId, locationId),
+          isNull(vouchers.deletedAt),
         ];
 
         if (startDate) {
@@ -18033,6 +18035,7 @@ if (asOfDate) {
           eq(vouchers.companyId, req.session.currentCompanyId),
           eq(vouchers.voucherType, "Sales"),
           eq(vouchers.locationId, locationId),
+          isNull(vouchers.deletedAt),
         ];
 
         if (startDate) {
