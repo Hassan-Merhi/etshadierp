@@ -8237,6 +8237,7 @@ if (asOfDate) {
       }
 
       let totalSales = 0;
+      let createdVoucher: any = null;
 
       await db.transaction(async (tx) => {
         // Create sales voucher
@@ -8371,10 +8372,13 @@ if (asOfDate) {
             totalAmount: totalSales.toString(),
           })
           .where(eq(vouchers.id, voucher.id));
+
+        createdVoucher = voucher;
       });
 
       res.json({
         success: true,
+        voucher: createdVoucher,
         itemsCount: items.length,
         totalSales: totalSales.toFixed(2),
       });
@@ -8659,6 +8663,7 @@ if (asOfDate) {
       }
 
       let totalSales = 0;
+      let createdVoucher: any = null;
 
       await db.transaction(async (tx) => {
         const voucherNumber = `CREDIT-SALES-${Date.now()}`;
@@ -8779,6 +8784,8 @@ if (asOfDate) {
           })
           .where(eq(vouchers.id, voucher.id));
 
+        createdVoucher = voucher;
+
         // Add customer balance transaction (credit sale = debit to customer = they owe us)
         // Get current running balance for this customer
         const [lastBalance] = await tx
@@ -8813,6 +8820,7 @@ if (asOfDate) {
 
       res.json({
         success: true,
+        voucher: createdVoucher,
         itemsCount: items.length,
         totalSales: totalSales.toFixed(2),
         customerName: customer.legalName,
@@ -10594,6 +10602,7 @@ if (asOfDate) {
             for (const voucher of oldVouchers) {
               await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
               await db.delete(vouchers).where(eq(vouchers.id, voucher.id));
+
             }
 
             // Delete old offload record
@@ -10827,6 +10836,7 @@ if (asOfDate) {
 
             // Delete the voucher
             await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
+
           }
 
           // Delete the offload record
@@ -11010,6 +11020,7 @@ if (asOfDate) {
               .delete(voucherEntries)
               .where(eq(voucherEntries.voucherId, voucher.id));
             await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
+
           }
 
           // Create new voucher entries with updated charges (similar to offloadContainer logic)

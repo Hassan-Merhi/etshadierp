@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useReactToPrint } from "react-to-print";
 import { formatNumber } from "@/lib/formatNumber";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard, Printer } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import {
   AlertDialog,
@@ -55,6 +56,10 @@ export default function POSImport() {
   const [saleDate, setSaleDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [importedSale, setImportedSale] = useState<any>(null);
+  const [printTime, setPrintTime] = useState<string>("");
+  const printRef = useRef<HTMLDivElement>(null);
 
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -138,6 +143,15 @@ export default function POSImport() {
     },
   });
 
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: importedSale?.voucher?.voucherNumber ? `Invoice-${importedSale.voucher.voucherNumber}` : "Invoice",
+    onAfterPrint: () => {
+      setShowPrintDialog(false);
+      navigate("/vouchers");
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/pos-import/import", data);
@@ -150,7 +164,18 @@ export default function POSImport() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      navigate("/vouchers");
+      
+      const location = locations.find(l => l.id === parseInt(selectedLocation));
+      setImportedSale({
+        voucher: data.voucher,
+        items: validationResult?.validatedItems || [],
+        grandTotal: data.totalSales,
+        saleDate,
+        location,
+        isCreditSale: false,
+      });
+      setPrintTime(new Date().toLocaleTimeString());
+      setShowPrintDialog(true);
     },
     onError: (error: any) => {
       toast({
@@ -174,7 +199,20 @@ export default function POSImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      navigate("/vouchers");
+      
+      const location = locations.find(l => l.id === parseInt(selectedLocation));
+      const customer = customers.find(c => c.id === parseInt(selectedCustomer));
+      setImportedSale({
+        voucher: data.voucher,
+        items: validationResult?.validatedItems || [],
+        grandTotal: data.totalSales,
+        saleDate,
+        location,
+        isCreditSale: true,
+        customer: customer ? { name: customer.legalName } : null,
+      });
+      setPrintTime(new Date().toLocaleTimeString());
+      setShowPrintDialog(true);
     },
     onError: (error: any) => {
       toast({
@@ -702,6 +740,111 @@ export default function POSImport() {
             >
               Proceed Anyway
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Print Dialog */}
+      <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import Successful</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sale has been imported successfully. Would you like to print the invoice?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {/* Hidden Print Template - POS/Thermal Style */}
+          <div className="hidden">
+            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '10pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
+              {/* Title */}
+              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '16pt', letterSpacing: '2px', marginBottom: '6px' }}>
+                POS INVOICE
+              </div>
+
+              {/* Bill Info - Single line: Bill No/Date left, Time/User right */}
+              <div style={{ fontSize: '10pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+                <span>Bill No: {importedSale?.voucher?.voucherNumber} | Date: {importedSale?.saleDate}</span>
+                <span>Time: {printTime} | User: Import</span>
+              </div>
+
+              {/* Credit Sale Customer Info */}
+              {importedSale?.isCreditSale && importedSale?.customer && (
+                <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
+                  <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+                  <div>Customer: {importedSale.customer.name}</div>
+                </div>
+              )}
+
+              {/* Items Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt', marginBottom: '0' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid black' }}>
+                    <th style={{ textAlign: 'left', padding: '3px 2px', width: '6%', fontWeight: '900' }}>Sl</th>
+                    <th style={{ textAlign: 'left', padding: '3px 2px', width: '42%', fontWeight: '900' }}>Description</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '12%', fontWeight: '900' }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '18%', fontWeight: '900' }}>Rate</th>
+                    <th style={{ textAlign: 'right', padding: '3px 2px', width: '22%', fontWeight: '900' }}>Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(importedSale?.items ?? []).map((item: any, idx: number) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid black' }}>
+                      <td style={{ padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{idx + 1}</td>
+                      <td style={{ padding: '3px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600' }}>{item.stockItemName || item.itemCode}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{formatNumber(parseFloat(item.rate))}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{formatNumber(parseFloat(item.quantity) * parseFloat(item.rate))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Totals Row */}
+                <tfoot>
+                  <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>{(importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</td>
+                    <td style={{ padding: '4px 2px' }}></td>
+                    <td style={{ textAlign: 'right', padding: '4px 2px' }}>{importedSale?.grandTotal}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Payment Summary */}
+              <div style={{ fontSize: '10pt', fontWeight: '700', marginTop: '6px', paddingTop: '6px', borderTop: '2px solid black' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                  <span>Cash:</span>
+                  <span>${importedSale?.grandTotal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                  <span>Cash Tendered:</span>
+                  <span>${importedSale?.grandTotal}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                  <span>Balance:</span>
+                  <span>$0.00</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginTop: '4px', borderTop: '2px solid black', fontWeight: '900', fontSize: '12pt' }}>
+                  <span>TOTAL PAID:</span>
+                  <span>${importedSale?.grandTotal}</span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+                <div>Thank you for your business!</div>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => { setShowPrintDialog(false); navigate("/vouchers"); }} data-testid="button-skip-print">
+              Skip
+            </Button>
+            <Button onClick={handlePrint} className="gap-2" data-testid="button-print-imported-invoice">
+              <Printer className="h-4 w-4" />
+              Print Invoice
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

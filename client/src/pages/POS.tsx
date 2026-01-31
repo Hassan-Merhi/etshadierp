@@ -408,17 +408,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? 'updated' : 'saved'} successfully.`,
       });
       
-      if (editVoucherId) {
-        // Navigate back to daybook after update
-        navigate("/pos-daybook");
-      } else {
+      if (!editVoucherId) {
         // Clear the form for new sales
         setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
         setNotes("");
-        
-        // Auto-show print dialog
-        setShowPrintDialog(true);
       }
+      
+      // Auto-show print dialog for both new and edit
+      setShowPrintDialog(true);
       
       // Invalidate inventory query to refresh stock levels
       queryClient.invalidateQueries({ queryKey: [`/api/locations/${activeLocation?.id}/inventory`] });
@@ -455,7 +452,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: savedSale?.voucher?.voucherNumber ? `Invoice-${savedSale.voucher.voucherNumber}` : "Invoice",
-    onAfterPrint: () => setShowPrintDialog(false),
+    onAfterPrint: () => {
+      setShowPrintDialog(false);
+      if (editVoucherId) {
+        navigate("/pos-daybook");
+      }
+    },
   });
 
   // Save draft mutation
@@ -1693,7 +1695,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setShowPrintDialog(false)} data-testid="button-cancel-print">
+            <Button variant="outline" onClick={() => { setShowPrintDialog(false); if (editVoucherId) navigate("/pos-daybook"); }} data-testid="button-cancel-print">
               Close
             </Button>
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-invoice">
