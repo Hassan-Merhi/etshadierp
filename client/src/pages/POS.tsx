@@ -1677,6 +1677,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           {/* Hidden Print Template - POS/Thermal Style */}
           <div className="hidden">
             <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
+              {/* Company & Location Header */}
+              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '14pt', marginBottom: '2px' }}>
+                {selectedCompany?.name || 'Company'}
+              </div>
+              <div style={{ textAlign: 'center', fontWeight: '700', fontSize: '11pt', marginBottom: '6px' }}>
+                {activeLocation?.name || 'Location'}
+              </div>
+
               {/* Title */}
               <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>
                 POS INVOICE
@@ -1685,7 +1693,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {/* Bill Info - Single line: Bill No/Date left, Time/User right */}
               <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                 <span>Bill No: {savedSale?.voucher?.voucherNumber} | Date: {savedSale?.saleDate}</span>
-                <span>Time: {printTime} | User: {posUser?.name || 'Admin'}</span>
+                <span>Time: {printTime} | User: {posUser?.username || 'Admin'}</span>
               </div>
 
               {/* Daily Exchange Rate - Only for Mali company */}

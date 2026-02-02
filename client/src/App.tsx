@@ -230,6 +230,7 @@ function AuthenticatedApp() {
               <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
                 <LogOut className="h-4 w-4" />
               </Button>
+              <CompanySelector />
               <CurrencyToggle />
               <ThemeToggle />
             </div>
