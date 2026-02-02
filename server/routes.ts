@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import * as XLSX from "xlsx";
+import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "./excelHelper";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
 import CryptoJS from "crypto-js";
@@ -7043,10 +7043,10 @@ if (asOfDate) {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const workbook = await readExcel(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        const rawData = sheetToJson(worksheet);
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
@@ -7890,7 +7890,7 @@ if (asOfDate) {
   });
 
   // Download sample PO import template
-  app.get("/api/po-import/template", (_req, res) => {
+  app.get("/api/po-import/template", async (_req, res) => {
     try {
       // Sample data for the template
       const sampleData = [
@@ -7972,14 +7972,9 @@ if (asOfDate) {
       ];
 
       // Create workbook and worksheet
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(sampleData);
-
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(workbook, worksheet, "PO Import");
-
-      // Generate buffer
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const workbook = createWorkbook();
+      jsonToSheet(workbook, sampleData, "PO Import");
+      const buffer = await writeWorkbook(workbook);
 
       // Set headers for download
       res.setHeader(
@@ -8012,10 +8007,10 @@ if (asOfDate) {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const workbook = await readExcel(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        const rawData = sheetToJson(worksheet);
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
@@ -8389,7 +8384,7 @@ if (asOfDate) {
   });
 
   // Download sample POS import template
-  app.get("/api/pos-import/template", (_req, res) => {
+  app.get("/api/pos-import/template", async (_req, res) => {
     try {
       const sampleData = [
         {
@@ -8409,11 +8404,10 @@ if (asOfDate) {
         },
       ];
 
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, "POS Import");
+      const workbook = createWorkbook();
+      jsonToSheet(workbook, sampleData, "POS Import");
 
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await writeWorkbook(workbook);
 
       res.setHeader(
         "Content-Disposition",
@@ -8447,10 +8441,10 @@ if (asOfDate) {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const workbook = await readExcel(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        const rawData = sheetToJson(worksheet);
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
@@ -8832,7 +8826,7 @@ if (asOfDate) {
   });
 
   // Download sample Credit Sales import template
-  app.get("/api/credit-sales-import/template", (_req, res) => {
+  app.get("/api/credit-sales-import/template", async (_req, res) => {
     try {
       const sampleData = [
         {
@@ -8852,11 +8846,10 @@ if (asOfDate) {
         },
       ];
 
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Credit Sales Import");
+      const workbook = createWorkbook();
+      jsonToSheet(workbook, sampleData, "Credit Sales Import");
 
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await writeWorkbook(workbook);
 
       res.setHeader(
         "Content-Disposition",
@@ -8890,10 +8883,10 @@ if (asOfDate) {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const workbook = await readExcel(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        const rawData = sheetToJson(worksheet);
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
@@ -9250,7 +9243,7 @@ if (asOfDate) {
   });
 
   // Download sample Stock Transfer import template
-  app.get("/api/stock-transfer-import/template", (_req, res) => {
+  app.get("/api/stock-transfer-import/template", async (_req, res) => {
     try {
       const sampleData = [
         {
@@ -9267,11 +9260,10 @@ if (asOfDate) {
         },
       ];
 
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Transfer");
+      const workbook = createWorkbook();
+      jsonToSheet(workbook, sampleData, "Stock Transfer");
 
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await writeWorkbook(workbook);
 
       res.setHeader(
         "Content-Disposition",
@@ -9289,7 +9281,7 @@ if (asOfDate) {
   });
 
   // Multi-source Stock Transfer Import - Template
-  app.get("/api/stock-transfer-import/template-multi-source", (_req, res) => {
+  app.get("/api/stock-transfer-import/template-multi-source", async (_req, res) => {
     try {
       const sampleData = [
         {
@@ -9309,11 +9301,10 @@ if (asOfDate) {
         },
       ];
 
-      const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(sampleData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Transfer");
+      const workbook = createWorkbook();
+      jsonToSheet(workbook, sampleData, "Stock Transfer");
 
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await writeWorkbook(workbook);
 
       res.setHeader(
         "Content-Disposition",
@@ -9346,10 +9337,10 @@ if (asOfDate) {
           return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const workbook = await readExcel(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        const rawData = sheetToJson(worksheet);
 
         if (rawData.length === 0) {
           return res.status(400).json({ message: "Excel file is empty" });
@@ -10252,7 +10243,7 @@ if (asOfDate) {
       }
 
       const allContainers = await storage.getAllContainers(req.session.currentCompanyId);
-      const workbook = XLSX.utils.book_new();
+      const workbook = createWorkbook();
 
       for (const container of allContainers) {
         const supplier = await storage.getSupplierById(container.supplierId);
@@ -10347,11 +10338,10 @@ if (asOfDate) {
         const sheetName = container.containerNumber
           .replace(/[\\/*?:\[\]]/g, "_")
           .substring(0, 31);
-        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        aoaToSheet(workbook, sheetData, sheetName);
       }
 
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = await writeWorkbook(workbook);
       
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="containers_export_${new Date().toISOString().split("T")[0]}.xlsx"`);
@@ -27190,10 +27180,10 @@ if (asOfDate) {
       }
 
       // Parse Excel file
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const workbook = await readExcel(req.file.buffer);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet);
+      const rows = sheetToJson(worksheet);
 
       const { insertBaleProductSchema } = await import("@shared/schema");
 
@@ -27739,10 +27729,10 @@ if (asOfDate) {
       }
 
       // Parse Excel file
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const workbook = await readExcel(req.file.buffer);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(worksheet);
+      const rows = sheetToJson(worksheet);
 
       const { insertProductionBaleSchema } = await import("@shared/schema");
       const mixBatchId = req.body.mixBatchId ? parseInt(req.body.mixBatchId) : undefined;

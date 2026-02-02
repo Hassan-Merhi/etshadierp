@@ -42,7 +42,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { formatNumber } from "@/lib/formatNumber";
@@ -320,128 +320,88 @@ export default function SalesReport() {
     setDetailsDialogOpen(true);
   };
 
-  const handleExportExcel = () => {
-    // Detailed export: export all individual sales items with all profit columns
-    const detailedExportData = salesData.map((item) => {
-      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
-      return {
-        "Location": item.locationName || "N/A",
-        "Item Name": item.stockItemName,
-        "Quantity": parseFloat(item.quantity),
-        "Sold Price": parseFloat(item.actualSellingPrice),
-        "Cost Price": parseFloat(item.costPrice),
-        "Hassan's Price": parseFloat(item.configuredSellingPrice),
-        "Unit Profit": unitProfit,
-        "Total Sales": parseFloat(item.totalSales),
-        "Total Cost": parseFloat(item.totalCost),
-        "Cost Profit": parseFloat(item.costProfit),
-        "Cost %": item.costProfitPercentage,
-        "Hassan's Profit": item.configuredProfit,
-        "Hassan's %": item.configuredProfitPercentage,
+  const handleExportExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Detailed Sales Report");
+
+    const currencyCols = [4, 5, 6, 7, 8, 9, 10, 12];
+    const percentCols = [11, 13];
+    const profitCols = [7, 10, 11, 12, 13];
+    
+    worksheet.columns = [
+      { header: "Location", key: "location", width: 15 },
+      { header: "Item Name", key: "itemName", width: 30 },
+      { header: "Quantity", key: "quantity", width: 10 },
+      { header: "Sold Price", key: "soldPrice", width: 12 },
+      { header: "Cost Price", key: "costPrice", width: 12 },
+      { header: "Hassan's Price", key: "hassansPrice", width: 14 },
+      { header: "Unit Profit", key: "unitProfit", width: 12 },
+      { header: "Total Sales", key: "totalSales", width: 12 },
+      { header: "Total Cost", key: "totalCost", width: 12 },
+      { header: "Cost Profit", key: "costProfit", width: 12 },
+      { header: "Cost %", key: "costPercent", width: 10 },
+      { header: "Hassan's Profit", key: "hassansProfit", width: 14 },
+      { header: "Hassan's %", key: "hassansPercent", width: 12 },
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
+    headerRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: "medium", color: { argb: "FF999999" } },
+        bottom: { style: "medium", color: { argb: "FF999999" } },
+        left: { style: "medium", color: { argb: "FF999999" } },
+        right: { style: "medium", color: { argb: "FF999999" } },
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(detailedExportData);
-    
-    // Apply currency formatting and conditional colors
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    // Column indices (0-based): 
-    // 0=Location, 1=Item Name, 2=Quantity, 3=Sold Price, 4=Cost Price, 
-    // 5=Hassan's Price, 6=Unit Profit, 7=Total Sales, 8=Total Cost, 9=Cost Profit, 
-    // 10=Cost %, 11=Hassan's Profit, 12=Hassan's %
-    const currencyCols = [3, 4, 5, 6, 7, 8, 9, 11]; // Currency columns
-    const percentCols = [10, 12]; // Percentage columns (Cost % and Hassan's %)
-    const profitCols = [6, 9, 10, 11, 12]; // All profit-related columns that need red/green
+    salesData.forEach((item) => {
+      const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
+      const row = worksheet.addRow({
+        location: item.locationName || "N/A",
+        itemName: item.stockItemName,
+        quantity: parseFloat(item.quantity),
+        soldPrice: parseFloat(item.actualSellingPrice),
+        costPrice: parseFloat(item.costPrice),
+        hassansPrice: parseFloat(item.configuredSellingPrice),
+        unitProfit: unitProfit,
+        totalSales: parseFloat(item.totalSales),
+        totalCost: parseFloat(item.totalCost),
+        costProfit: parseFloat(item.costProfit),
+        costPercent: item.costProfitPercentage,
+        hassansProfit: item.configuredProfit,
+        hassansPercent: item.configuredProfitPercentage,
+      });
 
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = ws[cellRef];
-        if (!cell) continue;
-
-        const val = typeof cell.v === 'number' ? cell.v : parseFloat(cell.v);
-
-        // Add currency formatting to currency columns
-        if (currencyCols.includes(C)) {
-          cell.z = '"$"#,##0.00';
-        }
-        
-        // Add percentage formatting to percentage columns
-        if (percentCols.includes(C)) {
-          cell.z = '0.0"%"';
-        }
-
-        // Define border style
-        const borderStyle = {
-          top: { style: "medium", color: { rgb: "999999" } },
-          bottom: { style: "medium", color: { rgb: "999999" } },
-          left: { style: "medium", color: { rgb: "999999" } },
-          right: { style: "medium", color: { rgb: "999999" } },
+      row.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: "medium", color: { argb: "FF999999" } },
+          bottom: { style: "medium", color: { argb: "FF999999" } },
+          left: { style: "medium", color: { argb: "FF999999" } },
+          right: { style: "medium", color: { argb: "FF999999" } },
         };
 
-        // Apply conditional colors for profit columns (red for loss, green for profit)
-        if (profitCols.includes(C) && !isNaN(val)) {
+        if (currencyCols.includes(colNumber)) {
+          cell.numFmt = '"$"#,##0.00';
+        }
+        if (percentCols.includes(colNumber)) {
+          cell.numFmt = '0.0"%"';
+        }
+
+        const val = typeof cell.value === "number" ? cell.value : parseFloat(String(cell.value || 0));
+        if (profitCols.includes(colNumber) && !isNaN(val)) {
           if (val < 0) {
-            cell.s = { 
-              font: { color: { rgb: "E57373" } },
-              border: borderStyle
-            };
+            cell.font = { color: { argb: "FFE57373" } };
           } else if (val > 0) {
-            cell.s = { 
-              font: { color: { rgb: "4CAF50" } },
-              border: borderStyle
-            };
-          } else {
-            cell.s = { border: borderStyle };
+            cell.font = { color: { argb: "FF4CAF50" } };
           }
-        } else {
-          // Apply borders to all cells
-          cell.s = { ...cell.s, border: borderStyle };
         }
-      }
-    }
+      });
+    });
 
-    // Apply borders to header row
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
-      const cell = ws[cellRef];
-      if (cell) {
-        cell.s = {
-          font: { bold: true },
-          fill: { fgColor: { rgb: "F5F5F5" } },
-          border: {
-            top: { style: "medium", color: { rgb: "999999" } },
-            bottom: { style: "medium", color: { rgb: "999999" } },
-            left: { style: "medium", color: { rgb: "999999" } },
-            right: { style: "medium", color: { rgb: "999999" } },
-          }
-        };
-      }
-    }
-
-    // Set column widths based on content (auto-fit simulation)
-    const colWidths = [
-      { wch: 15 },  // Location
-      { wch: 30 },  // Item Name
-      { wch: 10 },  // Quantity
-      { wch: 12 },  // Sold Price
-      { wch: 12 },  // Cost Price
-      { wch: 14 },  // Hassan's Price
-      { wch: 12 },  // Unit Profit
-      { wch: 12 },  // Total Sales
-      { wch: 12 },  // Total Cost
-      { wch: 12 },  // Cost Profit
-      { wch: 10 },  // Cost %
-      { wch: 14 },  // Hassan's Profit
-      { wch: 12 },  // Hassan's %
-    ];
-    ws['!cols'] = colWidths;
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Detailed Sales Report");
-    
     const fileName = `detailed-sales-report-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    await writeFile(workbook, fileName);
   };
 
   const handleExportPDF = () => {

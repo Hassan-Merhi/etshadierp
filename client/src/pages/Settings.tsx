@@ -57,7 +57,7 @@
   import { useMutation, useQuery } from "@tanstack/react-query";
   import { apiRequest, queryClient } from "@/lib/queryClient";
   import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp } from "lucide-react";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
   import { Link } from "wouter";
   import { useDateFormat } from "@/contexts/DateFormatContext";
   import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
@@ -585,10 +585,10 @@ function DataToolsTab() {
       { barcode: "ITEM001", costPrice: "125.50" },
       { barcode: "ITEM002", costPrice: "95.75" },
     ];
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Cost Price Import");
-    XLSX.writeFile(wb, "cost_price_import_template.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Cost Price Import");
+    writeFile(wb, "cost_price_import_template.xlsx");
     toast({
       title: "Template Downloaded",
       description: "Use this template to update cost prices",
@@ -606,16 +606,16 @@ function DataToolsTab() {
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<any>(worksheet);
 
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
       }
 
-      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
       const missingCols = requiredCols.filter(col => !columns.includes(col));
@@ -696,10 +696,10 @@ function DataToolsTab() {
       { Item_barcode: "ITEM-001", stockGroupCode: "GRP01", quantity: "100", rate: "50.00", value: "5000.00" },
       { Item_barcode: "ITEM-002", stockGroupCode: "GRP02", quantity: "50", rate: "100.00", value: "5000.00" },
     ];
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Stock Import");
-    XLSX.writeFile(wb, "stock_import_template.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Stock Import");
+    writeFile(wb, "stock_import_template.xlsx");
     toast({ title: "Template Downloaded", description: "Use this template to import stock" });
   };
 
@@ -714,16 +714,16 @@ function DataToolsTab() {
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<any>(worksheet);
 
       if (jsonData.length === 0) {
         toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
         return;
       }
 
-      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
       const missingCols = requiredCols.filter(col => !columns.includes(col));

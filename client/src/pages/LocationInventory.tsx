@@ -35,7 +35,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
 
 interface Location {
@@ -305,10 +305,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       { Item_barcode: "BALE002", stockGroupCode: "TEXTILE", quantity: "50", rate: "145.50", value: "7275.00" },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Inventory Import");
-    XLSX.writeFile(wb, "inventory_import_template.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Inventory Import");
+    writeFile(wb, "inventory_import_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -327,9 +327,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<any>(worksheet);
 
       // Validate file has data
       if (jsonData.length === 0) {
@@ -342,7 +342,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       }
 
       // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
-      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate"];
       const missingCols = requiredCols.filter(col => !columns.includes(col));
@@ -466,10 +466,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       { barcode: "ITEM002", costPrice: "95.75" },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Cost Price Import");
-    XLSX.writeFile(wb, "cost_price_import_template.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Cost Price Import");
+    writeFile(wb, "cost_price_import_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -488,9 +488,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<any>(worksheet);
 
       // Validate file has data
       if (jsonData.length === 0) {
@@ -503,7 +503,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       }
 
       // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
-      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
       const missingCols = requiredCols.filter(col => !columns.includes(col));

@@ -25,7 +25,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
 
 // Type definitions
@@ -873,7 +873,7 @@ export default function Analytics() {
   const exportRatiosToExcel = () => {
     if (!ratiosData) return;
 
-    const wb = XLSX.utils.book_new();
+    const wb = utils.book_new();
     const wsData = [
       ["Financial Ratios Report"],
       [""],
@@ -892,9 +892,9 @@ export default function Analytics() {
       ["Total Equity", formatNumber(ratiosData.underlying.totalEquity)],
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    XLSX.utils.book_append_sheet(wb, ws, "Financial Ratios");
-    XLSX.writeFile(wb, "financial-ratios.xlsx");
+    const ws = utils.aoa_to_sheet(wsData);
+    utils.book_append_sheet(wb, ws, "Financial Ratios");
+    writeFile(wb, "financial-ratios.xlsx");
 
     toast({ title: "Excel Exported", description: "Report downloaded successfully" });
   };

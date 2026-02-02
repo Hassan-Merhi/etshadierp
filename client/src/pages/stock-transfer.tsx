@@ -44,7 +44,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { utils, writeFile } from "xlsx";
+import { utils, writeFile } from "@/lib/excelHelper";
 import { Link } from "wouter";
 
 interface StockTransferPageProps {

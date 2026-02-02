@@ -80,7 +80,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown } from "lucide-react";
-import { utils, writeFile } from "xlsx";
+import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
   DropdownMenuContent,

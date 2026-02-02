@@ -41,7 +41,7 @@ import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 
 interface SupplierWithStats {
   id: number;
@@ -163,12 +163,12 @@ export default function Suppliers() {
       Balance: txn.balance,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Supplier Ledger");
+    const worksheet = utils.json_to_sheet(exportData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Supplier Ledger");
     
     const fileName = `${selectedSupplier.legalName}_Ledger_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    writeFile(workbook, fileName);
   };
 
   return (

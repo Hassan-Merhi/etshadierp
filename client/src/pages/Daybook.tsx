@@ -98,7 +98,7 @@ import { format, parseISO, isToday } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
-import { utils, writeFile } from "xlsx";
+import { utils, writeFile } from "@/lib/excelHelper";
 
 // Helper function to format amounts - wraps formatNumber to handle string inputs
 const formatAmount = (amount: number | string): string => {

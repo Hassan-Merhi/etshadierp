@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Upload, Download, CheckCircle2, AlertCircle } from "lucide-react";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -40,10 +40,10 @@ export default function ImportStockItems() {
       { code: "ITEM002", name: "Cotton Bale Grade B", unit: "Bale", stockGroupCode: "GRP001" },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Stock Items");
-    XLSX.writeFile(wb, "stock_items_template.xlsx");
+    const ws = utils.json_to_sheet(template);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Stock Items");
+    writeFile(wb, "stock_items_template.xlsx");
 
     toast({
       title: "Template Downloaded",
@@ -62,9 +62,9 @@ export default function ImportStockItems() {
 
     try {
       const data = await selectedFile.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+      const jsonData = utils.sheet_to_json<any>(worksheet);
 
       // Validate file has data
       if (jsonData.length === 0) {
@@ -77,7 +77,7 @@ export default function ImportStockItems() {
       }
 
       // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
-      const headerRow = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["code", "name"];
       const missingCols = requiredCols.filter(col => !columns.includes(col));

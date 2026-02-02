@@ -47,7 +47,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 
 interface Location {
   id: number;
@@ -273,10 +273,10 @@ export default function StockItems() {
       "Selling Price": item.sellingPrice,
       Active: item.active ? "Yes" : "No",
     }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Items");
-    XLSX.writeFile(workbook, "stock-items.xlsx");
+    const worksheet = utils.json_to_sheet(data);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Stock Items");
+    writeFile(workbook, "stock-items.xlsx");
   };
 
   return (

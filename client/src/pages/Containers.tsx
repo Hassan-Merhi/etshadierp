@@ -49,7 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AddContainerDialog } from "../components/AddContainerDialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import * as XLSX from "xlsx";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import type { Container, Supplier } from "@shared/schema";
 
 interface SoldContainer {
@@ -309,10 +309,10 @@ export default function Containers() {
       "Import Date": new Date(container.importDate).toLocaleDateString(),
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Containers");
-    XLSX.writeFile(workbook, "containers.xlsx");
+    const worksheet = utils.json_to_sheet(data);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Containers");
+    writeFile(workbook, "containers.xlsx");
   };
 
   const exportAllContainersFull = async () => {
@@ -362,10 +362,10 @@ export default function Containers() {
       Description: c.trackingDescription || "",
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "OTW Containers");
-    XLSX.writeFile(workbook, "otw_containers.xlsx");
+    const worksheet = utils.json_to_sheet(data);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "OTW Containers");
+    writeFile(workbook, "otw_containers.xlsx");
   };
 
   // Helper function to convert Excel date serial numbers to date strings
@@ -411,10 +411,10 @@ export default function Containers() {
       },
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Import Template");
-    XLSX.writeFile(workbook, "container_import_template.xlsx");
+    const worksheet = utils.json_to_sheet(templateData);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "Import Template");
+    writeFile(workbook, "container_import_template.xlsx");
   };
 
   const handleImportClick = () => {
@@ -428,9 +428,9 @@ export default function Containers() {
     setIsImporting(true);
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = await read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(sheet);
+      const jsonData = utils.sheet_to_json(sheet);
 
       // Validate file has data
       if (jsonData.length === 0) {
@@ -441,7 +441,7 @@ export default function Containers() {
 
       // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
       const headerRow =
-        XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] || [];
+        utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h) => String(h || "").trim());
 
       // Check for Container # column (required for matching)

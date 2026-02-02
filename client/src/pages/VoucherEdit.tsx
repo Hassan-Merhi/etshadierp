@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { utils, writeFile } from "@/lib/excelHelper";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -2295,7 +2296,7 @@ export default function VoucherEdit() {
     
     // Excel export function for Stock Transfer
     const exportToExcel = () => {
-      const XLSX = require('xlsx');
+      // Using imported excel helper
       
       const transferItems = transferForm.watch("items");
       const totalBales = transferItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
@@ -2319,12 +2320,12 @@ export default function VoucherEdit() {
         'Destination Location': '',
       });
       
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Transfer');
+      const worksheet = utils.json_to_sheet(exportData);
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, 'Stock Transfer');
       
       const filename = `Stock_Transfer_${voucher.voucherNumber}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
-      XLSX.writeFile(workbook, filename);
+      writeFile(workbook, filename);
       
       toast({
         title: "Export Successful",
