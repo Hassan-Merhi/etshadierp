@@ -12857,17 +12857,8 @@ if (asOfDate) {
   );
 
   // Create a new voucher
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
-      res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+
+  // Create a new voucher
   app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -12878,47 +12869,7 @@ if (asOfDate) {
       res.status(500).json({ message: error.message });
     }
   });
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
-      res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
-      res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
-      res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-  app.post("/api/vouchers", requireAuth, requireNonPOS, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
-      const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
-      res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-  });
+
 
   // Create a voucher with entries in one transaction
   app.post(
