@@ -2173,13 +2173,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             : new Date(data.voucherDate);
           const formattedVoucherDate = format(voucherDateObj, "yyyy-MM-dd");
           
-          console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", {
-            companyId: _companyId,
-            voucherType: "StockTransfer",
-            voucherDate: formattedVoucherDate,
-            totalAmount: _transferTotal.toString(),
-          });
-          const voucherRes = await apiRequest("POST", "/api/vouchers", {
+          const voucherPayload = {
             companyId: _companyId,
             voucherType: "StockTransfer",
             voucherNumber: `TRANSFER-${Date.now()}`,
@@ -2187,7 +2181,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             description: `Stock transfer from ${sourceNames} to ${destName}`,
             totalAmount: _transferTotal.toString(),
             optional: data.optional,
-          });
+          };
+          console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", voucherPayload);
+          console.log("[StockTransfer] MUTATION STEP D2: Payload JSON test:", JSON.stringify(voucherPayload));
+          
+          let voucherRes;
+          try {
+            console.log("[StockTransfer] MUTATION STEP D3: About to call apiRequest");
+            voucherRes = await apiRequest("POST", "/api/vouchers", voucherPayload);
+            console.log("[StockTransfer] MUTATION STEP D4: apiRequest completed, response:", voucherRes);
+          } catch (apiError: any) {
+            console.error("[StockTransfer] MUTATION STEP D-ERROR: apiRequest failed:", apiError);
+            console.error("[StockTransfer] Error message:", apiError?.message);
+            console.error("[StockTransfer] Error stack:", apiError?.stack);
+            throw apiError;
+          }
           console.log("[StockTransfer] MUTATION STEP E: Voucher created, parsing response");
           const voucher = await voucherRes.json();
           console.log("[StockTransfer] MUTATION STEP F: Voucher:", voucher);
