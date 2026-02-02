@@ -2099,6 +2099,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // Stock Transfer mutation (handles both create and update)
   const stockTransferMutation = useMutation({
     mutationFn: async (input: StockTransferMutationInput) => {
+      console.log("[StockTransfer] MUTATION STEP A: mutationFn started with input:", input);
       try {
         // Extract all data from input (not from closures)
         const { 
@@ -2110,6 +2111,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           _locations,
           ...data 
         } = input;
+        
+        console.log("[StockTransfer] MUTATION STEP B: Extracted data, isEditMode:", !!_voucherIdToEdit);
         
         const isEditMode = !!_voucherIdToEdit;
         
@@ -2123,6 +2126,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         if (!_companyId && !isEditMode) {
           throw new Error("No company selected");
         }
+        
+        console.log("[StockTransfer] MUTATION STEP C: Validation passed, preparing entries");
         
         // Get unique source locations for description
         const validEntries = data.entries.filter(e => e.sourceLocationId > 0 && e.stockItemId > 0);
@@ -2156,6 +2161,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return await voucherRes.json();
         } else {
           // CREATE MODE: Create new voucher and stock transfer
+          console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", {
+            companyId: _companyId,
+            voucherType: "StockTransfer",
+            voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+            totalAmount: _transferTotal.toString(),
+          });
           const voucherRes = await apiRequest("POST", "/api/vouchers", {
             companyId: _companyId,
             voucherType: "StockTransfer",
@@ -2165,9 +2176,12 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             totalAmount: _transferTotal.toString(),
             optional: data.optional,
           });
+          console.log("[StockTransfer] MUTATION STEP E: Voucher created, parsing response");
           const voucher = await voucherRes.json();
+          console.log("[StockTransfer] MUTATION STEP F: Voucher:", voucher);
 
           // Create stock transfer with items (including per-item source locations)
+          console.log("[StockTransfer] MUTATION STEP G: Creating stock transfer");
           await apiRequest("POST", "/api/stock-transfers", {
             voucherId: voucher.id,
             destinationLocationId: data.destinationLocationId,
