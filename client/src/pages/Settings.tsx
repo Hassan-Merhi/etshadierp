@@ -2615,6 +2615,17 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                                               <Label className="text-sm cursor-pointer">View Customers</Label>
                                             </div>
                                             <div className="flex items-center gap-2">
+                                              <Switch
+                                                checked={role.canCreateUsers}
+                                                onCheckedChange={(checked) =>
+                                                  handlePermissionToggle(role.id, user.id, role.companyId, "canCreateUsers", checked)
+                                                }
+                                                disabled={updatePermissionMutation.isPending}
+                                                data-testid={`toggle-can-create-users-${role.id}`}
+                                              />
+                                              <Label className="text-sm cursor-pointer">Create Users</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
                                               <Label className="text-sm">Edit Daybook:</Label>
                                               <Select
                                                 value={String(role.daybookEditDays || 0)}

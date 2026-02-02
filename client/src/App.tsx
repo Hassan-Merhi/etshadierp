@@ -15,8 +15,14 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, UserPlus, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -77,7 +83,6 @@ import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
-import { useEffect } from "react";
 
 function Router({ user }: { user: any }) {
   const isPOS = user?.role?.startsWith("POS");
@@ -179,6 +184,19 @@ function AuthenticatedApp() {
     retry: false,
   });
 
+  // Customer balances query for POS users with permission (must be before early returns)
+  const isPOS = !!user && user.role?.startsWith("POS");
+  const { data: customerBalances = [] } = useQuery<{
+    id: number;
+    name: string;
+    code: string;
+    balance: number;
+    balanceSide: "Dr" | "Cr";
+  }[]>({
+    queryKey: ["/api/pos/customer-balances"],
+    enabled: isPOS && !!user?.canViewCustomerBalances,
+  });
+
   useEffect(() => {
     if (!isLoading && (error || !user)) {
       setLocation("/login");
@@ -195,6 +213,40 @@ function AuthenticatedApp() {
     }
   };
 
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  };
+
+  // State for user creation dialog
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const { toast } = useToast();
+
+  // Mutation for creating users (for POS users with permission)
+  const createUserMutation = useMutation({
+    mutationFn: async (data: { username: string; password: string }) => {
+      const res = await apiRequest("POST", "/api/pos/create-user", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      });
+      setCreateUserOpen(false);
+      setNewUsername("");
+      setNewPassword("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -207,27 +259,9 @@ function AuthenticatedApp() {
     return null; // Will redirect to login
   }
 
-  const isPOS = user.role.startsWith("POS");
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
-  };
-
-  // Customer balances query for POS users with permission
-  interface CustomerBalanceItem {
-    id: number;
-    name: string;
-    code: string;
-    balance: number;
-    balanceSide: "Dr" | "Cr";
-  }
-  const { data: customerBalances = [] } = useQuery<CustomerBalanceItem[]>({
-    queryKey: ["/api/pos/customer-balances"],
-    enabled: isPOS && !!user?.canViewCustomerBalances,
-  });
-
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
   };
 
   // POS users get a simplified interface without sidebar
@@ -338,6 +372,69 @@ function AuthenticatedApp() {
                   </div>
                 </PopoverContent>
               </Popover>
+            )}
+            {user?.canCreateUsers && (
+              <Dialog open={createUserOpen} onOpenChange={setCreateUserOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="button-create-user-tab"
+                    className="shrink-0"
+                  >
+                    <UserPlus className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Add User</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New User</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-username">Username</Label>
+                      <Input
+                        id="new-username"
+                        value={newUsername}
+                        onChange={(e) => setNewUsername(e.target.value)}
+                        placeholder="Enter username"
+                        data-testid="input-new-username"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">Password</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter password"
+                        data-testid="input-new-password"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCreateUserOpen(false)}
+                      data-testid="button-cancel-create-user"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => createUserMutation.mutate({ username: newUsername, password: newPassword })}
+                      disabled={!newUsername || !newPassword || createUserMutation.isPending}
+                      data-testid="button-submit-create-user"
+                    >
+                      {createUserMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Create User"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </header>
