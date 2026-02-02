@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Upload, ArrowLeft, FileDown, ChevronDown } from "lucide-react";
+import { MapPin, Wallet, Printer, AlertCircle, Search, Check, Trash2, User, Users, Upload, ArrowLeft, FileDown, ChevronDown, ChevronRight, DollarSign } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -148,6 +148,22 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     queryKey: activeLocation ? [`/api/pos/drafts`, { locationId: activeLocation.id }] : [],
     enabled: !!activeLocation,
   });
+
+  // Fetch customer balances for POS users with permission
+  interface CustomerBalanceItem {
+    id: number;
+    name: string;
+    code: string;
+    balance: number;
+    balanceSide: string;
+  }
+  const { data: customerBalances = [], isLoading: customerBalancesLoading } = useQuery<CustomerBalanceItem[]>({
+    queryKey: ["/api/pos/customer-balances"],
+    enabled: !!posUser?.canViewCustomerBalances,
+  });
+
+  // State for customer balances panel visibility
+  const [showCustomerBalances, setShowCustomerBalances] = useState(false);
 
   // Fetch last sold prices for stock items (from any location in the company)
   const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
@@ -1572,6 +1588,58 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               ))}
             </div>
           </div>
+
+          {/* Customer Balances Panel (for POS users with permission) */}
+          {posUser?.canViewCustomerBalances && (
+            <div className="border-t">
+              <button
+                onClick={() => setShowCustomerBalances(!showCustomerBalances)}
+                className="w-full p-3 flex items-center justify-between hover-elevate"
+                data-testid="button-toggle-customer-balances"
+              >
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Customer Balances</span>
+                </div>
+                {showCustomerBalances ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {showCustomerBalances && (
+                <div className="max-h-64 overflow-y-auto px-2 pb-2">
+                  {customerBalancesLoading ? (
+                    <div className="text-center py-4 text-sm text-muted-foreground">Loading...</div>
+                  ) : customerBalances.length === 0 ? (
+                    <div className="text-center py-4 text-sm text-muted-foreground">No customers found</div>
+                  ) : (
+                    <div className="space-y-1">
+                      {customerBalances.filter(c => c.balance > 0).map((customer) => (
+                        <div
+                          key={customer.id}
+                          className="flex items-center justify-between px-3 py-2 rounded-md bg-muted/30"
+                          data-testid={`customer-balance-${customer.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{customer.name}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{customer.code}</div>
+                          </div>
+                          <div className={`text-sm font-mono font-medium ${
+                            customer.balanceSide === "Dr" 
+                              ? "text-destructive" 
+                              : "text-chart-2"
+                          }`}>
+                            {customer.balanceSide === "Dr" ? "" : "-"}${formatNumber(customer.balance)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
       </div>
 

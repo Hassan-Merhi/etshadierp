@@ -27783,6 +27783,78 @@ if (asOfDate) {
     }
   });
 
+  // POS endpoint: Get all customer balances (requires canViewCustomerBalances permission)
+  app.get("/api/pos/customer-balances", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      // Check if user has permission to view customer balances
+      const userRole = await storage.getUserCompanyRole(req.session.userId!, companyId);
+      if (!userRole?.canViewCustomerBalances && userRole?.role?.startsWith("POS")) {
+        return res.status(403).json({ message: "You don't have permission to view customer balances" });
+      }
+
+      const customers = await storage.getAllCustomers(companyId);
+
+      const customersWithBalances = await Promise.all(
+        customers.map(async (customer) => {
+          // If customer has a linked ledger account, calculate balance from voucher entries
+          if (customer.ledgerAccountId) {
+            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId);
+            const openingBalance = parseFloat(customer.openingBalance || "0");
+            const openingSide = customer.openingBalanceSide || "Dr";
+
+            const balance = entries.reduce((sum, entry) => {
+              const debit = parseFloat(entry.debitAmount || "0");
+              const credit = parseFloat(entry.creditAmount || "0");
+
+              if (debit > 0 && credit === 0) {
+                return sum + debit;
+              } else if (credit > 0 && debit === 0) {
+                return sum - credit;
+              }
+              return sum;
+            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+
+            return {
+              id: customer.id,
+              name: customer.legalName || customer.tradeName || `Customer ${customer.id}`,
+              code: customer.code,
+              balance: Math.abs(balance),
+              balanceSide: balance >= 0 ? "Dr" : "Cr",
+            };
+          }
+
+          // If no ledger account, check customer_balances table
+          const customerBalance = await storage.getCustomerBalance(customer.id, companyId);
+          const openingBalance = parseFloat(customer.openingBalance || "0");
+          const openingSide = customer.openingBalanceSide || "Dr";
+          
+          const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBalance;
+          
+          return {
+            id: customer.id,
+            name: customer.legalName || customer.tradeName || `Customer ${customer.id}`,
+            code: customer.code,
+            balance: Math.abs(totalBalance),
+            balanceSide: totalBalance >= 0 ? "Dr" : "Cr",
+          };
+        })
+      );
+
+      // Sort by name
+      customersWithBalances.sort((a, b) => a.name.localeCompare(b.name));
+
+      res.json(customersWithBalances);
+    } catch (error: any) {
+      console.error("Error fetching customer balances for POS:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/customers/:id/statement", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
