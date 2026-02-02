@@ -2257,6 +2257,51 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return;
     }
 
+    // Auto-fill missing rates from inventory before proceeding
+    const entriesWithMissingRates = validEntries.filter(entry => !entry.rate || entry.rate === "" || entry.rate === "0");
+    if (entriesWithMissingRates.length > 0) {
+      console.log("[StockTransfer] Fetching rates for entries with missing rates:", entriesWithMissingRates.length);
+      
+      // Fetch rates from inventory for each entry with missing rate
+      const ratePromises = entriesWithMissingRates.map(async (entry) => {
+        try {
+          const res = await fetch(`/api/locations/${entry.sourceLocationId}/inventory`);
+          if (res.ok) {
+            const inventory = await res.json();
+            const inventoryItem = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
+            return {
+              stockItemId: entry.stockItemId,
+              sourceLocationId: entry.sourceLocationId,
+              rate: inventoryItem?.averageRate || "0"
+            };
+          }
+        } catch (err) {
+          console.error("[StockTransfer] Failed to fetch rate for item:", entry.stockItemId, err);
+        }
+        return {
+          stockItemId: entry.stockItemId,
+          sourceLocationId: entry.sourceLocationId,
+          rate: "0"
+        };
+      });
+
+      const fetchedRates = await Promise.all(ratePromises);
+      
+      // Update validEntries with fetched rates
+      for (const entry of validEntries) {
+        if (!entry.rate || entry.rate === "" || entry.rate === "0") {
+          const fetchedRate = fetchedRates.find(
+            r => r.stockItemId === entry.stockItemId && r.sourceLocationId === entry.sourceLocationId
+          );
+          if (fetchedRate) {
+            entry.rate = fetchedRate.rate;
+          }
+        }
+      }
+      
+      console.log("[StockTransfer] Rates after auto-fill:", validEntries.map(e => ({ stockItemId: e.stockItemId, rate: e.rate })));
+    }
+
     // Check for zero quantity entries
     const zeroQtyEntry = data.entries.find(
       (entry) => entry.stockItemId > 0 && entry.sourceLocationId > 0 && parseFloat(entry.quantity) === 0
@@ -2432,8 +2477,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
 
     // Pass all required data explicitly to avoid stale closure issues
+    // Use validEntries which has auto-filled rates
     stockTransferMutation.mutate({ 
-      ...data, 
+      ...data,
+      entries: validEntries, // Use entries with auto-filled rates
       allowNegativeInventory: userConfirmedNegativeInventory,
       _companyId: selectedCompany?.id,
       _transferTotal: transferTotal,
