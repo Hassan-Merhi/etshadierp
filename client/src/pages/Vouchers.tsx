@@ -2137,8 +2137,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         
         if (isEditMode) {
           // UPDATE MODE: Use PATCH to update existing voucher and stock transfer
+          // Ensure voucherDate is a Date object before formatting
+          const editVoucherDateObj = data.voucherDate instanceof Date 
+            ? data.voucherDate 
+            : new Date(data.voucherDate);
+          const editFormattedVoucherDate = format(editVoucherDateObj, "yyyy-MM-dd");
+          
           const voucherRes = await apiRequest("PATCH", `/api/vouchers/${_voucherIdToEdit}`, {
-            voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+            voucherDate: editFormattedVoucherDate,
             description: `Stock transfer from ${sourceNames} to ${destName}`,
             totalAmount: _transferTotal.toString(),
             optional: data.optional,
@@ -2161,17 +2167,23 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           return await voucherRes.json();
         } else {
           // CREATE MODE: Create new voucher and stock transfer
+          // Ensure voucherDate is a Date object before formatting
+          const voucherDateObj = data.voucherDate instanceof Date 
+            ? data.voucherDate 
+            : new Date(data.voucherDate);
+          const formattedVoucherDate = format(voucherDateObj, "yyyy-MM-dd");
+          
           console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", {
             companyId: _companyId,
             voucherType: "StockTransfer",
-            voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+            voucherDate: formattedVoucherDate,
             totalAmount: _transferTotal.toString(),
           });
           const voucherRes = await apiRequest("POST", "/api/vouchers", {
             companyId: _companyId,
             voucherType: "StockTransfer",
             voucherNumber: `TRANSFER-${Date.now()}`,
-            voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
+            voucherDate: formattedVoucherDate,
             description: `Stock transfer from ${sourceNames} to ${destName}`,
             totalAmount: _transferTotal.toString(),
             optional: data.optional,
