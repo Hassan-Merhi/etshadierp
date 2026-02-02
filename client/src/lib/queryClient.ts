@@ -25,15 +25,51 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  console.log(`[apiRequest] Starting ${method} ${url}`);
+  
+  // Add timeout to prevent infinite hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    console.error(`[apiRequest] TIMEOUT after 30s for ${method} ${url}`);
+    controller.abort();
+  }, 30000);
+  
+  try {
+    console.log(`[apiRequest] Preparing fetch for ${method} ${url}`);
+    let body: string | undefined;
+    if (data) {
+      try {
+        body = JSON.stringify(data);
+        console.log(`[apiRequest] Body stringified successfully, length: ${body.length}`);
+      } catch (jsonError) {
+        console.error(`[apiRequest] JSON.stringify failed:`, jsonError);
+        throw jsonError;
+      }
+    }
+    
+    console.log(`[apiRequest] Calling fetch...`);
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body,
+      credentials: "include",
+      signal: controller.signal,
+    });
+    console.log(`[apiRequest] Fetch completed, status: ${res.status}`);
 
-  await throwIfResNotOk(res);
-  return res;
+    clearTimeout(timeoutId);
+    await throwIfResNotOk(res);
+    console.log(`[apiRequest] Response OK, returning`);
+    return res;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.error(`[apiRequest] Request aborted (timeout) for ${method} ${url}`);
+      throw new Error(`Request timeout after 30 seconds for ${method} ${url}`);
+    }
+    console.error(`[apiRequest] Error in ${method} ${url}:`, error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
