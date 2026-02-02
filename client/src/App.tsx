@@ -15,7 +15,8 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -212,6 +213,23 @@ function AuthenticatedApp() {
     "--sidebar-width-icon": "3rem",
   };
 
+  // Customer balances query for POS users with permission
+  interface CustomerBalanceItem {
+    id: number;
+    name: string;
+    code: string;
+    balance: number;
+    balanceSide: "Dr" | "Cr";
+  }
+  const { data: customerBalances = [] } = useQuery<CustomerBalanceItem[]>({
+    queryKey: ["/api/pos/customer-balances"],
+    enabled: isPOS && !!user?.canViewCustomerBalances,
+  });
+
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  };
+
   // POS users get a simplified interface without sidebar
   if (isPOS) {
     const isOnPOS = currentLocation === "/";
@@ -235,7 +253,7 @@ function AuthenticatedApp() {
               <ThemeToggle />
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 pb-2 overflow-x-auto">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 px-2 sm:px-4 pb-2 overflow-x-auto">
             <Button
               variant={isOnPOS ? "default" : "ghost"}
               size="sm"
@@ -276,6 +294,51 @@ function AuthenticatedApp() {
               <Package className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Transfer</span>
             </Button>
+            {user?.canViewCustomerBalances && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    data-testid="button-customers-tab"
+                    className="shrink-0"
+                  >
+                    <Users className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Customers</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 max-h-96 overflow-y-auto" align="end">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">Customer Balances</h4>
+                    {customerBalances.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No customers with balances</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {customerBalances.filter(c => c.balance > 0).map((customer) => (
+                          <div
+                            key={customer.id}
+                            className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/30"
+                            data-testid={`customer-balance-${customer.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{customer.name}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{customer.code}</div>
+                            </div>
+                            <div className={`text-sm font-mono font-medium ${
+                              customer.balanceSide === "Dr" 
+                                ? "text-destructive" 
+                                : "text-green-600 dark:text-green-400"
+                            }`}>
+                              {customer.balanceSide === "Dr" ? "" : "-"}${formatNumber(customer.balance)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">
