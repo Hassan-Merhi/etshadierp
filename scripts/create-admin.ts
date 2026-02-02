@@ -46,8 +46,7 @@ async function createAdmin() {
     console.log('════════════════════════════════════════');
     console.log('\nYou can now login with:');
     console.log(`  Username: ${username}`);
-    console.log(`  Password: ${password}`);
-    console.log('\n⚠️  IMPORTANT: Change this password after first login!\n');
+    console.log('\n⚠️  IMPORTANT: Change the default password after first login!\n');
     console.log('Your company details:');
     console.log(`  Company: ${company.name}`);
     console.log(`  Code: ${company.code}`);
