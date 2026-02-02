@@ -1259,15 +1259,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           )}
         </div>
 
-        {/* Date Picker */}
+        {/* Date Picker - frozen to current date for POS users */}
         <div className="flex items-center gap-2">
-          <DatePickerInput
-            value={saleDate}
-            onChange={setSaleDate}
-            placeholder="Date"
-            className="w-full sm:w-36"
-            data-testid="input-sale-date"
-          />
+          {posUser ? (
+            <div className="px-3 py-2 text-sm border rounded-md bg-muted w-full sm:w-36" data-testid="input-sale-date">
+              {new Date(saleDate).toLocaleDateString()}
+            </div>
+          ) : (
+            <DatePickerInput
+              value={saleDate}
+              onChange={setSaleDate}
+              placeholder="Date"
+              className="w-full sm:w-36"
+              data-testid="input-sale-date"
+            />
+          )}
         </div>
 
         {/* Hide cash account selector when credit sale is ON */}
