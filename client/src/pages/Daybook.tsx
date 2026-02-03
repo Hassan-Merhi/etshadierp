@@ -1754,8 +1754,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                               <div className="flex items-center gap-2">
                                 {!isPOSUser && purchaseOrderData.itemsTotal && (
                                   <div className="font-mono font-bold">
-                                    $
-                                    {formatNumber(
+                                    {formatAmount(
                                       parseFloat(
                                         purchaseOrderData.itemsTotal || "0",
                                       ),
@@ -1970,8 +1969,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                                     <>
                                       <TableCell></TableCell>
                                       <TableCell className="text-right font-mono">
-                                        $
-                                        {formatNumber(
+                                        {formatAmount(
                                           purchaseItems.reduce(
                                             (sum: number, item: ViewVoucherEntry) =>
                                               sum +

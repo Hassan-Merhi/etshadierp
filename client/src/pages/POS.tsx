@@ -172,7 +172,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
-  const { selectedCurrency, exchangeRate, convertToUSD, displayCurrency } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate, convertToUSD, displayCurrency, formatAmount } = useCurrencyContext();
   // Force USD if company doesn't have dual-currency enabled
   const [saleCurrency, setSaleCurrency] = useState<Currency>(displayCurrency ? selectedCurrency : "USD");
   
@@ -1427,7 +1427,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                             type={col.key === "quantity" || col.key === "rate" ? "number" : "text"}
                             value={
                               col.key === "amount"
-                                ? formatNumber(row.amount)
+                                ? formatAmount(row.amount)
                                 : col.key === "quantity" || col.key === "rate"
                                   ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
                                   : row[col.key as keyof SaleRow]
@@ -1487,7 +1487,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div className="flex items-center gap-2">
                 <span className="text-sm sm:text-lg font-semibold">Total:</span>
                 <span className="text-xl sm:text-2xl font-bold font-mono" data-testid="text-grand-total">
-                  {saleCurrency === "USD" ? "$" : "CFA "}{formatNumber(total)}
+                  {formatAmount(total)}
                 </span>
               </div>
             </div>
@@ -1652,7 +1652,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                       <td style={{ padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{idx + 1}</td>
                       <td style={{ padding: '3px 2px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600' }}>{item.stockItemName}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${formatNumber(parseFloat(item.rate))}</td>
+                      <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>{formatAmount(parseFloat(item.rate))}</td>
                       <td style={{ textAlign: 'right', padding: '3px 2px', verticalAlign: 'top', fontWeight: '600' }}>${item.amount}</td>
                     </tr>
                   ))}
