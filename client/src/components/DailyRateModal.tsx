@@ -42,7 +42,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [isOpen, setIsOpen] = useState(false);
-  const [hasChecked, setHasChecked] = useState(false);
+  const [checkedCompanyId, setCheckedCompanyId] = useState<number | null>(null);
 
   const form = useForm<RateFormData>({
     resolver: zodResolver(rateFormSchema),
@@ -69,13 +69,13 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
   });
 
   useEffect(() => {
-    if (!isCheckingRate && todayRateCheck && !hasChecked) {
-      setHasChecked(true);
+    if (!isCheckingRate && todayRateCheck && checkedCompanyId !== companyId) {
+      setCheckedCompanyId(companyId);
       if (!todayRateCheck.hasRate && company?.displayCurrency && company.displayCurrency !== "none") {
         setIsOpen(true);
       }
     }
-  }, [todayRateCheck, isCheckingRate, hasChecked, company]);
+  }, [todayRateCheck, isCheckingRate, checkedCompanyId, companyId, company]);
 
   const createRateMutation = useMutation({
     mutationFn: async (data: RateFormData) => {
@@ -90,7 +90,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       toast({ title: "Today's exchange rate has been set" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/latest"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/check-today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates/check-today", companyId] });
       setIsOpen(false);
     },
     onError: (error: any) => {
