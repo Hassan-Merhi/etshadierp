@@ -12974,7 +12974,7 @@ if (asOfDate) {
               description: voucher.description || null,
               totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
               optional: voucher.optional ?? false,
-              exchangeRate: exchangeRate,
+
             })
             .returning();
 
@@ -13065,6 +13065,8 @@ if (asOfDate) {
           entries, // Array of { accountType, accountId, accountName, amount }
           notes,
           optional,
+          currency,
+          exchangeRate,
         } = req.body;
 
         // Validate required fields
@@ -13095,6 +13097,8 @@ if (asOfDate) {
               description: notes || null,
               totalAmount: total.toFixed(2),
               optional: optional ?? false,
+              currency: currency || "USD",
+              exchangeRate: exchangeRate || null,
             })
             .returning();
 
@@ -13227,6 +13231,8 @@ if (asOfDate) {
           entries,
           notes,
           optional,
+          currency,
+          exchangeRate,
         } = req.body;
 
         // Validate required fields
@@ -13415,6 +13421,8 @@ if (asOfDate) {
           entries, // Array of { type: "DR" | "CR", accountType, accountId, accountName, amount }
           notes,
           optional,
+          currency,
+          exchangeRate,
         } = req.body;
 
         // Validate required fields
@@ -13455,6 +13463,8 @@ if (asOfDate) {
               description: notes || null,
               totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
               optional: optional ?? false,
+              currency: currency || "USD",
+              exchangeRate: exchangeRate || null,
             })
             .returning();
 
@@ -13539,6 +13549,8 @@ if (asOfDate) {
           entries,
           notes,
           optional,
+          currency,
+          exchangeRate,
         } = req.body;
 
         // Validate required fields
@@ -16157,7 +16169,7 @@ if (asOfDate) {
           voucherDate: voucher.voucherDate,
           description: voucher.description || null,
           optional: voucher.optional ?? false,
-              exchangeRate: exchangeRate,
+
           totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
         };
         // If locationId is being updated, also save the location name

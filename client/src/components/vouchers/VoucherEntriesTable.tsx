@@ -58,20 +58,6 @@ export function VoucherEntriesTable({
     });
   };
 
-  const handleBlur = (index: number) => {
-    const enteredAmount = Number(entries[index]?.amount);
-    if (!isNaN(enteredAmount) && enteredAmount > 0) {
-      // Convert from display currency to USD for storage
-      if (selectedCurrency !== "USD") {
-        const usdAmount = convertToUSD(enteredAmount);
-        form.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
-      }
-      if (onAmountCommit) {
-        onAmountCommit(index);
-      }
-    }
-  };
-
   const handleAccountKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -198,7 +184,19 @@ export function VoucherEntriesTable({
                           className="font-mono"
                           data-testid={`input-amount-${index}`}
                           onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                          onBlur={() => handleBlur(index)}
+                          onBlur={(e) => {
+                            const enteredAmount = Number(e.target.value);
+                            if (!isNaN(enteredAmount) && enteredAmount > 0) {
+                              // Convert from display currency to USD for storage
+                              if (selectedCurrency !== "USD") {
+                                const usdAmount = convertToUSD(enteredAmount);
+                                form.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
+                              }
+                              if (onAmountCommit) {
+                                onAmountCommit(index);
+                              }
+                            }
+                          }}
                           onFocus={() => onRowFocus(index, "amount")}
                         />
                       </FormControl>

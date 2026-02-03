@@ -530,7 +530,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
+  const { formatAmount, selectedCurrency, convertToUSD, exchangeRate } = useCurrencyContext();
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -1008,7 +1008,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       const voucherType = activeTab === "payment" ? "Payment" : "Receipt";
       const isEditMode = !!voucherIdToEdit;
 
-      // Prepare request payload
+      // Prepare request payload - include exchange rate for rate-locking
       const payload = {
         voucherType,
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
@@ -1018,6 +1018,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         entries: data.entries,
         notes: data.notes,
         optional: data.optional,
+        currency: selectedCurrency,
+        exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
       };
 
       // Use batch endpoint for both create and update
@@ -1511,12 +1513,14 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       // Filter out empty entries
       const validEntries = data.entries.filter((entry) => entry.accountId > 0);
 
-      // Prepare request payload
+      // Prepare request payload - include exchange rate for rate-locking
       const payload = {
         voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
         entries: validEntries,
         notes: data.notes,
         optional: data.optional,
+        currency: selectedCurrency,
+        exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
       };
 
       // Use batch endpoint for both create and update
@@ -2176,6 +2180,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             description: `Stock transfer from ${sourceNames} to ${destName}`,
             totalAmount: _transferTotal.toString(),
             optional: data.optional,
+            currency: selectedCurrency,
+            exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
           };
           console.log("[StockTransfer] MUTATION STEP D: Creating voucher with:", voucherPayload);
           console.log("[StockTransfer] MUTATION STEP D2: Payload JSON test:", JSON.stringify(voucherPayload));
@@ -2723,6 +2729,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           description: `Stock ${adjustmentType.toLowerCase()} at ${locations.find(l => l.id === data.locationId)?.name}`,
           totalAmount: totalAmount.toString(),
           optional: data.optional,
+          currency: selectedCurrency,
+          exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
         });
         const voucher = await voucherRes.json();
 
@@ -3753,8 +3761,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         className="font-mono text-right"
                                         data-testid={`input-journal-amount-${index}`}
                                         onKeyDown={(e) => handleJournalKeyDown(e, index, "amount")}
-                                        onBlur={() => {
-                                          const enteredAmount = Number(field.value);
+                                        onBlur={(e) => {
+                                          const enteredAmount = Number(e.target.value);
                                           if (!isNaN(enteredAmount) && enteredAmount > 0 && selectedCurrency !== "USD") {
                                             const usdAmount = convertToUSD(enteredAmount);
                                             journalForm.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
