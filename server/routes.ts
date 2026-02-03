@@ -1334,6 +1334,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
 
+  // Check if today's exchange rate exists
+  app.get("/api/exchange-rates/check-today", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.query.companyId 
+        ? parseInt(req.query.companyId as string) 
+        : req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "Company not selected" });
+      }
+      
+      const company = await storage.getCompany(companyId);
+      if (!company?.displayCurrency || company.displayCurrency === "none") {
+        return res.json({ hasRate: true });
+      }
+      
+      const latestRate = await storage.getLatestExchangeRate(
+        companyId, 
+        company.baseCurrency, 
+        company.displayCurrency
+      );
+      
+      if (!latestRate) {
+        return res.json({ hasRate: false });
+      }
+      
+      const today = new Date().toISOString().split("T")[0];
+      const rateDate = new Date(latestRate.effectiveDate).toISOString().split("T")[0];
+      const hasRate = rateDate === today;
+      
+      res.json({ hasRate, latestRate: hasRate ? latestRate : null });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Exchange Rates - Get all rates for current company
   app.get("/api/exchange-rates", requireAuth, async (req, res) => {
     try {

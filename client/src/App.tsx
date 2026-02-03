@@ -10,8 +10,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { AppSidebar } from "@/components/AppSidebar";
+import { DailyRateModal } from "@/components/DailyRateModal";
 import { LocationProvider } from "@/contexts/LocationContext";
-import { CompanyProvider } from "@/contexts/CompanyContext";
+import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
@@ -171,6 +172,7 @@ function Router({ user }: { user: any }) {
 }
 
 function AuthenticatedApp() {
+  const { selectedCompany } = useCompany();
   usePresence(); // Track user presence
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
@@ -222,6 +224,7 @@ function AuthenticatedApp() {
     
     return (
       <div className="flex flex-col h-screen w-full">
+        {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
         <header className="flex flex-col border-b">
           <div className="flex items-center justify-between p-2 sm:p-4 min-h-14 sm:h-16 gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
@@ -304,6 +307,7 @@ function AuthenticatedApp() {
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
+        {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
         <AppSidebar user={user} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
