@@ -31,6 +31,7 @@ import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface PaymentVoucherTabProps {
   form: UseFormReturn<any>;
@@ -87,6 +88,7 @@ export function PaymentVoucherTab({
   activeRowIndex,
   setActiveRowIndex,
 }: PaymentVoucherTabProps) {
+  const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
   const canRunActions = paymentAccountId !== 0;
@@ -150,11 +152,7 @@ export function PaymentVoucherTab({
                         </FormControl>
                         {paymentAccountId > 0 && (
                           <p className="text-sm text-muted-foreground mt-1.5">
-                            Balance: $
-                            {accountBalance.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            Balance: {formatAmount(accountBalance)}
                           </p>
                         )}
                         <FormMessage />

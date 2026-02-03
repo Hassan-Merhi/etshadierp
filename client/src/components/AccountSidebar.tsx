@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface Account {
   id: number;
@@ -54,6 +55,7 @@ export default function AccountSidebar({
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { formatAmount } = useCurrencyContext();
 
   // Calculate projected balances based on voucher entries
   const getProjectedBalance = (account: Account): number => {
@@ -118,8 +120,8 @@ export default function AccountSidebar({
   const formatBalance = (balance: number | undefined) => {
     if (balance === undefined) return "—";
     const absBalance = Math.abs(balance);
-    const formatted = formatNumber(absBalance);
-    return balance < 0 ? `($${formatted})` : `$${formatted}`;
+    const formatted = formatAmount(absBalance);
+    return balance < 0 ? `(${formatted})` : formatted;
   };
 
   const getBalanceColorClass = (

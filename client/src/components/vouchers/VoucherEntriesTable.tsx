@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Plus } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface VoucherEntry {
   accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset";
@@ -46,6 +47,7 @@ export function VoucherEntriesTable({
   onRowBlur,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
+  const { formatAmount } = useCurrencyContext();
 
   const handleAddRow = () => {
     append({
@@ -232,10 +234,7 @@ export function VoucherEntriesTable({
             </td>
             <td className="p-3">
               <div className="text-right font-bold font-mono">
-                ${total.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatAmount(total)}
               </div>
             </td>
             <td colSpan={1}></td>
