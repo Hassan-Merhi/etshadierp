@@ -1356,7 +1356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Company not selected" });
       }
       
-      const company = await storage.getCompany(companyId);
+      const company = await storage.getCompanyById(companyId);
       if (!company?.displayCurrency || company.displayCurrency === "none") {
         return res.json({ hasRate: true });
       }

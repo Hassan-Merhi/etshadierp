@@ -510,7 +510,7 @@ export default function VoucherEdit() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
-  const { exchangeRate } = useCurrencyContext();
+  const { selectedCurrency, formatAmount, exchangeRate } = useCurrencyContext();
   const [formInitialized, setFormInitialized] = useState(false);
 
   // Reset form initialization when voucher ID changes
@@ -583,7 +583,7 @@ export default function VoucherEdit() {
       paymentAccountId: 0,
       paymentAccountName: "",
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       entries: [],
       notes: "",
     },
@@ -715,7 +715,7 @@ export default function VoucherEdit() {
     resolver: zodResolver(journalFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       entries: [],
       notes: "",
     },
@@ -731,7 +731,7 @@ export default function VoucherEdit() {
     resolver: zodResolver(salesFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       locationId: 0,
       items: [],
       notes: "",
@@ -748,7 +748,7 @@ export default function VoucherEdit() {
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       items: [],
       notes: "",
     },
@@ -764,7 +764,7 @@ export default function VoucherEdit() {
     resolver: zodResolver(adjustmentFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       locationId: 0,
       items: [],
       notes: "",
@@ -781,7 +781,7 @@ export default function VoucherEdit() {
     resolver: zodResolver(transferFormSchema),
     defaultValues: {
       voucherDate: new Date(),
-      currency: "USD" as const,
+      currency: selectedCurrency as "USD" | "CFA",
       sourceLocationId: 0,
       destinationLocationId: 0,
       items: [],
@@ -954,7 +954,7 @@ export default function VoucherEdit() {
     } else if (isStockTransfer) {
       transferForm.reset({
         voucherDate: parseISO(voucher.voucherDate),
-        currency: "USD",
+        currency: (voucher.currency as "USD" | "CFA") || selectedCurrency,
         sourceLocationId: voucher.transferData?.sourceLocationId || voucher.locationId || 0,
         destinationLocationId: voucher.transferData?.destinationLocationId || 0,
         items: (voucher.transferData?.items || []).map(item => ({
@@ -1542,7 +1542,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${formatNumber(lineTotal)}
+                                  {formatAmount(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -1585,7 +1585,7 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono">
-                              ${formatNumber(salesGrandTotal)}
+                              {formatAmount(salesGrandTotal)}
                             </div>
                           </td>
                           <td></td>
@@ -1866,7 +1866,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${formatNumber(lineTotal)}
+                                  {formatAmount(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -1909,7 +1909,7 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${formatNumber(purchaseGrandTotal)}
+                              {formatAmount(purchaseGrandTotal)}
                             </div>
                           </td>
                           <td></td>
@@ -2172,7 +2172,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${formatNumber(lineTotal)}
+                                  {formatAmount(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -2215,7 +2215,7 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${formatNumber(adjustmentGrandTotal)}
+                              {formatAmount(adjustmentGrandTotal)}
                             </div>
                           </td>
                           <td></td>
@@ -2543,7 +2543,7 @@ export default function VoucherEdit() {
                               </td>
                               <td className="p-2">
                                 <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
-                                  ${formatNumber(lineTotal)}
+                                  {formatAmount(lineTotal)}
                                 </div>
                               </td>
                               <td className="p-2">
@@ -2586,7 +2586,7 @@ export default function VoucherEdit() {
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono" data-testid="text-grand-total">
-                              ${formatNumber(transferGrandTotal)}
+                              {formatAmount(transferGrandTotal)}
                             </div>
                           </td>
                           <td></td>
@@ -2892,7 +2892,7 @@ export default function VoucherEdit() {
                         </td>
                         <td className="p-3">
                           <div className="text-right font-bold font-mono">
-                            ${formatNumber(paymentTotal)}
+                            {formatAmount(paymentTotal)}
                           </div>
                         </td>
                         <td></td>
@@ -3143,16 +3143,16 @@ export default function VoucherEdit() {
                         <td className="p-3">
                           <div className="text-right text-sm">
                             <div className="text-muted-foreground">
-                              DR: ${formatNumber(journalDRTotal)}
+                              DR: {formatAmount(journalDRTotal)}
                             </div>
                             <div className="text-muted-foreground">
-                              CR: ${formatNumber(journalCRTotal)}
+                              CR: {formatAmount(journalCRTotal)}
                             </div>
                             <div className={cn(
                               "font-bold font-mono mt-1",
                               Math.abs(journalDRTotal - journalCRTotal) > 0.01 && "text-destructive"
                             )}>
-                              Diff: ${formatNumber(Math.abs(journalDRTotal - journalCRTotal))}
+                              Diff: {formatAmount(Math.abs(journalDRTotal - journalCRTotal))}
                             </div>
                           </div>
                         </td>

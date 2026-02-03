@@ -39,6 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Voucher } from "@shared/schema";
 
 // Types
@@ -116,6 +117,7 @@ type VoucherFormData = z.infer<typeof voucherSchema>;
 
 export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEditDialogProps) {
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const [showOptionalWarning, setShowOptionalWarning] = useState(false);
 
   // Fetch reference data
@@ -531,8 +533,8 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             <>
                               <td className="py-2 px-2">{itemName || "-"}</td>
                               <td className="py-2 px-2 text-right font-mono">{qty.toFixed(3)}</td>
-                              <td className="py-2 px-2 text-right font-mono">${formatNumber(rate)}</td>
-                              <td className="py-2 px-2 text-right font-mono">${formatNumber(qty * rate)}</td>
+                              <td className="py-2 px-2 text-right font-mono">{formatAmount(rate)}</td>
+                              <td className="py-2 px-2 text-right font-mono">{formatAmount(qty * rate)}</td>
                             </>
                           ) : (
                             <>
@@ -699,7 +701,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             </td>
                             <td className="py-2 px-2"></td>
                             <td className="py-2 px-2 text-right font-mono">
-                              ${formatNumber(fields.reduce((sum, _, index) => {
+                              {formatAmount(fields.reduce((sum, _, index) => {
                                 const narration = form.watch(`entries.${index}.narration`) || "";
                                 const match = narration.match(/of\s+([-\d.]+)\s+x\s+.+?\s+@\s+\$?([\d.]+)/);
                                 if (match) {
@@ -717,17 +719,17 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
                               <>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-amount">
-                                  ${formatNumber(Math.max(totalDebits, totalCredits))}
+                                  {formatAmount(Math.max(totalDebits, totalCredits))}
                                 </td>
                                 <td className="py-2 px-2"></td>
                               </>
                             ) : (
                               <>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-debits">
-                                  ${formatNumber(totalDebits)}
+                                  {formatAmount(totalDebits)}
                                 </td>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-credits">
-                                  ${formatNumber(totalCredits)}
+                                  {formatAmount(totalCredits)}
                                 </td>
                                 <td colSpan={2} className="py-2 px-2">
                                   {!isBalanced && !isOptional && (
