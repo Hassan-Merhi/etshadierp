@@ -60,6 +60,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -172,6 +173,7 @@ interface SalaryAdvance {
 
 export default function Payroll() {
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const [selectedTab, setSelectedTab] = useState("employees");
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [bonusDialogOpen, setBonusDialogOpen] = useState(false);
@@ -502,7 +504,7 @@ export default function Payroll() {
       
       payments[worker.id] = {
         workerId: worker.id,
-        amount: formatNumber(netPayment),
+        amount: netPayment.toString(),
         selected: true,
         manuallyEdited: false,
       };
@@ -1307,7 +1309,7 @@ export default function Payroll() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="flex items-center justify-between">
                     <span>
-                      <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {formatNumber(bulkDepositTotal)}
+                      <strong>{selectedEmployeesForDeposit.length} employees selected</strong> - Total deposit: {formatAmount(bulkDepositTotal)}
                     </span>
                     <Button
                       size="sm"
@@ -1405,16 +1407,16 @@ export default function Payroll() {
                             </button>
                           </TableCell>
                           <TableCell data-testid={`cell-salary-${employee.id}`} className="text-right font-mono">
-                            {formatNumber(parseFloat(employee.monthlySalary))}
+                            {formatAmount(parseFloat(employee.monthlySalary))}
                           </TableCell>
                           <TableCell data-testid={`cell-balance-${employee.id}`} className="text-right font-mono">
-                            {formatNumber(balance)}
+                            {formatAmount(balance)}
                           </TableCell>
                           <TableCell data-testid={`cell-deposits-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {formatNumber(parseFloat(employee.totalDeposits || "0"))}
+                            {formatAmount(parseFloat(employee.totalDeposits || "0"))}
                           </TableCell>
                           <TableCell data-testid={`cell-withdrawals-${employee.id}`} className="text-right font-mono text-muted-foreground">
-                            {formatNumber(parseFloat(employee.totalWithdrawals || "0"))}
+                            {formatAmount(parseFloat(employee.totalWithdrawals || "0"))}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${employee.id}`}>
                             <Badge variant={employee.active ? "default" : "secondary"}>
@@ -1511,7 +1513,7 @@ export default function Payroll() {
                           <TableCell className="font-mono">{wp.workerCode}</TableCell>
                           <TableCell>{wp.workerName}</TableCell>
                           <TableCell className="text-right font-mono" data-testid={`text-paid-${wp.workerId}`}>
-                            {formatNumber(parseFloat(wp.totalPaid))}
+                            {formatAmount(parseFloat(wp.totalPaid))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1521,7 +1523,7 @@ export default function Payroll() {
                 <div className="flex items-center justify-between pt-4 border-t">
                   <span className="text-lg font-semibold">Grand Total Paid:</span>
                   <span className="text-lg font-semibold font-mono" data-testid="text-grand-total">
-                    {formatNumber(parseFloat(workerPaymentSummary.grandTotal))}
+                    {formatAmount(parseFloat(workerPaymentSummary.grandTotal))}
                   </span>
                 </div>
               </div>
@@ -1563,7 +1565,7 @@ export default function Payroll() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {formatNumber(totalAmount)}
+                    <strong>{selectedPayments.length} workers selected</strong> - Total payment: {formatAmount(totalAmount)}
                   </AlertDescription>
                 </Alert>
               )}
@@ -1599,7 +1601,7 @@ export default function Payroll() {
                                 <div>
                                   <h3 className="font-semibold">{group.name}</h3>
                                   <p className="text-sm text-muted-foreground">
-                                    {groupMembers.length} workers - {selectedCount} selected - Total: {formatNumber(groupTotal)}
+                                    {groupMembers.length} workers - {selectedCount} selected - Total: {formatAmount(groupTotal)}
                                   </p>
                                 </div>
                               </div>
@@ -1700,12 +1702,12 @@ export default function Payroll() {
                                           </button>
                                         </TableCell>
                                         <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                                          {formatNumber(monthlySalary)}
+                                          {formatAmount(monthlySalary)}
                                         </TableCell>
                                         <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
                                           {advanceInfo.total > 0 ? (
                                             <span className="text-destructive">
-                                              {formatNumber(advanceInfo.total)}
+                                              {formatAmount(advanceInfo.total)}
                                               {advanceInfo.count > 0 && (
                                                 <span className="text-xs text-muted-foreground ml-1">
                                                   ({advanceInfo.count})
@@ -1833,12 +1835,12 @@ export default function Payroll() {
                                     </button>
                                   </TableCell>
                                   <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
-                                    {formatNumber(monthlySalary)}
+                                    {formatAmount(monthlySalary)}
                                   </TableCell>
                                   <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
                                     {advanceInfo.total > 0 ? (
                                       <span className="text-destructive">
-                                        {formatNumber(advanceInfo.total)}
+                                        {formatAmount(advanceInfo.total)}
                                         {advanceInfo.count > 0 && (
                                           <span className="text-xs text-muted-foreground ml-1">
                                             ({advanceInfo.count})
@@ -2007,7 +2009,7 @@ export default function Payroll() {
                                 </TableCell>
                                 <TableCell>{worker.firstName} {worker.lastName}</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {formatNumber(parseFloat(worker.monthlySalary || "0"))}
+                                  {formatAmount(parseFloat(worker.monthlySalary || "0"))}
                                 </TableCell>
                               </TableRow>
                             );
@@ -2050,7 +2052,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Total Advances Given</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-total-advances">
-                          ${formatNumber(workerAdvancesStats.totalAdvances)}
+                          {formatAmount(workerAdvancesStats.totalAdvances)}
                         </p>
                       </div>
                       <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -2062,7 +2064,7 @@ export default function Payroll() {
                       <div>
                         <p className="text-sm text-muted-foreground">Outstanding Balance</p>
                         <p className="text-2xl font-semibold font-mono" data-testid="text-outstanding-balance">
-                          ${formatNumber(workerAdvancesStats.outstandingBalance)}
+                          {formatAmount(workerAdvancesStats.outstandingBalance)}
                         </p>
                       </div>
                       <TrendingUp className="h-8 w-8 text-destructive" />
@@ -2125,17 +2127,17 @@ export default function Payroll() {
                                     {worker.firstName} {worker.lastName}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
-                                    {worker.code} • Salary: ${formatNumber(parseFloat(worker.monthlySalary))}
+                                    {worker.code} • Salary: {formatAmount(parseFloat(worker.monthlySalary))}
                                   </div>
                                 </div>
                                 {hasAdvances && (
                                   <Badge variant="secondary" className="text-destructive">
-                                    ${formatNumber(advanceInfo.total)} advance
+                                    {formatAmount(advanceInfo.total)} advance
                                   </Badge>
                                 )}
                                 {balance !== 0 && (
                                   <Badge variant="secondary">
-                                    Balance: ${formatNumber(balance)}
+                                    Balance: {formatAmount(balance)}
                                   </Badge>
                                 )}
                               </div>
@@ -2232,10 +2234,10 @@ export default function Payroll() {
                                   {formatDisplayDate(new Date(advance.advanceDate))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-amount-${advance.id}`} className="text-right font-mono">
-                                  ${formatNumber(parseFloat(advance.amount))}
+                                  {formatAmount(parseFloat(advance.amount))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-remaining-${advance.id}`} className="text-right font-mono">
-                                  ${formatNumber(parseFloat(advance.remainingBalance))}
+                                  {formatAmount(parseFloat(advance.remainingBalance))}
                                 </TableCell>
                                 <TableCell data-testid={`cell-status-${advance.id}`}>
                                   <Badge variant={advance.fullyPaid ? "default" : "secondary"} data-testid={`badge-status-${advance.id}`}>
@@ -2588,7 +2590,7 @@ export default function Payroll() {
           <DialogHeader>
             <DialogTitle>Process Bulk Payment</DialogTitle>
             <DialogDescription>
-              Pay {selectedPayments.length} workers - Total amount: {formatNumber(totalAmount)}
+              Pay {selectedPayments.length} workers - Total amount: {formatAmount(totalAmount)}
             </DialogDescription>
           </DialogHeader>
 
@@ -2600,13 +2602,13 @@ export default function Payroll() {
                 return (
                   <div key={payment.workerId} className="flex justify-between text-sm">
                     <span>{worker?.firstName} {worker?.lastName} ({worker?.code})</span>
-                    <span className="font-mono">{formatNumber(parseFloat(payment.amount))}</span>
+                    <span className="font-mono">{formatAmount(parseFloat(payment.amount))}</span>
                   </div>
                 );
               })}
               <div className="pt-2 border-t mt-3 flex justify-between font-semibold">
                 <span>Total</span>
-                <span className="font-mono">{formatNumber(totalAmount)}</span>
+                <span className="font-mono">{formatAmount(totalAmount)}</span>
               </div>
             </div>
           </div>
@@ -2949,12 +2951,12 @@ export default function Payroll() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Original Amount:</span>
-                <span className="font-mono">${formatNumber(parseFloat(selectedAdvance.amount))}</span>
+                <span className="font-mono">{formatAmount(parseFloat(selectedAdvance.amount))}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Remaining Balance:</span>
                 <span className="font-mono font-semibold" data-testid="text-deduction-remaining">
-                  ${formatNumber(parseFloat(selectedAdvance.remainingBalance))}
+                  {formatAmount(parseFloat(selectedAdvance.remainingBalance))}
                 </span>
               </div>
             </div>
@@ -2980,7 +2982,7 @@ export default function Payroll() {
                     <FormMessage />
                     {selectedAdvance && (
                       <p className="text-sm text-muted-foreground">
-                        Maximum: ${formatNumber(parseFloat(selectedAdvance.remainingBalance))}
+                        Maximum: {formatAmount(parseFloat(selectedAdvance.remainingBalance))}
                       </p>
                     )}
                   </FormItem>
@@ -3291,8 +3293,8 @@ export default function Payroll() {
                 <>
                   <span className="font-semibold">{deleteWorkerConflict.employee.firstName} {deleteWorkerConflict.employee.lastName}</span> has a non-zero balance:
                   <div className="mt-2 space-y-1 font-mono text-sm">
-                    <div>Employee Balance: {formatNumber(deleteWorkerConflict.employeeBalance)}</div>
-                    <div>Ledger Balance: {formatNumber(deleteWorkerConflict.ledgerBalance)}</div>
+                    <div>Employee Balance: {formatAmount(deleteWorkerConflict.employeeBalance)}</div>
+                    <div>Ledger Balance: {formatAmount(deleteWorkerConflict.ledgerBalance)}</div>
                   </div>
                   <p className="mt-3">
                     Deleting this worker will also delete their linked ledger account. This action cannot be undone.
@@ -3496,8 +3498,8 @@ export default function Payroll() {
                 <>
                   <span className="font-semibold">{deleteConflict.employee.firstName} {deleteConflict.employee.lastName}</span> has a non-zero balance:
                   <div className="mt-2 space-y-1 font-mono text-sm">
-                    <div>Employee Balance: {formatNumber(deleteConflict.employeeBalance)}</div>
-                    <div>Ledger Balance: {formatNumber(deleteConflict.ledgerBalance)}</div>
+                    <div>Employee Balance: {formatAmount(deleteConflict.employeeBalance)}</div>
+                    <div>Ledger Balance: {formatAmount(deleteConflict.ledgerBalance)}</div>
                   </div>
                   <p className="mt-3">
                     Deleting this employee will also delete their linked ledger account. This action cannot be undone.
@@ -3669,12 +3671,12 @@ export default function Payroll() {
               {validSelectedEmployees.map((emp) => (
                 <div key={emp.id} className="flex justify-between text-sm">
                   <span>{emp.firstName} {emp.lastName}</span>
-                  <span className="font-mono">{formatNumber(parseFloat(emp.monthlySalary))}</span>
+                  <span className="font-mono">{formatAmount(parseFloat(emp.monthlySalary))}</span>
                 </div>
               ))}
               <div className="flex justify-between font-semibold pt-2 border-t mt-2">
                 <span>Total</span>
-                <span className="font-mono">{formatNumber(bulkDepositTotal)}</span>
+                <span className="font-mono">{formatAmount(bulkDepositTotal)}</span>
               </div>
             </div>
 
@@ -3778,7 +3780,7 @@ export default function Payroll() {
                     {employeeStaff.map((emp) => (
                       <TableRow key={emp.id}>
                         <TableCell>{emp.firstName} {emp.lastName}</TableCell>
-                        <TableCell className="text-right font-mono">{formatNumber(parseFloat(emp.calculatedBalance || "0"))}</TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(parseFloat(emp.calculatedBalance || "0"))}</TableCell>
                         <TableCell className="text-right">
                           <Input
                             type="number"
@@ -3805,7 +3807,7 @@ export default function Payroll() {
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Withdrawal: </span>
                 <span className="font-semibold font-mono">
-                  {formatNumber(Object.values(bulkWithdrawalAmounts)
+                  {formatAmount(Object.values(bulkWithdrawalAmounts)
                     .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
                 </span>
                 <span className="text-muted-foreground ml-2">
@@ -3904,7 +3906,7 @@ export default function Payroll() {
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Bonus: </span>
                 <span className="font-semibold font-mono">
-                  {formatNumber(Object.values(bulkBonusAmounts)
+                  {formatAmount(Object.values(bulkBonusAmounts)
                     .reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0))}
                 </span>
                 <span className="text-muted-foreground ml-2">
@@ -3941,7 +3943,7 @@ export default function Payroll() {
               {statementEmployee?.firstName} {statementEmployee?.lastName} - Statement
             </DialogTitle>
             <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
-              <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatNumber(parseFloat(statementEmployee?.calculatedBalance || "0"))}</span></span>
+              <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(parseFloat(statementEmployee?.calculatedBalance || "0"))}</span></span>
               <Badge variant="secondary">
                 {parseFloat(statementEmployee?.calculatedBalance || "0") >= 0 ? "Cr (Owed to employee)" : "Dr"}
               </Badge>
@@ -3993,7 +3995,7 @@ export default function Payroll() {
                             {txn.narration || txn.description || "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatNumber(parseFloat(txn.amount || "0"))}
+                            {formatAmount(parseFloat(txn.amount || "0"))}
                           </TableCell>
                           <TableCell>
                             <Badge variant={txn.isDebit ? "secondary" : "default"}>
@@ -4013,7 +4015,7 @@ export default function Payroll() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Balance: </span>
                     <span className="font-mono font-semibold text-lg">
-                      {formatNumber(parseFloat(statementEmployee?.calculatedBalance || "0"))}
+                      {formatAmount(parseFloat(statementEmployee?.calculatedBalance || "0"))}
                     </span>
                   </div>
                 </div>

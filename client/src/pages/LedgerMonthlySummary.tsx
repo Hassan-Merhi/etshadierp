@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { format, startOfYear, endOfYear, parseISO } from "date-fns";
 import {
   ArrowLeft,
@@ -80,6 +81,7 @@ function formatFullNumber(value: number): string {
 }
 
 export default function LedgerMonthlySummary() {
+  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-monthly/:accountId");
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
@@ -240,8 +242,8 @@ export default function LedgerMonthlySummary() {
                       }`}
                       data-testid="text-closing-balance"
                     >
-                      {formatFullNumber(Math.abs(data.grandTotal.closingBalance))}
-                      {data.grandTotal.closingBalance >= 0 ? " Dr" : " Cr"}
+                      {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
+                      {data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}
                     </p>
                   </div>
                 </div>
@@ -274,8 +276,8 @@ export default function LedgerMonthlySummary() {
                         <TableCell></TableCell>
                         <TableCell></TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatFullNumber(Math.abs(data.openingBalance))}
-                          {data.openingBalance >= 0 ? " Dr" : " Cr"}
+                          {formatAmount(Math.abs(data.openingBalance))}{" "}
+                          {data.openingBalance >= 0 ? "Dr" : "Cr"}
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -294,10 +296,10 @@ export default function LedgerMonthlySummary() {
                               {month.monthName}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {month.debit > 0 ? formatFullNumber(month.debit) : ""}
+                              {month.debit > 0 ? formatAmount(month.debit) : ""}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {month.credit > 0 ? formatFullNumber(month.credit) : ""}
+                              {month.credit > 0 ? formatAmount(month.credit) : ""}
                             </TableCell>
                             <TableCell
                               className={`text-right font-mono ${
@@ -306,8 +308,8 @@ export default function LedgerMonthlySummary() {
                                   : "text-red-600"
                               }`}
                             >
-                              {formatFullNumber(Math.abs(month.closingBalance))}
-                              {month.closingBalance >= 0 ? " Dr" : " Cr"}
+                              {formatAmount(Math.abs(month.closingBalance))}{" "}
+                              {month.closingBalance >= 0 ? "Dr" : "Cr"}
                             </TableCell>
                             <TableCell>
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -320,10 +322,10 @@ export default function LedgerMonthlySummary() {
                       <TableRow className="bg-primary/10 font-bold border-t-2">
                         <TableCell>Grand Total</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatFullNumber(data.grandTotal.debit)}
+                          {formatAmount(data.grandTotal.debit)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatFullNumber(data.grandTotal.credit)}
+                          {formatAmount(data.grandTotal.credit)}
                         </TableCell>
                         <TableCell
                           className={`text-right font-mono ${
@@ -332,8 +334,8 @@ export default function LedgerMonthlySummary() {
                               : "text-red-600"
                           }`}
                         >
-                          {formatFullNumber(Math.abs(data.grandTotal.closingBalance))}
-                          {data.grandTotal.closingBalance >= 0 ? " Dr" : " Cr"}
+                          {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
+                          {data.grandTotal.closingBalance >= 0 ? "Dr" : "Cr"}
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -371,7 +373,7 @@ export default function LedgerMonthlySummary() {
                         tickFormatter={(value) => formatSmartNumber(value)}
                       />
                       <Tooltip
-                        formatter={(value: number) => formatFullNumber(value)}
+                        formatter={(value: number) => formatAmount(value)}
                         contentStyle={{
                           backgroundColor: "hsl(var(--background))",
                           border: "1px solid hsl(var(--border))",
@@ -396,7 +398,7 @@ export default function LedgerMonthlySummary() {
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Opening Balance</p>
                   <p className="text-lg font-bold font-mono">
-                    {formatFullNumber(Math.abs(data.openingBalance))}
+                    {formatAmount(Math.abs(data.openingBalance))}
                   </p>
                 </CardContent>
               </Card>
@@ -404,7 +406,7 @@ export default function LedgerMonthlySummary() {
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Current Total</p>
                   <p className="text-lg font-bold font-mono">
-                    {formatFullNumber(data.grandTotal.debit - data.grandTotal.credit)}
+                    {formatAmount(data.grandTotal.debit - data.grandTotal.credit)}
                   </p>
                 </CardContent>
               </Card>
@@ -418,7 +420,7 @@ export default function LedgerMonthlySummary() {
                         : "text-red-600"
                     }`}
                   >
-                    {formatFullNumber(Math.abs(data.grandTotal.closingBalance))}
+                    {formatAmount(Math.abs(data.grandTotal.closingBalance))}
                   </p>
                 </CardContent>
               </Card>

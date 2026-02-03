@@ -2,6 +2,7 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import {
   ArrowLeft,
   FileText,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 interface VoucherItem {
   id: number;
@@ -68,13 +68,6 @@ interface VoucherDetailData {
   };
 }
 
-function formatFullNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 const voucherTypeColors: Record<string, string> = {
   Payment: "bg-red-500",
   Receipt: "bg-green-500",
@@ -88,6 +81,7 @@ const voucherTypeColors: Record<string, string> = {
 export default function VoucherDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/voucher-detail/:voucherId");
+  const { formatAmount } = useCurrencyContext();
   
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
 
@@ -258,13 +252,13 @@ export default function VoucherDetail() {
                               {formatNumber(item.quantity)} {item.unit}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatFullNumber(item.rate)}
+                              {formatAmount(item.rate)}
                             </TableCell>
                             <TableCell className="text-center text-sm text-muted-foreground">
                               {item.unit}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatFullNumber(item.amount)}
+                              {formatAmount(item.amount)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -278,7 +272,7 @@ export default function VoucherDetail() {
                           <TableCell></TableCell>
                           <TableCell></TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatFullNumber(data.totals.amount)}
+                            {formatAmount(data.totals.amount)}
                           </TableCell>
                         </TableRow>
                       </TableBody>
@@ -315,12 +309,12 @@ export default function VoucherDetail() {
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {entry.debitAmount > 0
-                                ? formatFullNumber(entry.debitAmount)
+                                ? formatAmount(entry.debitAmount)
                                 : ""}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {entry.creditAmount > 0
-                                ? formatFullNumber(entry.creditAmount)
+                                ? formatAmount(entry.creditAmount)
                                 : ""}
                             </TableCell>
                           </TableRow>
@@ -330,10 +324,10 @@ export default function VoucherDetail() {
                         <TableRow className="bg-primary/10 font-bold border-t-2">
                           <TableCell>Total</TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatFullNumber(data.totals.debit)}
+                            {formatAmount(data.totals.debit)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatFullNumber(data.totals.credit)}
+                            {formatAmount(data.totals.credit)}
                           </TableCell>
                         </TableRow>
                       </TableBody>

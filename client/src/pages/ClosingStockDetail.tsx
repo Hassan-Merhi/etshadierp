@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Package } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface StockItem {
   id: number;
@@ -48,6 +49,7 @@ export default function ClosingStockDetail() {
   const params = useParams<{ groupId: string }>();
   const searchString = useSearch();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
 
   const groupName = new URLSearchParams(searchString).get("name") || "Stock Group";
   const groupId = params.groupId;
@@ -126,10 +128,10 @@ export default function ClosingStockDetail() {
                     {formatQty(item.closing.quantity)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.closing.rate)}
+                    {formatAmount(item.closing.rate)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.closing.value)}
+                    {formatAmount(item.closing.value)}
                   </div>
                 </div>
               ))}
@@ -149,10 +151,10 @@ export default function ClosingStockDetail() {
                 {formatNumber(data.totals.quantity)} BL
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.totals.rate)}
+                {formatAmount(data.totals.rate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.totals.value)}
+                {formatAmount(data.totals.value)}
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Package, ChevronRight } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface StockGroupSummary {
   id: number;
@@ -51,6 +52,7 @@ function formatValue(value: number): string {
 export default function OpeningStockSummary() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
 
   const { data, isLoading } = useQuery<OpeningStockData>({
     queryKey: ["/api/reports/opening-stock-summary", selectedCompany?.id],
@@ -140,20 +142,20 @@ export default function OpeningStockSummary() {
                     {formatQty(group.opening.quantity)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.opening.rate)}
+                    {group.opening.rate === 0 ? "" : formatAmount(group.opening.rate)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.opening.value)}
+                    {group.opening.value === 0 ? "" : formatAmount(group.opening.value)}
                   </div>
                   {/* Closing Balance */}
                   <div className="text-right font-mono text-sm border-l pl-2">
                     {formatQty(group.closing.quantity)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.closing.rate)}
+                    {group.closing.rate === 0 ? "" : formatAmount(group.closing.rate)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.closing.value)}
+                    {group.closing.value === 0 ? "" : formatAmount(group.closing.value)}
                   </div>
                 </div>
               ))}
@@ -175,20 +177,20 @@ export default function OpeningStockSummary() {
                 {formatNumber(data.grandTotal.opening.quantity)} BL
               </div>
               <div className="text-right font-mono">
-                {formatNumber(openingRate)}
+                {openingRate === 0 ? "" : formatAmount(openingRate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.opening.value)}
+                {data.grandTotal.opening.value === 0 ? "" : formatAmount(data.grandTotal.opening.value)}
               </div>
               {/* Closing Total */}
               <div className="text-right font-mono border-l pl-2">
                 {formatNumber(data.grandTotal.closing.quantity)} BL
               </div>
               <div className="text-right font-mono">
-                {formatNumber(closingRate)}
+                {closingRate === 0 ? "" : formatAmount(closingRate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.closing.value)}
+                {data.grandTotal.closing.value === 0 ? "" : formatAmount(data.grandTotal.closing.value)}
               </div>
             </div>
           </div>

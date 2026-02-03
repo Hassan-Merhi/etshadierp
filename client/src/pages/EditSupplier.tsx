@@ -19,11 +19,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { insertSupplierSchema } from "@shared/schema";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export default function EditSupplier() {
   const params = useParams();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const supplierId = params.id ? parseInt(params.id) : null;
 
   const { data: supplier, isLoading } = useQuery({

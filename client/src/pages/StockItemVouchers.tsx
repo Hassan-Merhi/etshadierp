@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface Transaction {
   date: string;
@@ -62,6 +63,7 @@ interface VouchersData {
 
 export default function StockItemVouchers() {
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const params = useParams();
   const stockItemId = parseInt(params.id || "0");
   const year = parseInt(params.year || "0");
@@ -213,18 +215,18 @@ export default function StockItemVouchers() {
                     </TableCell>
                     <TableCell className="border-r text-xs">{txn.vchType}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.inwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(txn.inwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(txn.inwardRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums border-r">{formatAmount(txn.inwardValue)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(txn.outwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatNumber(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                      {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums border-r">
-                      {formatNumber(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
+                      {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(txn.closingRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(txn.closingRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{formatAmount(txn.closingValue)}</TableCell>
                   </TableRow>
                 ))}
                 
@@ -240,14 +242,14 @@ export default function StockItemVouchers() {
                   <TableRow className="bg-muted/50 font-bold">
                     <TableCell colSpan={3} className="border-r">Totals</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(data.totals.inwardRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums border-r">{formatAmount(data.totals.inwardValue)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatNumber(data.totals.outwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(data.totals.outwardRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums border-r">{formatAmount(data.totals.outwardValue)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingQty, 0)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(data.totals.closingRate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatAmount(data.totals.closingValue)}</TableCell>
                   </TableRow>
                 )}
               </TableBody>

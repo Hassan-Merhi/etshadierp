@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
@@ -437,6 +438,7 @@ const PrintTemplate = ({
   entries,
   notes,
   total,
+  formatAmount,
 }: {
   voucherType: "Payment" | "Receipt";
   paymentAccountName: string;
@@ -445,6 +447,7 @@ const PrintTemplate = ({
   entries: VoucherEntry[];
   notes: string;
   total: number;
+  formatAmount: (amount: number | string) => string;
 }) => {
   return (
     <div className="p-8 max-w-4xl mx-auto bg-white text-black">
@@ -464,10 +467,7 @@ const PrintTemplate = ({
                 <strong>Account:</strong> {paymentAccountName}
               </p>
               <p>
-                <strong>Balance (Before Transaction):</strong> ${paymentAccountBalance.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                <strong>Balance (Before Transaction):</strong> {formatAmount(paymentAccountBalance)}
               </p>
             </div>
           )}
@@ -487,10 +487,7 @@ const PrintTemplate = ({
                 <td className="border border-black p-2">{index + 1}</td>
                 <td className="border border-black p-2">{entry.accountName}</td>
                 <td className="border border-black p-2 text-right font-mono">
-                  ${parseFloat(entry.amount || "0").toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatAmount(entry.amount || "0")}
                 </td>
               </tr>
             ))}
@@ -499,10 +496,7 @@ const PrintTemplate = ({
                 Total:
               </td>
               <td className="border border-black p-2 text-right font-mono">
-                ${total.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatAmount(total)}
               </td>
             </tr>
           </tbody>
@@ -536,6 +530,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -1673,7 +1668,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       toast({
         title: "Validation Error",
-        description: `Debits ($${formatNumber(totalDebit)}) must equal Credits ($${formatNumber(totalCredit)})`,
+        description: `Debits (${formatAmount(totalDebit)}) must equal Credits (${formatAmount(totalCredit)})`,
         variant: "destructive",
       });
       return;
@@ -3373,6 +3368,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               entries={entries.filter((e) => e.accountId > 0 && e.amount)}
               notes={form.watch("notes") || ""}
               total={total}
+              formatAmount={formatAmount}
             />
           </div>
         </div>
@@ -3729,7 +3725,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                           {entry?.accountId > 0 && (
                                             <div className="text-xs text-muted-foreground pl-1">
                                               <span>New Bal: <span className={cn("font-mono", displayBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
-                                                ${Math.abs(displayBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {displayBalance >= 0 ? "Dr" : "Cr"}
+                                                {formatAmount(Math.abs(displayBalance))} {displayBalance >= 0 ? "Dr" : "Cr"}
                                               </span></span>
                                             </div>
                                           )}
@@ -3803,14 +3799,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </Button>
                           </td>
                           <td className="p-3 text-right text-sm text-muted-foreground">
-                            DR: ${formatNumber(totalDebit)} | CR: ${formatNumber(totalCredit)}
+                            DR: {formatAmount(totalDebit)} | CR: {formatAmount(totalCredit)}
                           </td>
                           <td className="p-3">
                             <div className="text-right font-bold font-mono">
-                              ${Math.max(totalDebit, totalCredit).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              {formatAmount(Math.max(totalDebit, totalCredit))}
                             </div>
                           </td>
                           <td></td>
@@ -3819,8 +3812,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                           <tr>
                             <td colSpan={4} className="p-3">
                               <div className="text-center text-sm text-destructive">
-                                ⚠️ Debits and Credits must be equal. Difference: $
-                                {formatNumber(Math.abs(totalDebit - totalCredit))}
+                                ⚠️ Debits and Credits must be equal. Difference: {formatAmount(Math.abs(totalDebit - totalCredit))}
                               </div>
                             </td>
                           </tr>
@@ -3972,7 +3964,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
                                   : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
                               )}>
-                                ${Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount(Math.abs(balance))}
                               </div>
                             </button>
                           );
@@ -4497,7 +4489,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   />
                                 </div>
                                 <div className="w-20 sm:w-28 border-r h-9 sm:h-10 bg-muted/30 flex items-center justify-end px-2 sm:px-3 font-mono text-xs sm:text-sm">
-                                  {formatNumber(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0"))}
+                                  {formatAmount(parseFloat(transferEntries[index]?.quantity || "0") * parseFloat(transferEntries[index]?.rate || "0"))}
                                 </div>
                               </>
                             )}
@@ -4536,7 +4528,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <>
                           <div className="text-xs font-semibold">Grand Total:</div>
                           <div className="text-sm font-bold font-mono" data-testid="text-transfer-total">
-                            ${formatNumber(transferTotal)}
+                            {formatAmount(transferTotal)}
                           </div>
                         </>
                       )}
@@ -5140,7 +5132,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   </div>
                                   {/* Amount column */}
                                   <div className="w-20 sm:w-28 border-r h-9 sm:h-10 bg-muted/30 flex items-center justify-end px-2 sm:px-3 font-mono text-xs sm:text-sm">
-                                    {formatNumber(parseFloat(currentEntry?.quantity || "0") * parseFloat(currentEntry?.rate || "0"))}
+                                    {formatAmount(parseFloat(currentEntry?.quantity || "0") * parseFloat(currentEntry?.rate || "0"))}
                                   </div>
                                   {/* Delete button */}
                                   <div className="w-10 sm:w-12 flex items-center justify-center h-9 sm:h-10">
@@ -5192,15 +5184,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             </div>
                             <div className="text-xs text-muted-foreground">Consume:</div>
                             <div className="text-xs font-mono font-medium text-destructive">
-                              ${formatNumber(consumptionTotal)}
+                              {formatAmount(consumptionTotal)}
                             </div>
                             <div className="text-xs text-muted-foreground">Produce:</div>
                             <div className="text-xs font-mono font-medium text-green-600">
-                              ${formatNumber(productionTotal)}
+                              {formatAmount(productionTotal)}
                             </div>
                             <div className="text-sm font-semibold">Total:</div>
                             <div className="text-sm font-bold font-mono" data-testid="text-adjustment-total">
-                              ${formatNumber(consumptionTotal + productionTotal)}
+                              {formatAmount(consumptionTotal + productionTotal)}
                             </div>
                           </div>
                         </div>
@@ -5285,7 +5277,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                           {formatNumber(stock)}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
-                                          @{formatNumber(parseFloat(item.averageRate || "0"))}
+                                          @{formatAmount(item.averageRate || "0")}
                                         </div>
                                       </div>
                                     </div>

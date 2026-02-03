@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { ArrowLeft, Calendar, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import {
   Select,
   SelectContent,
@@ -59,6 +60,7 @@ interface LocationMonthlySummaryData {
 }
 
 export default function LocationMonthlySummary() {
+  const { formatAmount } = useCurrencyContext();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
@@ -290,19 +292,19 @@ export default function LocationMonthlySummary() {
                         {formatNumber(month.inwardQty, 0)}
                       </td>
                       <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatNumber(month.inwardValue)}
+                        {formatAmount(month.inwardValue)}
                       </td>
                       <td className="text-right px-4 py-3 tabular-nums">
                         {formatNumber(month.outwardQty, 0)}
                       </td>
                       <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatNumber(month.outwardValue)}
+                        {formatAmount(month.outwardValue)}
                       </td>
                       <td className="text-right px-4 py-3 tabular-nums font-medium">
                         {formatNumber(month.closingQty, 0)}
                       </td>
                       <td className="text-right px-4 py-3 tabular-nums font-medium">
-                        {formatNumber(month.closingValue)}
+                        {formatAmount(month.closingValue)}
                       </td>
                     </tr>
                   ) : null;
@@ -314,19 +316,19 @@ export default function LocationMonthlySummary() {
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
                   </td>
                   <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.inwardValue || 0)}
+                    {formatAmount(data?.grandTotal.inwardValue || 0)}
                   </td>
                   <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
                   </td>
                   <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.outwardValue || 0)}
+                    {formatAmount(data?.grandTotal.outwardValue || 0)}
                   </td>
                   <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.closingQty || 0, 0)}
                   </td>
                   <td className="text-right px-4 py-3 tabular-nums">
-                    {formatNumber(data?.grandTotal.closingValue || 0)}
+                    {formatAmount(data?.grandTotal.closingValue || 0)}
                   </td>
                 </tr>
               </tbody>

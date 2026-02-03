@@ -2,6 +2,7 @@ import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -295,6 +296,7 @@ function formatSmartNumber(num: number | string): string {
 export default function Analytics() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
@@ -884,12 +886,12 @@ export default function Analytics() {
       ["Debt to Equity", formatNumber(ratiosData.ratios.debtToEquity)],
       [""],
       ["Underlying Data", "Amount"],
-      ["Total Income", formatNumber(ratiosData.underlying.totalIncome)],
-      ["Total Expenses", formatNumber(ratiosData.underlying.totalExpenses)],
-      ["Net Profit", formatNumber(ratiosData.underlying.netProfit)],
-      ["Total Assets", formatNumber(ratiosData.underlying.totalAssets)],
-      ["Total Liabilities", formatNumber(ratiosData.underlying.totalLiabilities)],
-      ["Total Equity", formatNumber(ratiosData.underlying.totalEquity)],
+      ["Total Income", formatAmount(ratiosData.underlying.totalIncome)],
+      ["Total Expenses", formatAmount(ratiosData.underlying.totalExpenses)],
+      ["Net Profit", formatAmount(ratiosData.underlying.netProfit)],
+      ["Total Assets", formatAmount(ratiosData.underlying.totalAssets)],
+      ["Total Liabilities", formatAmount(ratiosData.underlying.totalLiabilities)],
+      ["Total Equity", formatAmount(ratiosData.underlying.totalEquity)],
     ];
 
     const ws = utils.aoa_to_sheet(wsData);
@@ -1328,7 +1330,7 @@ export default function Analytics() {
                     <TableRow key={location.locationId}>
                       <TableCell className="font-medium">{location.locationName}</TableCell>
                       <TableCell className="text-right font-mono">
-                        ${location.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatAmount(location.totalSales)}
                       </TableCell>
                       <TableCell className="text-right">
                         {location.totalTransactions}
@@ -1412,7 +1414,7 @@ export default function Analytics() {
                               {transaction.totalQuantity}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              ${transaction.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {formatAmount(transaction.totalAmount)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1433,7 +1435,7 @@ export default function Analytics() {
                       <div className="flex justify-between text-sm mt-2">
                         <span className="text-muted-foreground">Total Amount:</span>
                         <span className="font-mono font-medium">
-                          ${transactions.reduce((sum, t) => sum + t.totalAmount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatAmount(transactions.reduce((sum, t) => sum + t.totalAmount, 0))}
                         </span>
                       </div>
                     </div>
@@ -1536,13 +1538,13 @@ export default function Analytics() {
                           <TableCell>{container.status}</TableCell>
                           <TableCell>{container.importDate}</TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.itemsTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatAmount(parseFloat(container.itemsTotal))}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.chargesTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatAmount(parseFloat(container.chargesTotal))}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(container.grandTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatAmount(parseFloat(container.grandTotal))}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1551,13 +1553,13 @@ export default function Analytics() {
                       <TableRow>
                         <TableCell colSpan={4}>TOTALS</TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalItemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatAmount(containerData.summary.totalItemsTotal)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalChargesTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatAmount(containerData.summary.totalChargesTotal)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          ${containerData.summary.totalGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatAmount(containerData.summary.totalGrandTotal)}
                         </TableCell>
                       </TableRow>
                     </TableBody>
@@ -1649,7 +1651,7 @@ export default function Analytics() {
                         <ChevronRight className="h-4 w-4" />
                         Opening Stock
                       </span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.openingStock.value)}</span>
+                      <span className="font-mono">{formatAmount(netProfitData.leftPane.openingStock.value)}</span>
                     </div>
 
                     {/* Purchase Accounts */}
@@ -1672,7 +1674,7 @@ export default function Analytics() {
                             </span>
                           )}
                         </span>
-                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.purchaseAccounts.total)}</span>
+                        <span className="font-mono">{formatAmount(netProfitData.leftPane.purchaseAccounts.total)}</span>
                       </div>
                       {expandedNetProfitSections.has("purchaseAccounts") && netProfitData.leftPane.purchaseAccounts.accounts.length > 0 && (
                         <div className="bg-muted/30 divide-y">
@@ -1688,7 +1690,7 @@ export default function Analytics() {
                                 {acc.name}
                               </span>
                               <span className="font-mono">
-                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
                               </span>
                             </div>
                           ))}
@@ -1715,7 +1717,7 @@ export default function Analytics() {
                               ({netProfitData.rightPane.directIncomes.count})
                             </span>
                           </span>
-                          <span className="font-mono">${formatSmartNumber(netProfitData.rightPane.directIncomes.total)}</span>
+                          <span className="font-mono">{formatAmount(netProfitData.rightPane.directIncomes.total)}</span>
                         </div>
                         {expandedNetProfitSections.has("directIncomes") && netProfitData.rightPane.directIncomes.accounts.length > 0 && (
                           <div className="bg-muted/30 divide-y">
@@ -1723,7 +1725,7 @@ export default function Analytics() {
                               <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                                 <span>{acc.name}</span>
                                 <span className="font-mono">
-                                  Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                  Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
                                 </span>
                               </div>
                             ))}
@@ -1751,7 +1753,7 @@ export default function Analytics() {
                               ({netProfitData.leftPane.directExpenses.count})
                             </span>
                           </span>
-                          <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.directExpenses.total)}</span>
+                          <span className="font-mono">{formatAmount(netProfitData.leftPane.directExpenses.total)}</span>
                         </div>
                         {expandedNetProfitSections.has("directExpenses") && netProfitData.leftPane.directExpenses.accounts.length > 0 && (
                           <div className="bg-muted/30 divide-y">
@@ -1759,7 +1761,7 @@ export default function Analytics() {
                               <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                                 <span>{acc.name}</span>
                                 <span className="font-mono">
-                                  Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                  Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
                                 </span>
                               </div>
                             ))}
@@ -1772,7 +1774,7 @@ export default function Analytics() {
                     <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
                       <span>Gross Profit c/o</span>
                       <span className={`font-mono ${netProfitData.leftPane.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.grossProfit))}
+                        {formatAmount(Math.abs(netProfitData.leftPane.grossProfit))}
                         {netProfitData.leftPane.grossProfit < 0 && ' (Loss)'}
                       </span>
                     </div>
@@ -1780,7 +1782,7 @@ export default function Analytics() {
                     {/* Total */}
                     <div className="flex justify-between items-center p-3 bg-primary/10 font-semibold border-t-2">
                       <span>Total</span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.tradingTotal)}</span>
+                      <span className="font-mono">{formatAmount(netProfitData.leftPane.tradingTotal)}</span>
                     </div>
 
                     {/* Separator */}
@@ -1806,7 +1808,7 @@ export default function Analytics() {
                             </span>
                           )}
                         </span>
-                        <span className="font-mono">${formatSmartNumber(netProfitData.leftPane.indirectExpenses.total)}</span>
+                        <span className="font-mono">{formatAmount(netProfitData.leftPane.indirectExpenses.total)}</span>
                       </div>
                       {expandedNetProfitSections.has("indirectExpenses") && netProfitData.leftPane.indirectExpenses.accounts.length > 0 && (
                         <div className="bg-muted/30 divide-y">
@@ -1814,7 +1816,7 @@ export default function Analytics() {
                             <div key={acc.id} className="flex justify-between items-center px-6 py-2 text-sm text-muted-foreground">
                               <span>{acc.name}</span>
                               <span className="font-mono">
-                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
                               </span>
                             </div>
                           ))}
@@ -1826,7 +1828,7 @@ export default function Analytics() {
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
                       <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.netProfit))}
+                        {formatAmount(Math.abs(netProfitData.leftPane.netProfit))}
                         {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
                       </span>
                     </div>
@@ -1849,7 +1851,7 @@ export default function Analytics() {
                         <ChevronRight className="h-4 w-4" />
                         Sales Accounts
                       </span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.salesAccounts?.total || 0)}</span>
+                      <span className="font-mono">{formatAmount(netProfitData.rightPane?.salesAccounts?.total || 0)}</span>
                     </div>
 
                     {/* Closing Stock */}
@@ -1862,7 +1864,7 @@ export default function Analytics() {
                         <ChevronRight className="h-4 w-4" />
                         Closing Stock
                       </span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.closingStock?.value || 0)}</span>
+                      <span className="font-mono">{formatAmount(netProfitData.rightPane?.closingStock?.value || 0)}</span>
                     </div>
 
                     {/* Empty spacer rows to match left pane */}
@@ -1873,7 +1875,7 @@ export default function Analytics() {
                     <div className="flex justify-between items-center p-3 bg-muted/50 font-medium">
                       <span>Gross Profit b/f</span>
                       <span className={`font-mono ${(netProfitData.rightPane?.grossProfitBf || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${formatSmartNumber(Math.abs(netProfitData.rightPane?.grossProfitBf || 0))}
+                        {formatAmount(Math.abs(netProfitData.rightPane?.grossProfitBf || 0))}
                         {(netProfitData.rightPane?.grossProfitBf || 0) < 0 && ' (Loss)'}
                       </span>
                     </div>
@@ -1881,7 +1883,7 @@ export default function Analytics() {
                     {/* Total */}
                     <div className="flex justify-between items-center p-3 bg-primary/10 font-semibold border-t-2">
                       <span>Total</span>
-                      <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.total || 0)}</span>
+                      <span className="font-mono">{formatAmount(netProfitData.rightPane?.total || 0)}</span>
                     </div>
 
                     {/* Separator */}
@@ -1907,7 +1909,7 @@ export default function Analytics() {
                             </span>
                           )}
                         </span>
-                        <span className="font-mono">${formatSmartNumber(netProfitData.rightPane?.indirectIncomes?.total || 0)}</span>
+                        <span className="font-mono">{formatAmount(netProfitData.rightPane?.indirectIncomes?.total || 0)}</span>
                       </div>
                       {expandedNetProfitSections.has("indirectIncomes") && (netProfitData.rightPane?.indirectIncomes?.accounts?.length || 0) > 0 && (
                         <div className="bg-muted/30 divide-y">
@@ -1923,7 +1925,7 @@ export default function Analytics() {
                                 {acc.name}
                               </span>
                               <span className="font-mono">
-                                Dr: ${formatSmartNumber(acc.debit)} | Cr: ${formatSmartNumber(acc.credit)}
+                                Dr: {formatAmount(acc.debit)} | Cr: {formatAmount(acc.credit)}
                               </span>
                             </div>
                           ))}
@@ -1935,7 +1937,7 @@ export default function Analytics() {
                     <div className="flex justify-between items-center p-3 bg-primary/20 font-bold">
                       <span>Net Profit</span>
                       <span className={`font-mono ${netProfitData.leftPane.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${formatSmartNumber(Math.abs(netProfitData.leftPane.netProfit))}
+                        {formatAmount(Math.abs(netProfitData.leftPane.netProfit))}
                         {netProfitData.leftPane.netProfit < 0 && ' (Loss)'}
                       </span>
                     </div>

@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Users, Container, DollarSign, Download, Edit, EyeOff, Eye, ExternalLink, FileText } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
@@ -63,6 +64,7 @@ export default function Suppliers() {
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [dialogTab, setDialogTab] = useState<"transactions" | "purchase-orders">("transactions");
   const { selectedCompany, selectCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const [_location, navigate] = useLocation();
 
   // Handle clicking on a transaction to navigate to it
@@ -233,7 +235,7 @@ export default function Suppliers() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-total-balance">
-                ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatAmount(totalBalance)}
               </div>
             )}
           </CardContent>
@@ -303,7 +305,7 @@ export default function Suppliers() {
                       </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-balance-${supplier.id}`}>
                         <span className={supplier.balance > 0 ? "text-red-600" : supplier.balance < 0 ? "text-green-600" : ""}>
-                          ${Math.abs(supplier.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatAmount(Math.abs(supplier.balance))}
                           {supplier.balance !== 0 && (supplier.balance > 0 ? " Cr" : " Dr")}
                         </span>
                       </TableCell>
@@ -441,7 +443,7 @@ export default function Suppliers() {
                                 </button>
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold">
-                                ${txn.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount(txn.balance)}
                               </TableCell>
                             </TableRow>
                           );
@@ -454,9 +456,9 @@ export default function Suppliers() {
                     <div className="text-sm">
                       <span className="text-muted-foreground">Total Balance: </span>
                       <span className="font-mono font-semibold text-lg">
-                        ${(unifiedLedger.length > 0 
+                        {formatAmount(unifiedLedger.length > 0 
                           ? [...unifiedLedger].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.balance 
-                          : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          : 0)}
                       </span>
                     </div>
                   </div>
@@ -532,7 +534,7 @@ export default function Suppliers() {
                                 <Badge variant="secondary">{po.companyName}</Badge>
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold">
-                                ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatAmount(totalAmount)}
                               </TableCell>
                             </TableRow>
                           );

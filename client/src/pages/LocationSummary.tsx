@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronRight, Settings2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface LocationData {
   quantity: number;
@@ -91,6 +92,7 @@ export default function LocationSummary() {
   // Track interaction mode: 'keyboard' blocks hover selection until pointer moves
   const interactionMode = useRef<'keyboard' | 'pointer'>('pointer');
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   
   // Helper to handle mouse enter - only select if in pointer mode
   const handleMouseEnterRow = (rowKey: string) => {
@@ -574,13 +576,13 @@ export default function LocationSummary() {
                                   "text-right py-1 px-2 tabular-nums text-foreground text-xs",
                                   isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
-                                  {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
+                                  {data.rate === 0 ? "" : formatAmount(data.rate)}
                                 </td>
                                 <td className={cn(
                                   "text-right py-1 px-2 border-r tabular-nums font-semibold text-xs",
                                   isSelectedCell && "bg-blue-200 dark:bg-blue-800"
                                 )}>
-                                  {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
+                                  {data.value === 0 ? "" : formatAmount(data.value)}
                                 </td>
                               </Fragment>
                             );
@@ -643,7 +645,7 @@ export default function LocationSummary() {
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-rate-${item.id}-${location.id}`}
                                   >
-                                    {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
+                                    {data.rate === 0 ? "" : formatAmount(data.rate)}
                                   </td>
                                   <td 
                                     className={cn(
@@ -653,7 +655,7 @@ export default function LocationSummary() {
                                     onClick={() => navigate(`/locations/${location.id}/stock-items/${item.id}/history`)}
                                     data-testid={`cell-value-${item.id}-${location.id}`}
                                   >
-                                    {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
+                                    {data.value === 0 ? "" : formatAmount(data.value)}
                                   </td>
                                 </Fragment>
                               );
@@ -674,10 +676,10 @@ export default function LocationSummary() {
                               {formatNumber(data.quantity, 0, "BL")}
                             </td>
                             <td className="text-right py-1 px-2 tabular-nums text-foreground">
-                              {data.rate === 0 ? "" : "$" + formatNumber(data.rate, 2)}
+                              {data.rate === 0 ? "" : formatAmount(data.rate)}
                             </td>
                             <td className="text-right py-1 px-2 border-r tabular-nums" data-testid={`text-grand-value-${location.id}`}>
-                              {data.value === 0 ? "" : "$" + formatNumber(data.value, 2)}
+                              {data.value === 0 ? "" : formatAmount(data.value)}
                             </td>
                           </Fragment>
                         );
@@ -703,10 +705,10 @@ export default function LocationSummary() {
                               {formatNumber(totalQty, 0, "BL")}
                             </td>
                             <td className="text-right py-1 px-2 tabular-nums text-foreground" data-testid="text-total-all-rate">
-                              {avgRate === 0 ? "" : "$" + formatNumber(avgRate, 2)}
+                              {avgRate === 0 ? "" : formatAmount(avgRate)}
                             </td>
                             <td className="text-right py-1 px-2 border-r tabular-nums" data-testid="text-total-all-value">
-                              {formatNumber(totalValue, 2, "")}
+                              {formatAmount(totalValue)}
                             </td>
                           </Fragment>
                         );

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Package, TrendingUp, MapPin } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatNumber } from "@/lib/formatNumber";
 
 interface StockItem {
   id: number;
@@ -58,6 +58,7 @@ const formatSmartNumber = (value: string | number) => {
 
 export default function StockItemDetail() {
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const [_match, params] = useRoute("/stock-query/:id");
   const [_location, navigate] = useLocation();
   const itemId = params?.id ? parseInt(params.id) : null;
@@ -169,7 +170,7 @@ export default function StockItemDetail() {
                         <TableRow key={idx}>
                           <TableCell className="text-sm">{purchase.supplierName || "-"}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">${formatNumber(parseFloat(purchase.rate))}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(purchase.rate))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -214,7 +215,7 @@ export default function StockItemDetail() {
                           <TableCell className="text-sm">{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
                           <TableCell className="text-sm">{sale.locationName || "-"}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatSmartNumber(sale.quantity)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">${formatNumber(parseFloat(sale.sellingPrice))}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(sale.sellingPrice))}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -256,10 +257,10 @@ export default function StockItemDetail() {
                             {formatSmartNumber(loc.quantity)}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            ${formatNumber(parseFloat(loc.averageRate))}
+                            {formatAmount(parseFloat(loc.averageRate))}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            ${formatNumber(parseFloat(loc.totalValue))}
+                            {formatAmount(parseFloat(loc.totalValue))}
                           </TableCell>
                         </TableRow>
                       ))}

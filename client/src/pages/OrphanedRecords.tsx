@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AlertCircle, RefreshCw, AlertTriangle, Archive, RotateCcw, Trash2 } from "lucide-react";
 import {
   Table,
@@ -68,6 +69,7 @@ interface StockGroupArchive {
 
 export default function OrphanedRecordsPage() {
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedVouchers, setSelectedVouchers] = useState<number[]>([]);
@@ -185,15 +187,6 @@ export default function OrphanedRecordsPage() {
     });
   };
 
-  const formatCurrency = (value: string | number) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(num);
-  };
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -248,13 +241,13 @@ export default function OrphanedRecordsPage() {
                     {voucher.voucherDate}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-debits-${voucher.id}`}>
-                    {formatCurrency(voucher.totalDebits)}
+                    {formatAmount(voucher.totalDebits)}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-credits-${voucher.id}`}>
-                    {formatCurrency(voucher.totalCredits)}
+                    {formatAmount(voucher.totalCredits)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-red-600 font-bold" data-testid={`text-imbalance-${voucher.id}`}>
-                    {formatCurrency(voucher.imbalance)}
+                    {formatAmount(voucher.imbalance)}
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" data-testid={`text-unbalanced-desc-${voucher.id}`}>
                     {voucher.description || "-"}
@@ -369,7 +362,7 @@ export default function OrphanedRecordsPage() {
                     {voucher.locationName || <span className="text-muted-foreground">Not saved</span>}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-amount-${voucher.id}`}>
-                    {formatCurrency(voucher.totalAmount)}
+                    {formatAmount(voucher.totalAmount)}
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate" data-testid={`text-description-${voucher.id}`}>
                     {voucher.description || "-"}
@@ -428,7 +421,7 @@ export default function OrphanedRecordsPage() {
                     {parseFloat(archive.totalQuantity).toFixed(3)}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-archive-value-${archive.id}`}>
-                    {formatCurrency(archive.totalValue)}
+                    {formatAmount(archive.totalValue)}
                   </TableCell>
                   <TableCell data-testid={`text-archive-date-${archive.id}`}>
                     {formatDisplayDate(archive.archivedAt)}

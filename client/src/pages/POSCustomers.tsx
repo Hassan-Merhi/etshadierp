@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -50,6 +50,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function POSCustomers() {
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -145,7 +146,7 @@ export default function POSCustomers() {
               <Skeleton className="h-6 w-20" />
             ) : (
               <div className="text-lg md:text-2xl font-bold" data-testid="text-total-receivables">
-                ${formatNumber(totalReceivables)}
+                {formatAmount(totalReceivables)}
               </div>
             )}
           </CardContent>
@@ -328,7 +329,7 @@ export default function POSCustomers() {
                         {customer.phone || "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        ${formatNumber(customer.balance || 0)}
+                        {formatAmount(customer.balance || 0)}
                       </TableCell>
                       <TableCell>
                         <Badge 

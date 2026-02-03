@@ -28,7 +28,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Link } from "wouter";
-import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface AccountItem {
   name: string;
@@ -67,6 +67,7 @@ interface NetProfitData {
 }
 
 export default function NetProfitDetails() {
+  const { formatAmount } = useCurrencyContext();
   const { data, isLoading, error, refetch } = useQuery<NetProfitData>({
     queryKey: ["/api/stats/net-profit"],
   });
@@ -147,7 +148,7 @@ export default function NetProfitDetails() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              ${formatNumber(data?.incomeTotal || 0)}
+              {formatAmount(data?.incomeTotal || 0)}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               Added to profit
@@ -164,7 +165,7 @@ export default function NetProfitDetails() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ${formatNumber(data?.expensesTotal || 0)}
+              {formatAmount(data?.expensesTotal || 0)}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               Subtracted from profit
@@ -183,7 +184,7 @@ export default function NetProfitDetails() {
             <div
               className={`text-2xl font-bold ${isProfit ? "text-green-600" : "text-red-600"}`}
             >
-              ${formatNumber(netProfit)}
+              {formatAmount(netProfit)}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {isProfit ? "Profit" : "Loss"}
@@ -204,7 +205,7 @@ export default function NetProfitDetails() {
                 What We Have
               </span>
               <span className="text-green-600">
-                ${formatNumber(data?.forUsTotal || 0)}
+                {formatAmount(data?.forUsTotal || 0)}
               </span>
             </div>
             <Minus className="h-5 w-5 text-muted-foreground" />
@@ -213,7 +214,7 @@ export default function NetProfitDetails() {
                 What We Owe
               </span>
               <span className="text-red-600">
-                ${formatNumber(data?.onUsTotal || 0)}
+                {formatAmount(data?.onUsTotal || 0)}
               </span>
             </div>
             <Equal className="h-5 w-5 text-muted-foreground" />
@@ -232,7 +233,7 @@ export default function NetProfitDetails() {
                     : "text-red-600"
                 }
               >
-                ${formatNumber(data?.netPosition || 0)}
+                {formatAmount(data?.netPosition || 0)}
               </span>
             </div>
           </div>
@@ -282,15 +283,14 @@ export default function NetProfitDetails() {
                       <TableCell
                         className={`text-right ${acc.value >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {acc.value >= 0 ? "+" : "-"}$
-                        {formatNumber(Math.abs(acc.value))}
+                        {acc.value >= 0 ? "+" : "-"}{formatAmount(Math.abs(acc.value))}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
                     <TableCell colSpan={2}>Total Income</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatNumber(data?.incomeTotal || 0)}
+                      {formatAmount(data?.incomeTotal || 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -336,15 +336,14 @@ export default function NetProfitDetails() {
                       <TableCell
                         className={`text-right ${acc.value >= 0 ? "text-red-600" : "text-green-600"}`}
                       >
-                        {acc.value >= 0 ? "-" : "+"}$
-                        {formatNumber(Math.abs(acc.value))}
+                        {acc.value >= 0 ? "-" : "+"}{formatAmount(Math.abs(acc.value))}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
                     <TableCell colSpan={2}>Total Expenses</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatNumber(data?.expensesTotal || 0)}
+                      {formatAmount(data?.expensesTotal || 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -396,14 +395,14 @@ export default function NetProfitDetails() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-green-600">
-                        ${formatNumber(acc.value)}
+                        {formatAmount(acc.value)}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
                     <TableCell colSpan={3}>Total Assets</TableCell>
                     <TableCell className="text-right text-green-600">
-                      ${formatNumber(data?.forUsTotal || 0)}
+                      {formatAmount(data?.forUsTotal || 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -453,14 +452,14 @@ export default function NetProfitDetails() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-red-600">
-                        ${formatNumber(acc.value)}
+                        {formatAmount(acc.value)}
                       </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/50">
                     <TableCell colSpan={3}>Total Liabilities</TableCell>
                     <TableCell className="text-right text-red-600">
-                      ${formatNumber(data?.onUsTotal || 0)}
+                      {formatAmount(data?.onUsTotal || 0)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

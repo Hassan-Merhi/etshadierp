@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { ArrowLeft, Calendar } from "lucide-react";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -65,6 +66,7 @@ export default function StockItemHistory() {
   const params = useParams();
   const stockItemId = parseInt(params.id || "0");
   const [_location, navigate] = useLocation();
+  const { formatAmount } = useCurrencyContext();
   
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
@@ -181,19 +183,19 @@ export default function StockItemHistory() {
                         {month.inwardQty > 0 ? formatNumber(month.inwardQty, 0) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums border-r">
-                        {month.inwardValue > 0 ? formatNumber(month.inwardValue) : ""}
+                        {month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums border-r">
-                        {month.outwardValue > 0 ? formatNumber(month.outwardValue) : ""}
+                        {month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
                         {month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {month.closingValue !== 0 ? formatNumber(month.closingValue) : ""}
+                        {month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}
                       </TableCell>
                     </TableRow>
                   );
@@ -205,19 +207,19 @@ export default function StockItemHistory() {
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.inwardValue || 0)}
+                    {formatAmount(data?.grandTotal.inwardValue || 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums border-r">
-                    {formatNumber(data?.grandTotal.outwardValue || 0)}
+                    {formatAmount(data?.grandTotal.outwardValue || 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(data?.grandTotal.closingQty || 0, 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatNumber(data?.grandTotal.closingValue || 0)}
+                    {formatAmount(data?.grandTotal.closingValue || 0)}
                   </TableCell>
                 </TableRow>
               </TableBody>

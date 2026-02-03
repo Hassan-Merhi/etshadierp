@@ -134,7 +134,7 @@ type PayableAccount = {
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
-  const { selectedCurrency, exchangeRate } = useCurrencyContext();
+  const { formatAmount } = useCurrencyContext();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddPayableDialogOpen, setIsAddPayableDialogOpen] = useState(false);
@@ -352,22 +352,6 @@ export default function Dashboard() {
     );
   }
 
-  const formatCurrency = (value: number, currency?: Currency) => {
-    const curr = currency || selectedCurrency;
-    let displayValue = value;
-    
-    // If displaying in CFA, convert USD to CFA using exchange rate
-    if (curr === "CFA" && exchangeRate) {
-      displayValue = value * exchangeRate;
-    }
-    
-    if (curr === "USD") {
-      return `$ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } else {
-      return `CFA ${Math.round(displayValue).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -385,7 +369,7 @@ export default function Dashboard() {
           value={
             isLoading
               ? "Loading..."
-              : formatCurrency(profitData?.totalIncome || 0)
+              : formatAmount(profitData?.totalIncome || 0)
           }
           change="From all income accounts"
           changeType="positive"
@@ -397,7 +381,7 @@ export default function Dashboard() {
           value={
             isLoading
               ? "Loading..."
-              : formatCurrency(profitData?.netPosition || 0)
+              : formatAmount(profitData?.netPosition || 0)
           }
           change={
             profitData?.netPositionLabel || "What we have minus what we owe"
@@ -414,8 +398,8 @@ export default function Dashboard() {
             !importCycleData
               ? "Loading..."
               : Math.abs(importCycleData.netImportCycleBalance) < 1
-                ? "$0.00"
-                : formatCurrency(importCycleData.netImportCycleBalance)
+                ? formatAmount(0)
+                : formatAmount(importCycleData.netImportCycleBalance)
           }
           change="Should be $0 when balanced"
           changeType={
@@ -448,14 +432,14 @@ export default function Dashboard() {
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
                     <span className="font-mono">
-                      {formatCurrency(item.value)}
+                      {formatAmount(item.value)}
                     </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Assets:</span>
                   <span className="font-mono text-green-600">
-                    {formatCurrency(profitData?.forUsTotal ?? 0)}
+                    {formatAmount(profitData?.forUsTotal ?? 0)}
                   </span>
                 </div>
               </div>
@@ -472,14 +456,14 @@ export default function Dashboard() {
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
                     <span className="font-mono text-red-600">
-                      {formatCurrency(item.value)}
+                      {formatAmount(item.value)}
                     </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Liabilities:</span>
                   <span className="font-mono text-red-600">
-                    {formatCurrency(profitData?.onUsTotal ?? 0)}
+                    {formatAmount(profitData?.onUsTotal ?? 0)}
                   </span>
                 </div>
               </div>
@@ -496,14 +480,14 @@ export default function Dashboard() {
                   <div key={idx} className="flex justify-between">
                     <span className="text-muted-foreground">{item.name}:</span>
                     <span className="font-mono text-orange-600">
-                      {formatCurrency(item.value)}
+                      {formatAmount(item.value)}
                     </span>
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                   <span>Total Expenses:</span>
                   <span className="font-mono text-orange-600">
-                    {formatCurrency(profitData?.expensesTotal ?? 0)}
+                    {formatAmount(profitData?.expensesTotal ?? 0)}
                   </span>
                 </div>
               </div>
@@ -516,13 +500,13 @@ export default function Dashboard() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Assets:</span>
                   <span className="font-mono text-green-600">
-                    {formatCurrency(profitData?.forUsTotal ?? 0)}
+                    {formatAmount(profitData?.forUsTotal ?? 0)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">- Liabilities:</span>
                   <span className="font-mono text-red-600">
-                    {formatCurrency(profitData?.onUsTotal ?? 0)}
+                    {formatAmount(profitData?.onUsTotal ?? 0)}
                   </span>
                 </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
@@ -535,7 +519,7 @@ export default function Dashboard() {
                         : "text-red-600",
                     )}
                   >
-                    {formatCurrency(profitData?.netPosition ?? 0)}
+                    {formatAmount(profitData?.netPosition ?? 0)}
                   </span>
                 </div>
                 <div className="text-center mt-2">
@@ -691,7 +675,7 @@ export default function Dashboard() {
                         className="text-sm font-bold font-mono text-green-600"
                         data-testid={`text-balance-${dca.id}`}
                       >
-                        {formatCurrency(balance)}
+                        {formatAmount(balance)}
                       </p>
                     </div>
 
@@ -715,7 +699,7 @@ export default function Dashboard() {
                     className="text-green-600 font-mono"
                     data-testid="text-total-available"
                   >
-                    {formatCurrency(
+                    {formatAmount(
                       displayedCashAccounts.reduce((sum, dca) => {
                         const balance = parseFloat(
                           String(
@@ -866,7 +850,7 @@ export default function Dashboard() {
                       className="text-sm font-bold font-mono text-red-600"
                       data-testid={`text-payable-${account.id}`}
                     >
-                      {formatCurrency(Math.abs(account.balance))}
+                      {formatAmount(Math.abs(account.balance))}
                     </p>
                   </div>
                   <Button
@@ -890,7 +874,7 @@ export default function Dashboard() {
                     className="text-red-600 font-mono"
                     data-testid="text-total-payable"
                   >
-                    {formatCurrency(
+                    {formatAmount(
                       displayedPayableAccounts.reduce(
                         (sum, acc) => sum + Math.abs(acc.balance),
                         0,

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Package, ChevronRight, RefreshCw, Calendar } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -54,6 +55,7 @@ function formatValue(value: number): string {
 export default function ClosingStockSummary() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
 
   const { data, isLoading } = useQuery<ClosingStockData>({
     queryKey: ["/api/reports/closing-stock-summary", selectedCompany?.id],
@@ -161,7 +163,7 @@ export default function ClosingStockSummary() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Current Inventory Value:</span>
-                <span className="font-mono font-medium">${data?.grandTotal ? formatNumber(data.grandTotal.value) : "0.00"}</span>
+                <span className="font-mono font-medium">{formatAmount(data?.grandTotal ? data.grandTotal.value : 0)}</span>
               </div>
             </div>
           </div>
@@ -220,10 +222,10 @@ export default function ClosingStockSummary() {
                     {formatQty(group.closing.quantity)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.closing.rate)}
+                    {group.closing.rate > 0 ? formatAmount(group.closing.rate) : ""}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(group.closing.value)}
+                    {group.closing.value > 0 ? formatAmount(group.closing.value) : ""}
                   </div>
                 </div>
               ))}
@@ -243,10 +245,10 @@ export default function ClosingStockSummary() {
                 {formatNumber(data.grandTotal.quantity)} BL
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.rate)}
+                {formatAmount(data.grandTotal.rate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.value)}
+                {formatAmount(data.grandTotal.value)}
               </div>
             </div>
           </div>

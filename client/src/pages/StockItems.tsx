@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
 
@@ -94,6 +95,7 @@ export default function StockItems() {
   const [adjustType, setAdjustType] = useState<"add" | "subtract">("add");
 
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
 
   const { data: stockItems = [], isLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -270,7 +272,7 @@ export default function StockItems() {
       Barcode: item.barcode || "",
       UOM: item.uom,
       "Stock Group": getStockGroupName(item.stockGroupId),
-      "Selling Price": item.sellingPrice,
+      "Selling Price": formatAmount(item.sellingPrice),
       Active: item.active ? "Yes" : "No",
     }));
     const worksheet = utils.json_to_sheet(data);

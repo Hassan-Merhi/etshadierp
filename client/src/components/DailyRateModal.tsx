@@ -24,6 +24,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { format } from "date-fns";
 
 const rateFormSchema = z.object({
@@ -41,6 +42,7 @@ interface DailyRateModalProps {
 export function DailyRateModal({ companyId }: DailyRateModalProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const [isOpen, setIsOpen] = useState(false);
   const [checkedCompanyId, setCheckedCompanyId] = useState<number | null>(null);
 
@@ -129,7 +131,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
               name="rate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>$1 {company?.baseCurrency} = X {company?.displayCurrency}</FormLabel>
+                  <FormLabel>{formatAmount(1)} {company?.baseCurrency} = X {company?.displayCurrency}</FormLabel>
                   <FormControl>
                     <Input
                       {...field}

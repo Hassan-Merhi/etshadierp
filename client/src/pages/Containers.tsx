@@ -47,6 +47,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AddContainerDialog } from "../components/AddContainerDialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
@@ -97,6 +98,7 @@ export default function Containers() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -945,16 +947,12 @@ export default function Containers() {
                         className="text-2xl font-semibold font-mono"
                         data-testid="text-total-amount"
                       >
-                        $
-                        {containers
-                          .reduce(
+                        {formatAmount(
+                          containers.reduce(
                             (sum, c) => sum + parseFloat(c.grandTotal || "0"),
                             0,
                           )
-                          .toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                        )}
                       </p>
                     </div>
                   </CardContent>
@@ -1000,13 +998,9 @@ export default function Containers() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono">
-                            $
-                            {parseFloat(
-                              container.grandTotal || "0",
-                            ).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            {formatAmount(
+                              parseFloat(container.grandTotal || "0")
+                            )}
                           </TableCell>
                           <TableCell className="font-mono">
                             {new Date(
@@ -1219,10 +1213,9 @@ export default function Containers() {
                           {getSupplierName(container.supplierId)}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
-                          $
-                          {parseFloat(
-                            container.grandTotal || "0",
-                          ).toLocaleString()}
+                          {formatAmount(
+                            parseFloat(container.grandTotal || "0")
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input
@@ -1626,33 +1619,18 @@ export default function Containers() {
                           className="text-right font-mono"
                           data-testid={`text-sale-price-${sale.saleId}`}
                         >
-                          $
-                          {parseFloat(sale.containerCost).toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
+                          {formatAmount(
+                            parseFloat(sale.containerCost)
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          $
-                          {parseFloat(sale.commission || "0").toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
+                          {formatAmount(
+                            parseFloat(sale.commission || "0")
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold">
-                          $
-                          {parseFloat(sale.totalAmount).toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            },
+                          {formatAmount(
+                            parseFloat(sale.totalAmount)
                           )}
                         </TableCell>
                         <TableCell className="text-right">

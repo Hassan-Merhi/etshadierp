@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface PrecisionTrace {
   formula: string;
@@ -202,6 +203,8 @@ const SeverityBadge = ({ severity }: { severity: string }) => {
 };
 
 export default function ImportCycleDiagnostics() {
+  const { formatAmount } = useCurrencyContext();
+
   const { data, isLoading, error, refetch } = useQuery<ImportCycleData>({
     queryKey: ["/api/stats/import-cycle-balance"],
   });
@@ -339,7 +342,7 @@ export default function ImportCycleDiagnostics() {
           <div className={`text-center p-6 rounded-lg ${isBalanced ? 'bg-green-50 dark:bg-green-950' : 'bg-destructive/10'}`}>
             <div className="text-sm text-muted-foreground mb-2">Net Import Cycle Balance</div>
             <div className={`text-3xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
-              ${formatNumber(netBalance)}
+              {formatAmount(netBalance)}
             </div>
           </div>
         </CardContent>
@@ -364,21 +367,21 @@ export default function ImportCycleDiagnostics() {
                 <div className="p-3 bg-green-100 dark:bg-green-900 rounded">
                   <div className="text-xs text-muted-foreground mb-1">Assets</div>
                   <div className="font-bold text-green-700 dark:text-green-300">
-                    ${formatNumber(data.precisionTrace.calculation.assetTotal.value)}
+                    {formatAmount(data.precisionTrace.calculation.assetTotal.value)}
                   </div>
                 </div>
                 <div className="text-lg font-bold">+</div>
                 <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded">
                   <div className="text-xs text-muted-foreground mb-1">Expenses</div>
                   <div className="font-bold text-orange-700 dark:text-orange-300">
-                    ${formatNumber(data.precisionTrace.calculation.expenseTotal.value)}
+                    {formatAmount(data.precisionTrace.calculation.expenseTotal.value)}
                   </div>
                 </div>
                 <div className="text-lg font-bold">−</div>
                 <div className="p-3 bg-red-100 dark:bg-red-900 rounded">
                   <div className="text-xs text-muted-foreground mb-1">Liabilities</div>
                   <div className="font-bold text-red-700 dark:text-red-300">
-                    ${formatNumber(data.precisionTrace.calculation.liabilityTotal.value)}
+                    {formatAmount(data.precisionTrace.calculation.liabilityTotal.value)}
                   </div>
                 </div>
               </div>
@@ -452,18 +455,18 @@ export default function ImportCycleDiagnostics() {
                   <div className="grid grid-cols-3 gap-4 text-center mb-4">
                     <div className="p-3 bg-green-50 dark:bg-green-950 rounded">
                       <div className="text-xs text-muted-foreground">Assets + Expenses</div>
-                      <div className="text-lg font-bold text-green-600">${formatNumber(assetTotal + expenseTotal)}</div>
+                      <div className="text-lg font-bold text-green-600">{formatAmount(assetTotal + expenseTotal)}</div>
                     </div>
                     <div className="flex items-center justify-center text-2xl font-bold">−</div>
                     <div className="p-3 bg-red-50 dark:bg-red-950 rounded">
                       <div className="text-xs text-muted-foreground">Liabilities</div>
-                      <div className="text-lg font-bold text-red-600">${formatNumber(liabilityTotal)}</div>
+                      <div className="text-lg font-bold text-red-600">{formatAmount(liabilityTotal)}</div>
                     </div>
                   </div>
                   <div className="text-center p-3 bg-muted rounded">
                     <div className="text-xs text-muted-foreground">= Net Balance</div>
                     <div className={`text-xl font-bold ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
-                      ${formatNumber(netBalance)}
+                      {formatAmount(netBalance)}
                     </div>
                   </div>
                 </div>
@@ -482,7 +485,7 @@ export default function ImportCycleDiagnostics() {
                           {c.label}
                         </span>
                         <span className={`font-mono ${c.category === 'liability' ? 'text-red-600' : 'text-green-600'}`}>
-                          ${formatNumber(c.value)}
+                          {formatAmount(c.value)}
                         </span>
                       </div>
                     ))}
@@ -496,8 +499,8 @@ export default function ImportCycleDiagnostics() {
                       <h4 className="font-semibold text-blue-800 dark:text-blue-200">What This Means</h4>
                       <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
                         {netBalance < 0 
-                          ? `Your liabilities ($${formatNumber(liabilityTotal)}) exceed your assets plus expenses ($${formatNumber(assetTotal + expenseTotal)}) by $${formatNumber(Math.abs(netBalance))}. This could indicate unpaid supplier bills without corresponding inventory, or adjustments from a previous system.`
-                          : `Your assets plus expenses ($${formatNumber(assetTotal + expenseTotal)}) exceed your liabilities ($${formatNumber(liabilityTotal)}) by $${formatNumber(netBalance)}. This could indicate inventory that wasn't properly accounted for, or missing liability entries.`
+                          ? `Your liabilities (${formatAmount(liabilityTotal)}) exceed your assets plus expenses (${formatAmount(assetTotal + expenseTotal)}) by ${formatAmount(Math.abs(netBalance))}. This could indicate unpaid supplier bills without corresponding inventory, or adjustments from a previous system.`
+                          : `Your assets plus expenses (${formatAmount(assetTotal + expenseTotal)}) exceed your liabilities (${formatAmount(liabilityTotal)}) by ${formatAmount(netBalance)}. This could indicate inventory that wasn't properly accounted for, or missing liability entries.`
                         }
                       </p>
                     </div>
@@ -526,7 +529,7 @@ export default function ImportCycleDiagnostics() {
                           <span className="font-semibold">{issue.title}</span>
                           {issue.impact > 0 && (
                             <Badge variant="outline" className="ml-auto">
-                              Impact: ${formatNumber(issue.impact)}
+                              Impact: {formatAmount(issue.impact)}
                             </Badge>
                           )}
                         </div>
@@ -583,7 +586,7 @@ export default function ImportCycleDiagnostics() {
                     <TableCell className="font-medium">{config.label}</TableCell>
                     <TableCell>{getCategoryBadge(config.category)}</TableCell>
                     <TableCell className={`text-right font-mono ${getCategoryColor(config.category)}`}>
-                      ${formatNumber(value)}
+                      {formatAmount(value)}
                     </TableCell>
                   </TableRow>
                 );
@@ -591,7 +594,7 @@ export default function ImportCycleDiagnostics() {
               <TableRow className="border-t-2 bg-muted/50">
                 <TableCell colSpan={3} className="font-bold">Net Import Cycle Balance</TableCell>
                 <TableCell className={`text-right font-bold font-mono ${isBalanced ? 'text-green-600' : 'text-destructive'}`}>
-                  ${formatNumber(netBalance)}
+                  {formatAmount(netBalance)}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -632,7 +635,7 @@ export default function ImportCycleDiagnostics() {
                       <TableCell className="font-medium">{config.label}</TableCell>
                       <TableCell>{getCategoryBadge(config.category)}</TableCell>
                       <TableCell className="text-right font-mono text-muted-foreground">
-                        ${formatNumber(value)}
+                        {formatAmount(value)}
                       </TableCell>
                     </TableRow>
                   );
@@ -680,10 +683,10 @@ export default function ImportCycleDiagnostics() {
                     data-testid={`recon-row-${bucket.bucket}`}
                   >
                     <TableCell className="font-medium">{bucket.bucket}</TableCell>
-                    <TableCell className="text-right font-mono">${formatNumber(bucket.computed)}</TableCell>
-                    <TableCell className="text-right font-mono">${formatNumber(bucket.fromAccounts)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(bucket.computed)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(bucket.fromAccounts)}</TableCell>
                     <TableCell className={`text-right font-mono ${Math.abs(bucket.variance) > 1 ? 'text-destructive font-bold' : ''}`}>
-                      ${formatNumber(bucket.variance)}
+                      {formatAmount(bucket.variance)}
                     </TableCell>
                     <TableCell className="text-right">{bucket.accountsInBucket}</TableCell>
                   </TableRow>
@@ -706,7 +709,7 @@ export default function ImportCycleDiagnostics() {
                         <Badge variant="outline" className="ml-2">{account.parentType}</Badge>
                       </span>
                       <span className={`font-mono ${account.balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        ${formatNumber(account.balance)}
+                        {formatAmount(account.balance)}
                       </span>
                     </div>
                   ))}
@@ -739,7 +742,7 @@ export default function ImportCycleDiagnostics() {
                       >
                         <TableCell className="font-medium">{comp.label}</TableCell>
                         <TableCell className="text-right font-mono">
-                          ${formatNumber(comp.value)}
+                          {formatAmount(comp.value)}
                         </TableCell>
                         <TableCell>
                           <Badge variant={comp.ledgerVerified ? "default" : "outline"}>
@@ -747,10 +750,10 @@ export default function ImportCycleDiagnostics() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {comp.ledgerVerified ? `$${formatNumber(comp.ledgerSum || 0)}` : 'N/A'}
+                          {comp.ledgerVerified ? formatAmount(comp.ledgerSum || 0) : 'N/A'}
                         </TableCell>
                         <TableCell className={`text-right font-mono ${comp.variance && Math.abs(comp.variance) > 0.5 ? 'text-destructive font-bold' : ''}`}>
-                          {comp.ledgerVerified ? `$${formatNumber(comp.variance || 0)}` : '-'}
+                          {comp.ledgerVerified ? formatAmount(comp.variance || 0) : '-'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -803,11 +806,11 @@ export default function ImportCycleDiagnostics() {
                   >
                     <TableCell className="font-medium">{container.containerNumber}</TableCell>
                     <TableCell>{container.supplierName}</TableCell>
-                    <TableCell className="text-right font-mono">${formatNumber(container.grandTotal)}</TableCell>
-                    <TableCell className="text-right font-mono">${formatNumber(container.voucherDebits)}</TableCell>
-                    <TableCell className="text-right font-mono">${formatNumber(container.voucherCredits)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(container.grandTotal)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(container.voucherDebits)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(container.voucherCredits)}</TableCell>
                     <TableCell className={`text-right font-mono ${container.hasDiscrepancy ? 'text-destructive font-bold' : ''}`}>
-                      ${formatNumber(container.difference)}
+                      {formatAmount(container.difference)}
                     </TableCell>
                     <TableCell className="text-right">{container.voucherCount}</TableCell>
                   </TableRow>
@@ -820,7 +823,7 @@ export default function ImportCycleDiagnostics() {
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total Discrepancy:</span>
                 <span className={`font-mono text-lg ${diagnosticsData.containerAudit.reduce((sum, c) => sum + c.difference, 0) !== 0 ? 'text-destructive font-bold' : 'text-green-600'}`}>
-                  ${formatNumber(diagnosticsData.containerAudit.reduce((sum, c) => sum + c.difference, 0))}
+                  {formatAmount(diagnosticsData.containerAudit.reduce((sum, c) => sum + c.difference, 0))}
                 </span>
               </div>
               {diagnosticsData.containerAudit.filter(c => c.hasDiscrepancy).length > 0 && (

@@ -1618,6 +1618,7 @@ export const userPreferences = pgTable("user_preferences", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
+  preferredCurrency: varchar("preferred_currency", { length: 10 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1629,6 +1630,7 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).o
 }).extend({
   userId: z.string().min(1, "User ID is required"),
   dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY"]).default("MM/DD/YYYY"),
+  preferredCurrency: z.string().nullable().optional(),
 });
 
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;

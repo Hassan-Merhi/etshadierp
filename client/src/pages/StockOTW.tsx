@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Container, Supplier } from "@shared/schema";
 
 interface ContainerDetailData {
@@ -41,6 +41,7 @@ interface GroupedStockItem {
 }
 
 export default function StockOTW() {
+  const { formatAmount } = useCurrencyContext();
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -347,7 +348,7 @@ export default function StockOTW() {
                             {Math.round(item.totalQuantity).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${formatNumber(item.totalCost)}
+                            {formatAmount(item.totalCost)}
                           </TableCell>
                           <TableCell className="text-sm">
                             {(() => {
@@ -374,7 +375,7 @@ export default function StockOTW() {
                               {Math.round(container.quantity).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              ${formatNumber(container.cost)}
+                              {formatAmount(container.cost)}
                             </TableCell>
                             <TableCell className="text-sm">
                               {container.supplierName}
@@ -399,7 +400,7 @@ export default function StockOTW() {
                 <div className="text-right">
                   <span className="text-sm text-muted-foreground">Total Value:</span>
                   <span className="ml-2 font-mono font-semibold" data-testid="text-summary-value">
-                    ${formatNumber(totalValue)}
+                    {formatAmount(totalValue)}
                   </span>
                 </div>
               </div>

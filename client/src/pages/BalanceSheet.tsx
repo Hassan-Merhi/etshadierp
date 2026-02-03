@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign } from "lucide-react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface Account {
   id: string;
@@ -19,36 +21,34 @@ interface Account {
 }
 
 export default function BalanceSheet() {
-  import { useCompany } from "@/contexts/CompanyContext";
+  const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
 
-  export default function BalanceSheet() {
-    const { selectedCompany } = useCompany();
+  const { data: accounts = [], isLoading } = useQuery<Account[]>({
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
 
-    const { data: accounts = [], isLoading } = useQuery<Account[]>({
-      queryKey: ["/api/accounts/all", selectedCompany?.id],
-      enabled: !!selectedCompany,
-    });
-    
   // Filter accounts by type
   // Include Fixed Asset type and Ledger accounts with accountType=Asset
-    const assetAccounts = accounts.filter(
-      (acc) =>
-        acc.type === "fixedAsset" ||
-        (acc.type === "ledger" && acc.accountType === "Asset") ||
-        acc.type === "bank"
-    );
-  
+  const assetAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "fixedAsset" ||
+      (acc.type === "ledger" && acc.accountType === "Asset") ||
+      acc.type === "bank"
+  );
+
   // Include Supplier type and Ledger accounts with accountType=Liability
-    const liabilityAccounts = accounts.filter(
-      (acc) =>
-        acc.type === "supplier" ||
-        (acc.type === "ledger" && acc.accountType === "Liability")
-    );
-  
+  const liabilityAccounts = accounts.filter(
+    (acc) =>
+      acc.type === "supplier" ||
+      (acc.type === "ledger" && acc.accountType === "Liability")
+  );
+
   // Ledger accounts with accountType=Equity
-    const equityAccounts = accounts.filter(
-      (acc) => acc.type === "ledger" && acc.accountType === "Equity"
-    );
+  const equityAccounts = accounts.filter(
+    (acc) => acc.type === "ledger" && acc.accountType === "Equity"
+  );
 
   // Calculate totals
   const calculateTotal = (accountList: Account[]) => {
@@ -61,14 +61,6 @@ export default function BalanceSheet() {
   const totalAssets = calculateTotal(assetAccounts);
   const totalLiabilities = calculateTotal(liabilityAccounts);
   const totalEquity = calculateTotal(equityAccounts);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-    }).format(Math.abs(value));
-  };
 
   const renderAccountTable = (accountList: Account[], showTotal: boolean = true) => {
     if (isLoading) {
@@ -105,7 +97,7 @@ export default function BalanceSheet() {
               <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatCurrency(account.balance)} {account.balanceSide || ""}
+                  {formatAmount(account.balance)} {account.balanceSide || ""}
                 </TableCell>
               </TableRow>
             ))}
@@ -113,7 +105,7 @@ export default function BalanceSheet() {
               <TableRow className="font-semibold bg-muted/50">
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right font-mono" data-testid="text-total">
-                  {formatCurrency(total)}
+                  {formatAmount(total)}
                 </TableCell>
               </TableRow>
             )}
@@ -140,7 +132,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-assets">
-              {isLoading ? "Loading..." : formatCurrency(totalAssets)}
+              {isLoading ? "Loading..." : formatAmount(totalAssets)}
             </div>
           </CardContent>
         </Card>
@@ -152,7 +144,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-liabilities">
-              {isLoading ? "Loading..." : formatCurrency(totalLiabilities)}
+              {isLoading ? "Loading..." : formatAmount(totalLiabilities)}
             </div>
           </CardContent>
         </Card>
@@ -164,7 +156,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-equity">
-              {isLoading ? "Loading..." : formatCurrency(totalEquity)}
+              {isLoading ? "Loading..." : formatAmount(totalEquity)}
             </div>
           </CardContent>
         </Card>

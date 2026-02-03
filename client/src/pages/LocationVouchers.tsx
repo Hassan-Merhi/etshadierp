@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useState, useEffect, useRef } from "react";
 
 interface Transaction {
@@ -60,6 +61,7 @@ interface LocationVouchersData {
 
 export default function LocationVouchers() {
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
   const stockItemId = parseInt(params.stockItemId || "0");
@@ -263,18 +265,18 @@ export default function LocationVouchers() {
                     </td>
                     <td className="px-4 py-3 border-r text-xs">{txn.vchType}</td>
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.inwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.inwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.inwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.inwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(txn.inwardValue)}</td>
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.outwardQty, 0)}</td>
                     <td className="text-right px-2 py-3 tabular-nums">
-                      {formatNumber(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                      {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
                     </td>
                     <td className="text-right px-2 py-3 tabular-nums border-r">
-                      {formatNumber(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
+                      {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                     </td>
                     <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.closingRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.closingRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>
                   </tr>
                   );
                 })}
@@ -291,14 +293,14 @@ export default function LocationVouchers() {
                   <tr className="bg-muted/50 font-bold border-t">
                     <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.inwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(data.totals.inwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.inwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(data.totals.inwardValue)}</td>
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.outwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(data.totals.outwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.outwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(data.totals.outwardValue)}</td>
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.closingRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.closingValue)}</td>
                   </tr>
                 )}
               </tbody>

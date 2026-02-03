@@ -1203,28 +1203,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const { dateFormat } = req.body;
+      const { dateFormat, preferredCurrency } = req.body;
       
-      // Validate date format
-      if (!["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
+      // Validate date format if provided
+      if (dateFormat && !["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
         return res.status(400).json({ message: "Invalid date format" });
+      }
+      
+      // Validate currency if provided
+      if (preferredCurrency && !["USD", "CFA"].includes(preferredCurrency)) {
+        return res.status(400).json({ message: "Invalid currency" });
       }
       
       // Check if preferences exist
       const existing = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.user.id));
       
+      // Build update object with only provided fields
+      const updateFields: any = { updatedAt: new Date() };
+      if (dateFormat) updateFields.dateFormat = dateFormat;
+      if (preferredCurrency !== undefined) updateFields.preferredCurrency = preferredCurrency;
+      
       if (existing.length === 0) {
         // Create new preferences
         const newPrefs = await db.insert(userPreferences).values({
           userId: req.user.id,
-          dateFormat,
+          dateFormat: dateFormat || "MM/DD/YYYY",
+          preferredCurrency: preferredCurrency || null,
         }).returning();
         return res.json(newPrefs[0]);
       }
       
       // Update existing preferences
       const updated = await db.update(userPreferences)
-        .set({ dateFormat, updatedAt: new Date() })
+        .set(updateFields)
         .where(eq(userPreferences.userId, req.user.id))
         .returning();
       
@@ -1233,6 +1244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
 
   // Company management routes
   app.get("/api/companies", requireAuth, async (req, res) => {

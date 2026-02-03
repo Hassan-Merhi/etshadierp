@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Plus, Search, Building2, Pencil, ExternalLink, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ const formSchema = insertCustomerSchema.extend({
 export default function Customers() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -331,7 +333,7 @@ export default function Customers() {
                     </button>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${formatNumber(customer.balance || 0)}
+                    {formatAmount(customer.balance || 0)}
                   </TableCell>
                   <TableCell>{customer.balanceSide || "Dr"}</TableCell>
                   <TableCell>
@@ -468,7 +470,7 @@ export default function Customers() {
               {statementCustomer?.legalName} - Statement
             </DialogTitle>
             <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
-              <span>Current Balance: <span className="font-mono font-semibold text-foreground">${formatNumber(statementCustomer?.balance || 0)}</span></span>
+              <span>Current Balance: <span className="font-mono font-semibold text-foreground">{formatAmount(statementCustomer?.balance || 0)}</span></span>
               <Badge variant={statementCustomer?.balanceSide === "Cr" ? "default" : "secondary"}>
                 {statementCustomer?.balanceSide || "Dr"}
               </Badge>
@@ -517,10 +519,10 @@ export default function Customers() {
                             {sale.invoiceNumber || "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(sale.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatAmount(sale.totalAmount || 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            ${parseFloat(sale.paidAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatAmount(sale.paidAmount || 0)}
                           </TableCell>
                           <TableCell>
                             <Badge variant={sale.paymentStatus === "PAID" ? "default" : sale.paymentStatus === "PARTIAL" ? "secondary" : "outline"}>
@@ -540,7 +542,7 @@ export default function Customers() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Outstanding: </span>
                     <span className="font-mono font-semibold text-lg">
-                      ${formatNumber(statementCustomer?.balance || 0)}
+                      {formatAmount(statementCustomer?.balance || 0)}
                     </span>
                   </div>
                 </div>

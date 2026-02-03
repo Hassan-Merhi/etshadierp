@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useState, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -103,6 +104,7 @@ type DashboardData = {
 
 export default function ContainerDashboard() {
   const { selectCompany, companies } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const [filterAgent, setFilterAgent] = useState<string>("all");
   const [filterCompany, setFilterCompany] = useState<string[]>([]);
@@ -387,7 +389,7 @@ export default function ContainerDashboard() {
                         <td className="py-1 px-2">{formatDate(container.borderDate)}</td>
                         <td className="py-1 px-2">{container.transporter || "-"}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
+                        <td className="py-1 px-2 text-right">{formatAmount(parseFloat(container.dutyFee || "0"))}</td>
                       </tr>
                     ))
                   ) : (
@@ -398,7 +400,7 @@ export default function ContainerDashboard() {
                   <tfoot className="bg-green-100 dark:bg-green-900/30">
                     <tr>
                       <td colSpan={6} className="py-1 px-2 font-bold">Total Balance Owed</td>
-                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
+                      <td className="py-1 px-2 text-right font-bold">{formatAmount(agentData.offloadedContainers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
                     </tr>
                   </tfoot>
                 )}
@@ -435,7 +437,7 @@ export default function ContainerDashboard() {
                         <td className="py-1 px-2">{formatDate(container.borderDate)}</td>
                         <td className="py-1 px-2">{container.transporter || "-"}</td>
                         <td className="py-1 px-2">{container.trackingLocation || "-"}</td>
-                        <td className="py-1 px-2 text-right">${formatNumber(parseFloat(container.dutyFee || "0"))}</td>
+                        <td className="py-1 px-2 text-right">{formatAmount(parseFloat(container.dutyFee || "0"))}</td>
                       </tr>
                     ))
                   ) : (
@@ -446,7 +448,7 @@ export default function ContainerDashboard() {
                   <tfoot className="bg-yellow-100 dark:bg-yellow-900/30">
                     <tr>
                       <td colSpan={6} className="py-1 px-2 font-bold">Total OTW</td>
-                      <td className="py-1 px-2 text-right font-bold">${formatNumber(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
+                      <td className="py-1 px-2 text-right font-bold">{formatAmount(agentData.containers.reduce((sum: number, c: any) => sum + parseFloat(c.dutyFee || "0"), 0))}</td>
                     </tr>
                   </tfoot>
                 )}
@@ -590,7 +592,7 @@ export default function ContainerDashboard() {
                       <DollarSign className="h-3 w-3 text-muted-foreground" />
                       <div>
                         <p className="text-[10px] text-muted-foreground">Total Value</p>
-                        <p className="text-sm font-bold">${formatNumber(filteredData?.totals.amount || 0)}</p>
+                        <p className="text-sm font-bold">{formatAmount(filteredData?.totals.amount || 0)}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -640,7 +642,7 @@ export default function ContainerDashboard() {
                                     </CardTitle>
                                     <Badge variant="secondary" className="text-xs">{containers.length}</Badge>
                                   </div>
-                                  <span className="text-xs font-medium">${formatNumber(routeTotal)}</span>
+                                  <span className="text-xs font-medium">{formatAmount(routeTotal)}</span>
                                 </div>
                               </CardHeader>
                             </CollapsibleTrigger>
@@ -686,7 +688,7 @@ export default function ContainerDashboard() {
                                         >
                                           {container.containerNumber}
                                         </td>
-                                        <td className="py-0.5 px-0.5 text-right">${formatNumber(parseFloat(container.grandTotal || "0"))}</td>
+                                        <td className="py-0.5 px-0.5 text-right">{formatAmount(parseFloat(container.grandTotal || "0"))}</td>
                                         <td className="py-0.5 px-0.5">{container.supplierName || "-"}</td>
                                         <td className={cn("py-0.5 px-0.5", isOverdue(container.eta) && "text-yellow-600 dark:text-yellow-400")}>
                                           {formatDate(container.eta)}
@@ -703,9 +705,9 @@ export default function ContainerDashboard() {
                                           )}
                                         </td>
                                         <td className="py-0.5 px-0.5">{container.transporter || "-"}</td>
-                                        <td className="py-0.5 px-2 text-center min-w-[80px]">{container.transportFee ? `$${formatNumber(parseFloat(container.transportFee))}` : "-"}</td>
+                                        <td className="py-0.5 px-2 text-center min-w-[80px]">{container.transportFee ? formatAmount(parseFloat(container.transportFee)) : "-"}</td>
                                         <td className="py-0.5 px-2 min-w-[90px]">{container.agent || "-"}</td>
-                                        <td className="py-0.5 px-0.5 text-right">{container.dutyFee ? `$${formatNumber(parseFloat(container.dutyFee))}` : "-"}</td>
+                                        <td className="py-0.5 px-0.5 text-right">{container.dutyFee ? formatAmount(parseFloat(container.dutyFee)) : "-"}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -793,7 +795,7 @@ export default function ContainerDashboard() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Total Value</span>
-                          <span className="font-bold">${formatNumber(filteredData?.totals.amount || 0)}</span>
+                          <span className="font-bold">{formatAmount(filteredData?.totals.amount || 0)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Total Items</span>
@@ -859,7 +861,7 @@ export default function ContainerDashboard() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total:</span>
-                  <span className="ml-2 font-bold">${formatNumber(parseFloat(poData.container.grandTotal || "0"))}</span>
+                  <span className="ml-2 font-bold">{formatAmount(parseFloat(poData.container.grandTotal || "0"))}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total Qty:</span>
@@ -909,7 +911,7 @@ export default function ContainerDashboard() {
                                 </td>
                                 <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.quantity || "0"))}</td>
                                 <td className="py-1 px-2 text-right">{formatNumber(parseFloat(item.rate || "0"))}</td>
-                                <td className="py-1 px-2 text-right font-medium">${formatNumber(parseFloat(item.lineTotal || "0"))}</td>
+                                <td className="py-1 px-2 text-right font-medium">{formatAmount(parseFloat(item.lineTotal || "0"))}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -922,30 +924,30 @@ export default function ContainerDashboard() {
                             </tr>
                             <tr className="font-medium">
                               <td colSpan={3} className="py-1 px-2 text-right">Items Total:</td>
-                              <td className="py-1 px-2 text-right" data-testid="text-items-total">${formatNumber(parseFloat(po.itemsTotal || "0"))}</td>
+                              <td className="py-1 px-2 text-right" data-testid="text-items-total">{formatAmount(parseFloat(po.itemsTotal || "0"))}</td>
                             </tr>
                             {parseFloat(po.freight || "0") > 0 && (
                               <tr>
                                 <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Freight:</td>
-                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.freight || "0"))}</td>
+                                <td className="py-0.5 px-2 text-right">{formatAmount(parseFloat(po.freight || "0"))}</td>
                               </tr>
                             )}
                             {parseFloat(po.surcharge || "0") > 0 && (
                               <tr>
                                 <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Surcharge:</td>
-                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.surcharge || "0"))}</td>
+                                <td className="py-0.5 px-2 text-right">{formatAmount(parseFloat(po.surcharge || "0"))}</td>
                               </tr>
                             )}
                             {parseFloat(po.otherCharges || "0") > 0 && (
                               <tr>
                                 <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Other Charges:</td>
-                                <td className="py-0.5 px-2 text-right">${formatNumber(parseFloat(po.otherCharges || "0"))}</td>
+                                <td className="py-0.5 px-2 text-right">{formatAmount(parseFloat(po.otherCharges || "0"))}</td>
                               </tr>
                             )}
                             {parseFloat(po.discount || "0") > 0 && (
                               <tr>
                                 <td colSpan={3} className="py-0.5 px-2 text-right text-muted-foreground">Discount:</td>
-                                <td className="py-0.5 px-2 text-right">-${formatNumber(parseFloat(po.discount || "0"))}</td>
+                                <td className="py-0.5 px-2 text-right">-{formatAmount(parseFloat(po.discount || "0"))}</td>
                               </tr>
                             )}
                           </tfoot>

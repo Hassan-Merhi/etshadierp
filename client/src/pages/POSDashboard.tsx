@@ -41,7 +41,7 @@ import {
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { formatNumber } from "@/lib/formatNumber";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface PosShift {
   id: number;
@@ -88,6 +88,7 @@ interface POSDashboardProps {
 export default function POSDashboard({ posUser }: POSDashboardProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [openShiftDialog, setOpenShiftDialog] = useState(false);
   const [closeShiftDialog, setCloseShiftDialog] = useState(false);
@@ -197,7 +198,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       const variance = parseFloat(data.variance || "0");
       toast({
         title: "Shift Closed",
-        description: `Your shift has been closed. ${variance !== 0 ? `Variance: ${formatNumber(variance)}` : "Cash balanced!"}`,
+        description: `Your shift has been closed. ${variance !== 0 ? `Variance: ${formatAmount(variance)}` : "Cash balanced!"}`,
         variant: variance !== 0 ? "destructive" : "default",
       });
     },
@@ -271,7 +272,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                     Started: {format(new Date(currentShift.openedAt), "MMM dd, yyyy 'at' hh:mm a")}
                   </p>
                   <p className="text-sm">
-                    Opening Cash: <span className="font-medium">{formatNumber(parseFloat(currentShift.openingCash))}</span>
+                    Opening Cash: <span className="font-medium">{formatAmount(parseFloat(currentShift.openingCash))}</span>
                   </p>
                 </div>
                 <Button
@@ -338,7 +339,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             ) : (
               <>
                 <div className="text-2xl font-bold" data-testid="text-today-revenue">
-                  {formatNumber(parseFloat(todaySales?.total || "0"))}
+                  {formatAmount(parseFloat(todaySales?.total || "0"))}
                 </div>
                 <p className="text-xs text-muted-foreground">total revenue</p>
               </>
@@ -357,7 +358,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             ) : (
               <>
                 <div className="text-2xl font-bold" data-testid="text-average-sale">
-                  {formatNumber(parseFloat(todaySales?.average || "0"))}
+                  {formatAmount(parseFloat(todaySales?.average || "0"))}
                 </div>
                 <p className="text-xs text-muted-foreground">per transaction</p>
               </>
@@ -455,17 +456,17 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(shift.openingCash))}
+                        {formatAmount(parseFloat(shift.openingCash))}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {shift.closingCash ? formatNumber(parseFloat(shift.closingCash)) : "-"}
+                        {shift.closingCash ? formatAmount(parseFloat(shift.closingCash)) : "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {shift.salesTotal ? formatNumber(parseFloat(shift.salesTotal)) : "-"}
+                        {shift.salesTotal ? formatAmount(parseFloat(shift.salesTotal)) : "-"}
                         {shift.salesCount ? ` (${shift.salesCount})` : ""}
                       </TableCell>
                       <TableCell className={`text-right font-mono ${variance !== 0 ? "text-destructive" : "text-green-600"}`}>
-                        {shift.variance ? formatNumber(variance) : "-"}
+                        {shift.variance ? formatAmount(variance) : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={shift.status === "open" ? "default" : "secondary"}>
@@ -540,7 +541,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <div className="bg-muted p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Opening Cash:</span>
-                  <span className="font-mono">{formatNumber(parseFloat(currentShift.openingCash))}</span>
+                  <span className="font-mono">{formatAmount(parseFloat(currentShift.openingCash))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Shift Started:</span>

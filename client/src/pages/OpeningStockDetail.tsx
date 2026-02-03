@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Package, Search } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface StockItemData {
   id: number;
@@ -97,16 +98,12 @@ function formatQty(value: number, uom: string = "BL"): string {
   return `${formatNumber(value)} ${uom}`;
 }
 
-function formatValue(value: number): string {
-  if (value === 0) return "";
-  return formatNumber(value);
-}
-
 export default function OpeningStockDetail() {
   const [, navigate] = useLocation();
   const params = useParams<{ groupId: string }>();
   const searchString = useSearch();
   const { selectedCompany } = useCompany();
+  const { formatAmount } = useCurrencyContext();
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   const searchParams = new URLSearchParams(searchString);
@@ -210,20 +207,20 @@ export default function OpeningStockDetail() {
                     {formatQty(item.opening.quantity, item.uom)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.opening.rate)}
+                    {formatNumber(item.opening.rate)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.opening.value)}
+                    {item.opening.value === 0 ? "" : formatAmount(item.opening.value)}
                   </div>
                   {/* Closing Balance */}
                   <div className="text-right font-mono text-sm border-l pl-2">
                     {formatQty(item.closing.quantity, item.uom)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.closing.rate)}
+                    {formatNumber(item.closing.rate)}
                   </div>
                   <div className="text-right font-mono text-sm">
-                    {formatValue(item.closing.value)}
+                    {item.closing.value === 0 ? "" : formatAmount(item.closing.value)}
                   </div>
                 </div>
               ))}
@@ -248,7 +245,7 @@ export default function OpeningStockDetail() {
                 {formatNumber(openingRate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.opening.value)}
+                {formatAmount(data.grandTotal.opening.value)}
               </div>
               {/* Closing Total */}
               <div className="text-right font-mono border-l pl-2">
@@ -258,7 +255,7 @@ export default function OpeningStockDetail() {
                 {formatNumber(closingRate)}
               </div>
               <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.closing.value)}
+                {formatAmount(data.grandTotal.closing.value)}
               </div>
             </div>
           </div>
@@ -335,7 +332,7 @@ export default function OpeningStockDetail() {
                             {formatNumber(rec.averageRate)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatNumber(rec.totalValue)}
+                            {formatAmount(rec.totalValue)}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {new Date(rec.lastUpdated).toLocaleString()}
@@ -373,7 +370,7 @@ export default function OpeningStockDetail() {
                   </div>
                   <div>
                     <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
-                      {formatNumber(debugData.totals.activeValue)}
+                      {formatAmount(debugData.totals.activeValue)}
                     </div>
                     <div className="text-sm text-muted-foreground">Value</div>
                   </div>
@@ -401,7 +398,7 @@ export default function OpeningStockDetail() {
                     </div>
                     <div>
                       <div className="text-xl font-mono">
-                        {formatNumber(debugData.totals.totalValue)}
+                        {formatAmount(debugData.totals.totalValue)}
                       </div>
                       <div className="text-sm">Value</div>
                     </div>

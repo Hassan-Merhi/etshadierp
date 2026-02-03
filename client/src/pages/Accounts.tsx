@@ -76,8 +76,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatNumber } from "@/lib/formatNumber";
 
 interface Account {
   id: string;
@@ -120,6 +120,7 @@ export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
+  const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
   const searchString = useSearch();
 
@@ -1390,7 +1391,7 @@ export default function Accounts() {
                                 className="font-mono font-semibold"
                                 data-testid="text-account-balance"
                               >
-                                ${formatNumber(Math.abs(closingBalance))}{" "}
+                                {formatAmount(Math.abs(closingBalance))}{" "}
                                 {selectedAccount?.type === "supplier"
                                   ? closingBalance > 0
                                     ? "Cr"
@@ -1630,23 +1631,23 @@ export default function Accounts() {
                               <TableCell className="text-right font-mono py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? openingBalance < 0
-                                    ? `$${formatNumber(Math.abs(openingBalance))}`
+                                    ? formatAmount(Math.abs(openingBalance))
                                     : "-"
                                   : openingBalance > 0
-                                    ? `$${formatNumber(openingBalance)}`
+                                    ? formatAmount(openingBalance)
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? openingBalance > 0
-                                    ? `$${formatNumber(openingBalance)}`
+                                    ? formatAmount(openingBalance)
                                     : "-"
                                   : openingBalance < 0
-                                    ? `$${formatNumber(Math.abs(openingBalance))}`
+                                    ? formatAmount(Math.abs(openingBalance))
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold py-2">
-                                ${formatNumber(Math.abs(openingBalance))}{" "}
+                                {formatAmount(Math.abs(openingBalance))}{" "}
                                 {selectedAccount?.type === "supplier"
                                   ? openingBalance > 0
                                     ? "Cr"
@@ -1726,17 +1727,16 @@ export default function Accounts() {
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-2">
                                     {voucher.totalDebit > 0
-                                      ? `$${formatNumber(voucher.totalDebit)}`
+                                      ? formatAmount(voucher.totalDebit)
                                       : "-"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono py-2">
                                     {voucher.totalCredit > 0
-                                      ? `$${formatNumber(voucher.totalCredit)}`
+                                      ? formatAmount(voucher.totalCredit)
                                       : "-"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono font-medium py-2">
-                                    $
-                                    {formatNumber(
+                                    {formatAmount(
                                       Math.abs(voucher.runningBalance ?? 0),
                                     )}{" "}
                                     {selectedAccount?.type === "supplier"
@@ -1768,19 +1768,19 @@ export default function Accounts() {
                               <TableCell className="text-right font-mono w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? openingBalance < 0
-                                    ? `$${formatNumber(Math.abs(openingBalance))}`
+                                    ? formatAmount(Math.abs(openingBalance))
                                     : "-"
                                   : openingBalance > 0
-                                    ? `$${formatNumber(openingBalance)}`
+                                    ? formatAmount(openingBalance)
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? openingBalance > 0
-                                    ? `$${formatNumber(openingBalance)}`
+                                    ? formatAmount(openingBalance)
                                     : "-"
                                   : openingBalance < 0
-                                    ? `$${formatNumber(Math.abs(openingBalance))}`
+                                    ? formatAmount(Math.abs(openingBalance))
                                     : "-"}
                               </TableCell>
                               <TableCell className="w-[130px] py-2"></TableCell>
@@ -1793,10 +1793,10 @@ export default function Accounts() {
                                 Current Total:
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold w-[120px] py-2">
-                                ${formatNumber(transactionTotals.totalDebit)}
+                                {formatAmount(transactionTotals.totalDebit)}
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold w-[120px] py-2">
-                                ${formatNumber(transactionTotals.totalCredit)}
+                                {formatAmount(transactionTotals.totalCredit)}
                               </TableCell>
                               <TableCell className="w-[130px] py-2"></TableCell>
                             </TableRow>
@@ -1810,23 +1810,23 @@ export default function Accounts() {
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? closingBalance < 0
-                                    ? `$${formatNumber(Math.abs(closingBalance))}`
+                                    ? formatAmount(Math.abs(closingBalance))
                                     : "-"
                                   : closingBalance > 0
-                                    ? `$${formatNumber(closingBalance)}`
+                                    ? formatAmount(closingBalance)
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[120px] py-2">
                                 {selectedAccount?.type === "supplier"
                                   ? closingBalance > 0
-                                    ? `$${formatNumber(closingBalance)}`
+                                    ? formatAmount(closingBalance)
                                     : "-"
                                   : closingBalance < 0
-                                    ? `$${formatNumber(Math.abs(closingBalance))}`
+                                    ? formatAmount(Math.abs(closingBalance))
                                     : "-"}
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold w-[130px] py-2">
-                                ${formatNumber(Math.abs(closingBalance))}{" "}
+                                {formatAmount(Math.abs(closingBalance))}{" "}
                                 {selectedAccount?.type === "supplier"
                                   ? closingBalance > 0
                                     ? "Cr"

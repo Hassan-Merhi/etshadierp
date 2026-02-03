@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 interface VoucherEntry {
   id: number;
@@ -49,13 +50,6 @@ interface LedgerVouchersData {
   closingBalance: number;
 }
 
-function formatFullNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 const voucherTypeColors: Record<string, string> = {
   Payment: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   Receipt: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
@@ -69,6 +63,7 @@ const voucherTypeColors: Record<string, string> = {
 export default function LedgerVouchers() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-vouchers/:accountId/:year/:month");
+  const { formatAmount } = useCurrencyContext();
   
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
   const year = params?.year ? parseInt(params.year) : null;
@@ -206,12 +201,12 @@ export default function LedgerVouchers() {
                               </TableCell>
                               <TableCell className="text-right font-mono">
                                 {voucher.debit > 0
-                                  ? formatFullNumber(voucher.debit)
+                                  ? formatAmount(voucher.debit)
                                   : ""}
                               </TableCell>
                               <TableCell className="text-right font-mono">
                                 {voucher.credit > 0
-                                  ? formatFullNumber(voucher.credit)
+                                  ? formatAmount(voucher.credit)
                                   : ""}
                               </TableCell>
                               <TableCell>
@@ -224,10 +219,10 @@ export default function LedgerVouchers() {
                           <TableRow className="bg-primary/10 font-bold border-t-2">
                             <TableCell colSpan={3}></TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatFullNumber(data.totals.debit)}
+                              {formatAmount(data.totals.debit)}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {formatFullNumber(data.totals.credit)}
+                              {formatAmount(data.totals.credit)}
                             </TableCell>
                             <TableCell></TableCell>
                           </TableRow>
@@ -245,7 +240,7 @@ export default function LedgerVouchers() {
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Opening Balance</p>
                   <p className="text-lg font-bold font-mono">
-                    {formatFullNumber(Math.abs(data.openingBalance))}
+                    {formatAmount(Math.abs(data.openingBalance))}
                   </p>
                 </CardContent>
               </Card>
@@ -253,7 +248,7 @@ export default function LedgerVouchers() {
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Current Total</p>
                   <p className="text-lg font-bold font-mono">
-                    {formatFullNumber(data.totals.debit - data.totals.credit)}
+                    {formatAmount(data.totals.debit - data.totals.credit)}
                   </p>
                 </CardContent>
               </Card>
@@ -267,7 +262,7 @@ export default function LedgerVouchers() {
                         : "text-red-600"
                     }`}
                   >
-                    {formatFullNumber(Math.abs(data.closingBalance))}
+                    {formatAmount(Math.abs(data.closingBalance))}
                   </p>
                 </CardContent>
               </Card>
