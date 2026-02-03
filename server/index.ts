@@ -23,7 +23,6 @@ declare global {
         posStation?: number | null;
         cashAccountId?: number | null;
         canSellNegativeStock?: boolean;
-        canViewCustomerBalances?: boolean;
         daybookEditDays?: number;
       };
     }
