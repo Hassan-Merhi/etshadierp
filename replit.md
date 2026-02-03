@@ -35,6 +35,7 @@ The frontend uses React with TypeScript and Vite, implementing the shadcn/ui des
 -   **Employee Deposit Accounting**: Employee deposits are accounted for as `PAYROLL_DEPOSIT_EXPENSE` (Indirect Expense), hitting Net Profit at deposit/payroll time. Withdrawals reduce liability without Net Profit impact. Employee opening balances are included in the implicit opening balance equity calculation.
 -   **Active Users Monitoring**: Admin-only feature displaying logged-in users, grouped by company, with role, current page, and last active time, updated in real-time.
 -   **OTW Container Tracking**: A TallyPrime-style interface for tracking containers in transit, including automatic fields from PO data and manual, inline-editable fields (e.g., shop name, ETA, transport fee). Supports export to Excel and optional API integration for automatic ETA updates.
+-   **Global Multi-Currency Switcher**: For companies with a `displayCurrency` set (e.g., CFA), users can toggle between USD and CFA currencies. The preference persists across sessions via localStorage (for guests) and backend database (for logged-in users via `user_preferences.preferredCurrency`). All currency displays use a centralized `formatAmount()` function from `CurrencyContext` that handles exchange rate conversion at display time. Graceful fallback to USD with console warnings when exchange rates are missing.
 
 ### System Design Choices
 
