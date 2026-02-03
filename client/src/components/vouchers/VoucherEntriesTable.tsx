@@ -47,7 +47,7 @@ export function VoucherEntriesTable({
   onRowBlur,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
 
   const handleAddRow = () => {
     append({
@@ -59,11 +59,16 @@ export function VoucherEntriesTable({
   };
 
   const handleBlur = (index: number) => {
-    if (!onAmountCommit) return;
-    
-    const amount = Number(entries[index]?.amount);
-    if (!isNaN(amount) && amount > 0) {
-      onAmountCommit(index);
+    const enteredAmount = Number(entries[index]?.amount);
+    if (!isNaN(enteredAmount) && enteredAmount > 0) {
+      // Convert from display currency to USD for storage
+      if (selectedCurrency !== "USD") {
+        const usdAmount = convertToUSD(enteredAmount);
+        form.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
+      }
+      if (onAmountCommit) {
+        onAmountCommit(index);
+      }
     }
   };
 

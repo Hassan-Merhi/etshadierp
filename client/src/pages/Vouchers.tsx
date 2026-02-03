@@ -530,7 +530,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -3753,6 +3753,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         className="font-mono text-right"
                                         data-testid={`input-journal-amount-${index}`}
                                         onKeyDown={(e) => handleJournalKeyDown(e, index, "amount")}
+                                        onBlur={() => {
+                                          const enteredAmount = Number(field.value);
+                                          if (!isNaN(enteredAmount) && enteredAmount > 0 && selectedCurrency !== "USD") {
+                                            const usdAmount = convertToUSD(enteredAmount);
+                                            journalForm.setValue(`entries.${index}.amount`, usdAmount.toFixed(2));
+                                          }
+                                        }}
                                       />
                                     </FormControl>
                                     <FormMessage />
