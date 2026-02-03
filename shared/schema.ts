@@ -65,6 +65,7 @@ export const userCompanyRoles = pgTable("user_company_roles", {
   posStation: integer("pos_station"),
   canSellNegativeStock: boolean("can_sell_negative_stock").notNull().default(false),
   daybookEditDays: integer("daybook_edit_days").notNull().default(0),
+  canAccessCustomers: boolean("can_access_customers").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

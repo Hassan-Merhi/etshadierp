@@ -15,7 +15,7 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package } from "lucide-react";
+import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users } from "lucide-react";
 import { usePresence } from "@/hooks/use-presence";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
@@ -44,6 +44,7 @@ import StockItemDetail from "@/pages/StockItemDetail";
 import SalesReport from "@/pages/SalesReport";
 import POSDaybook from "@/pages/POSDaybook";
 import POSDashboard from "@/pages/POSDashboard";
+import POSCustomers from "@/pages/POSCustomers";
 import EditSupplier from "@/pages/EditSupplier";
 import StockOTW from "@/pages/StockOTW";
 import Customers from "@/pages/Customers";
@@ -98,6 +99,7 @@ function Router({ user }: { user: any }) {
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
+        <Route path="/pos-customers">{() => <POSCustomers />}</Route>
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route>{() => <POS posUser={user} />}</Route>
       </Switch>
@@ -275,6 +277,18 @@ function AuthenticatedApp() {
               <Package className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Transfer</span>
             </Button>
+            {user.canAccessCustomers && (
+              <Button
+                variant={currentLocation === "/pos-customers" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setLocation("/pos-customers")}
+                data-testid="button-customers-tab"
+                className="shrink-0"
+              >
+                <Users className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Customers</span>
+              </Button>
+            )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">

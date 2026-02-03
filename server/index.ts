@@ -24,6 +24,7 @@ declare global {
         cashAccountId?: number | null;
         canSellNegativeStock?: boolean;
         daybookEditDays?: number;
+        canAccessCustomers?: boolean;
       };
     }
   }
@@ -45,6 +46,7 @@ declare module 'express-session' {
     cashAccountId?: number | null;
     canSellNegativeStock?: boolean;
     daybookEditDays?: number;
+    canAccessCustomers?: boolean;
   }
 }
 

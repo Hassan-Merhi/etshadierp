@@ -2604,6 +2604,17 @@ function EditLogTable({ companyId }: { companyId?: number }) {
                                               <Label className="text-sm cursor-pointer">Can Sell</Label>
                                             </div>
                                             <div className="flex items-center gap-2">
+                                              <Switch
+                                                checked={role.canAccessCustomers || false}
+                                                onCheckedChange={(checked) =>
+                                                  handlePermissionToggle(role.id, user.id, role.companyId, "canAccessCustomers", checked)
+                                                }
+                                                disabled={updatePermissionMutation.isPending}
+                                                data-testid={`toggle-can-access-customers-${role.id}`}
+                                              />
+                                              <Label className="text-sm cursor-pointer">Customers</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
                                               <Label className="text-sm">Edit Daybook:</Label>
                                               <Select
                                                 value={String(role.daybookEditDays || 0)}
