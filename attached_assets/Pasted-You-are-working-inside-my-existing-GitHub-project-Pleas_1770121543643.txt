@@ -1,0 +1,48 @@
+You are working inside my existing GitHub project. Please analyze the current codebase and implement a global multi-currency switcher.
+
+Goal
+1) In multi-currency countries, there is a currency button in the top header (example: “USD/CFA” or whatever label exists today). When I click it, EVERYTHING on the site/app must immediately change to the other currency.
+2) This must work for ALL users (guest + logged-in), across all pages/components where currency is shown.
+
+Requirements / Acceptance Criteria
+- Clicking the header currency button toggles between exactly two currencies for that locale/country (e.g., USD <-> CFA), based on the existing button/logic.
+- All currency displays update instantly without needing a full page refresh:
+  - product prices, totals, cart/checkout summaries, fees, shipping, taxes, subscriptions, invoices, any price badges, etc.
+- The selection persists:
+  - For guests: persist in localStorage (or cookie) and restore on reload.
+  - For logged-in users: also persist to user profile/settings in the backend (if such a model exists), so it follows them across devices.
+- Single source of truth:
+  - Introduce/extend a global “currency state” (Context/Redux/store or equivalent) so every component reads from it.
+  - Do NOT let components manage their own currency separately.
+- Formatting + conversion:
+  - Use a single formatting utility (Intl.NumberFormat or existing utility).
+  - Use a single conversion function:
+    - If prices are stored in one base currency, convert consistently using an exchange rate source already in the project.
+    - If there’s already multi-currency pricing returned by API, switch which field is rendered instead of converting.
+- Server/API integration:
+  - If the API supports a currency parameter/header, include the currently selected currency on requests that return prices (cart, checkout, product lists, etc.).
+  - Make sure totals match the selected currency (avoid mixing currencies).
+- Edge cases:
+  - If the country is NOT multi-currency, hide/disable the toggle.
+  - Handle missing exchange rates gracefully (fallback to default currency + show console warning).
+- Tests / Verification:
+  - Add or update tests (unit/integration) to ensure toggling currency updates a representative price component and cart total.
+  - Provide a short manual QA checklist.
+
+Implementation Steps (what you should do)
+1) Locate the header currency button component and identify current currency/country detection logic.
+2) Find all places currency is rendered; refactor them to use the new global currency selector + formatPrice() utility.
+3) Implement a global CurrencyProvider/store:
+   - state: selectedCurrency, availableCurrencies
+   - actions: toggleCurrency(), setCurrency()
+   - persistence: localStorage/cookie; and user profile if logged in
+4) Update API calls that return prices to respect selectedCurrency (query param or header).
+5) Ensure cart/checkout totals recalculate/re-render correctly when currency changes.
+6) Output a clear summary of changes with file paths and key code snippets.
+
+Important:
+- Do not change the UI design; keep the existing button and just make it functional globally.
+- Keep changes minimal and consistent with the project’s current patterns (React context vs Redux vs Zustand, etc.).
+- After implementing, list every file modified and why.
+
+Start by scanning the repo for currency-related code (search terms: “currency”, “USD”, “CFA”, “Intl.NumberFormat”, “price”, “formatPrice”, “exchangeRate”, “locale”, “country”).
