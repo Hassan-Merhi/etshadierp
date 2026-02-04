@@ -1615,7 +1615,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           
           {/* Hidden Print Template - POS/Thermal Style */}
           <div className="hidden">
-            <div ref={printRef} style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600' }}>
+            <div ref={printRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
+              {/* Injected print styles to match LocationInventory print */}
+              <style dangerouslySetInnerHTML={{ __html: `
+                @media print {
+                  body { font-family: Arial, Helvetica, sans-serif !important; }
+                  * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; }
+                }
+              `}} />
               {/* Title */}
               <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>
                 POS INVOICE
