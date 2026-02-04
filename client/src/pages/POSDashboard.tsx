@@ -217,7 +217,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-lg font-semibold mb-2">No Location Assigned</h2>
+            <h2 className="text-lg font-medium mb-2">No Location Assigned</h2>
             <p className="text-muted-foreground">
               Please contact your administrator to assign you to a location.
             </p>
@@ -232,7 +232,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">POS Dashboard</h1>
+          <h1 className="text-2xl font-semibold">POS Dashboard</h1>
           <p className="text-muted-foreground">
             {location?.name || "Loading..."} - {posUser.username}
           </p>
@@ -319,7 +319,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-today-sales-count">
+                <div className="text-2xl font-semibold" data-testid="text-today-sales-count">
                   {todaySales?.count || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">transactions</p>
@@ -338,7 +338,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-today-revenue">
+                <div className="text-2xl font-semibold" data-testid="text-today-revenue">
                   {formatAmount(parseFloat(todaySales?.total || "0"))}
                 </div>
                 <p className="text-xs text-muted-foreground">total revenue</p>
@@ -357,7 +357,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-average-sale">
+                <div className="text-2xl font-semibold" data-testid="text-average-sale">
                   {formatAmount(parseFloat(todaySales?.average || "0"))}
                 </div>
                 <p className="text-xs text-muted-foreground">per transaction</p>

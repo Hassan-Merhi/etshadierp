@@ -321,7 +321,7 @@ export default function POSDaybook() {
             {isLoading ? (
               <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-xl md:text-2xl font-bold" data-testid="text-transaction-count">
+              <div className="text-xl md:text-2xl font-semibold" data-testid="text-transaction-count">
                 {salesTransactionCount}
               </div>
             )}
@@ -339,7 +339,7 @@ export default function POSDaybook() {
             {isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-lg md:text-2xl font-bold" data-testid="text-total-sales">
+              <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-sales">
                 {formatAmount(totalSales)}
               </div>
             )}
@@ -357,7 +357,7 @@ export default function POSDaybook() {
             {isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-lg md:text-2xl font-bold" data-testid="text-avg-transaction">
+              <div className="text-lg md:text-2xl font-semibold" data-testid="text-avg-transaction">
                 {formatAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
               </div>
             )}
@@ -375,7 +375,7 @@ export default function POSDaybook() {
             {isLoading ? (
               <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-xl md:text-2xl font-bold" data-testid="text-transfer-count">
+              <div className="text-xl md:text-2xl font-semibold" data-testid="text-transfer-count">
                 {transferCount}
               </div>
             )}

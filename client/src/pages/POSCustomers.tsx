@@ -127,7 +127,7 @@ export default function POSCustomers() {
             {isLoading ? (
               <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-xl md:text-2xl font-bold" data-testid="text-total-customers">
+              <div className="text-xl md:text-2xl font-semibold" data-testid="text-total-customers">
                 {totalCustomers}
               </div>
             )}
@@ -145,7 +145,7 @@ export default function POSCustomers() {
             {isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-lg md:text-2xl font-bold" data-testid="text-total-receivables">
+              <div className="text-lg md:text-2xl font-semibold" data-testid="text-total-receivables">
                 {formatAmount(totalReceivables)}
               </div>
             )}
