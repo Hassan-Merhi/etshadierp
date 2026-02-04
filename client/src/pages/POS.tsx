@@ -590,7 +590,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 md:gap-6 p-4 md:p-8">
         <div className="text-center">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">Point of Sale</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold mb-2">Point of Sale</h1>
           <p className="text-sm md:text-base text-muted-foreground">Select a location to begin</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 w-full max-w-4xl">
@@ -604,7 +604,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               <div className="p-4 md:p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="font-semibold text-lg">{location.name}</h3>
+                    <h3 className="font-medium text-lg">{location.name}</h3>
                     <p className="text-sm text-muted-foreground">{location.code}</p>
                   </div>
                   <MapPin className="h-5 w-5 text-muted-foreground" />
@@ -652,7 +652,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <div className="flex flex-col items-center justify-center h-full gap-4 p-4 md:p-8">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-6 w-6 md:h-8 md:w-8" />
-          <h2 className="text-lg md:text-xl font-semibold">Location Access Denied</h2>
+          <h2 className="text-lg md:text-xl font-medium">Location Access Denied</h2>
         </div>
         <p className="text-center text-sm md:text-base text-muted-foreground max-w-md">
           You don't have access to a location in the currently selected company. 
@@ -676,7 +676,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-8 w-8" />
-          <h2 className="text-xl font-semibold">No Location Assigned</h2>
+          <h2 className="text-xl font-medium">No Location Assigned</h2>
         </div>
         <p className="text-center text-muted-foreground max-w-md">
           You don't have a location assigned to your account. 
@@ -692,7 +692,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-8 w-8" />
-          <h2 className="text-xl font-semibold">Inventory Access Denied</h2>
+          <h2 className="text-xl font-medium">Inventory Access Denied</h2>
         </div>
         <p className="text-center text-muted-foreground max-w-md">
           Unable to access inventory for this location. This may be because the location 
@@ -1217,7 +1217,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           {posUser ? (
             <div className="px-2 sm:px-3 py-1.5">
-              <span className="font-medium text-sm sm:text-base">{activeLocation?.name}</span>
+              <span className="text-sm sm:text-base">{activeLocation?.name}</span>
             </div>
           ) : (
             <Select 
@@ -1260,7 +1260,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             {posUser?.cashAccountId && assignedCashAccount ? (
               <div className="px-2 sm:px-3 py-1.5 bg-muted/50 rounded-md border">
-                <span className="text-xs sm:text-sm font-medium">{assignedCashAccount.name}</span>
+                <span className="text-xs sm:text-sm">{assignedCashAccount.name}</span>
                 <span className="text-xs text-muted-foreground ml-1 sm:ml-2 hidden sm:inline">({assignedCashAccount.code})</span>
               </div>
             ) : (
@@ -1338,7 +1338,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             onCheckedChange={setIsCreditSale}
             data-testid="toggle-credit-sale"
           />
-          <Label htmlFor="credit-sale" className="text-xs sm:text-sm font-medium cursor-pointer">
+          <Label htmlFor="credit-sale" className="text-xs sm:text-sm cursor-pointer">
             Credit
           </Label>
         </div>
@@ -1379,14 +1379,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           <div className="overflow-x-auto">
             <div className="min-w-[500px]">
               {/* Header */}
-              <div className="flex bg-muted/50 border-b sticky top-0 z-10">
-                <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 font-medium text-xs">
+              <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-10">
+                <div className="w-10 sm:w-12 flex items-center justify-center border-r border-muted h-9 sm:h-10 text-xs text-muted-foreground">
                   #
                 </div>
                 {columns.map((col) => (
                   <div
                     key={col.key}
-                    className={`${col.width} flex items-center px-2 sm:px-3 border-r h-9 sm:h-10 font-medium text-xs sm:text-sm`}
+                    className={`${col.width} flex items-center px-2 sm:px-3 border-r border-muted h-9 sm:h-10 text-xs sm:text-sm text-muted-foreground`}
                   >
                     {col.label}
                   </div>
@@ -1396,8 +1396,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {/* Rows */}
               <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
                 {rows.map((row, rowIndex) => (
-                  <div key={row.id} className="flex border-b hover-elevate">
-                    <div className="w-10 sm:w-12 flex items-center justify-center border-r h-9 sm:h-10 text-xs text-muted-foreground">
+                  <div key={row.id} className="flex border-b border-muted/50 hover-elevate">
+                    <div className="w-10 sm:w-12 flex items-center justify-center border-r border-muted/50 h-9 sm:h-10 text-xs text-muted-foreground">
                       {rowIndex + 1}
                     </div>
                     {columns.map((col, colIndex) => (
@@ -1476,17 +1476,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           {/* Total Section */}
-          <div className="border-t bg-muted/20 p-2 sm:p-4">
+          <div className="border-t border-muted bg-muted/20 p-2 sm:p-4">
             <div className="flex flex-col sm:flex-row sm:justify-end items-end sm:items-center gap-2 sm:gap-6 max-w-md ml-auto">
               <div className="flex items-center gap-2 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Items:</span>
-                <span className="font-mono font-medium">{rows.filter((r) => r.amount > 0).length}</span>
+                <span className="font-mono">{rows.filter((r) => r.amount > 0).length}</span>
                 <span className="text-muted-foreground ml-2">Qty:</span>
-                <span className="font-mono font-medium" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
+                <span className="font-mono" data-testid="text-total-qty">{totalQty > 0 ? totalQty.toFixed(3) : "0"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-lg font-semibold">Total:</span>
-                <span className="text-xl sm:text-2xl font-bold font-mono" data-testid="text-grand-total">
+                <span className="text-sm sm:text-lg font-medium">Total:</span>
+                <span className="text-xl sm:text-2xl font-semibold font-mono" data-testid="text-grand-total">
                   {formatAmount(total)}
                 </span>
               </div>
@@ -1497,7 +1497,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         {/* Right Panel - Item Search */}
         <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
-            <h3 className="text-sm font-semibold mb-3">Search Items</h3>
+            <h3 className="text-sm font-medium mb-3">Search Items</h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1551,7 +1551,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium mb-1">{item.name}</div>
+                      <div className="text-sm mb-1">{item.name}</div>
                       <div className="text-xs text-muted-foreground font-mono">
                         {item.code}
                       </div>
