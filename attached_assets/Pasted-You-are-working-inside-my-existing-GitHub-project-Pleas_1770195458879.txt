@@ -1,0 +1,94 @@
+You are working inside my existing GitHub project. Please fix the POS INVOICE print template (receipt/invoice printout) exactly as requested below. Analyze the current receipt/print generation code (PDF/HTML/thermal print template) and implement these changes without redesigning anything else.
+
+A) PRINTING MUST ALWAYS BE IN USD (even if the transaction was done in CFA)
+Important clarification:
+- While using the POS, the transaction can be created/paid in either USD or CFA (or the other currency).
+- BUT when PRINTING the POS invoice/receipt, ALL monetary amounts shown on the printed invoice must be displayed in USD only (not CFA), regardless of the transaction currency.
+
+Acceptance criteria (USD-only printing)
+- If a sale/payment was entered in CFA:
+  - The printed receipt must still show item rates, line totals, totals, paid amounts, etc. in USD.
+  - Do the conversion using the transaction’s locked fx_rate_used (the rate used at time of transaction).
+  - Do NOT use today’s/new daily rate for printing.
+- If a sale/payment was entered in USD:
+  - Print normally in USD.
+
+B) DAILY RATE LINE MUST ALWAYS DISPLAY IN USD FORMAT WHEN PRINTING
+- On ALL printed POS invoices/receipts, show the daily rate line as:
+  “Daily Rate: $1 = XXX CFA”
+- Always USD on the left side.
+- Use the transaction’s stored fx_rate_used (rate at time of sale). If stored inversely, invert for printing so it always prints as "$1 = ...".
+
+C) REMOVE THESE FIELDS FROM THE PRINTOUT
+Remove the following lines/fields entirely:
+- “Bill No:” (remove the whole Bill No field)
+- “Cash:”
+- “Cash Tendered:”
+- “Balance:”
+Also fix the header so the date is NOT repeated:
+- Date/time is currently shown more than once; keep only one date/time display and remove duplicates.
+
+D) REMOVE THE SERIAL/ROW NUMBER COLUMN IN ITEMS
+Current print shows an item serial/row number column (e.g., “Sl” and a “1” per row).
+Required:
+- Remove that serial/index column completely so the items table starts with Description (or the first meaningful column) and does not print row numbering.
+
+E) FIX USER DISPLAY: SHOW THE REAL LOGGED-IN USER (NOT “ADMIN” PLACEHOLDER)
+Current behavior:
+- Printed invoice shows “User: Admin” (or placeholder) and does not reflect the real user.
+Required:
+- Print the actual authenticated user who created the POS sale:
+  - Prefer: full name
+  - Fallback: username
+  - Fallback: email
+- Ensure the POS transaction record stores created_by / user_id at creation time.
+- Print template must read from that stored transaction data.
+
+F) FONT + SPACING MUST MATCH THE PROVIDED SAMPLE IMAGE
+I provided a reference screenshot for the item rows (font + spacing + alignment).
+Requirements:
+- Update the print template styling so the items section matches the sample:
+  - Same (or the closest available) font appearance
+  - Same spacing/line-height
+  - Same column alignment:
+    - Description left aligned
+    - Qty aligned consistently
+    - Rate aligned consistently
+    - Amount aligned consistently
+  - Ensure numbers line up vertically (monospace/tabular alignment if needed).
+Implementation note:
+- If this is HTML printing: use a fixed-width/monospace font OR enable tabular numbers (font-variant-numeric: tabular-nums) and set consistent column widths.
+- If this is PDF generation: set the exact font family used by the PDF library (or closest supported) and enforce consistent column widths + right alignment for numeric columns.
+- Apply the same spacing as the screenshot as closely as possible.
+
+Implementation steps (do this)
+1) Locate the POS invoice/receipt printing template(s):
+   Search for: “POS INVOICE”, “receipt”, “print”, “invoice”, “thermal”, “pdf”, “Bill No”, “Cash Tendered”, “Daily Rate”.
+2) Identify how the template gets transaction data (sale totals, transaction currency, fx rate, user).
+3) Implement USD-only printing:
+   - Create a dedicated “print currency = USD” formatting path.
+   - Convert all non-USD transaction money values to USD using transaction.fx_rate_used.
+   - Ensure line items, totals, payments, paid amount, etc. render in USD only.
+4) Enforce Daily Rate printed as: “$1 = X CFA” using the transaction’s locked rate (invert if needed).
+5) Remove Bill No, Cash, Cash Tendered, Balance, and duplicate date occurrences.
+6) Remove item serial column and reflow the table columns.
+7) Fix “User:” to print the real user who created the transaction.
+8) Apply font + spacing changes to match the provided sample image as closely as possible.
+
+Deliverables
+- List the exact files changed (with paths).
+- Show key diff/snippets for:
+  - USD-only print conversion logic
+  - Daily Rate formatting ($1 = X CFA)
+  - Template field removals
+  - User mapping (created_by persistence + print)
+  - Font/spacing/table alignment changes
+- Provide a quick manual QA checklist:
+  - Print USD transaction → USD output
+  - Print CFA transaction → still USD output using locked rate
+  - Daily rate line correct
+  - Removed fields gone
+  - Date not duplicated
+  - No row numbering
+  - Correct user displayed
+  - Items alignment matches sample
