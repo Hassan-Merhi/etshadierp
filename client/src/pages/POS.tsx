@@ -1630,7 +1630,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
               {/* Invoice Info - Date/Time left, User right */}
               <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
-                <span>Date: {savedSale?.saleDate} {printTime}</span>
+                <span>Date: {savedSale?.saleDate}</span>
                 <span>User: {printUserName}</span>
               </div>
 
