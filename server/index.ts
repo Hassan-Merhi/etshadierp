@@ -65,9 +65,17 @@ app.set("trust proxy", 1);
 // Session middleware
 const PgSession = connectPgSimple(session);
 
+if (!process.env.SESSION_SECRET) {
+  console.error("CRITICAL: SESSION_SECRET environment variable is not set!");
+  console.error("Please set a strong, random SESSION_SECRET for production security.");
+  if (process.env.NODE_ENV === "production") {
+    process.exit(1);
+  }
+}
+
 const sessionConfig: session.SessionOptions = {
   name: 'erp.session', // Explicit cookie name
-  secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+  secret: process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -150,7 +158,15 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const isProduction = process.env.NODE_ENV === "production";
+    
+    if (status >= 500) {
+      console.error("[Server Error]", isProduction ? err.message : err);
+    }
+    
+    const message = isProduction && status >= 500
+      ? "An unexpected error occurred. Please try again."
+      : (err.message || "Internal Server Error");
 
     res.status(status).json({ message });
   });

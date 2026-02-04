@@ -4,3 +4,21 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Security: Exclude sensitive/debug files
+attached_assets/
+*.sql
+*.dump
+*.backup
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Backup files
+*.backup*
+*.bak
+*~
