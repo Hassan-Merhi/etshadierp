@@ -6,6 +6,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { ExchangeRateInput } from "@/components/ExchangeRateInput";
 import { formatNumber } from "@/lib/formatNumber";
 import { useReactToPrint } from "react-to-print";
 import { useLocation } from "wouter";
@@ -530,7 +531,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount, selectedCurrency, convertToUSD, exchangeRate } = useCurrencyContext();
+  const { formatAmount, selectedCurrency, convertToUSD, exchangeRate: dailyExchangeRate } = useCurrencyContext();
+  // Transaction-specific exchange rate (allows override of daily rate for rate-locking)
+  const [transactionRate, setTransactionRate] = useState<number | null>(null);
+  // Use transaction rate if set, otherwise fall back to daily rate
+  const exchangeRate = transactionRate || dailyExchangeRate;
   const [location, setLocation] = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
   const isPOS = !!posUser;
@@ -840,6 +845,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         notes: voucherToEdit.description || "",
         optional: voucherToEdit.optional || false,
       });
+      
+      // Initialize transaction rate from voucher's rate-locked exchange rate
+      if (voucherToEdit.exchangeRate) {
+        setTransactionRate(parseFloat(voucherToEdit.exchangeRate));
+      }
     }
   }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, form]);
 
@@ -3408,6 +3418,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {!isPOS && (
           <TabsContent value="payment" className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <PaymentVoucherTab
               form={form}
               fieldArray={fieldArray}
@@ -3440,6 +3461,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
         {!isPOS && (
           <TabsContent value="receipt" className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <ReceiptVoucherTab
               form={form}
               fieldArray={fieldArray}
@@ -3473,6 +3505,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {/* Journal Voucher Tab */}
         {!isPOS && (
           <TabsContent value="journal" className="space-y-4">
+            {/* Exchange Rate Input for multi-currency transactions */}
+            {selectedCurrency === "CFA" && (
+              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-md">
+                <span className="text-sm text-muted-foreground">Transaction Rate:</span>
+                <ExchangeRateInput
+                  value={transactionRate}
+                  onChange={setTransactionRate}
+                  selectedCurrency={selectedCurrency}
+                />
+              </div>
+            )}
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Left Panel - Form */}
               <Card className="flex-1 min-w-0">

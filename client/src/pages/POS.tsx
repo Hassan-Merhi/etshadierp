@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CurrencySelector } from "@/components/CurrencySelector";
+import { ExchangeRateInput } from "@/components/ExchangeRateInput";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -172,9 +173,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!editVoucherId,
   });
 
-  const { selectedCurrency, exchangeRate, convertToUSD, displayCurrency, formatAmount } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate: dailyExchangeRate, convertToUSD, displayCurrency, formatAmount } = useCurrencyContext();
   // Force USD if company doesn't have dual-currency enabled
   const [saleCurrency, setSaleCurrency] = useState<Currency>(displayCurrency ? selectedCurrency : "USD");
+  // Transaction-specific exchange rate (allows override of daily rate)
+  const [transactionRate, setTransactionRate] = useState<number | null>(null);
+  // Use transaction rate if set, otherwise fall back to daily rate
+  const exchangeRate = transactionRate || dailyExchangeRate;
   
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 },
@@ -284,6 +289,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       // Populate currency from voucher
       if (editVoucher.currency) {
         setSaleCurrency(editVoucher.currency);
+      }
+
+      // Populate exchange rate from voucher (rate-locking)
+      if (editVoucher.exchangeRate) {
+        setTransactionRate(parseFloat(editVoucher.exchangeRate));
       }
 
       // Populate payment account and credit sale info from voucher entries
@@ -1093,7 +1103,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     if (saleCurrency === "CFA" && !exchangeRate) {
       toast({
         title: "Error",
-        description: "No exchange rate set for this date. Please set an exchange rate in Settings before selling in CFA.",
+        description: "Please enter an exchange rate for this transaction.",
         variant: "destructive",
       });
       return;
@@ -1118,6 +1128,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       notes,
       voucherDate: saleDate,
       currency: "USD", // Always store in USD
+      exchangeRate: exchangeRate ? exchangeRate.toString() : undefined, // Rate-lock: store the rate used for this transaction
       items: validItems.map(row => {
         // Use canonical USD rate directly (no conversion needed)
         return {
@@ -1301,33 +1312,58 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Currency Selector - only show if company has dual-currency enabled */}
         {displayCurrency && (
-          <CurrencySelector 
-            value={saleCurrency} 
-            onChange={(newCurrency) => {
-              if (newCurrency === saleCurrency) return;
-              
-              // Convert existing rows when currency changes using canonical USD rate
-              if (exchangeRate && rows.some(r => r.rateUSD > 0)) {
-                const convertedRows = rows.map(row => {
-                  if (row.rateUSD === 0) return row;
-                  
-                  // Always convert from the canonical USD rate
-                  const newRate = newCurrency === "CFA"
-                    ? Math.round(row.rateUSD * exchangeRate)
-                    : row.rateUSD;
-                  
-                  return {
-                    ...row,
-                    rate: newRate,
-                    amount: row.quantity * newRate,
-                  };
-                });
-                setRows(convertedRows);
-              }
-              
-              setSaleCurrency(newCurrency);
-            }} 
-          />
+          <>
+            <CurrencySelector 
+              value={saleCurrency} 
+              onChange={(newCurrency) => {
+                if (newCurrency === saleCurrency) return;
+                
+                // Convert existing rows when currency changes using canonical USD rate
+                if (exchangeRate && rows.some(r => r.rateUSD > 0)) {
+                  const convertedRows = rows.map(row => {
+                    if (row.rateUSD === 0) return row;
+                    
+                    // Always convert from the canonical USD rate
+                    const newRate = newCurrency === "CFA"
+                      ? Math.round(row.rateUSD * exchangeRate)
+                      : row.rateUSD;
+                    
+                    return {
+                      ...row,
+                      rate: newRate,
+                      amount: row.quantity * newRate,
+                    };
+                  });
+                  setRows(convertedRows);
+                }
+                
+                setSaleCurrency(newCurrency);
+              }} 
+            />
+            {/* Exchange Rate Input - allows per-transaction rate override */}
+            {saleCurrency === "CFA" && (
+              <ExchangeRateInput
+                value={transactionRate}
+                onChange={(rate) => {
+                  setTransactionRate(rate);
+                  // Recalculate display amounts when rate changes
+                  if (rate && rows.some(r => r.rateUSD > 0)) {
+                    const convertedRows = rows.map(row => {
+                      if (row.rateUSD === 0) return row;
+                      const newRate = Math.round(row.rateUSD * rate);
+                      return {
+                        ...row,
+                        rate: newRate,
+                        amount: row.quantity * newRate,
+                      };
+                    });
+                    setRows(convertedRows);
+                  }
+                }}
+                selectedCurrency={saleCurrency}
+              />
+            )}
+          </>
         )}
 
         {/* Credit Sale Toggle */}
