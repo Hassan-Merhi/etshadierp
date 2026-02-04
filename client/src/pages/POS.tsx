@@ -148,6 +148,17 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!activeLocation,
   });
 
+  // Fetch authenticated user for printing (fallback when posUser not available)
+  const { data: authUser } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  // Compute the username to display on printed invoices
+  // Priority: posUser fields (if POS login) -> authUser fields (if regular login)
+  const printUserName = posUser?.fullName || posUser?.username || posUser?.email 
+    || authUser?.fullName || authUser?.name || authUser?.username || authUser?.email 
+    || 'Unknown';
+
   // Fetch last sold prices for stock items (from any location in the company)
   const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
     queryKey: activeLocation ? [`/api/pos/last-sold-prices`, { locationId: activeLocation.id }] : [],
@@ -1613,7 +1624,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {/* Invoice Info - Date/Time left, User right */}
               <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
                 <span>Date: {savedSale?.saleDate} {printTime}</span>
-                <span>User: {posUser?.fullName || posUser?.name || posUser?.username || posUser?.email || 'Unknown'}</span>
+                <span>User: {printUserName}</span>
               </div>
 
               {/* Daily Exchange Rate - Only for Mali company, uses transaction's locked rate */}
