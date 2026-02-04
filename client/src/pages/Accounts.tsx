@@ -4,7 +4,6 @@ import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Select,
   SelectContent,
@@ -49,7 +48,6 @@ import {
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { Checkbox } from "@/components/ui/checkbox";
-import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -78,6 +76,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 interface Account {
   id: string;
@@ -146,10 +145,15 @@ export default function Accounts() {
 
   // Initialize state from URL params
   const [searchTerm, setSearchTerm] = useState("");
-  const [startDate, setStartDate] = useState(urlStartDate);
-  const [endDate, setEndDate] = useState(urlEndDate);
-  const [selectedMonth, setSelectedMonth] = useState(urlMonth);
-  const [selectedYear, setSelectedYear] = useState(urlYear);
+  
+  // Period filter state - use URL params if available, otherwise default to "this_month"
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
+    if (urlStartDate && urlEndDate) {
+      return { fromDate: urlStartDate, toDate: urlEndDate, preset: "custom" as const };
+    }
+    return getDefaultPeriodValue("this_month");
+  });
+  
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(
     null,
   );
@@ -193,22 +197,16 @@ export default function Accounts() {
 
   // label that shows the chosen period on the printout
   const periodLabel = useMemo(() => {
-    const hasStart = !!startDate;
-    const hasEnd = !!endDate;
+    const hasStart = !!periodFilter.fromDate;
+    const hasEnd = !!periodFilter.toDate;
 
     if (hasStart && hasEnd)
-      return `${formatDisplayDate(startDate)} → ${formatDisplayDate(endDate)}`;
-    if (hasStart) return `From ${formatDisplayDate(startDate)}`;
-    if (hasEnd) return `Up to ${formatDisplayDate(endDate)}`;
-
-    if (selectedMonth && selectedYear) {
-      const monthName =
-        months.find((m) => m.value === selectedMonth)?.label ?? selectedMonth;
-      return `${monthName} ${selectedYear}`;
-    }
+      return `${formatDisplayDate(periodFilter.fromDate)} → ${formatDisplayDate(periodFilter.toDate)}`;
+    if (hasStart) return `From ${formatDisplayDate(periodFilter.fromDate)}`;
+    if (hasEnd) return `Up to ${formatDisplayDate(periodFilter.toDate)}`;
 
     return "All dates";
-  }, [startDate, endDate, selectedMonth, selectedYear, formatDisplayDate]);
+  }, [periodFilter.fromDate, periodFilter.toDate, formatDisplayDate]);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -272,15 +270,16 @@ export default function Accounts() {
     queryKey: selectedAccount
       ? [
           `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
-          { startDate, endDate },
+          { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
         ]
       : [],
     queryFn: async () => {
       if (!selectedAccount) return [];
 
       const params = new URLSearchParams();
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
+      // Map periodFilter.fromDate/toDate to backend's startDate/endDate
+      if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
 
       let accountType = (selectedAccount.type || "").toLowerCase();
       if (accountType === "fixed asset") {
@@ -334,73 +333,14 @@ export default function Accounts() {
     }
   };
 
-  const handleMonthChange = (month: string) => {
-    setSelectedMonth(month);
-    if (month && selectedYear) {
-      const monthIndex = parseInt(month) - 1;
-      const year = parseInt(selectedYear);
-      const start = startOfMonth(new Date(year, monthIndex, 1));
-      const end = endOfMonth(new Date(year, monthIndex, 1));
-      const startStr = format(start, "yyyy-MM-dd");
-      const endStr = format(end, "yyyy-MM-dd");
-      setStartDate(startStr);
-      setEndDate(endStr);
-      updateUrlParams({ month, startDate: startStr, endDate: endStr });
-    } else {
-      setStartDate("");
-      setEndDate("");
-      updateUrlParams({ month, startDate: null, endDate: null });
-    }
-  };
-
-  const handleYearChange = (year: string) => {
-    setSelectedYear(year);
-    if (year && selectedMonth) {
-      const monthIndex = parseInt(selectedMonth) - 1;
-      const yearNum = parseInt(year);
-      const start = startOfMonth(new Date(yearNum, monthIndex, 1));
-      const end = endOfMonth(new Date(yearNum, monthIndex, 1));
-      const startStr = format(start, "yyyy-MM-dd");
-      const endStr = format(end, "yyyy-MM-dd");
-      setStartDate(startStr);
-      setEndDate(endStr);
-      updateUrlParams({ year, startDate: startStr, endDate: endStr });
-    } else {
-      setStartDate("");
-      setEndDate("");
-      updateUrlParams({ year, startDate: null, endDate: null });
-    }
-  };
-
-  const clearDateFilters = () => {
-    setStartDate("");
-    setEndDate("");
-    setSelectedMonth("");
-    setSelectedYear("");
+  // Handler for period filter changes - updates state and URL params
+  const handlePeriodFilterChange = useCallback((newValue: PeriodFilterValue) => {
+    setPeriodFilter(newValue);
     updateUrlParams({
-      startDate: null,
-      endDate: null,
-      month: null,
-      year: null,
+      startDate: newValue.fromDate || null,
+      endDate: newValue.toDate || null,
     });
-  };
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-  const months = [
-    { value: "1", label: "January" },
-    { value: "2", label: "February" },
-    { value: "3", label: "March" },
-    { value: "4", label: "April" },
-    { value: "5", label: "May" },
-    { value: "6", label: "June" },
-    { value: "7", label: "July" },
-    { value: "8", label: "August" },
-    { value: "9", label: "September" },
-    { value: "10", label: "October" },
-    { value: "11", label: "November" },
-    { value: "12", label: "December" },
-  ];
+  }, [updateUrlParams]);
 
   // Build account hierarchy
   const buildAccountHierarchy = () => {
@@ -1429,110 +1369,19 @@ export default function Accounts() {
           {selectedAccount && (
             <>
               <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      Filter by Date Range
+                      Statement Period
                     </CardTitle>
-                    {(startDate || endDate) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearDateFilters}
-                        data-testid="button-clear-filters"
-                      >
-                        <X className="w-4 h-4 mr-1" />
-                        Clear
-                      </Button>
-                    )}
+                    <PeriodFilter
+                      value={periodFilter}
+                      onChange={handlePeriodFilterChange}
+                      data-testid="period-filter"
+                    />
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">
-                      Quick Filter by Month
-                    </Label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="filter-year">Year</Label>
-                        <Select
-                          value={selectedYear}
-                          onValueChange={handleYearChange}
-                        >
-                          <SelectTrigger
-                            id="filter-year"
-                            data-testid="select-year"
-                          >
-                            <SelectValue placeholder="Select year" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {years.map((year) => (
-                              <SelectItem key={year} value={year.toString()}>
-                                {year}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="filter-month">Month</Label>
-                        <Select
-                          value={selectedMonth}
-                          onValueChange={handleMonthChange}
-                        >
-                          <SelectTrigger
-                            id="filter-month"
-                            data-testid="select-month"
-                          >
-                            <SelectValue placeholder="Select month" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {months.map((month) => (
-                              <SelectItem key={month.value} value={month.value}>
-                                {month.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <Label className="text-sm font-medium mb-2 block">
-                      Or Set Custom Date Range
-                    </Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="start-date">Start Date</Label>
-                        <DatePickerInput
-                          value={startDate}
-                          onChange={(value) => {
-                            setStartDate(value);
-                            setSelectedMonth("");
-                            setSelectedYear("");
-                          }}
-                          placeholder="Start date"
-                          data-testid="input-start-date"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="end-date">End Date</Label>
-                        <DatePickerInput
-                          value={endDate}
-                          onChange={(value) => {
-                            setEndDate(value);
-                            setSelectedMonth("");
-                            setSelectedYear("");
-                          }}
-                          placeholder="End date"
-                          data-testid="input-end-date"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
               </Card>
 
               <Card>
@@ -1569,7 +1418,7 @@ export default function Accounts() {
                         <h2 className="text-xl font-semibold mb-1">
                           Ledger: {selectedAccount?.name}
                         </h2>
-                        {(startDate || endDate) && (
+                        {(periodFilter.fromDate || periodFilter.toDate) && (
                           <p className="text-sm text-muted-foreground">
                             {periodLabel}
                           </p>
@@ -1667,7 +1516,7 @@ export default function Accounts() {
                                 >
                                   <Search className="w-10 h-10 mx-auto mb-2 opacity-50" />
                                   <p>No transactions found for this account</p>
-                                  {(startDate || endDate) && (
+                                  {(periodFilter.fromDate || periodFilter.toDate) && (
                                     <p className="text-sm mt-1">
                                       Try adjusting the date range
                                     </p>

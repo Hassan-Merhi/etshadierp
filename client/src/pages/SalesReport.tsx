@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -108,8 +108,7 @@ const formatSmartNumber = (value: string | number) => {
 };
 
 export default function SalesReport() {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [selectedStockItem, setSelectedStockItem] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -127,8 +126,8 @@ export default function SalesReport() {
   const recalculateMutation = useMutation({
     mutationFn: async () => {
       const body: any = {};
-      if (startDate) body.startDate = startDate;
-      if (endDate) body.endDate = endDate;
+      if (periodFilter.fromDate) body.startDate = periodFilter.fromDate;
+      if (periodFilter.toDate) body.endDate = periodFilter.toDate;
       if (selectedLocation && selectedLocation !== "all") body.locationId = parseInt(selectedLocation);
       if (selectedStockItem && selectedStockItem !== "all") body.stockItemId = parseInt(selectedStockItem);
       
@@ -162,8 +161,8 @@ export default function SalesReport() {
 
   // Build query params for single-company mode
   const queryParams = new URLSearchParams();
-  if (startDate) queryParams.append("startDate", startDate);
-  if (endDate) queryParams.append("endDate", endDate);
+  if (periodFilter.fromDate) queryParams.append("startDate", periodFilter.fromDate);
+  if (periodFilter.toDate) queryParams.append("endDate", periodFilter.toDate);
   if (selectedLocation && selectedLocation !== "all") queryParams.append("locationId", selectedLocation);
   if (selectedStockItem && selectedStockItem !== "all") queryParams.append("stockItemId", selectedStockItem);
 
@@ -172,8 +171,8 @@ export default function SalesReport() {
 
   // Build query params for multi-company mode
   const multiCompanyParams = new URLSearchParams();
-  if (startDate) multiCompanyParams.append("startDate", startDate);
-  if (endDate) multiCompanyParams.append("endDate", endDate);
+  if (periodFilter.fromDate) multiCompanyParams.append("startDate", periodFilter.fromDate);
+  if (periodFilter.toDate) multiCompanyParams.append("endDate", periodFilter.toDate);
   if (selectedLocation && selectedLocation !== "all") multiCompanyParams.append("locationId", selectedLocation);
   if (selectedStockItem && selectedStockItem !== "all") multiCompanyParams.append("stockItemId", selectedStockItem);
   if (selectedCompanies.length > 0) multiCompanyParams.append("companyFilter", selectedCompanies.join(","));
@@ -298,8 +297,7 @@ export default function SalesReport() {
   );
 
   const handleClearFilters = () => {
-    setStartDate("");
-    setEndDate("");
+    setPeriodFilter(getDefaultPeriodValue("this_month"));
     setSelectedLocation("");
     setSelectedStockItem("");
     setSearchTerm("");
@@ -411,6 +409,13 @@ export default function SalesReport() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          {/* Period Filter */}
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter-sales-report"
+          />
+
           {/* Multi-company mode toggle */}
           <Button
             variant={isMultiCompanyMode ? "default" : "outline"}
@@ -551,7 +556,7 @@ export default function SalesReport() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label htmlFor="grouping">View By</Label>
               <Select
@@ -583,24 +588,6 @@ export default function SalesReport() {
                   <SelectItem value="negative">Negative Only</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date</Label>
-              <DatePickerInput
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="Start date"
-                data-testid="input-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endDate">End Date</Label>
-              <DatePickerInput
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="End date"
-                data-testid="input-end-date"
-              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>

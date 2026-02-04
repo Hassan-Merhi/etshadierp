@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   Table,
   TableBody,
@@ -92,16 +93,23 @@ export default function POSDaybook() {
   const voucherIdParam = urlParams.get('voucherId');
   const dateParam = urlParams.get('date');
 
-  // Get date range - use URL param if provided and valid, otherwise default to today
-  let targetDate = new Date();
-  if (dateParam) {
-    const parsedDate = parseISO(dateParam);
-    if (isValid(parsedDate)) {
-      targetDate = parsedDate;
+  // Period filter state - initialize based on URL param or default to today
+  const getInitialPeriod = (): PeriodFilterValue => {
+    if (dateParam) {
+      const parsedDate = parseISO(dateParam);
+      if (isValid(parsedDate)) {
+        const dateStr = format(parsedDate, "yyyy-MM-dd");
+        return { fromDate: dateStr, toDate: dateStr, preset: "custom" };
+      }
     }
-  }
-  const startDate = format(startOfDay(targetDate), "yyyy-MM-dd");
-  const endDate = format(endOfDay(targetDate), "yyyy-MM-dd");
+    return getDefaultPeriodValue("today");
+  };
+
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getInitialPeriod);
+
+  // Use periodFilter dates for API queries
+  const startDate = periodFilter.fromDate;
+  const endDate = periodFilter.toDate;
 
   // Fetch user permissions
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
@@ -302,12 +310,29 @@ export default function POSDaybook() {
   const salesTransactionCount = salesOnlyVouchers.length;
   const transferCount = transferVouchers.length;
 
+  // Generate subtitle based on period filter
+  const getSubtitle = () => {
+    const fromDate = new Date(periodFilter.fromDate);
+    const toDate = new Date(periodFilter.toDate);
+    if (periodFilter.fromDate === periodFilter.toDate) {
+      return `Sales transactions - ${formatDisplayDate(fromDate)}`;
+    }
+    return `Sales transactions - ${formatDisplayDate(fromDate)} to ${formatDisplayDate(toDate)}`;
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader 
-        title="POS Daybook" 
-        subtitle={`Sales transactions - ${formatDisplayDate(targetDate)}`}
-      />
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <PageHeader 
+          title="POS Daybook" 
+          subtitle={getSubtitle()}
+        />
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="pos-daybook-period-filter"
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-4">
         <Card>
@@ -397,8 +422,8 @@ export default function POSDaybook() {
           ) : salesVouchers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No transactions today</p>
-              <p className="text-sm mt-1">Sales and transfers will appear here</p>
+              <p className="text-lg font-medium">No transactions found</p>
+              <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
             </div>
           ) : (
             <div className="overflow-x-auto">

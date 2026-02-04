@@ -128,7 +128,7 @@ export function PeriodFilter({
   const toDateObj = value.toDate ? new Date(value.toDate) : undefined;
 
   const displayLabel = value.preset === "custom" 
-    ? `${formatDisplayDate(fromDateObj)} - ${formatDisplayDate(toDateObj)}`
+    ? `${fromDateObj ? formatDisplayDate(fromDateObj) : ''} - ${toDateObj ? formatDisplayDate(toDateObj) : ''}`
     : presetLabels[value.preset];
 
   return (

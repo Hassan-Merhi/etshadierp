@@ -3,12 +3,10 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { format, startOfYear, endOfYear, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   ArrowLeft,
-  Calendar,
   ChevronRight,
-  Loader2,
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
@@ -23,8 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import {
   BarChart,
   Bar,
@@ -86,13 +83,12 @@ export default function LedgerMonthlySummary() {
   const [, params] = useRoute("/ledger-monthly/:accountId");
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
 
-  const currentYear = new Date().getFullYear();
-  const [startDate, setStartDate] = useState(
-    format(startOfYear(new Date()), "yyyy-MM-dd")
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
+    getDefaultPeriodValue("this_year")
   );
-  const [endDate, setEndDate] = useState(
-    format(endOfYear(new Date()), "yyyy-MM-dd")
-  );
+
+  const startDate = periodFilter.fromDate;
+  const endDate = periodFilter.toDate;
 
   const { data, isLoading } = useQuery<LedgerMonthlySummaryData>({
     queryKey: ["/api/reports/ledger-monthly-summary", accountId, startDate, endDate],
@@ -159,56 +155,14 @@ export default function LedgerMonthlySummary() {
       </div>
 
       <div className="p-4 space-y-6">
-        {/* Date Filter */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Date Range Filter
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="space-y-1">
-                <Label htmlFor="startDate" className="text-xs">
-                  Start Date
-                </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-40"
-                  data-testid="input-start-date"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="endDate" className="text-xs">
-                  End Date
-                </Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-40"
-                  data-testid="input-end-date"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setStartDate(format(startOfYear(new Date()), "yyyy-MM-dd"));
-                  setEndDate(format(endOfYear(new Date()), "yyyy-MM-dd"));
-                }}
-                data-testid="button-reset-dates"
-              >
-                This Year
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Period Filter */}
+        <div className="flex justify-end">
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter"
+          />
+        </div>
 
         {isLoading ? (
           <div className="space-y-4">

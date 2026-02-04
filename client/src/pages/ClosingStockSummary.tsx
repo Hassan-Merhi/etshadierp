@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 interface StockGroupSummary {
   id: number;
@@ -56,9 +57,18 @@ export default function ClosingStockSummary() {
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("this_month"));
 
   const { data, isLoading } = useQuery<ClosingStockData>({
-    queryKey: ["/api/reports/closing-stock-summary", selectedCompany?.id],
+    queryKey: ["/api/reports/closing-stock-summary", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodFilter.fromDate) params.append("fromDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("toDate", periodFilter.toDate);
+      const response = await fetch(`/api/reports/closing-stock-summary?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch closing stock summary");
+      return response.json();
+    },
     enabled: !!selectedCompany?.id,
   });
 
@@ -119,15 +129,22 @@ export default function ClosingStockSummary() {
             </p>
           </div>
         </div>
-        {data?.grandTotal && data.grandTotal.value > 0 && (
-          <Button
-            onClick={() => setShowCarryForwardDialog(true)}
-            data-testid="button-carryforward-stock"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Set as Opening Stock
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter-closing-stock"
+          />
+          {data?.grandTotal && data.grandTotal.value > 0 && (
+            <Button
+              onClick={() => setShowCarryForwardDialog(true)}
+              data-testid="button-carryforward-stock"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Set as Opening Stock
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Carry Forward Confirmation Dialog */}

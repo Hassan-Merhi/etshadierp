@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
 import {
   BarChart,
   Bar,
@@ -70,11 +71,12 @@ export default function StockItemHistory() {
   
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   
   const { data, isLoading } = useQuery<StockItemSummary>({
-    queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }],
+    queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
     queryFn: async () => {
-      const response = await fetch(`/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`, {
+      const response = await fetch(`/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}&startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`, {
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to fetch');
@@ -130,18 +132,25 @@ export default function StockItemHistory() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]" data-testid="select-year">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(y => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4">
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter"
+          />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[120px]" data-testid="select-year">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map(y => (
+                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
       

@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Form,
   FormControl,
@@ -100,6 +99,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 // Account types
 interface LedgerAccount {
@@ -356,9 +356,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("this_month"));
   const [filters, setFilters] = useState({
-    startDate: format(new Date(), "yyyy-MM-dd"),
-    endDate: format(new Date(), "yyyy-MM-dd"),
     voucherType: "all",
     searchQuery: "",
     sortOrder: "asc" as "asc" | "desc",
@@ -580,9 +579,18 @@ export default function Daybook({ user }: { user?: any } = {}) {
     Record<number, string>
   >({});
 
-  // Fetch all vouchers
+  // Fetch all vouchers with date filtering
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/vouchers", selectedCompany?.id],
+    queryKey: ["/api/vouchers", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
+      const url = `/api/vouchers${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+      return res.json();
+    },
     enabled: !!selectedCompany,
   });
 
@@ -625,18 +633,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [vouchers, accountNameCache]);
 
-  // Apply filters
+  // Apply filters (date filtering is now done server-side via periodFilter)
   const filteredVouchers = useMemo(() => {
     return vouchers
       .filter((voucher) => {
-        // Date range filter
-        if (filters.startDate && voucher.voucherDate < filters.startDate) {
-          return false;
-        }
-        if (filters.endDate && voucher.voucherDate > filters.endDate) {
-          return false;
-        }
-
         // Voucher type filter
         if (
           filters.voucherType !== "all" &&
@@ -1143,9 +1143,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const clearFilters = () => {
+    setPeriodFilter(getDefaultPeriodValue("this_month"));
     setFilters({
-      startDate: "",
-      endDate: "",
       voucherType: "all",
       searchQuery: "",
       sortOrder: "desc",
@@ -1153,8 +1152,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const hasActiveFilters =
-    filters.startDate ||
-    filters.endDate ||
+    periodFilter.preset !== "this_month" ||
     filters.voucherType !== "all" ||
     filters.searchQuery;
 
@@ -1252,25 +1250,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
-              <Label htmlFor="start-date">Start Date</Label>
-              <DatePickerInput
-                value={filters.startDate}
-                onChange={(value) =>
-                  setFilters({ ...filters, startDate: value })
-                }
-                placeholder="Start date"
-                data-testid="input-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-date">End Date</Label>
-              <DatePickerInput
-                value={filters.endDate}
-                onChange={(value) => setFilters({ ...filters, endDate: value })}
-                placeholder="End date"
-                data-testid="input-end-date"
+              <Label>Period</Label>
+              <PeriodFilter
+                value={periodFilter}
+                onChange={setPeriodFilter}
+                data-testid="period-filter"
               />
             </div>
             <div className="space-y-2">
@@ -1298,7 +1284,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-[200px]">
               <Label htmlFor="search">Search</Label>
               <Input
                 id="search"

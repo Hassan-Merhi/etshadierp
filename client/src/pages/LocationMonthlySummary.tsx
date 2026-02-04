@@ -1,16 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Calendar, MapPin, Globe } from "lucide-react";
+import { ArrowLeft, MapPin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -68,18 +62,17 @@ export default function LocationMonthlySummary() {
   
   const isAllLocationsMode = locationId === 0;
   
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
   
   const apiUrl = isAllLocationsMode
-    ? `/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`
-    : `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}`;
+    ? `/api/stock-items/${stockItemId}/monthly-summary?startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`
+    : `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`;
   
   const queryKey = isAllLocationsMode
-    ? [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }]
-    : [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear }];
+    ? [`/api/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }]
+    : [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }];
   
   const { data, isLoading } = useQuery<LocationMonthlySummaryData>({
     queryKey,
@@ -93,11 +86,6 @@ export default function LocationMonthlySummary() {
     enabled: stockItemId > 0,
   });
   
-  const years = [];
-  for (let y = currentYear; y >= currentYear - 5; y--) {
-    years.push(y);
-  }
-  
   const chartData = data?.monthlyData.map(m => ({
     name: m.monthName.substring(0, 3),
     Inwards: m.inwardQty,
@@ -106,7 +94,8 @@ export default function LocationMonthlySummary() {
   
   const handleMonthClick = (month: number) => {
     if (!isAllLocationsMode) {
-      navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${selectedYear}/${month}`);
+      const year = new Date(periodFilter.fromDate).getFullYear();
+      navigate(`/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`);
     }
   };
   
@@ -235,24 +224,16 @@ export default function LocationMonthlySummary() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]" data-testid="select-year">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(y => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="period-filter"
+        />
       </div>
       
       <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 300px)' }}>
         <CardHeader className="pb-2 flex-shrink-0">
-          <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
+          <CardTitle className="text-lg">Monthly Summary</CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">

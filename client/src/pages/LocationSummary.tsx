@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +13,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, ChevronRight, Settings2, Calendar } from "lucide-react";
+import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 interface LocationData {
   quantity: number;
@@ -78,7 +78,9 @@ export default function LocationSummary() {
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(() => 
     new Set(savedState?.expandedGroups || [])
   );
-  const [asOfDate, setAsOfDate] = useState(() => savedState?.asOfDate || new Date().toISOString().split('T')[0]);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
+    savedState?.periodFilter || getDefaultPeriodValue("this_month")
+  );
   const [locationDialogOpen, setLocationDialogOpen] = useState(false);
   const [selectedRowKey, setSelectedRowKey] = useState<string | null>(savedState?.selectedRowKey || null);
   const [highlightedRows, setHighlightedRows] = useState<Set<string>>(() => 
@@ -110,7 +112,7 @@ export default function LocationSummary() {
   useEffect(() => {
     const state = {
       expandedGroups: Array.from(expandedGroups),
-      asOfDate,
+      periodFilter,
       selectedRowKey,
       highlightedRows: Array.from(highlightedRows),
       selectedLocationIndex,
@@ -119,7 +121,7 @@ export default function LocationSummary() {
       scrollLeft: tableScrollContainer.current?.scrollLeft || 0,
     };
     sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
-  }, [expandedGroups, asOfDate, selectedRowKey, highlightedRows, selectedLocationIndex, hiddenRows]);
+  }, [expandedGroups, periodFilter, selectedRowKey, highlightedRows, selectedLocationIndex, hiddenRows]);
   
   // Restore scroll position on mount
   useEffect(() => {
@@ -142,13 +144,14 @@ export default function LocationSummary() {
   });
 
   const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
-    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(','), asOfDate }],
+    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(','), startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedLocationIds.length > 0) {
         params.append('locationIds', selectedLocationIds.join(','));
       }
-      params.append('asOfDate', asOfDate);
+      params.append('startDate', periodFilter.fromDate);
+      params.append('endDate', periodFilter.toDate);
       const res = await fetch(`/api/location-summary?${params.toString()}`, {
         credentials: 'include',
       });
@@ -394,16 +397,11 @@ export default function LocationSummary() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="asOfDate" className="text-sm whitespace-nowrap">As of:</Label>
-            <DatePickerInput
-              value={asOfDate}
-              onChange={setAsOfDate}
-              placeholder="Select date"
-              className="w-48"
-              data-testid="input-as-of-date"
-            />
-          </div>
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter"
+          />
           <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" data-testid="button-configure-locations">

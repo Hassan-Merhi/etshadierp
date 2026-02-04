@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -70,8 +72,21 @@ export default function StockItemVouchers() {
   const month = parseInt(params.month || "0");
   const [_location, navigate] = useLocation();
   
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
+    getDefaultPeriodValue("this_month")
+  );
+  
   const { data, isLoading } = useQuery<VouchersData>({
-    queryKey: [`/api/stock-items/${stockItemId}/vouchers/${year}/${month}`],
+    queryKey: [`/api/stock-items/${stockItemId}/vouchers/${year}/${month}`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        startDate: periodFilter.fromDate,
+        endDate: periodFilter.toDate,
+      });
+      const res = await fetch(`/api/stock-items/${stockItemId}/vouchers/${year}/${month}?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+      return res.json();
+    },
     enabled: stockItemId > 0 && year > 0 && month > 0,
   });
   
@@ -139,25 +154,32 @@ export default function StockItemVouchers() {
   
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigate(`/stock-items/${stockItemId}/history`)} 
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Stock Item Vouchers
-          </h1>
-          {data?.stockItem && (
-            <p className="text-muted-foreground" data-testid="text-item-name">
-              {data.stockItem.name} ({data.stockItem.code}) - {data.monthName} {data.year}
-            </p>
-          )}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate(`/stock-items/${stockItemId}/history`)} 
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Stock Item Vouchers
+            </h1>
+            {data?.stockItem && (
+              <p className="text-muted-foreground" data-testid="text-item-name">
+                {data.stockItem.name} ({data.stockItem.code}) - {data.monthName} {data.year}
+              </p>
+            )}
+          </div>
         </div>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="period-filter"
+        />
       </div>
       
       <Card>

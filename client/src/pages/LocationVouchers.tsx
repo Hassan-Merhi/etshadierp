@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -70,9 +71,19 @@ export default function LocationVouchers() {
   const [_location, navigate] = useLocation();
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   
   const { data, isLoading } = useQuery<LocationVouchersData>({
-    queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`],
+    queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`, periodFilter.fromDate, periodFilter.toDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
+      const url = `/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+      return res.json();
+    },
     enabled: locationId > 0 && stockItemId > 0 && year > 0 && month > 0,
   });
   
@@ -180,30 +191,37 @@ export default function LocationVouchers() {
   
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`)} 
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Location Vouchers
-          </h1>
-          {data?.stockItem && data?.location && (
-            <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
-              <span>{data.stockItem.name} ({data.stockItem.code})</span>
-              <span>•</span>
-              <MapPin className="h-4 w-4" />
-              <span>{data.location.name}</span>
-              <span>•</span>
-              <span>{data.monthName} {data.year}</span>
-            </div>
-          )}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`)} 
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Location Vouchers
+            </h1>
+            {data?.stockItem && data?.location && (
+              <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
+                <span>{data.stockItem.name} ({data.stockItem.code})</span>
+                <span>•</span>
+                <MapPin className="h-4 w-4" />
+                <span>{data.location.name}</span>
+                <span>•</span>
+                <span>{data.monthName} {data.year}</span>
+              </div>
+            )}
+          </div>
         </div>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="period-filter"
+        />
       </div>
       
       <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 250px)' }}>

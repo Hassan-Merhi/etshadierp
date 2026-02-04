@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -300,6 +301,7 @@ export default function Analytics() {
   const [, navigate] = useLocation();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [detailsPeriod, setDetailsPeriod] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
   const [ratiosStartDate, setRatiosStartDate] = useState("");
@@ -368,11 +370,14 @@ export default function Analytics() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch profit data
+  // Fetch profit data with period filter
   const { data: profitData, isLoading: profitLoading } = useQuery<ProfitData>({
-    queryKey: ["/api/stats/net-profit", selectedCompany?.id],
+    queryKey: ["/api/stats/net-profit", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
     queryFn: async () => {
-      const response = await fetch("/api/stats/net-profit", { credentials: "include" });
+      const params = new URLSearchParams();
+      if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
+      const response = await fetch(`/api/stats/net-profit?${params}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch net profit");
       return await response.json();
     },
@@ -442,14 +447,13 @@ export default function Analytics() {
     enabled: !!selectedLocationForDetails,
   });
 
-  // Fetch financial ratios
-  // Fetch financial ratios
+  // Fetch financial ratios with period filter
   const { data: ratiosData, isLoading: ratiosLoading } = useQuery<FinancialRatiosData>({
-    queryKey: ["/api/reports/financial-ratios", selectedCompany?.id, ratiosStartDate, ratiosEndDate],
+    queryKey: ["/api/reports/financial-ratios", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (ratiosStartDate) params.append("startDate", ratiosStartDate);
-      if (ratiosEndDate) params.append("endDate", ratiosEndDate);
+      if (periodFilter.fromDate) params.append("startDate", periodFilter.fromDate);
+      if (periodFilter.toDate) params.append("endDate", periodFilter.toDate);
       const response = await fetch(`/api/reports/financial-ratios?${params}`, {
         credentials: "include",
       });
@@ -903,11 +907,18 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Comprehensive financial analysis and reporting
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Comprehensive financial analysis and reporting
+          </p>
+        </div>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="analytics-period-filter"
+        />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
