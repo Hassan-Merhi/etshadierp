@@ -1,0 +1,65 @@
+You are working inside my existing GitHub project. Please fix POS + voucher payment (and any similar payment/receipt flows) so that when I’m operating in the OTHER currency (e.g., CFA), I can enter the exchange rate in that currency direction — not USD-only — and the transaction uses exactly the rate I entered.
+
+Problem
+- When creating POS transactions or voucher payments/receipts in the other currency, the app only lets me enter the rate in USD (or forces USD as the rate-entry side).
+- It auto-converts/auto-updates the rate to the other currency instead of letting me directly input the rate in the currency I’m currently using.
+- I want to be able to input the rate from either direction depending on the selected currency (USD mode vs CFA mode) during the transaction.
+
+Goal
+- In POS / voucher payment / receipt screens (any transaction that needs an exchange rate), the “rate” input must follow the currently selected currency:
+  - If selected currency is USD: allow input like “1 USD = X CFA” (or whatever is consistent with the app).
+  - If selected currency is CFA: allow input like “1 CFA = Y USD” (or “X CFA = 1 USD”), whichever best matches the UI/UX and existing model.
+- Internally store ONE canonical exchange rate (single consistent representation), but allow entry in either direction.
+- The transaction must “lock” and save the exact rate used at creation time (do not change later when rates update).
+
+Acceptance Criteria
+1) Rate entry is not USD-only
+- If I’m in CFA mode and creating a POS/voucher payment, I can type the rate directly in CFA mode (no disabled field, no forced USD-only input).
+
+2) Correct canonical storage + no surprise overwrites
+- Decide a canonical internal representation for rates (example: CFA_per_USD).
+- If user enters in the opposite direction (USD_per_CFA), invert properly before saving:
+  - CFA_per_USD = 1 / (USD_per_CFA)
+- Do not auto-replace what the user is typing while typing.
+- If you show the “other side” rate, show it as a read-only helper, not as an auto-overwrite.
+
+3) Transaction uses and stores the chosen rate
+- On submit, the payload for POS/voucher payment/receipt must include:
+  - fx_rate_used (canonical value)
+  - base_currency + quote_currency (or equivalent)
+  - currency of the entered amount
+  - amounts consistent with the currency selected
+  - rate timestamp/date
+- When viewing the saved transaction later, it must use its stored fx_rate_used and must NOT change when a new rate is set the next day.
+
+4) Amount parsing must respect selected currency (related bug)
+- If selected currency is CFA and I type “50”, it must be treated as 50 CFA (not 50 USD) and conversions must use the transaction’s fx_rate_used.
+
+Implementation Steps
+1) Locate POS + voucher payment/receipt flows and any exchange-rate inputs:
+   Search: “pos”, “voucher”, “payment”, “receipt”, “exchange”, “fx”, “rate”, “currency”, “USD”, “CFA”.
+2) Identify how the app currently stores money and rates:
+   - Is there a Money type? Minor units? Base currency?
+   - What does the existing fx rate represent (quote per base)?
+3) Implement an “entry mode” for transaction rate input:
+   - entryMode derived from selectedCurrency (USD_MODE vs OTHER_MODE).
+   - Update labels/placeholders accordingly.
+4) On submit:
+   - Parse rate in the direction entered (based on entryMode).
+   - Convert to canonical stored rate (invert if needed).
+   - Save fx_rate_used on the transaction record.
+5) Ensure UI and payload currency are consistent:
+   - Update amount input so it always uses selectedCurrency (no hard-coded USD).
+   - Update validations and payload building accordingly.
+6) Update transaction display/reporting to use stored fx_rate_used (rate locked).
+7) Add tests:
+   - CFA mode: enter rate in CFA direction, enter amount “50”, submit → payload shows 50 CFA + correct canonical fx_rate_used.
+   - After changing the “daily/current rate”, previously saved transaction values remain unchanged.
+
+Output Requirements
+- List all modified files and why.
+- Show key snippets for:
+  - rate entry mode + inversion logic
+  - payload creation for POS/voucher payments
+  - transaction rate-lock usage on display
+- Provide a manual QA checklist covering POS, voucher payments, receipts in both currencies.
