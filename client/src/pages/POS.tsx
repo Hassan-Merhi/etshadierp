@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ExchangeRateInput } from "@/components/ExchangeRateInput";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
@@ -175,10 +174,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const { selectedCurrency, exchangeRate: dailyExchangeRate, convertToUSD, displayCurrency, formatAmount } = useCurrencyContext();
   // Use global currency from context (force USD if company doesn't have dual-currency enabled)
   const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
-  // Transaction-specific exchange rate (allows override of daily rate)
-  const [transactionRate, setTransactionRate] = useState<number | null>(null);
-  // Use transaction rate if set, otherwise fall back to daily rate
-  const exchangeRate = transactionRate || dailyExchangeRate;
+  // Use the daily exchange rate from context
+  const exchangeRate = dailyExchangeRate;
   
   const [rows, setRows] = useState<SaleRow[]>([
     { id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 },
@@ -285,12 +282,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         setSaleDate(editVoucher.voucherDate);
       }
 
-      // Note: currency now comes from global context, not voucher
-
-      // Populate exchange rate from voucher (rate-locking)
-      if (editVoucher.exchangeRate) {
-        setTransactionRate(parseFloat(editVoucher.exchangeRate));
-      }
+      // Note: currency and exchange rate come from global context
 
       // Populate payment account and credit sale info from voucher entries
       if (editVoucher.entries && editVoucher.entries.length > 0) {
@@ -1332,30 +1324,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </>
             )}
           </div>
-        )}
-
-        {/* Exchange Rate Input - allows per-transaction rate override (only when in CFA mode) */}
-        {displayCurrency && activeCurrency === "CFA" && (
-          <ExchangeRateInput
-            value={transactionRate}
-            onChange={(rate) => {
-              setTransactionRate(rate);
-              // Recalculate display amounts when rate changes
-              if (rate && rows.some(r => r.rateUSD > 0)) {
-                const convertedRows = rows.map(row => {
-                  if (row.rateUSD === 0) return row;
-                  const newRate = Math.round(row.rateUSD * rate);
-                  return {
-                    ...row,
-                    rate: newRate,
-                    amount: row.quantity * newRate,
-                  };
-                });
-                setRows(convertedRows);
-              }
-            }}
-            selectedCurrency={activeCurrency}
-          />
         )}
 
         {/* Credit Sale Toggle */}
