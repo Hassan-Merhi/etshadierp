@@ -1,0 +1,77 @@
+You are working inside my existing GitHub project (main branch). Please perform a focused SECURITY and DATA-LEAK audit across the entire codebase and fix any issues found.
+
+Goals
+1) Ensure there are NO data leaks, credential leaks, or unsafe exposures in frontend or backend code.
+2) Ensure sensitive data is never logged, returned, or exposed unintentionally.
+3) Harden authentication, API usage, and environment variable handling.
+
+What to check (required)
+
+A) Secrets & credentials
+- Scan for hardcoded:
+  - API keys
+  - passwords
+  - tokens
+  - private keys
+  - database connection strings
+- Ensure ALL secrets are loaded from environment variables only.
+- Ensure no secrets are committed in:
+  - source files
+  - scripts
+  - comments
+  - attached assets
+  - logs
+
+B) Logging & debug leaks
+- Remove or guard ALL console.log / debug logs that may expose:
+  - user data
+  - auth/session info
+  - request/response bodies
+  - tokens
+  - internal errors
+- Backend logs must never print sensitive fields.
+- Frontend must not log API responses containing user data.
+
+C) API response safety
+- Audit all API routes to ensure they do NOT return:
+  - passwords
+  - password hashes
+  - tokens
+  - internal IDs unnecessarily
+  - session objects
+- Ensure user APIs return only required fields (id, username, role, etc.).
+
+D) Authentication & authorization
+- Verify protected routes correctly enforce authentication.
+- Verify role-based access checks exist where needed (admin vs user vs POS user).
+- Ensure POS, vouchers, inventory, and financial endpoints cannot be accessed without proper auth.
+
+E) Frontend exposure risks
+- Ensure no sensitive data is stored in:
+  - localStorage
+  - sessionStorage
+  - URL query params
+- Ensure auth tokens (if any) are handled securely (HTTP-only cookies preferred).
+
+F) Files & repo hygiene
+- Remove committed debug artifacts (e.g., attached_assets/, pasted logs).
+- Add proper .gitignore rules to prevent future leaks.
+- Ensure build output and temp files are not committed.
+
+G) Error handling
+- Replace raw error dumps with safe, user-friendly messages.
+- Ensure stack traces are not sent to the client in production.
+
+Deliverables
+- List every security issue found (with file paths).
+- Explain the risk level (low / medium / high).
+- Show exactly what was changed to fix each issue.
+- Confirm if NO critical data leaks were found (explicitly state this if true).
+- Provide a short security hardening checklist for future changes.
+
+Constraints
+- Do NOT redesign the app.
+- Keep changes minimal and consistent with existing patterns.
+- Preserve current functionality.
+
+Start by scanning the entire repo for secrets, logs, and unsafe API responses, then fix issues systematically.
