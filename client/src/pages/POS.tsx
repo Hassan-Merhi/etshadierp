@@ -1643,8 +1643,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 </thead>
                 <tbody>
                   {(savedSale?.items ?? []).map((item: any, idx: number) => {
-                    const storedRate = parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 1;
-                    const itemRateUSD = parseFloat(item.rateUSD || item.rate);
+                    const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 1;
+                    const wasCFA = savedSale?.voucher?.currency === "CFA";
+                    const rawRate = parseFloat(item.rateUSD || item.rate);
+                    const itemRateUSD = wasCFA && !item.rateUSD && lockedRate > 1 
+                      ? rawRate / lockedRate 
+                      : rawRate;
                     const itemAmountUSD = parseFloat(item.quantity) * itemRateUSD;
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #ccc' }}>
@@ -1662,7 +1666,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                     <td style={{ padding: '5px 3px', fontWeight: '900' }}>TOTAL</td>
                     <td style={{ textAlign: 'right', padding: '5px 3px' }}>{(savedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0)}</td>
                     <td style={{ padding: '5px 3px' }}></td>
-                    <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>${parseFloat(savedSale?.grandTotal || 0).toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', padding: '5px 3px', fontWeight: '900' }}>
+                      ${(() => {
+                        const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 1;
+                        const wasCFA = savedSale?.voucher?.currency === "CFA";
+                        const total = (savedSale?.items ?? []).reduce((sum: number, item: any) => {
+                          const rawRate = parseFloat(item.rateUSD || item.rate);
+                          const rateUSD = wasCFA && !item.rateUSD && lockedRate > 1 ? rawRate / lockedRate : rawRate;
+                          return sum + (parseFloat(item.quantity) * rateUSD);
+                        }, 0);
+                        return total.toFixed(2);
+                      })()}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
@@ -1670,7 +1685,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               {/* Total Paid - Simple clean display */}
               <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
                 <span>TOTAL PAID:</span>
-                <span>${parseFloat(savedSale?.grandTotal || 0).toFixed(2)}</span>
+                <span>
+                  ${(() => {
+                    const lockedRate = parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 1;
+                    const wasCFA = savedSale?.voucher?.currency === "CFA";
+                    const total = (savedSale?.items ?? []).reduce((sum: number, item: any) => {
+                      const rawRate = parseFloat(item.rateUSD || item.rate);
+                      const rateUSD = wasCFA && !item.rateUSD && lockedRate > 1 ? rawRate / lockedRate : rawRate;
+                      return sum + (parseFloat(item.quantity) * rateUSD);
+                    }, 0);
+                    return total.toFixed(2);
+                  })()}
+                </span>
               </div>
 
               {/* Notes */}
