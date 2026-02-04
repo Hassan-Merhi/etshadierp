@@ -1421,7 +1421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new exchange rate
-  app.post("/api/exchange-rates", requireAuth, requireRole("Admin", "Owner", "Manager"), async (req, res) => {
+  app.post("/api/exchange-rates", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {
