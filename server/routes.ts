@@ -12740,6 +12740,7 @@ if (asOfDate) {
       let vouchers;
       if (startDate && endDate) {
         vouchers = await storage.getVouchersByDateRange(
+          req.session.currentCompanyId,
           startDate as string,
           endDate as string,
         );

@@ -211,7 +211,7 @@ export interface IStorage {
   // Vouchers and Journal Entries
   getAllVouchers(companyId: number): Promise<Voucher[]>;
   getVoucherById(id: number): Promise<Voucher | undefined>;
-  getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]>;
+  getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]>;
   getVoucherEntriesByLedger(ledgerAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByBankAccount(bankAccountId: number, startDate?: string, endDate?: string): Promise<any[]>;
   getVoucherEntriesByFixedAsset(fixedAssetId: number, startDate?: string, endDate?: string): Promise<any[]>;
@@ -2692,13 +2692,14 @@ export class DbStorage implements IStorage {
     return voucher;
   }
 
-  async getVouchersByDateRange(startDate: string, endDate: string): Promise<any[]> {
-    // Filter out soft-deleted vouchers
+  async getVouchersByDateRange(companyId: number, startDate: string, endDate: string): Promise<any[]> {
+    // Filter by company and date range, excluding soft-deleted vouchers
     const vouchers = await db
       .select()
       .from(schema.vouchers)
       .where(
         and(
+          eq(schema.vouchers.companyId, companyId),
           sql`${schema.vouchers.voucherDate} >= ${startDate}`,
           sql`${schema.vouchers.voucherDate} <= ${endDate}`,
           isNull(schema.vouchers.deletedAt)
