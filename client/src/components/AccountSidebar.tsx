@@ -72,13 +72,17 @@ export default function AccountSidebar({
       const trimmedName = searchValue.trim();
       if (!trimmedName) return;
 
-      // If there's a highlighted account, select it
-      if (filteredAccounts.length > 0 && highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length) {
-        onSelectAccount(filteredAccounts[highlightedIndex]);
+      // Check for EXACT match (case-insensitive) - only select if name matches exactly
+      const exactMatch = filteredAccounts.find(
+        (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      
+      if (exactMatch) {
+        onSelectAccount(exactMatch);
         return;
       }
 
-      // No matching accounts - auto-create for factory
+      // No exact match - auto-create for factory (even if there are partial matches)
       const newAccount = await onAutoCreateAccount(trimmedName);
       if (newAccount) {
         onSelectAccount(newAccount);

@@ -4134,13 +4134,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                             const trimmedName = journalAccountSearchTerm.trim();
                             if (!trimmedName) return;
 
-                            // If there's a highlighted account, select it
-                            if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
-                              handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                            // Check for EXACT match (case-insensitive) - only select if name matches exactly
+                            const exactMatch = filteredJournalAccounts.find(
+                              (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
+                            );
+                            
+                            if (exactMatch) {
+                              handleJournalAccountSelect(exactMatch);
                               return;
                             }
 
-                            // No matching accounts - auto-create for factory
+                            // No exact match - auto-create for factory (even if there are partial matches)
                             const newAccount = await handleAutoCreateAccount(trimmedName);
                             if (newAccount) {
                               // Convert Account to CombinedAccount format
