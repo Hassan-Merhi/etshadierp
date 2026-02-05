@@ -98,6 +98,8 @@ function Router({ user }: { user: any }) {
         <Route path="/">{() => <POS posUser={user} />}</Route>
         <Route path="/pos/edit/:id">{(params) => <POS posUser={user} editVoucherId={params.id} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
+        <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary posUser={user} />}</Route>
+        <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers posUser={user} />}</Route>
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
         <Route path="/pos-customers">{() => <POSCustomers />}</Route>
@@ -138,9 +140,9 @@ function Router({ user }: { user: any }) {
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
       <Route path="/stock-items/:id/history" component={StockItemHistory} />
       <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />
-      <Route path="/stock-items/:stockItemId/monthly-summary" component={LocationMonthlySummary} />
-      <Route path="/locations/:locationId/stock-items/:stockItemId/history" component={LocationMonthlySummary} />
-      <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month" component={LocationVouchers} />
+      <Route path="/stock-items/:stockItemId/monthly-summary">{() => <LocationMonthlySummary />}</Route>
+      <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary />}</Route>
+      <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>
       <Route path="/sales-report" component={SalesReport} />
       <Route path="/pos-daybook" component={POSDaybook} />
       <Route path="/suppliers/:id/edit" component={EditSupplier} />

@@ -53,7 +53,7 @@ interface LocationMonthlySummaryData {
   };
 }
 
-export default function LocationMonthlySummary() {
+export default function LocationMonthlySummary({ posUser }: { posUser?: any } = {}) {
   const { formatAmount } = useCurrencyContext();
   const params = useParams();
   const locationId = parseInt(params.locationId || "0");
@@ -240,17 +240,17 @@ export default function LocationMonthlySummary() {
             <thead className="sticky top-0 z-10 bg-muted">
               <tr className="bg-muted border-b">
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
-                <th colSpan={2} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
-                <th colSpan={2} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
-                <th colSpan={2} className="text-center px-4 py-2 bg-muted font-medium">Closing Balance</th>
+                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
+                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
+                <th colSpan={posUser ? 1 : 2} className="text-center px-4 py-2 bg-muted font-medium">Closing Balance</th>
               </tr>
               <tr className="bg-muted/80 border-b">
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium border-r">Quantity</th>
+                {!posUser && <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>}
+                <th className="text-right px-4 py-2 bg-muted/80 font-medium border-r">Quantity</th>
+                {!posUser && <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>}
                 <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
-                <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
-                <th className="text-right px-4 py-2 border-r bg-muted/80 font-medium">Value</th>
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Quantity</th>
-                <th className="text-right px-4 py-2 bg-muted/80 font-medium">Value</th>
+                {!posUser && <th className="text-right px-4 py-2 bg-muted/80 font-medium">Value</th>}
               </tr>
             </thead>
             <tbody>
@@ -269,48 +269,60 @@ export default function LocationMonthlySummary() {
                       data-row-index={displayIndex}
                     >
                       <td className="font-medium px-4 py-3 border-r">{month.monthName}</td>
-                      <td className="text-right px-4 py-3 tabular-nums">
+                      <td className="text-right px-4 py-3 tabular-nums border-r">
                         {formatNumber(month.inwardQty, 0)}
                       </td>
+                      {!posUser && (
+                        <td className="text-right px-4 py-3 tabular-nums border-r">
+                          {formatAmount(month.inwardValue)}
+                        </td>
+                      )}
                       <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatAmount(month.inwardValue)}
-                      </td>
-                      <td className="text-right px-4 py-3 tabular-nums">
                         {formatNumber(month.outwardQty, 0)}
                       </td>
-                      <td className="text-right px-4 py-3 tabular-nums border-r">
-                        {formatAmount(month.outwardValue)}
-                      </td>
+                      {!posUser && (
+                        <td className="text-right px-4 py-3 tabular-nums border-r">
+                          {formatAmount(month.outwardValue)}
+                        </td>
+                      )}
                       <td className="text-right px-4 py-3 tabular-nums font-medium">
                         {formatNumber(month.closingQty, 0)}
                       </td>
-                      <td className="text-right px-4 py-3 tabular-nums font-medium">
-                        {formatAmount(month.closingValue)}
-                      </td>
+                      {!posUser && (
+                        <td className="text-right px-4 py-3 tabular-nums font-medium">
+                          {formatAmount(month.closingValue)}
+                        </td>
+                      )}
                     </tr>
                   ) : null;
                 })}
                 
                 <tr className="bg-muted/50 font-bold border-t">
                   <td className="px-4 py-3 border-r">Grand Total</td>
-                  <td className="text-right px-4 py-3 tabular-nums">
+                  <td className="text-right px-4 py-3 tabular-nums border-r">
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
                   </td>
+                  {!posUser && (
+                    <td className="text-right px-4 py-3 tabular-nums border-r">
+                      {formatAmount(data?.grandTotal.inwardValue || 0)}
+                    </td>
+                  )}
                   <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatAmount(data?.grandTotal.inwardValue || 0)}
-                  </td>
-                  <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
                   </td>
-                  <td className="text-right px-4 py-3 tabular-nums border-r">
-                    {formatAmount(data?.grandTotal.outwardValue || 0)}
-                  </td>
+                  {!posUser && (
+                    <td className="text-right px-4 py-3 tabular-nums border-r">
+                      {formatAmount(data?.grandTotal.outwardValue || 0)}
+                    </td>
+                  )}
                   <td className="text-right px-4 py-3 tabular-nums">
                     {formatNumber(data?.grandTotal.closingQty || 0, 0)}
                   </td>
-                  <td className="text-right px-4 py-3 tabular-nums">
-                    {formatAmount(data?.grandTotal.closingValue || 0)}
-                  </td>
+                  {!posUser && (
+                    <td className="text-right px-4 py-3 tabular-nums">
+                      {formatAmount(data?.grandTotal.closingValue || 0)}
+                    </td>
+                  )}
                 </tr>
               </tbody>
             </table>

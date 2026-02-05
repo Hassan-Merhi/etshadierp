@@ -62,7 +62,7 @@ interface LocationVouchersData {
   };
 }
 
-export default function LocationVouchers() {
+export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const params = useParams();
@@ -305,20 +305,20 @@ export default function LocationVouchers() {
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[100px] bg-muted font-medium">Date</th>
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
                 <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r w-[120px] bg-muted font-medium">Vch Type</th>
-                <th colSpan={3} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
-                <th colSpan={3} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
-                <th colSpan={3} className="text-center px-4 py-2 bg-muted font-medium">Closing</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 border-r bg-muted font-medium">Inwards</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 border-r bg-muted font-medium">Outwards</th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-4 py-2 bg-muted font-medium">Closing</th>
               </tr>
               <tr className="bg-muted/80 border-b">
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium border-r">Qty</th>
+                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>}
+                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium border-r">Qty</th>
+                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>}
                 <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
-                <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
-                <th className="text-right px-2 py-2 border-r w-[80px] bg-muted/80 font-medium">Value</th>
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Qty</th>
-                <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>
-                <th className="text-right px-2 py-2 w-[80px] bg-muted/80 font-medium">Value</th>
+                {!posUser && <th className="text-right px-2 py-2 w-[60px] bg-muted/80 font-medium">Rate</th>}
+                {!posUser && <th className="text-right px-2 py-2 w-[80px] bg-muted/80 font-medium">Value</th>}
               </tr>
             </thead>
             <tbody>
@@ -351,26 +351,30 @@ export default function LocationVouchers() {
                       )}
                     </td>
                     <td className="px-4 py-3 border-r text-xs">{txn.vchType}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.inwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.inwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(txn.inwardValue)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(txn.outwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">
-                      {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
-                    </td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">
-                      {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
-                    </td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.inwardQty, 0)}</td>
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.inwardRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(txn.inwardValue)}</td>}
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(txn.outwardQty, 0)}</td>
+                    {!posUser && (
+                      <td className="text-right px-2 py-3 tabular-nums">
+                        {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                      </td>
+                    )}
+                    {!posUser && (
+                      <td className="text-right px-2 py-3 tabular-nums border-r">
+                        {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
+                      </td>
+                    )}
                     <td className="text-right px-2 py-3 tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.closingRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(txn.closingRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>}
                   </tr>
                   );
                 })}
                 
                 {filteredTransactions.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="text-center text-muted-foreground py-8">
+                    <td colSpan={posUser ? 6 : 12} className="text-center text-muted-foreground py-8">
                       No transactions found for this month
                     </td>
                   </tr>
@@ -379,15 +383,15 @@ export default function LocationVouchers() {
                 {filteredTransactions.length > 0 && (
                   <tr className="bg-muted/50 font-bold border-t">
                     <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>}
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>}
                     <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.closingQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>}
+                    {!posUser && <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>}
                   </tr>
                 )}
               </tbody>
