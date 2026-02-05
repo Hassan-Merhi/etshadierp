@@ -356,11 +356,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("this_month"));
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
   const [filters, setFilters] = useState({
     voucherType: "all",
     searchQuery: "",
-    sortOrder: "asc" as "asc" | "desc",
+    sortOrder: "desc" as "asc" | "desc",
   });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
@@ -1143,7 +1143,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const clearFilters = () => {
-    setPeriodFilter(getDefaultPeriodValue("this_month"));
+    setPeriodFilter(getDefaultPeriodValue("today"));
     setFilters({
       voucherType: "all",
       searchQuery: "",
@@ -1152,7 +1152,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   };
 
   const hasActiveFilters =
-    periodFilter.preset !== "this_month" ||
+    periodFilter.preset !== "today" ||
     filters.voucherType !== "all" ||
     filters.searchQuery;
 
