@@ -1011,7 +1011,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
                               {group.itemCount.toLocaleString()}
                             </td>
-                            <td className={`px-3 text-right font-mono ${group.totalQuantity < 0 ? "text-yellow-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                            <td className={`px-3 text-right font-mono ${group.totalQuantity < 0 ? "text-red-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
                               {Math.floor(group.totalQuantity).toLocaleString()}<span className="ml-2">BL</span>
                             </td>
                             {!posUser && (
@@ -1120,8 +1120,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           data-testid={`row-item-${item.stockItemId}`}
                           className={`border-t h-12 ${
                             index === selectedRowIndex 
-                              ? (isNegative ? "bg-yellow-200 dark:bg-yellow-800/50 ring-2 ring-primary" : "bg-accent") 
-                              : (isNegative ? "bg-yellow-100 dark:bg-yellow-900/30" : "hover-elevate")
+                              ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent") 
+                              : (isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate")
                           }`}
                           onClick={() => setSelectedRowIndex(index)}
                         >
@@ -1137,7 +1137,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               {item.stockItemName}
                             </button>
                           </td>
-                          <td className={`px-3 text-right font-mono ${isNegative ? "text-yellow-600 font-semibold" : ""}`}>
+                          <td className={`px-3 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
                             {Math.floor(itemQty).toLocaleString()}
                           </td>
                           {!posUser && (
@@ -1313,7 +1313,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   background-color: #f0f0f0 !important;
                 }
                 .print-inventory-table tr.negative-row td {
-                  background-color: rgba(255, 255, 0, 0.35) !important;
+                  background-color: rgba(255, 200, 200, 0.5) !important;
                 }
                 .print-inventory-table .negative-value {
                   font-weight: 600 !important;
@@ -1408,7 +1408,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                       const itemQty = parseFloat(item.quantity || "0");
                                       const isNegative = itemQty < 0;
                                       return (
-                                        <tr key={item.inventoryId} className={`border-t ${isNegative ? "bg-yellow-100 dark:bg-yellow-900/30" : "hover-elevate"}`}>
+                                        <tr key={item.inventoryId} className={`border-t ${isNegative ? "bg-red-100 dark:bg-red-900/30" : "hover-elevate"}`}>
                                           <td className="px-3 py-2">
                                             <button
                                               onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
@@ -1418,7 +1418,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                               {item.stockItemName}
                                             </button>
                                           </td>
-                                          <td className={`px-3 py-2 text-right font-mono ${isNegative ? "text-yellow-600 font-semibold" : ""}`}>
+                                          <td className={`px-3 py-2 text-right font-mono ${isNegative ? "text-red-600 font-semibold" : ""}`}>
                                             {Math.floor(itemQty).toLocaleString()}
                                           </td>
                                           {!posUser && (
