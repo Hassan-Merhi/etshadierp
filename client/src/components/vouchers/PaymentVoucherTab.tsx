@@ -59,6 +59,7 @@ interface PaymentVoucherTabProps {
   activeTab: "payment" | "receipt";
   activeRowIndex: number | null;
   setActiveRowIndex: (index: number | null) => void;
+  onCreateAccount?: () => void;
 }
 
 export function PaymentVoucherTab({
@@ -87,6 +88,7 @@ export function PaymentVoucherTab({
   activeTab,
   activeRowIndex,
   setActiveRowIndex,
+  onCreateAccount,
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
@@ -363,6 +365,7 @@ export function PaymentVoucherTab({
           paymentAccountId={paymentAccountId}
           paymentAccountType={paymentAccountType}
           voucherTotal={total}
+          onCreateAccount={onCreateAccount}
         />
       </div>
     </div>

@@ -22,6 +22,7 @@ import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
 import { PaymentVoucherTab } from "@/components/vouchers/PaymentVoucherTab";
 import { ReceiptVoucherTab } from "@/components/vouchers/ReceiptVoucherTab";
 import { CreditNoteTab } from "@/components/vouchers/CreditNoteTab";
+import { CreateAccountModal } from "@/components/vouchers/CreateAccountModal";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Card,
@@ -1184,6 +1185,49 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
   };
 
+  // Handle opening the create account modal
+  const handleOpenCreateAccountModal = (tab: "payment" | "receipt" | "journal", rowIndex?: number) => {
+    setCreateAccountContext({ tab, rowIndex });
+    setShowCreateAccountModal(true);
+  };
+
+  // Handle account created - auto-select in the appropriate field
+  const handleAccountCreated = (account: { id: number; name: string; type: string }) => {
+    if (!createAccountContext) return;
+
+    if (createAccountContext.tab === "payment" || createAccountContext.tab === "receipt") {
+      // For Payment/Receipt tabs, use the sidebar account select logic
+      const accountObj: Account = {
+        id: account.id,
+        name: account.name,
+        type: account.type as "ledger" | "bank" | "supplier" | "employee" | "fixedAsset",
+        code: "",
+      };
+      handleSidebarAccountSelect(accountObj);
+    } else if (createAccountContext.tab === "journal" && createAccountContext.rowIndex !== undefined) {
+      // For Journal tab, update the specific row
+      const rowIndex = createAccountContext.rowIndex;
+      // Newly created accounts are always ledger type
+      journalForm.setValue(`entries.${rowIndex}.accountType`, "ledger");
+      journalForm.setValue(`entries.${rowIndex}.accountId`, account.id);
+      journalForm.setValue(`entries.${rowIndex}.accountName`, account.name);
+      setShowAccountSidebar(false);
+      
+      // Focus the amount input
+      requestAnimationFrame(() => {
+        const amountInput = document.querySelector(
+          `[data-testid="input-journal-amount-${rowIndex}"]`
+        ) as HTMLInputElement;
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
+      });
+    }
+
+    setCreateAccountContext(null);
+  };
+
   // Sync active row's accountName to sidebar search (like POS does with itemName)
   useEffect(() => {
     if (activeRowIndex !== null) {
@@ -1347,6 +1391,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [journalAccountSearchTerm, setJournalAccountSearchTerm] = useState("");
   const [journalAccountHighlightedIndex, setJournalAccountHighlightedIndex] = useState(0);
   const journalSidebarRef = useRef<HTMLDivElement>(null);
+
+  // Create account modal state
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
+  const [createAccountContext, setCreateAccountContext] = useState<{
+    tab: "payment" | "receipt" | "journal";
+    rowIndex?: number;
+  } | null>(null);
 
   // Filter accounts for journal sidebar
   const filteredJournalAccounts = useMemo(() => {
@@ -3455,6 +3506,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               activeTab="payment"
               activeRowIndex={activeRowIndex}
               setActiveRowIndex={setActiveRowIndex}
+              onCreateAccount={() => handleOpenCreateAccountModal("payment", activeRowIndex ?? undefined)}
             />
           </TabsContent>
         )}
@@ -3498,6 +3550,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               activeTab="receipt"
               activeRowIndex={activeRowIndex}
               setActiveRowIndex={setActiveRowIndex}
+              onCreateAccount={() => handleOpenCreateAccountModal("receipt", activeRowIndex ?? undefined)}
             />
           </TabsContent>
         )}
@@ -3964,13 +4017,25 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-semibold">Search Accounts</h3>
-                      <button 
-                        onClick={() => setShowAccountSidebar(false)} 
-                        className="text-xs text-muted-foreground hover:text-foreground" 
-                        data-testid="button-close-account-sidebar"
-                      >
-                        ✕
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
+                          data-testid="button-journal-create-account"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          New
+                        </Button>
+                        <button 
+                          onClick={() => setShowAccountSidebar(false)} 
+                          className="text-xs text-muted-foreground hover:text-foreground" 
+                          data-testid="button-close-account-sidebar"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -5677,6 +5742,17 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Account Modal */}
+      <CreateAccountModal
+        open={showCreateAccountModal}
+        onClose={() => {
+          setShowCreateAccountModal(false);
+          setCreateAccountContext(null);
+        }}
+        companyId={selectedCompany?.id || 0}
+        onAccountCreated={handleAccountCreated}
+      />
     </div>
   );
 }

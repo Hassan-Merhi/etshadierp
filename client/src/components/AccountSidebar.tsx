@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Plus } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -35,6 +36,7 @@ interface AccountSidebarProps {
   paymentAccountId?: number;
   paymentAccountType?: string;
   voucherTotal?: number;
+  onCreateAccount?: () => void;
 }
 
 export default function AccountSidebar({
@@ -52,6 +54,7 @@ export default function AccountSidebar({
   paymentAccountId = 0,
   paymentAccountType = "",
   voucherTotal = 0,
+  onCreateAccount,
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -148,7 +151,21 @@ export default function AccountSidebar({
   return (
     <Card className="flex flex-col h-full">
       <div className="p-4 border-b">
-        <h3 className="text-base font-semibold mb-3">Select Account</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold">Select Account</h3>
+          {onCreateAccount && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCreateAccount}
+              data-testid="button-create-new-account"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New
+            </Button>
+          )}
+        </div>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
