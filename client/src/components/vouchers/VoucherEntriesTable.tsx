@@ -131,7 +131,7 @@ export function VoucherEntriesTable({
         <thead className="bg-muted/50">
           <tr>
             <th className="text-left p-3 font-medium w-[60%]">Account</th>
-            <th className="text-left p-3 font-medium w-[35%]">Amount</th>
+            <th className="text-right p-3 font-medium w-[35%]">Amount</th>
             <th className="w-[5%]"></th>
           </tr>
         </thead>
@@ -181,7 +181,7 @@ export function VoucherEntriesTable({
                           type="number"
                           step="0.01"
                           placeholder="0.00"
-                          className="font-mono"
+                          className="font-mono text-right"
                           data-testid={`input-amount-${index}`}
                           onKeyDown={(e) => handleAmountKeyDown(e, index)}
                           onBlur={(e) => {

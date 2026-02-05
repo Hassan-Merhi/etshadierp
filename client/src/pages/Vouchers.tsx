@@ -3369,10 +3369,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <PageHeader 
-        title={isPOS ? "Stock Transfer" : "Vouchers"}
-        subtitle={isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
-      />
+      {/* Sticky header with page title and tabs */}
+      <div className="sticky top-0 z-40 bg-background pb-2 -mx-4 px-4 md:-mx-6 md:px-6 border-b">
+        <PageHeader 
+          title={isPOS ? "Stock Transfer" : "Vouchers"}
+          subtitle={isPOS ? "Transfer stock between locations" : "Create payment and receipt vouchers"}
+        />
+      </div>
 
       {/* Hidden print template */}
       {!isPOS && (
@@ -3394,7 +3397,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <Tabs value={isPOS ? "transfer" : activeTab} onValueChange={(v) => !isPOS && setActiveTab(v as "payment" | "receipt" | "journal" | "transfer" | "adjustment" | "creditnote")}>
         {!isPOS && (
-          <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsList className="sticky top-16 z-30 bg-background flex flex-wrap h-auto gap-1">
             <TabsTrigger value="payment" className="text-xs sm:text-sm" data-testid="tab-payment">
               Payment
             </TabsTrigger>
@@ -3571,7 +3574,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                         <tr>
                           <th className="text-left p-3 font-medium w-[10%]">DR/CR</th>
                           <th className="text-left p-3 font-medium w-[50%]">Account</th>
-                          <th className="text-left p-3 font-medium w-[25%]">Amount</th>
+                          <th className="text-right p-3 font-medium w-[25%]">Amount</th>
                           <th className="w-[10%]"></th>
                         </tr>
                       </thead>
