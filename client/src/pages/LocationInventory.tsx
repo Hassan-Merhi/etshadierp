@@ -681,7 +681,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 w-full min-w-0">
       <PageHeader 
         title="Location Inventory" 
         subtitle="Manage inventory across all locations"
@@ -804,7 +804,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             onOpenChange={setCreateLocationDialogOpen}
           />
           
-          <Card className="p-4">
+          <Card className="p-4 w-full">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -827,7 +827,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 No locations found. Create a location first.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden w-full">
+              <div className="rounded-md border overflow-hidden w-full min-w-0">
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-12">
@@ -948,7 +948,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             </AlertDialogContent>
           </AlertDialog>
 
-          <Card className="p-4">
+          <Card className="p-4 w-full">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -971,17 +971,28 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 No inventory found at this location.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden w-full">
+              <div className="rounded-md border overflow-hidden w-full min-w-0">
                 <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "140px" }} />
+                    {!posUser && (
+                      <>
+                        <col style={{ width: "120px" }} />
+                        <col style={{ width: "140px" }} />
+                      </>
+                    )}
+                  </colgroup>
                   <thead className="bg-muted/50">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
-                      <th className="text-right px-3 font-medium w-[100px]">Items</th>
-                      <th className="text-right px-3 font-medium w-[140px]">Total Qty (BL)</th>
+                      <th className="text-right px-3 font-medium">Items</th>
+                      <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Total Qty (BL)</th>
                       {!posUser && (
                         <>
-                          <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
-                          <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
+                          <th className="text-right px-3 font-medium">Avg Rate</th>
+                          <th className="text-right px-3 pr-6 font-medium">Total Value</th>
                         </>
                       )}
                     </tr>
@@ -1079,7 +1090,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             )}
           </div>
 
-          <Card className="p-4">
+          <Card className="p-4 w-full">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -1091,16 +1102,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               />
             </div>
 
-            <div className="rounded-md border overflow-hidden w-full">
+            <div className="rounded-md border overflow-hidden w-full min-w-0">
               <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col />
+                  <col style={{ width: "140px" }} />
+                  {!posUser && (
+                    <>
+                      <col style={{ width: "120px" }} />
+                      <col style={{ width: "140px" }} />
+                    </>
+                  )}
+                </colgroup>
                 <thead className="bg-muted/50">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
-                    <th className="text-right px-3 font-medium w-[140px]">Quantity</th>
+                    <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
                     {!posUser && (
                       <>
-                        <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
-                        <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
+                        <th className="text-right px-3 font-medium">Avg Rate</th>
+                        <th className="text-right px-3 pr-6 font-medium">Total Value</th>
                       </>
                     )}
                   </tr>
@@ -1379,18 +1400,28 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   return (
                     <>
                       {/* Screen view - Spreadsheet table */}
-                      <div className="screen-only">
-                        <Card>
-                          <div className="rounded-md border overflow-hidden w-full">
+                      <div className="screen-only w-full min-w-0">
+                        <Card className="w-full">
+                          <div className="rounded-md border overflow-hidden w-full min-w-0">
                             <table className="w-full table-fixed text-sm">
+                              <colgroup>
+                                <col />
+                                <col style={{ width: "140px" }} />
+                                {!posUser && (
+                                  <>
+                                    <col style={{ width: "120px" }} />
+                                    <col style={{ width: "140px" }} />
+                                  </>
+                                )}
+                              </colgroup>
                               <thead className="bg-muted/50">
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
-                                  <th className="text-right px-3 font-medium w-[140px]">Quantity</th>
+                                  <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
                                   {!posUser && (
                                     <>
-                                      <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
-                                      <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
+                                      <th className="text-right px-3 font-medium">Avg Rate</th>
+                                      <th className="text-right px-3 pr-6 font-medium">Total Value</th>
                                     </>
                                   )}
                                 </tr>
