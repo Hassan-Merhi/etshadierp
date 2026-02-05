@@ -1,14 +1,16 @@
- import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 interface Transaction {
   date: string;
@@ -72,6 +74,7 @@ export default function LocationVouchers() {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(-1);
   const tableScrollContainer = useRef<HTMLDivElement>(null);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
+  const [showStockTransfers, setShowStockTransfers] = useState(false);
   
   const { data, isLoading } = useQuery<LocationVouchersData>({
     queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`, periodFilter.fromDate, periodFilter.toDate],
@@ -99,6 +102,53 @@ export default function LocationVouchers() {
       return dateStr;
     }
   };
+
+  // Helper to check if a transaction is a stock transfer
+  const isStockTransfer = (vchType: string) => {
+    const type = (vchType || "").toLowerCase();
+    return type === "stock transfer" || type === "stocktransfer" || type === "st";
+  };
+
+  // Filter transactions based on showStockTransfers toggle
+  const filteredTransactions = useMemo(() => {
+    if (!data?.transactions) return [];
+    
+    return data.transactions.filter((txn) => {
+      // Always keep opening balance row
+      if (txn.isOpeningBalance) return true;
+      // Filter out stock transfers if toggle is off
+      if (!showStockTransfers && isStockTransfer(txn.vchType)) return false;
+      return true;
+    });
+  }, [data?.transactions, showStockTransfers]);
+
+  // Recalculate totals based on filtered transactions (excluding opening balance)
+  const calculatedTotals = useMemo(() => {
+    const nonOpeningTxns = filteredTransactions.filter(t => !t.isOpeningBalance);
+    
+    const inwardQty = nonOpeningTxns.reduce((sum, t) => sum + (t.inwardQty || 0), 0);
+    const inwardValue = nonOpeningTxns.reduce((sum, t) => sum + (t.inwardValue || 0), 0);
+    const outwardQty = nonOpeningTxns.reduce((sum, t) => sum + (t.outwardQty || 0), 0);
+    const outwardValue = nonOpeningTxns.reduce((sum, t) => sum + (t.outwardValue || 0), 0);
+    
+    // Use the overall closing values from original data (not filtered) for accuracy
+    const originalLastTxn = data?.transactions?.[data.transactions.length - 1];
+    const closingQty = originalLastTxn?.closingQty || 0;
+    const closingRate = originalLastTxn?.closingRate || 0;
+    const closingValue = originalLastTxn?.closingValue || 0;
+
+    return {
+      inwardQty,
+      inwardRate: inwardQty > 0 ? inwardValue / inwardQty : 0,
+      inwardValue,
+      outwardQty,
+      outwardRate: outwardQty > 0 ? outwardValue / outwardQty : 0,
+      outwardValue,
+      closingQty,
+      closingRate,
+      closingValue,
+    };
+  }, [filteredTransactions, data?.transactions]);
   
   const getTransactionEditUrl = (txn: Transaction): string | null => {
     if (txn.isOpeningBalance) return null;
@@ -131,8 +181,13 @@ export default function LocationVouchers() {
     }
   };
 
+  // Get navigable rows (excluding opening balance) from filtered transactions
+  const navigableRows = useMemo(() => {
+    return filteredTransactions.filter(t => !t.isOpeningBalance);
+  }, [filteredTransactions]);
+
   const getNavigableRows = () => {
-    return data?.transactions?.filter((_, idx) => idx > 0) || []; // Skip opening balance row (index 0)
+    return navigableRows;
   };
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
@@ -217,11 +272,24 @@ export default function LocationVouchers() {
             )}
           </div>
         </div>
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="show-stock-transfers"
+              checked={showStockTransfers}
+              onCheckedChange={(checked) => setShowStockTransfers(checked === true)}
+              data-testid="checkbox-show-stock-transfers"
+            />
+            <Label htmlFor="show-stock-transfers" className="text-sm cursor-pointer">
+              Show Stock Transfers
+            </Label>
+          </div>
+          <PeriodFilter
+            value={periodFilter}
+            onChange={setPeriodFilter}
+            data-testid="period-filter"
+          />
+        </div>
       </div>
       
       <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 250px)' }}>
@@ -254,16 +322,17 @@ export default function LocationVouchers() {
               </tr>
             </thead>
             <tbody>
-                {data?.transactions.map((txn, idx) => {
-                  const displayIndex = idx > 0 ? idx - 1 : -1; // Skip opening balance in navigation
-                  const isSelected = displayIndex >= 0 && selectedRowIndex === displayIndex;
+                {filteredTransactions.map((txn, idx) => {
+                  // Find this transaction's index in the navigable rows array
+                  const navIndex = txn.isOpeningBalance ? -1 : navigableRows.indexOf(txn);
+                  const isSelected = navIndex >= 0 && selectedRowIndex === navIndex;
                   
                   return (
                   <tr 
                     key={idx} 
                     data-testid={`row-txn-${idx}`}
                     className={`border-b ${txn.isOpeningBalance ? "bg-muted/30 font-medium" : isSelected ? "ring-2 ring-primary bg-blue-200 dark:bg-blue-900" : ""}`}
-                    data-row-index={displayIndex >= 0 ? displayIndex : undefined}
+                    data-row-index={navIndex >= 0 ? navIndex : undefined}
                   >
                     <td className="px-4 py-3 border-r tabular-nums">
                       {txn.isOpeningBalance ? "" : formatDate(txn.date)}
@@ -299,7 +368,7 @@ export default function LocationVouchers() {
                   );
                 })}
                 
-                {data?.transactions.length === 0 && (
+                {filteredTransactions.length === 0 && (
                   <tr>
                     <td colSpan={12} className="text-center text-muted-foreground py-8">
                       No transactions found for this month
@@ -307,18 +376,18 @@ export default function LocationVouchers() {
                   </tr>
                 )}
                 
-                {data && data.transactions.length > 0 && (
+                {filteredTransactions.length > 0 && (
                   <tr className="bg-muted/50 font-bold border-t">
                     <td colSpan={3} className="px-4 py-3 border-r">Totals</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.inwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(data.totals.inwardValue)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.outwardRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(data.totals.outwardValue)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(data.totals.closingQty, 0)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.closingRate)}</td>
-                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(data.totals.closingValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.inwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.inwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.outwardRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums border-r">{formatAmount(calculatedTotals.outwardValue)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatNumber(calculatedTotals.closingQty, 0)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingRate)}</td>
+                    <td className="text-right px-2 py-3 tabular-nums">{formatAmount(calculatedTotals.closingValue)}</td>
                   </tr>
                 )}
               </tbody>

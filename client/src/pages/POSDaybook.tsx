@@ -127,7 +127,16 @@ export default function POSDaybook() {
 
   // Fetch today's sales vouchers (only fetch after user is loaded)
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/vouchers", { startDate, endDate }],
+    queryKey: ["/api/vouchers", startDate, endDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      const url = `/api/vouchers?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+      return res.json();
+    },
     enabled: !isLoadingUser, // Only fetch vouchers after user data is loaded
   });
 
@@ -439,7 +448,6 @@ export default function POSDaybook() {
                   <TableRow>
                     <TableHead className="text-xs">Time</TableHead>
                     <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Receipt #</TableHead>
                     <TableHead className="text-xs hidden sm:table-cell">Location</TableHead>
                     <TableHead className="text-xs text-right">Amount</TableHead>
                     <TableHead className="text-xs hidden md:table-cell">Notes</TableHead>
@@ -459,9 +467,6 @@ export default function POSDaybook() {
                         <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
                           {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs font-medium">
-                        {voucher.voucherNumber}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <Badge variant="secondary" className="text-xs">
