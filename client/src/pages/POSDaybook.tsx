@@ -135,21 +135,28 @@ export default function POSDaybook() {
   // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
   const bypassLocationFilter = voucherIdParam && isAdminOrOwner;
   
-  const filteredVouchers = vouchers.filter((v) => {
-    // Must be a Sales or Stock Transfer voucher
-    if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer") return false;
-    
-    // Bypass location filter when viewing specific historical voucher
-    if (bypassLocationFilter) return true;
-    
-    // If user has an assigned location (POS users), only show transactions from that location
-    if (currentUser?.assignedLocationId !== undefined && currentUser?.assignedLocationId !== null) {
-      return v.locationId === currentUser.assignedLocationId;
-    }
-    
-    // Non-POS users see all transactions
-    return true;
-  });
+  const filteredVouchers = vouchers
+    .filter((v) => {
+      // Must be a Sales or Stock Transfer voucher
+      if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer") return false;
+      
+      // Bypass location filter when viewing specific historical voucher
+      if (bypassLocationFilter) return true;
+      
+      // If user has an assigned location (POS users), only show transactions from that location
+      if (currentUser?.assignedLocationId !== undefined && currentUser?.assignedLocationId !== null) {
+        return v.locationId === currentUser.assignedLocationId;
+      }
+      
+      // Non-POS users see all transactions
+      return true;
+    })
+    // Sort newest first (descending by date, then by voucher number)
+    .sort((a, b) => {
+      const dateCompare = b.voucherDate.localeCompare(a.voucherDate);
+      if (dateCompare !== 0) return dateCompare;
+      return b.voucherNumber.localeCompare(a.voucherNumber);
+    });
   
   // Backward compatibility alias
   const salesVouchers = filteredVouchers;
