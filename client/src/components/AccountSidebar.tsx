@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, KeyboardEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Loader2 } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
@@ -37,6 +37,9 @@ interface AccountSidebarProps {
   paymentAccountType?: string;
   voucherTotal?: number;
   onCreateAccount?: () => void;
+  isFactoryCompany?: boolean;
+  onAutoCreateAccount?: (name: string) => Promise<Account | null>;
+  isAutoCreating?: boolean;
 }
 
 export default function AccountSidebar({
@@ -55,10 +58,49 @@ export default function AccountSidebar({
   paymentAccountType = "",
   voucherTotal = 0,
   onCreateAccount,
+  isFactoryCompany = false,
+  onAutoCreateAccount,
+  isAutoCreating = false,
 }: AccountSidebarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
+
+  const handleKeyDown = async (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && isFactoryCompany && onAutoCreateAccount) {
+      e.preventDefault();
+      const trimmedName = searchValue.trim();
+      if (!trimmedName) return;
+
+      // If there's a highlighted account, select it
+      if (filteredAccounts.length > 0 && highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length) {
+        onSelectAccount(filteredAccounts[highlightedIndex]);
+        return;
+      }
+
+      // No matching accounts - auto-create for factory
+      const newAccount = await onAutoCreateAccount(trimmedName);
+      if (newAccount) {
+        onSelectAccount(newAccount);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (filteredAccounts.length > 0) {
+        onHighlightedIndexChange(Math.min(highlightedIndex + 1, filteredAccounts.length - 1));
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (filteredAccounts.length > 0) {
+        onHighlightedIndexChange(Math.max(highlightedIndex - 1, 0));
+      }
+    } else if (e.key === "Enter" && !isFactoryCompany) {
+      // For non-factory: select highlighted account on Enter
+      if (filteredAccounts.length > 0 && highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length) {
+        e.preventDefault();
+        onSelectAccount(filteredAccounts[highlightedIndex]);
+      }
+    }
+  };
 
   // Calculate projected balances based on voucher entries
   const getProjectedBalance = (account: Account): number => {
@@ -168,14 +210,20 @@ export default function AccountSidebar({
         </div>
 
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {isAutoCreating ? (
+            <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+          ) : (
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          )}
           <Input
             ref={searchInputRef}
-            placeholder="Search accounts..."
+            placeholder={isFactoryCompany ? "Type expense name & Enter..." : "Search accounts..."}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="pl-9"
             data-testid="input-search-account"
+            disabled={isAutoCreating}
           />
         </div>
       </div>
@@ -184,7 +232,11 @@ export default function AccountSidebar({
         <div className="space-y-1">
           {filteredAccounts.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">
-              No accounts found
+              {isFactoryCompany && searchValue.trim() ? (
+                <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{searchValue.trim()}"</span>
+              ) : (
+                "No accounts found"
+              )}
             </div>
           ) : (
             filteredAccounts.map((account, idx) => {

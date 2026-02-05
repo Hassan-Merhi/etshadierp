@@ -60,6 +60,9 @@ interface PaymentVoucherTabProps {
   activeRowIndex: number | null;
   setActiveRowIndex: (index: number | null) => void;
   onCreateAccount?: () => void;
+  isFactoryCompany?: boolean;
+  onAutoCreateAccount?: (name: string) => Promise<Account | null>;
+  isAutoCreating?: boolean;
 }
 
 export function PaymentVoucherTab({
@@ -89,6 +92,9 @@ export function PaymentVoucherTab({
   activeRowIndex,
   setActiveRowIndex,
   onCreateAccount,
+  isFactoryCompany = false,
+  onAutoCreateAccount,
+  isAutoCreating = false,
 }: PaymentVoucherTabProps) {
   const { formatAmount } = useCurrencyContext();
   const hasExport = Boolean(handleExportVoucher);
@@ -365,7 +371,10 @@ export function PaymentVoucherTab({
           paymentAccountId={paymentAccountId}
           paymentAccountType={paymentAccountType}
           voucherTotal={total}
-          onCreateAccount={onCreateAccount}
+          onCreateAccount={isFactoryCompany ? undefined : onCreateAccount}
+          isFactoryCompany={isFactoryCompany}
+          onAutoCreateAccount={onAutoCreateAccount}
+          isAutoCreating={isAutoCreating}
         />
       </div>
     </div>

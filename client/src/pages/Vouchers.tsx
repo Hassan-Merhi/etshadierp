@@ -82,7 +82,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown } from "lucide-react";
+import { CalendarIcon, Printer, Plus, Check, ChevronsUpDown, Pencil, Upload, FileSpreadsheet, Download, CheckCircle, XCircle, X, Search, ChevronDown, FileDown, Loader2 } from "lucide-react";
 import { utils, writeFile } from "@/lib/excelHelper";
 import {
   DropdownMenu,
@@ -531,6 +531,8 @@ interface VouchersProps {
 export default function Vouchers({ posUser }: VouchersProps = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const isFactoryCompany = selectedCompany?.companyType === "factory";
+  const [isAutoCreating, setIsAutoCreating] = useState(false);
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount, selectedCurrency, convertToUSD, exchangeRate: dailyExchangeRate } = useCurrencyContext();
   // Transaction-specific exchange rate (allows override of daily rate for rate-locking)
@@ -1226,6 +1228,74 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     }
 
     setCreateAccountContext(null);
+  };
+
+  // Auto-create expense account for FACTORY companies
+  // This allows typing a new expense name and pressing Enter to auto-create under Indirect Expense
+  const handleAutoCreateAccount = async (name: string): Promise<Account | null> => {
+    if (!selectedCompany?.id || !name.trim()) return null;
+
+    setIsAutoCreating(true);
+    try {
+      // Check if account already exists (case-insensitive search in sidebar accounts)
+      const normalizedName = name.trim().toLowerCase();
+      const existingAccount = sidebarAccounts.find(
+        (acc) => acc.name.toLowerCase() === normalizedName
+      );
+
+      if (existingAccount) {
+        // Account exists, just return it
+        return existingAccount;
+      }
+
+      // Create new expense account under Indirect Expense
+      const payload = {
+        name: name.trim(),
+        accountType: "Indirect Expense",
+        companyId: selectedCompany.id,
+      };
+
+      const response = await fetch("/api/ledger-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create account");
+      }
+
+      const newAccount = await response.json();
+
+      // Invalidate cache to refresh account lists
+      await queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar", selectedCompany.id] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany.id] });
+
+      toast({
+        title: "Account created",
+        description: `"${newAccount.name}" created as Indirect Expense.`,
+      });
+
+      // Return as Account type for sidebar
+      return {
+        id: newAccount.id,
+        name: newAccount.name,
+        type: "ledger" as const,
+        code: newAccount.code || "",
+        balance: 0,
+      };
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create account",
+      });
+      return null;
+    } finally {
+      setIsAutoCreating(false);
+    }
   };
 
   // Sync active row's accountName to sidebar search (like POS does with itemName)
@@ -3507,6 +3577,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               activeRowIndex={activeRowIndex}
               setActiveRowIndex={setActiveRowIndex}
               onCreateAccount={() => handleOpenCreateAccountModal("payment", activeRowIndex ?? undefined)}
+              isFactoryCompany={isFactoryCompany}
+              onAutoCreateAccount={handleAutoCreateAccount}
+              isAutoCreating={isAutoCreating}
             />
           </TabsContent>
         )}
@@ -3551,6 +3624,9 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               activeRowIndex={activeRowIndex}
               setActiveRowIndex={setActiveRowIndex}
               onCreateAccount={() => handleOpenCreateAccountModal("receipt", activeRowIndex ?? undefined)}
+              isFactoryCompany={isFactoryCompany}
+              onAutoCreateAccount={handleAutoCreateAccount}
+              isAutoCreating={isAutoCreating}
             />
           </TabsContent>
         )}
@@ -4018,16 +4094,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-semibold">Search Accounts</h3>
                       <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
-                          data-testid="button-journal-create-account"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          New
-                        </Button>
+                        {!isFactoryCompany && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenCreateAccountModal("journal", activeJournalRow ?? undefined)}
+                            data-testid="button-journal-create-account"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            New
+                          </Button>
+                        )}
                         <button 
                           onClick={() => setShowAccountSidebar(false)} 
                           className="text-xs text-muted-foreground hover:text-foreground" 
@@ -4038,16 +4116,60 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                       </div>
                     </div>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      {isAutoCreating ? (
+                        <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+                      ) : (
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      )}
                       <Input
-                        placeholder="Search by name or code..."
+                        placeholder={isFactoryCompany ? "Type expense name & Enter..." : "Search by name or code..."}
                         value={journalAccountSearchTerm}
                         onChange={(e) => {
                           setJournalAccountSearchTerm(e.target.value);
                           setJournalAccountHighlightedIndex(0);
                         }}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter" && isFactoryCompany) {
+                            e.preventDefault();
+                            const trimmedName = journalAccountSearchTerm.trim();
+                            if (!trimmedName) return;
+
+                            // If there's a highlighted account, select it
+                            if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
+                              handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                              return;
+                            }
+
+                            // No matching accounts - auto-create for factory
+                            const newAccount = await handleAutoCreateAccount(trimmedName);
+                            if (newAccount) {
+                              // Convert Account to CombinedAccount format
+                              handleJournalAccountSelect({
+                                ...newAccount,
+                                balance: newAccount.balance?.toString(),
+                              });
+                            }
+                          } else if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            if (filteredJournalAccounts.length > 0) {
+                              setJournalAccountHighlightedIndex(Math.min(journalAccountHighlightedIndex + 1, filteredJournalAccounts.length - 1));
+                            }
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            if (filteredJournalAccounts.length > 0) {
+                              setJournalAccountHighlightedIndex(Math.max(journalAccountHighlightedIndex - 1, 0));
+                            }
+                          } else if (e.key === "Enter" && !isFactoryCompany) {
+                            // For non-factory: select highlighted account on Enter
+                            if (filteredJournalAccounts.length > 0 && journalAccountHighlightedIndex >= 0 && journalAccountHighlightedIndex < filteredJournalAccounts.length) {
+                              e.preventDefault();
+                              handleJournalAccountSelect(filteredJournalAccounts[journalAccountHighlightedIndex]);
+                            }
+                          }
+                        }}
                         className="pl-9"
                         data-testid="input-journal-sidebar-search"
+                        disabled={isAutoCreating}
                       />
                     </div>
                   </div>
@@ -4055,7 +4177,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                     <div className="space-y-1">
                       {filteredJournalAccounts.length === 0 ? (
                         <div className="text-center py-8 text-sm text-muted-foreground">
-                          No accounts found
+                          {isFactoryCompany && journalAccountSearchTerm.trim() ? (
+                            <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{journalAccountSearchTerm.trim()}"</span>
+                          ) : (
+                            "No accounts found"
+                          )}
                         </div>
                       ) : (
                         filteredJournalAccounts.map((account, idx) => {

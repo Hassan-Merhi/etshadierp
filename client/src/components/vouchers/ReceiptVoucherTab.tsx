@@ -59,6 +59,9 @@ interface ReceiptVoucherTabProps {
   activeRowIndex: number | null;
   setActiveRowIndex: (index: number | null) => void;
   onCreateAccount?: () => void;
+  isFactoryCompany?: boolean;
+  onAutoCreateAccount?: (name: string) => Promise<Account | null>;
+  isAutoCreating?: boolean;
 }
 
 export function ReceiptVoucherTab({
@@ -88,6 +91,9 @@ export function ReceiptVoucherTab({
   activeRowIndex,
   setActiveRowIndex,
   onCreateAccount,
+  isFactoryCompany = false,
+  onAutoCreateAccount,
+  isAutoCreating = false,
 }: ReceiptVoucherTabProps) {
   const hasExport = Boolean(handleExportVoucher);
   const hasAnyEntry = entries.some((e) => (e?.accountId ?? 0) > 0);
@@ -361,7 +367,10 @@ export function ReceiptVoucherTab({
           paymentAccountId={paymentAccountId}
           paymentAccountType={paymentAccountType}
           voucherTotal={total}
-          onCreateAccount={onCreateAccount}
+          onCreateAccount={isFactoryCompany ? undefined : onCreateAccount}
+          isFactoryCompany={isFactoryCompany}
+          onAutoCreateAccount={onAutoCreateAccount}
+          isAutoCreating={isAutoCreating}
         />
       </div>
     </div>
