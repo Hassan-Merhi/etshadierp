@@ -1095,7 +1095,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
                     <th className="text-right px-3 font-medium">Quantity</th>
-                    <th className="text-left px-3 font-medium">UOM</th>
                     {!posUser && (
                       <>
                         <th className="text-right px-3 font-medium">Avg Rate</th>
@@ -1107,7 +1106,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <tbody>
                   {filteredStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan={posUser ? 3 : 5} className="text-center py-8 text-muted-foreground">
+                      <td colSpan={posUser ? 2 : 4} className="text-center py-8 text-muted-foreground">
                         {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
                       </td>
                     </tr>
@@ -1125,7 +1124,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/locations/${selectedLocationLocal?.id}/stock-items/${item.stockItemId}/history`);
+                              navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
                             }}
                             className="text-left text-primary hover:underline cursor-pointer"
                             data-testid={`link-item-${item.stockItemId}`}
@@ -1134,9 +1133,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           </button>
                         </td>
                         <td className="px-3 text-right font-mono">
-                          {Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}
+                          {Math.floor(parseFloat(item.quantity)).toLocaleString()}
                         </td>
-                        <td className="px-3"></td>
                         {!posUser && (
                           <>
                             <td className="px-3 text-right font-mono">
@@ -1373,7 +1371,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
                                   <th className="text-right px-3 font-medium">Quantity</th>
-                                  <th className="text-right px-3 font-medium">UOM</th>
                                   {!posUser && (
                                     <>
                                       <th className="text-right px-3 font-medium">Avg Rate</th>
@@ -1387,7 +1384,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                   <>
                                     {/* Group header row */}
                                     <tr key={`header-${groupCode}`} className="bg-muted/30">
-                                      <td colSpan={posUser ? 3 : 5} className="px-3 py-2 font-bold">
+                                      <td colSpan={posUser ? 2 : 4} className="px-3 py-2 font-bold">
                                         {name}
                                       </td>
                                     </tr>
@@ -1396,7 +1393,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                       <tr key={item.inventoryId} className="border-t hover-elevate">
                                         <td className="px-3 py-2">
                                           <button
-                                            onClick={() => navigate(`/locations/${selectedLocationLocal?.id}/stock-items/${item.stockItemId}/history`)}
+                                            onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
                                             className="text-left text-primary hover:underline cursor-pointer"
                                             data-testid={`link-all-item-${item.stockItemId}`}
                                           >
@@ -1406,7 +1403,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                         <td className="px-3 py-2 text-right font-mono">
                                           {Math.floor(parseFloat(item.quantity)).toLocaleString()}
                                         </td>
-                                        <td className="px-3 py-2 text-right">{item.stockItemUom}</td>
                                         {!posUser && (
                                           <>
                                             <td className="px-3 py-2 text-right font-mono">
@@ -1427,7 +1423,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                   <td className="px-3 text-right font-mono font-bold">
                                     {Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}
                                   </td>
-                                  <td className="px-3"></td>
                                   {!posUser && (
                                     <>
                                       <td className="px-3"></td>
