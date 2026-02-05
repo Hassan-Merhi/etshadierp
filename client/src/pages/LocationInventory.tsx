@@ -827,8 +827,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 No locations found. Create a location first.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="rounded-md border overflow-hidden w-full">
+                <table className="w-full table-fixed text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
@@ -971,17 +971,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 No inventory found at this location.
               </div>
             ) : (
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="rounded-md border overflow-hidden w-full">
+                <table className="w-full table-fixed text-sm">
                   <thead className="bg-muted/50">
                     <tr className="h-12">
                       <th className="text-left px-3 font-medium">Name</th>
-                      <th className="text-right px-3 font-medium">Items</th>
-                      <th className="text-right px-3 font-medium">Total Qty (BL)</th>
+                      <th className="text-right px-3 font-medium w-[100px]">Items</th>
+                      <th className="text-right px-3 font-medium w-[140px]">Total Qty (BL)</th>
                       {!posUser && (
                         <>
-                          <th className="text-right px-3 font-medium">Avg Rate</th>
-                          <th className="text-right px-3 font-medium">Total Value</th>
+                          <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
+                          <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
                         </>
                       )}
                     </tr>
@@ -1011,8 +1011,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <td className="px-3 text-right" data-testid={`items-${group.groupId}`}>
                               {group.itemCount.toLocaleString()}
                             </td>
-                            <td className="px-3 text-right font-mono" data-testid={`qty-${group.groupId}`}>
-                              {Math.floor(group.totalQuantity).toLocaleString()} BL
+                            <td className={`px-3 text-right font-mono ${group.totalQuantity < 0 ? "text-amber-600 font-semibold" : ""}`} data-testid={`qty-${group.groupId}`}>
+                              {Math.floor(group.totalQuantity).toLocaleString()}<span className="ml-2">BL</span>
                             </td>
                             {!posUser && (
                               <>
@@ -1031,7 +1031,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                             <td className="px-3">Total</td>
                             <td className="px-3 text-right">{filteredStockGroups.reduce((sum, g) => sum + g.itemCount, 0).toLocaleString()}</td>
                             <td className="px-3 text-right font-mono">
-                              {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()} BL
+                              {Math.floor(filteredStockGroups.reduce((sum, g) => sum + g.totalQuantity, 0)).toLocaleString()}<span className="ml-2">BL</span>
                             </td>
                             {!posUser && (
                               <>
@@ -1089,16 +1089,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               />
             </div>
 
-            <div className="rounded-md border overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="rounded-md border overflow-hidden w-full">
+              <table className="w-full table-fixed text-sm">
                 <thead className="bg-muted/50">
                   <tr className="h-12">
                     <th className="text-left px-3 font-medium">Name</th>
-                    <th className="text-right px-3 font-medium">Quantity</th>
+                    <th className="text-right px-3 font-medium w-[140px]">Quantity</th>
                     {!posUser && (
                       <>
-                        <th className="text-right px-3 font-medium">Avg Rate</th>
-                        <th className="text-right px-3 font-medium">Total Value</th>
+                        <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
+                        <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
                       </>
                     )}
                   </tr>
@@ -1111,42 +1111,48 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       </td>
                     </tr>
                   ) : (
-                    filteredStockItems.map((item, index) => (
-                      <tr
-                        key={item.inventoryId}
-                        data-testid={`row-item-${item.stockItemId}`}
-                        className={`border-t h-12 ${
-                          index === selectedRowIndex ? "bg-accent" : "hover-elevate"
-                        }`}
-                        onClick={() => setSelectedRowIndex(index)}
-                      >
-                        <td className="px-3 font-medium">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
-                            }}
-                            className="text-left text-primary hover:underline cursor-pointer"
-                            data-testid={`link-item-${item.stockItemId}`}
-                          >
-                            {item.stockItemName}
-                          </button>
-                        </td>
-                        <td className="px-3 text-right font-mono">
-                          {Math.floor(parseFloat(item.quantity)).toLocaleString()}
-                        </td>
-                        {!posUser && (
-                          <>
-                            <td className="px-3 text-right font-mono">
-                              {formatAmount(parseFloat(item.averageRate))}
-                            </td>
-                            <td className="px-3 text-right font-mono font-medium">
-                              {formatAmount(parseFloat(item.totalValue))}
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))
+                    filteredStockItems.map((item, index) => {
+                      const itemQty = parseFloat(item.quantity || "0");
+                      const isNegative = itemQty < 0;
+                      return (
+                        <tr
+                          key={item.inventoryId}
+                          data-testid={`row-item-${item.stockItemId}`}
+                          className={`border-t h-12 ${
+                            index === selectedRowIndex 
+                              ? (isNegative ? "bg-amber-200 dark:bg-amber-800/50 ring-2 ring-primary" : "bg-accent") 
+                              : (isNegative ? "bg-amber-100 dark:bg-amber-900/30" : "hover-elevate")
+                          }`}
+                          onClick={() => setSelectedRowIndex(index)}
+                        >
+                          <td className="px-3 font-medium">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`);
+                              }}
+                              className="text-left text-primary hover:underline cursor-pointer"
+                              data-testid={`link-item-${item.stockItemId}`}
+                            >
+                              {item.stockItemName}
+                            </button>
+                          </td>
+                          <td className={`px-3 text-right font-mono ${isNegative ? "text-amber-600 font-semibold" : ""}`}>
+                            {Math.floor(itemQty).toLocaleString()}
+                          </td>
+                          {!posUser && (
+                            <>
+                              <td className="px-3 text-right font-mono">
+                                {formatAmount(parseFloat(item.averageRate))}
+                              </td>
+                              <td className="px-3 text-right font-mono font-medium">
+                                {formatAmount(parseFloat(item.totalValue))}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
                 {filteredStockItems.length > 0 && (
@@ -1306,6 +1312,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   padding: 5px 8px !important;
                   background-color: #f0f0f0 !important;
                 }
+                .print-inventory-table tr.negative-row td {
+                  background-color: rgba(255, 193, 7, 0.3) !important;
+                }
+                .print-inventory-table .negative-value {
+                  font-weight: 600 !important;
+                }
+                .print-inventory-table .qty-unit {
+                  margin-left: 0.5em !important;
+                }
                 .screen-only {
                   display: none !important;
                 }
@@ -1365,16 +1380,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       {/* Screen view - Spreadsheet table */}
                       <div className="screen-only">
                         <Card>
-                          <div className="rounded-md border overflow-hidden">
-                            <table className="w-full text-sm">
+                          <div className="rounded-md border overflow-hidden w-full">
+                            <table className="w-full table-fixed text-sm">
                               <thead className="bg-muted/50">
                                 <tr className="h-10">
                                   <th className="text-left px-3 font-medium">Name</th>
-                                  <th className="text-right px-3 font-medium">Quantity</th>
+                                  <th className="text-right px-3 font-medium w-[140px]">Quantity</th>
                                   {!posUser && (
                                     <>
-                                      <th className="text-right px-3 font-medium">Avg Rate</th>
-                                      <th className="text-right px-3 font-medium">Total Value</th>
+                                      <th className="text-right px-3 font-medium w-[120px]">Avg Rate</th>
+                                      <th className="text-right px-3 font-medium w-[140px]">Total Value</th>
                                     </>
                                   )}
                                 </tr>
@@ -1389,32 +1404,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                                       </td>
                                     </tr>
                                     {/* Group items */}
-                                    {items.map((item) => (
-                                      <tr key={item.inventoryId} className="border-t hover-elevate">
-                                        <td className="px-3 py-2">
-                                          <button
-                                            onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
-                                            className="text-left text-primary hover:underline cursor-pointer"
-                                            data-testid={`link-all-item-${item.stockItemId}`}
-                                          >
-                                            {item.stockItemName}
-                                          </button>
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-mono">
-                                          {Math.floor(parseFloat(item.quantity)).toLocaleString()}
-                                        </td>
-                                        {!posUser && (
-                                          <>
-                                            <td className="px-3 py-2 text-right font-mono">
-                                              {formatAmount(parseFloat(item.averageRate))}
-                                            </td>
-                                            <td className="px-3 py-2 text-right font-mono font-medium">
-                                              {formatAmount(parseFloat(item.totalValue))}
-                                            </td>
-                                          </>
-                                        )}
-                                      </tr>
-                                    ))}
+                                    {items.map((item) => {
+                                      const itemQty = parseFloat(item.quantity || "0");
+                                      const isNegative = itemQty < 0;
+                                      return (
+                                        <tr key={item.inventoryId} className={`border-t ${isNegative ? "bg-amber-100 dark:bg-amber-900/30" : "hover-elevate"}`}>
+                                          <td className="px-3 py-2">
+                                            <button
+                                              onClick={() => navigate(`/locations/${item.locationId}/stock-items/${item.stockItemId}/history`)}
+                                              className="text-left text-primary hover:underline cursor-pointer"
+                                              data-testid={`link-all-item-${item.stockItemId}`}
+                                            >
+                                              {item.stockItemName}
+                                            </button>
+                                          </td>
+                                          <td className={`px-3 py-2 text-right font-mono ${isNegative ? "text-amber-600 font-semibold" : ""}`}>
+                                            {Math.floor(itemQty).toLocaleString()}
+                                          </td>
+                                          {!posUser && (
+                                            <>
+                                              <td className="px-3 py-2 text-right font-mono">
+                                                {formatAmount(parseFloat(item.averageRate))}
+                                              </td>
+                                              <td className="px-3 py-2 text-right font-mono font-medium">
+                                                {formatAmount(parseFloat(item.totalValue))}
+                                              </td>
+                                            </>
+                                          )}
+                                        </tr>
+                                      );
+                                    })}
                                   </>
                                 ))}
                                 {/* Grand Totals Row */}
@@ -1450,21 +1469,32 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           {Object.entries(groupedInventory).map(([groupCode, { name, items }]) => {
                             const groupTotal = items.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0);
                             const firstItemUom = items[0]?.stockItemUom || "";
+                            const isGroupNegative = groupTotal < 0;
                             
                             return (
                               <>
                                 {/* Group header row */}
-                                <tr key={`group-${groupCode}`} className="group-row">
+                                <tr key={`group-${groupCode}`} className={`group-row ${isGroupNegative ? "negative-row" : ""}`}>
                                   <td>{name}</td>
-                                  <td className="qty-col">{Math.floor(groupTotal).toLocaleString()} {firstItemUom}</td>
+                                  <td className="qty-col">
+                                    <span className={isGroupNegative ? "negative-value" : ""}>{Math.floor(groupTotal).toLocaleString()}</span>
+                                    <span className="qty-unit">{firstItemUom}</span>
+                                  </td>
                                 </tr>
                                 {/* Group items */}
-                                {items.map((item) => (
-                                  <tr key={`item-${item.inventoryId}`} className="item-row">
-                                    <td>{item.stockItemName}</td>
-                                    <td className="qty-col">{Math.floor(parseFloat(item.quantity)).toLocaleString()} {item.stockItemUom}</td>
-                                  </tr>
-                                ))}
+                                {items.map((item) => {
+                                  const itemQty = parseFloat(item.quantity || "0");
+                                  const isItemNegative = itemQty < 0;
+                                  return (
+                                    <tr key={`item-${item.inventoryId}`} className={`item-row ${isItemNegative ? "negative-row" : ""}`}>
+                                      <td>{item.stockItemName}</td>
+                                      <td className="qty-col">
+                                        <span className={isItemNegative ? "negative-value" : ""}>{Math.floor(itemQty).toLocaleString()}</span>
+                                        <span className="qty-unit">{item.stockItemUom}</span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </>
                             );
                           })}
@@ -1472,7 +1502,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <tr className="total-row">
                             <td>Grand Total</td>
                             <td className="qty-col">
-                              {Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} {inventory[0]?.stockItemUom || ""}
+                              <span>{Math.floor(inventory.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}</span>
+                              <span className="qty-unit">{inventory[0]?.stockItemUom || ""}</span>
                             </td>
                           </tr>
                         </tbody>
