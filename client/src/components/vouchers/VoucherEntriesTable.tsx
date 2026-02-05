@@ -28,6 +28,9 @@ interface VoucherEntriesTableProps {
   handleSidebarAccountSelect: (account: Account) => void;
   onRowFocus: (rowIndex: number, fieldName: string) => void;
   onRowBlur: () => void;
+  isFactoryCompany?: boolean;
+  onAutoCreateAccount?: (name: string) => Promise<Account | null>;
+  isAutoCreating?: boolean;
 }
 
 export function VoucherEntriesTable({
@@ -45,6 +48,9 @@ export function VoucherEntriesTable({
   handleSidebarAccountSelect,
   onRowFocus,
   onRowBlur,
+  isFactoryCompany = false,
+  onAutoCreateAccount,
+  isAutoCreating = false,
 }: VoucherEntriesTableProps) {
   const { fields, append, remove } = fieldArray;
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
@@ -58,7 +64,7 @@ export function VoucherEntriesTable({
     });
   };
 
-  const handleAccountKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleAccountKeyDown = async (e: React.KeyboardEvent, index: number) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
@@ -74,12 +80,31 @@ export function VoucherEntriesTable({
       setSidebarHighlightedIndex(newIndex);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (filteredSidebarAccounts.length === 0 || sidebarHighlightedIndex < 0) {
-        return;
-      }
-      const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
-      if (highlightedAccount) {
-        handleSidebarAccountSelect(highlightedAccount);
+      
+      // Get the current account name from the form
+      const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
+      
+      if (isFactoryCompany && onAutoCreateAccount && currentName) {
+        // Check for EXACT match (case-insensitive)
+        const exactMatch = filteredSidebarAccounts.find(
+          (acc) => acc.name.toLowerCase() === currentName.toLowerCase()
+        );
+        
+        if (exactMatch) {
+          handleSidebarAccountSelect(exactMatch);
+        } else {
+          // No exact match - auto-create for factory
+          const newAccount = await onAutoCreateAccount(currentName);
+          if (newAccount) {
+            handleSidebarAccountSelect(newAccount);
+          }
+        }
+      } else if (filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
+        // Non-factory: select highlighted account
+        const highlightedAccount = filteredSidebarAccounts[sidebarHighlightedIndex];
+        if (highlightedAccount) {
+          handleSidebarAccountSelect(highlightedAccount);
+        }
       }
     }
   };

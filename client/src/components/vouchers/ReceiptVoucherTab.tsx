@@ -288,6 +288,9 @@ export function ReceiptVoucherTab({
                   onRowBlur={() => {
                     // Don't clear activeRow on blur - let amount commit handle it
                   }}
+                  isFactoryCompany={isFactoryCompany}
+                  onAutoCreateAccount={onAutoCreateAccount}
+                  isAutoCreating={isAutoCreating}
                 />
 
                 {/* Notes field */}
