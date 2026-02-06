@@ -386,6 +386,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     };
   }, [rows]);
 
+  useEffect(() => {
+    window.__escBackGuard = () => {
+      return rows.some(row => row.itemName && row.quantity > 0);
+    };
+    window.__escBackConfirm = () => {
+      setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
+    };
+    return () => {
+      delete window.__escBackGuard;
+      delete window.__escBackConfirm;
+    };
+  }, [rows]);
+
   // Save sale mutation (handles both create and update)
   const saveMutation = useMutation({
     mutationFn: async (saleData: any) => {

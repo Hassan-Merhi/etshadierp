@@ -78,7 +78,25 @@ import ImportCycleDiagnostics from "@/pages/ImportCycleDiagnostics";
 import NetProfitDetails from "@/pages/NetProfitDetails";
 import CompanyDataReset from "@/pages/CompanyDataReset";
 import StockTransferOrder from "@/pages/StockTransferOrder";
-import { useEffect } from "react";
+import { useEffect, useCallback, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+declare global {
+  interface Window {
+    __escBackGuard?: () => boolean;
+    __escBackConfirm?: () => void;
+  }
+}
 
 function Router({ user }: { user: any }) {
   const isPOS = user?.role?.startsWith("POS");
@@ -178,11 +196,51 @@ function AuthenticatedApp() {
   usePresence(); // Track user presence
   const [location, setLocation] = useLocation();
   const [currentLocation] = useLocation();
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   
   const { data: user, isLoading, error } = useQuery<any>({
     queryKey: ["/api/auth/me"],
     retry: false,
   });
+
+  const handleGoBack = useCallback(() => {
+    if (window.__escBackGuard && window.__escBackGuard()) {
+      setShowLeaveConfirm(true);
+      return;
+    }
+    window.history.back();
+  }, []);
+
+  const handleConfirmLeave = useCallback(() => {
+    setShowLeaveConfirm(false);
+    if (window.__escBackConfirm) {
+      window.__escBackConfirm();
+    }
+    window.history.back();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+        (target as HTMLInputElement).blur();
+        return;
+      }
+
+      const hasOpenOverlay = document.querySelector(
+        '[data-state="open"][role="dialog"], [data-state="open"][role="alertdialog"], [data-state="open"][data-radix-popper-content-wrapper], [data-state="open"][role="listbox"], [data-state="open"][role="menu"]'
+      );
+      if (hasOpenOverlay) return;
+
+      e.preventDefault();
+      handleGoBack();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleGoBack]);
 
   useEffect(() => {
     if (!isLoading && (error || !user)) {
@@ -218,6 +276,25 @@ function AuthenticatedApp() {
     "--sidebar-width-icon": "3rem",
   };
 
+  const leaveConfirmDialog = (
+    <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Leave this page?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You have an ongoing sale. Leaving now will lose your unsaved changes.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-cancel-leave">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmLeave} data-testid="button-confirm-leave">
+            Leave
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   // POS users get a simplified interface without sidebar
   if (isPOS) {
     const isOnPOS = currentLocation === "/";
@@ -225,11 +302,15 @@ function AuthenticatedApp() {
     const isOnDaybook = currentLocation === "/pos-daybook";
     
     return (
+      <>
       <div className="flex flex-col h-screen w-full">
         {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
         <header className="flex flex-col border-b">
           <div className="flex items-center justify-between p-2 sm:p-4 min-h-14 sm:h-16 gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={handleGoBack} data-testid="button-pos-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
               <h1 className="text-base sm:text-lg font-semibold truncate">POS {user.posStation || ""}</h1>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 ml-auto">
@@ -302,36 +383,41 @@ function AuthenticatedApp() {
           </div>
         </main>
       </div>
+      {leaveConfirmDialog}
+      </>
     );
   }
 
   // Full interface for Admin, Owner, Manager
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
-        <AppSidebar user={user} />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
-              <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
-              <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
-                <LogOut className="h-4 w-4" />
-              </Button>
-              <CompanySelector />
-              <CurrencyToggle />
-              <ThemeToggle />
-            </div>
-          </header>
-          <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-            <div className="w-full">
-              <Router user={user} />
-            </div>
-          </main>
+    <>
+      <SidebarProvider style={style as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
+          <AppSidebar user={user} />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <header className="flex items-center justify-between p-2 sm:p-4 border-b min-h-14 sm:h-16 gap-2 sm:gap-4">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-wrap justify-end">
+                <span className="hidden md:inline text-sm text-muted-foreground">{user.username} ({user.role})</span>
+                <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+                <CompanySelector />
+                <CurrencyToggle />
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+              <div className="w-full">
+                <Router user={user} />
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+      {leaveConfirmDialog}
+    </>
   );
 }
 
