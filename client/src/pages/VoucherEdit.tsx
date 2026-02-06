@@ -2301,19 +2301,24 @@ export default function VoucherEdit() {
       const transferItems = transferForm.watch("items");
       const totalBales = transferItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
       
-      const exportData = transferItems.map(item => ({
-        'Source Location': sourceLocation?.name || 'Unknown',
-        'Bale Name': item.stockItemName || 'Unknown',
-        'Quantity': parseFloat(item.quantity) || 0,
-        'Rate': parseFloat(item.rate) || 0,
-        'Amount': (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0),
-        'Destination Location': destinationLocation?.name || 'Unknown',
-      }));
+      const originalItems = voucher.transferData?.items || [];
+      const exportData = transferItems.map(item => {
+        const orig = originalItems.find((oi: any) => oi.stockItemId === item.stockItemId);
+        return {
+          'Source Location': sourceLocation?.name || 'Unknown',
+          'Item Code': orig?.stockItemCode || '',
+          'Item Name': orig?.stockItemName || item.stockItemName || 'Unknown',
+          'Quantity': parseFloat(item.quantity) || 0,
+          'Rate': parseFloat(item.rate) || 0,
+          'Amount': (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0),
+          'Destination Location': destinationLocation?.name || 'Unknown',
+        };
+      });
       
-      // Add total row
       exportData.push({
         'Source Location': '',
-        'Bale Name': 'TOTAL',
+        'Item Code': '',
+        'Item Name': 'TOTAL',
         'Quantity': totalBales,
         'Rate': 0,
         'Amount': transferGrandTotal,

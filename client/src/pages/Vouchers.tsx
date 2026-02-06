@@ -177,6 +177,7 @@ interface StockTransferEntry {
   sourceLocationId: number;
   sourceLocationName: string;
   stockItemId: number;
+  stockItemCode: string;
   stockItemName: string;
   quantity: string;
   rate: string;
@@ -184,6 +185,7 @@ interface StockTransferEntry {
 
 interface StockAdjustmentEntry {
   stockItemId: number;
+  stockItemCode: string;
   stockItemName: string;
   quantity: string;
   rate: string;
@@ -232,16 +234,17 @@ const journalFormSchema = z.object({
 const stockTransferEntrySchema = z.object({
   sourceLocationId: z.coerce.number(), // Coerce to handle strings, validated in onStockTransferSubmit
   sourceLocationName: z.string(),
-  stockItemId: z.coerce.number(), // Coerce to handle strings, validated in onStockTransferSubmit
+  stockItemId: z.coerce.number(),
+  stockItemCode: z.string().default(""),
   stockItemName: z.string(),
-  quantity: z.string(), // Allow empty - validated in onStockTransferSubmit
-  rate: z.string(), // Allow empty - validated in onStockTransferSubmit
+  quantity: z.string(),
+  rate: z.string(),
 });
 
 const stockTransferFormSchema = z.object({
   voucherDate: z.date(),
-  destinationLocationId: z.number(), // Allow 0 - validated in onStockTransferSubmit
-  entries: z.array(stockTransferEntrySchema), // Allow empty - validated in onStockTransferSubmit
+  destinationLocationId: z.number(),
+  entries: z.array(stockTransferEntrySchema),
   notes: z.string().optional(),
   optional: z.boolean().default(false),
 });
@@ -249,6 +252,7 @@ const stockTransferFormSchema = z.object({
 const stockAdjustmentEntrySchema = z.object({
   type: z.enum(["CONSUME", "PRODUCE"]),
   stockItemId: z.number().min(1, "Please select a stock item"),
+  stockItemCode: z.string().default(""),
   stockItemName: z.string(),
   quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) !== 0, "Quantity cannot be zero"),
   rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
@@ -1823,6 +1827,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           sourceLocationId: 0,
           sourceLocationName: "",
           stockItemId: 0,
+          stockItemCode: "",
           stockItemName: "",
           quantity: "",
           rate: "",
@@ -2131,6 +2136,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           sourceLocationId: item.sourceLocationId || 0,
           sourceLocationName: sourceLocation?.name || "",
           stockItemId: item.stockItemId || 0,
+          stockItemCode: stockItem?.code || "",
           stockItemName: stockItem?.name || "",
           quantity: item.quantity || "0",
           rate: item.rate || "0",
@@ -2145,6 +2151,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           sourceLocationId: 0,
           sourceLocationName: "",
           stockItemId: 0,
+          stockItemCode: "",
           stockItemName: "",
           quantity: "",
           rate: "",
@@ -2377,6 +2384,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               sourceLocationId: 0,
               sourceLocationName: "",
               stockItemId: 0,
+              stockItemCode: "",
               stockItemName: "",
               quantity: "",
               rate: "",
@@ -2681,6 +2689,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         {
           type: "CONSUME",
           stockItemId: 0,
+          stockItemCode: "",
           stockItemName: "",
           quantity: "",
           rate: "",
@@ -2781,6 +2790,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         return {
           type,
           stockItemId: item.stockItemId || 0,
+          stockItemCode: stockItem?.code || "",
           stockItemName: stockItem?.name || "",
           quantity: absQuantity,
           rate: item.rate || "0",
@@ -2794,6 +2804,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         entries: formEntries.length > 0 ? formEntries : [{
           type: "PRODUCE",
           stockItemId: 0,
+          stockItemCode: "",
           stockItemName: "",
           quantity: "",
           rate: "",
@@ -2899,6 +2910,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             {
               type: "PRODUCE",
               stockItemId: 0,
+              stockItemCode: "",
               stockItemName: "",
               quantity: "",
               rate: "",
@@ -2942,7 +2954,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         "Entry Type": entry.type?.toUpperCase() === "CONSUME" ? "Consumption" : "Production",
         "Date": voucherDate,
         "Location": locationName,
-        "Stock Item": entry.stockItemName || "",
+        "Item Code": entry.stockItemCode || "",
+        "Item Name": entry.stockItemName || "",
         "Quantity": parseFloat(entry.quantity).toFixed(2),
         "Rate": parseFloat(entry.rate || "0").toFixed(2),
         "Amount": (parseFloat(entry.quantity) * parseFloat(entry.rate || "0")).toFixed(2),
@@ -3012,7 +3025,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         "Date": voucherDate,
         "Source Location": entry.sourceLocationName || "",
         "Destination Location": destLocationName,
-        "Stock Item": entry.stockItemName || "",
+        "Item Code": entry.stockItemCode || "",
+        "Item Name": entry.stockItemName || "",
         "Quantity": parseFloat(entry.quantity).toFixed(2),
         "Rate": parseFloat(entry.rate || "0").toFixed(2),
         "Amount": (parseFloat(entry.quantity) * parseFloat(entry.rate || "0")).toFixed(2),
@@ -3391,6 +3405,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             sourceLocationId: 0,
             sourceLocationName: "",
             stockItemId: 0,
+            stockItemCode: "",
             stockItemName: "",
             quantity: "",
             rate: "",
@@ -3412,6 +3427,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
             sourceLocationId: 0,
             sourceLocationName: "",
             stockItemId: 0,
+            stockItemCode: "",
             stockItemName: "",
             quantity: "",
             rate: "",
@@ -3474,6 +3490,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         appendAdjustment({
           type: "CONSUME",
           stockItemId: 0,
+          stockItemCode: "",
           stockItemName: "",
           quantity: "",
           rate: "",
@@ -4465,6 +4482,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                   setTransferHighlightedIndex(0);
                                   if (!e.target.value) {
                                     stockTransferForm.setValue(`entries.${index}.stockItemId`, 0);
+                                    stockTransferForm.setValue(`entries.${index}.stockItemCode`, "");
                                     stockTransferForm.setValue(`entries.${index}.stockItemName`, "");
                                   }
                                 }}
@@ -4582,6 +4600,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         
                                         // Set item details
                                         stockTransferForm.setValue(`entries.${index}.stockItemId`, item.stockItemId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                                        stockTransferForm.setValue(`entries.${index}.stockItemCode`, stockItem.code || "");
                                         stockTransferForm.setValue(`entries.${index}.stockItemName`, stockItem.name);
                                         stockTransferForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
                                         setTransferSearchTerm("");
@@ -4659,6 +4678,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         sourceLocationId: 0,
                                         sourceLocationName: "",
                                         stockItemId: 0,
+                                        stockItemCode: "",
                                         stockItemName: "",
                                         quantity: "",
                                         rate: "",
@@ -4725,6 +4745,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             sourceLocationId: 0,
                                             sourceLocationName: "",
                                             stockItemId: 0,
+                                            stockItemCode: "",
                                             stockItemName: "",
                                             quantity: "",
                                             rate: "",
@@ -4876,6 +4897,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     
                                     // Set item details
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemId`, item.stockItemId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+                                    stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemCode`, stockItem.code || "");
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.stockItemName`, stockItem.name);
                                     stockTransferForm.setValue(`entries.${activeTransferRow}.rate`, item.averageRate || "0");
                                     setTransferSearchTerm("");
@@ -5246,6 +5268,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                         setAdjustmentHighlightedIndex(0);
                                         if (!e.target.value) {
                                           stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, 0);
+                                          stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, "");
                                           stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, "");
                                         }
                                       }}
@@ -5289,6 +5312,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             const item = filteredAdjustmentItems[adjustmentHighlightedIndex];
                                             if (item) {
                                               stockAdjustmentForm.setValue(`entries.${index}.stockItemId`, item.stockItemId);
+                                              stockAdjustmentForm.setValue(`entries.${index}.stockItemCode`, item.stockItemCode || "");
                                               stockAdjustmentForm.setValue(`entries.${index}.stockItemName`, item.stockItemName);
                                               stockAdjustmentForm.setValue(`entries.${index}.rate`, item.averageRate || "0");
                                               setAdjustmentSearchTerm("");
@@ -5356,6 +5380,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                             appendAdjustment({
                                               type: "CONSUME",
                                               stockItemId: 0,
+                                              stockItemCode: "",
                                               stockItemName: "",
                                               quantity: "",
                                               rate: "",
@@ -5420,6 +5445,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                               appendAdjustment({
                                 type: "CONSUME",
                                 stockItemId: 0,
+                                stockItemCode: "",
                                 stockItemName: "",
                                 quantity: "",
                                 rate: "",
@@ -5508,6 +5534,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                                     onClick={() => {
                                       if (activeAdjustmentRow !== null) {
                                         stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.stockItemId`, item.stockItemId);
+                                        stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.stockItemCode`, item.stockItemCode || "");
                                         stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.stockItemName`, item.stockItemName);
                                         stockAdjustmentForm.setValue(`entries.${activeAdjustmentRow}.rate`, item.averageRate || "0");
                                         setAdjustmentSearchTerm("");

@@ -314,12 +314,13 @@ export default function SalesReport() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Detailed Sales Report");
 
-    const currencyCols = [4, 5, 6, 7, 8, 9, 10, 12];
-    const percentCols = [11, 13];
-    const profitCols = [7, 10, 11, 12, 13];
+    const currencyCols = [5, 6, 7, 8, 9, 10, 11, 13];
+    const percentCols = [12, 14];
+    const profitCols = [8, 11, 12, 13, 14];
     
     worksheet.columns = [
       { header: "Location", key: "location", width: 15 },
+      { header: "Item Code", key: "itemCode", width: 15 },
       { header: "Item Name", key: "itemName", width: 30 },
       { header: "Quantity", key: "quantity", width: 10 },
       { header: "Sold Price", key: "soldPrice", width: 12 },
@@ -350,6 +351,7 @@ export default function SalesReport() {
       const unitProfit = parseFloat(item.configuredSellingPrice) - parseFloat(item.costPrice);
       const row = worksheet.addRow({
         location: item.locationName || "N/A",
+        itemCode: item.stockItemCode || "",
         itemName: item.stockItemName,
         quantity: parseFloat(item.quantity),
         soldPrice: parseFloat(item.actualSellingPrice),

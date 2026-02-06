@@ -230,6 +230,7 @@ interface ViewVoucherEntry {
   narration: string | null;
   isStockItem?: boolean;
   stockItemId?: number;
+  stockItemCode?: string;
   stockItemName?: string;
   ledgerAccountId?: number;
   bankAccountId?: number;
@@ -969,6 +970,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         Optional: string;
         "Account Name": string;
         "Account Type": string;
+        "Item Code": string;
+        "Item Name": string;
         Debit: string;
         Credit: string;
         Narration: string;
@@ -998,6 +1001,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                 Optional: voucher.optional ? "Yes" : "No",
                 "Account Name": "",
                 "Account Type": "",
+                "Item Code": "",
+                "Item Name": "",
                 Debit: "",
                 Credit: "",
                 Narration: "",
@@ -1035,6 +1040,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
                   Optional: voucher.optional ? "Yes" : "No",
                   "Account Name": accountName,
                   "Account Type": accountType,
+                  "Item Code": (entry.isStockItem || entry.stockItemId) ? (entry.stockItemCode || "") : "",
+                  "Item Name": (entry.isStockItem || entry.stockItemId) ? (entry.stockItemName || "") : "",
                   Debit:
                     entry.debitAmount && parseFloat(entry.debitAmount) > 0
                       ? formatAmount(entry.debitAmount)
@@ -1087,6 +1094,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         { wch: 8 }, // Optional
         { wch: 30 }, // Account Name
         { wch: 15 }, // Account Type
+        { wch: 15 }, // Item Code
+        { wch: 30 }, // Item Name
         { wch: 15 }, // Debit
         { wch: 15 }, // Credit
         { wch: 30 }, // Narration

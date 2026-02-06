@@ -43,6 +43,7 @@ import {
 interface SaleRow {
   id: string;
   itemName: string;
+  stockItemCode?: string;
   quantity: number;
   rate: number;
   rateUSD: number; // Canonical USD rate for storage (never converted)
@@ -262,6 +263,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
         id: String(index + 1),
         itemName: item.stockItemName || "",
+        stockItemCode: item.stockItemCode || "",
         stockItemId: item.stockItemId,
         salesItemId: item.id, // Preserve original sales item ID for proper cost tracking
         quantity: parseFloat(item.quantity),
@@ -568,6 +570,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const draftRows = draft.items.map((item: any, index: number) => ({
         id: String(index + 1),
         itemName: item.stockItemName,
+        stockItemCode: item.stockItemCode || "",
         stockItemId: item.stockItemId,
         quantity: parseFloat(item.quantity),
         rate: parseFloat(item.rate),
@@ -797,8 +800,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     newRows[activeRow] = {
       ...newRows[activeRow],
       itemName: item.name,
+      stockItemCode: item.code,
       rate: displayRate,
-      rateUSD: rateUSD, // Store canonical USD rate for storage
+      rateUSD: rateUSD,
       quantity: qty,
       stockItemId: item.stockItemId,
       amount: qty * displayRate,
@@ -1090,6 +1094,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         "Voucher Number": editVoucher?.voucherNumber || "New Sale",
         "Date": exportDate,
         "Location": locationName,
+        "Item Code": item.stockItemCode || "",
         "Item Name": item.itemName || "",
         "Quantity": item.quantity,
         "Rate": item.rate.toFixed(2),

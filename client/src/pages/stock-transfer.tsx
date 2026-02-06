@@ -471,7 +471,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         "Description": string;
         "Source Location": string;
         "Destination Location": string;
-        "Stock Item": string;
+        "Item Code": string;
+        "Item Name": string;
         "Quantity": string;
       }> = [];
       
@@ -494,19 +495,20 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                   "Description": voucher.description || "",
                   "Source Location": item.sourceLocationName || sourceLocation?.name || "Unknown",
                   "Destination Location": destLocation?.name || "Unknown",
-                  "Stock Item": item.stockItemName || `Item ${item.stockItemId}`,
+                  "Item Code": item.stockItemCode || "",
+                  "Item Name": item.stockItemName || `Item ${item.stockItemId}`,
                   "Quantity": formatNumber(parseFloat(item.quantity || "0"), 0),
                 });
               }
             } else {
-              // No items - still add a row
               detailedData.push({
                 "Voucher Number": voucher.voucherNumber,
                 "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
                 "Description": voucher.description || "",
                 "Source Location": sourceLocation?.name || "Unknown",
                 "Destination Location": destLocation?.name || "Unknown",
-                "Stock Item": "",
+                "Item Code": "",
+                "Item Name": "",
                 "Quantity": "",
               });
             }
@@ -536,7 +538,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         { wch: 30 }, // Description
         { wch: 20 }, // Source Location
         { wch: 20 }, // Destination Location
-        { wch: 30 }, // Stock Item
+        { wch: 15 }, // Item Code
+        { wch: 30 }, // Item Name
         { wch: 12 }, // Quantity
       ];
       worksheet["!cols"] = colWidths;
