@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 
 type TxOrDb = {
@@ -6,6 +6,7 @@ type TxOrDb = {
   insert: Function;
   update: Function;
   delete: Function;
+  execute: Function;
 };
 
 export interface AdjustInventoryResult {
@@ -25,21 +26,19 @@ export async function adjustInventory(
   companyId: number,
   incomingRate?: number,
 ): Promise<AdjustInventoryResult> {
-  const [existing] = await (tx as any)
-    .select()
-    .from(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId),
-      ),
-    )
-    .limit(1);
+  const lockResult = await (tx as any).execute(
+    sql`SELECT id, quantity, average_rate, total_value
+        FROM inventory
+        WHERE location_id = ${locationId} AND stock_item_id = ${stockItemId}
+        FOR UPDATE`
+  );
+
+  const existing = lockResult.rows?.[0] || lockResult[0];
 
   if (existing) {
     const prevQty = parseFloat(existing.quantity || "0");
-    const prevRate = parseFloat(existing.averageRate || "0");
-    const prevTotalValue = parseFloat(existing.totalValue || "0");
+    const prevRate = parseFloat(existing.average_rate || "0");
+    const prevTotalValue = parseFloat(existing.total_value || "0");
     const newQty = prevQty + deltaQty;
 
     let newTotalValue: number;
@@ -57,15 +56,14 @@ export async function adjustInventory(
       newRate = prevRate;
     }
 
-    await (tx as any)
-      .update(schema.inventory)
-      .set({
-        quantity: newQty.toFixed(3),
-        averageRate: newRate.toFixed(2),
-        totalValue: newTotalValue.toFixed(2),
-        lastUpdated: new Date(),
-      })
-      .where(eq(schema.inventory.id, existing.id));
+    await (tx as any).execute(
+      sql`UPDATE inventory
+          SET quantity = ${newQty.toFixed(3)},
+              average_rate = ${newRate.toFixed(2)},
+              total_value = ${newTotalValue.toFixed(2)},
+              last_updated = NOW()
+          WHERE id = ${existing.id}`
+    );
 
     return {
       previousQuantity: prevQty,
@@ -79,15 +77,19 @@ export async function adjustInventory(
     const rate = incomingRate ?? 0;
     const totalValue = deltaQty * rate;
 
-    await (tx as any).insert(schema.inventory).values({
-      companyId,
-      locationId,
-      stockItemId,
-      quantity: deltaQty.toFixed(3),
-      averageRate: rate.toFixed(2),
-      totalValue: totalValue.toFixed(2),
-      lastUpdated: new Date(),
-    });
+    await (tx as any).execute(
+      sql`INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value, last_updated)
+          VALUES (${companyId}, ${locationId}, ${stockItemId}, ${deltaQty.toFixed(3)}, ${rate.toFixed(2)}, ${totalValue.toFixed(2)}, NOW())
+          ON CONFLICT (location_id, stock_item_id) DO UPDATE
+          SET quantity = inventory.quantity + ${deltaQty},
+              total_value = inventory.total_value + ${totalValue},
+              average_rate = CASE
+                WHEN inventory.quantity + ${deltaQty} > 0
+                THEN (inventory.total_value + ${totalValue}) / (inventory.quantity + ${deltaQty})
+                ELSE ${rate}
+              END,
+              last_updated = NOW()`
+    );
 
     return {
       previousQuantity: 0,

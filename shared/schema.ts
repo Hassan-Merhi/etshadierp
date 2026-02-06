@@ -612,7 +612,9 @@ export const inventory = pgTable("inventory", {
   averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull().default("0"),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqueLocationItem: uniqueIndex("inventory_location_item_unique").on(t.locationId, t.stockItemId),
+}));
 
 export const insertInventorySchema = createInsertSchema(inventory).omit({
   id: true,
