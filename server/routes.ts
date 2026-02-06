@@ -6051,6 +6051,66 @@ if (asOfDate) {
     }
   });
 
+  // Bulk rename stock items
+  app.post("/api/stock-items/bulk-rename", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { findText, replaceWith, itemIds, wholeWordOnly, caseInsensitive } = req.body;
+
+      if (!findText || typeof findText !== "string" || findText.trim() === "") {
+        return res.status(400).json({ message: "findText is required" });
+      }
+      if (typeof replaceWith !== "string") {
+        return res.status(400).json({ message: "replaceWith is required" });
+      }
+      if (!Array.isArray(itemIds) || itemIds.length === 0) {
+        return res.status(400).json({ message: "itemIds must be a non-empty array" });
+      }
+
+      const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = wholeWordOnly ? `\\b${escaped}\\b` : escaped;
+      const flags = caseInsensitive !== false ? "gi" : "g";
+      const regex = new RegExp(pattern, flags);
+
+      const results: { id: number; oldName: string; newName: string }[] = [];
+      const failures: { id: number; name: string; reason: string }[] = [];
+
+      const validItems = await storage.bulkGetStockItemsByIds(
+        itemIds.map((id: any) => Number(id)),
+        req.session.currentCompanyId
+      );
+
+      for (const item of validItems) {
+        const newName = item.name.replace(regex, replaceWith);
+        if (newName === item.name) {
+          continue;
+        }
+        if (!newName || newName.trim() === "") {
+          failures.push({ id: item.id, name: item.name, reason: "Resulting name would be empty" });
+          continue;
+        }
+        try {
+          await storage.updateStockItem(item.id, { name: newName });
+          results.push({ id: item.id, oldName: item.name, newName });
+        } catch (err: any) {
+          failures.push({ id: item.id, name: item.name, reason: err.message });
+        }
+      }
+
+      res.json({
+        message: `Renamed ${results.length} item(s)`,
+        updated: results.length,
+        results,
+        failures,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get single stock item by ID
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
