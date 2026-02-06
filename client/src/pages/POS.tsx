@@ -353,10 +353,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [editVoucher, allLedgerAccounts]);
 
-  // Scroll highlighted item into view
+  // Scroll highlighted item into view in the sidebar list
   useEffect(() => {
     if (itemListRef.current && activeRow !== null) {
-      const highlightedElement = itemListRef.current.children[highlightedIndex] as HTMLElement;
+      const listContainer = itemListRef.current.children[0] as HTMLElement;
+      const highlightedElement = listContainer?.children[highlightedIndex] as HTMLElement;
       if (highlightedElement) {
         highlightedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
@@ -496,6 +497,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     mutationFn: async () => {
       if (!activeLocation) throw new Error("No location selected");
       
+      const invalidRow = rows.find(r => r.itemName?.trim() && !r.stockItemId);
+      if (invalidRow) {
+        const invalidIdx = rows.indexOf(invalidRow);
+        setSelectedCell({ row: invalidIdx, col: 0 });
+        focusCell(invalidIdx, 0);
+        throw new Error(`"${invalidRow.itemName}" is not a valid item. Please select an item from the list.`);
+      }
+
       const validItems = rows.filter(r => r.stockItemId && r.quantity > 0 && r.rate > 0);
       if (validItems.length === 0) throw new Error("No items to save");
 
@@ -754,12 +763,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     { key: "delete", label: "", width: "w-10 sm:w-12" },
   ];
 
+  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-]/g, "");
+
   const getFilteredInventory = () => {
     if (!searchTerm) return inventory;
-    const searchLower = (searchTerm || "").toLowerCase();
+    const searchNorm = normalize(searchTerm);
     return inventory.filter((item) =>
-      (item.name || "").toLowerCase().includes(searchLower) ||
-      (item.code || "").toLowerCase().includes(searchLower)
+      normalize(item.name).includes(searchNorm) ||
+      normalize(item.code).includes(searchNorm)
     );
   };
 
@@ -925,9 +936,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       }
     }
 
+    // Block navigation away from item field if text is typed but no item selected
+    const currentRow = rows[rowIndex];
+    const hasUnselectedItem = isItemNameField && currentRow?.itemName?.trim() && !currentRow?.stockItemId;
+
     switch (e.key) {
       case "ArrowUp":
         if (!isItemNameField || filteredItems.length === 0) {
+          if (hasUnselectedItem) {
+            e.preventDefault();
+            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            return;
+          }
           e.preventDefault();
           if (rowIndex > 0) {
             setSelectedCell({ row: rowIndex - 1, col: colIndex });
@@ -937,6 +957,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         break;
       case "ArrowDown":
         if (!isItemNameField || filteredItems.length === 0) {
+          if (hasUnselectedItem) {
+            e.preventDefault();
+            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            return;
+          }
           e.preventDefault();
           if (rowIndex < maxRow) {
             setSelectedCell({ row: rowIndex + 1, col: colIndex });
@@ -946,6 +971,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         break;
       case "Enter":
         if (!isItemNameField || filteredItems.length === 0) {
+          if (hasUnselectedItem) {
+            e.preventDefault();
+            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            return;
+          }
           e.preventDefault();
           
           // If on qty field, move to rate field (same row)
@@ -995,6 +1025,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         }
         break;
       case "ArrowRight":
+        if (hasUnselectedItem) {
+          e.preventDefault();
+          toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+          return;
+        }
         e.preventDefault();
         if (colIndex < maxCol) {
           setSelectedCell({ row: rowIndex, col: colIndex + 1 });
@@ -1008,6 +1043,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           if (filteredItems[highlightedIndex]) {
             selectItem(filteredItems[highlightedIndex]);
           }
+          return;
+        }
+        if (hasUnselectedItem) {
+          e.preventDefault();
+          toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
           return;
         }
         if (!e.shiftKey && colIndex < maxCol) {
@@ -1133,6 +1173,19 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         description: "Please enter an exchange rate for this transaction.",
         variant: "destructive",
       });
+      return;
+    }
+
+    const invalidRow = rows.find(r => r.itemName?.trim() && !r.stockItemId);
+    if (invalidRow) {
+      const invalidIdx = rows.indexOf(invalidRow);
+      toast({
+        title: "Invalid item",
+        description: `"${invalidRow.itemName}" is not a valid item. Please select an item from the list.`,
+        variant: "destructive",
+      });
+      setSelectedCell({ row: invalidIdx, col: 0 });
+      focusCell(invalidIdx, 0);
       return;
     }
 
