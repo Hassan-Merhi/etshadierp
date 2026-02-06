@@ -203,7 +203,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
       companyId: company.id,
       code: `${prefix}_CASH`,
       name: "Cash Account",
-      accountType: "Asset",
+      accountType: "Cash",
       subType: "Cash",
       openingBalance: "0",
       openingBalanceSide: "Dr",
