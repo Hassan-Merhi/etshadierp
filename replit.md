@@ -37,6 +37,9 @@ The frontend uses React with TypeScript and Vite, implementing the shadcn/ui des
 -   **OTW Container Tracking**: A TallyPrime-style interface for tracking containers in transit, including automatic fields from PO data and manual, inline-editable fields (e.g., shop name, ETA, transport fee). Supports export to Excel and optional API integration for automatic ETA updates.
 -   **Global Multi-Currency Switcher**: For companies with a `displayCurrency` set (e.g., CFA), users can toggle between USD and CFA currencies. The preference persists across sessions via localStorage (for guests) and backend database (for logged-in users via `user_preferences.preferredCurrency`). All currency displays use a centralized `formatAmount()` function from `CurrencyContext` that handles exchange rate conversion at display time. Graceful fallback to USD with console warnings when exchange rates are missing.
 
+-   **Inventory Transaction Safety**: All 11 critical stock-mutation endpoints are wrapped in `db.transaction()` blocks using the shared `adjustInventory` helper (`server/inventoryHelper.ts`) for atomic insert-or-update operations. Input validation guards reject NaN/invalid data before transactions execute. Voucher deletion atomically reverses inventory for Sales, Stock Transfers, and Adjustments. Zero `db.*` calls remain inside any `tx` block (verified by automated audit). Integration test suite (`tests/inventory.test.ts`) with 19 tests covers POS sales, stock transfers, quick adjustments, voucher deletions, input validation, and the `adjustInventory` helper.
+-   **Inventory Reconciliation**: Admin-only `GET /api/inventory/reconcile` endpoint detects negative inventory, value mismatches (qty * rate vs totalValue), negative rates, zero-qty with non-zero value, and duplicate inventory records. Returns severity-categorized issues with a summary.
+
 ### System Design Choices
 
 -   **Shared Schemas**: `shared/schema.ts` for type safety across the stack.

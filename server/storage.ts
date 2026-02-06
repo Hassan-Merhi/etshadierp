@@ -2327,7 +2327,7 @@ export class DbStorage implements IStorage {
         .limit(1);
 
       if (!parentAccount) {
-        [parentAccount] = await db.insert(schema.ledgerAccounts).values({
+        [parentAccount] = await tx.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
           code: "IMPORT_CHARGES",
           name: "Import Charges",
@@ -2356,7 +2356,7 @@ export class DbStorage implements IStorage {
 
       if (!account.length) {
         // Use accountType: "Direct Expense" so it's included in import cycle's directExpenseBalance
-        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+        const [newAccount] = await tx.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
           code,
           name,
@@ -2381,7 +2381,7 @@ export class DbStorage implements IStorage {
     // ============================================================
     for (const po of pos) {
       if (po.voucherId) {
-        await db.update(schema.vouchers)
+        await tx.update(schema.vouchers)
           .set({ 
             description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Offloaded)` 
           })
@@ -2393,7 +2393,7 @@ export class DbStorage implements IStorage {
     if (dutiesAccountId && parseFloat(duties) > 0) {
       const dutiesExpenseAccountId = await findOrCreateExpenseAccount("DUTIES", "Duties", importChargesParentId);
       const voucherNumber = `DUTY-${container.containerNumber}-${Date.now()}`;
-      const [voucher] = await db.insert(schema.vouchers).values({
+      const [voucher] = await tx.insert(schema.vouchers).values({
         companyId: location.companyId,
         voucherNumber,
         voucherType: "Payment",
@@ -2403,7 +2403,7 @@ export class DbStorage implements IStorage {
       }).returning();
 
       // Debit: Duties Expense (Expense increases)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: dutiesExpenseAccountId,
         debitAmount: duties,
@@ -2412,7 +2412,7 @@ export class DbStorage implements IStorage {
       });
 
       // Credit: Duty Agent account (Liability increases)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: dutiesAccountId,
         debitAmount: "0",
@@ -2426,7 +2426,7 @@ export class DbStorage implements IStorage {
     // This keeps the import cycle balanced: DR Asset (office charges account) = CR Asset (cash)
     if (officeChargesAccountId && officeChargesCashAccountId && parseFloat(officeCharges) > 0) {
       const voucherNumber = `OFFICE-${container.containerNumber}-${Date.now()}`;
-      const [voucher] = await db.insert(schema.vouchers).values({
+      const [voucher] = await tx.insert(schema.vouchers).values({
         companyId: location.companyId,
         voucherNumber,
         voucherType: "Payment",
@@ -2436,7 +2436,7 @@ export class DbStorage implements IStorage {
       }).returning();
 
       // Debit: User-selected Office Charges Account (should be Asset type to keep import cycle balanced)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: officeChargesAccountId,
         debitAmount: officeCharges,
@@ -2445,7 +2445,7 @@ export class DbStorage implements IStorage {
       });
 
       // Credit: Cash Account (Cash decreases)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: officeChargesCashAccountId,
         debitAmount: "0",
@@ -2479,7 +2479,7 @@ export class DbStorage implements IStorage {
           .limit(1);
 
         if (!transportPayableAccount.length) {
-          const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+          const [newAccount] = await tx.insert(schema.ledgerAccounts).values({
             companyId: location.companyId,
             code: "TRANSPORT_PAYABLE",
             name: "Transport Fees Payable",
@@ -2522,7 +2522,7 @@ export class DbStorage implements IStorage {
       }
       
       const voucherNumber = `TRANS-${container.containerNumber}-${Date.now()}`;
-      const [voucher] = await db.insert(schema.vouchers).values({
+      const [voucher] = await tx.insert(schema.vouchers).values({
         companyId: location.companyId,
         voucherNumber,
         voucherType: "Payment",
@@ -2532,7 +2532,7 @@ export class DbStorage implements IStorage {
       }).returning();
 
       // Debit: Transport Expense (Direct Expense - included in import cycle)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transportExpenseAccountId,
         debitAmount: transportFees,
@@ -2541,7 +2541,7 @@ export class DbStorage implements IStorage {
       });
 
       // Credit: Transporter Agent or Transport Fees Payable (Liability increases)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: creditAccountId,
         debitAmount: "0",
@@ -2571,7 +2571,7 @@ export class DbStorage implements IStorage {
         .limit(1);
 
       if (!transferPayableAccount.length) {
-        const [newAccount] = await db.insert(schema.ledgerAccounts).values({
+        const [newAccount] = await tx.insert(schema.ledgerAccounts).values({
           companyId: location.companyId,
           code: "TRANSFER_PAYABLE",
           name: "Transfer Charges Payable",
@@ -2584,7 +2584,7 @@ export class DbStorage implements IStorage {
       }
 
       const voucherNumber = `XFER-${container.containerNumber}-${Date.now()}`;
-      const [voucher] = await db.insert(schema.vouchers).values({
+      const [voucher] = await tx.insert(schema.vouchers).values({
         companyId: location.companyId,
         voucherNumber,
         voucherType: "Payment",
@@ -2594,7 +2594,7 @@ export class DbStorage implements IStorage {
       }).returning();
 
       // Debit: Transfer Charges Expense (Direct Expense - included in import cycle)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transferExpenseAccountId,
         debitAmount: transferCharges,
@@ -2603,7 +2603,7 @@ export class DbStorage implements IStorage {
       });
 
       // Credit: Transfer Charges Payable (Liability increases)
-      await db.insert(schema.voucherEntries).values({
+      await tx.insert(schema.voucherEntries).values({
         voucherId: voucher.id,
         ledgerAccountId: transferPayableAccount[0].id,
         debitAmount: "0",
@@ -2616,7 +2616,7 @@ export class DbStorage implements IStorage {
     for (const charge of additionalCharges) {
       if (charge.amount > 0) {
         const voucherNumber = `CHG-${container.containerNumber}-${Date.now()}`;
-        const [voucher] = await db.insert(schema.vouchers).values({
+        const [voucher] = await tx.insert(schema.vouchers).values({
           companyId: location.companyId,
           voucherNumber,
           voucherType: "Payment",
@@ -2631,7 +2631,7 @@ export class DbStorage implements IStorage {
           "Additional Container Charges",
           importChargesParentId
         );
-        await db.insert(schema.voucherEntries).values({
+        await tx.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: additionalExpenseAccountId,
           debitAmount: charge.amount.toFixed(2),
@@ -2640,7 +2640,7 @@ export class DbStorage implements IStorage {
         });
 
         // Credit: Specified ledger account (Liability increases)
-        await db.insert(schema.voucherEntries).values({
+        await tx.insert(schema.voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: charge.ledgerAccountId,
           debitAmount: "0",
@@ -3146,210 +3146,46 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoucher(id: number): Promise<void> {
-    // First, get the voucher to check its type and location
-    const [voucher] = await db
-      .select()
-      .from(schema.vouchers)
-      .where(eq(schema.vouchers.id, id));
-
-    if (!voucher) {
-      throw new Error("Voucher not found");
-    }
-
-    // STEP 1: Reverse inventory movements based on voucher type
-    if (voucher.voucherType === "Sales" && voucher.locationId) {
-      // Restore items back to location inventory
-      const salesItemsList = await db
+    await db.transaction(async (tx) => {
+      // First, get the voucher to check its type and location
+      const [voucher] = await tx
         .select()
-        .from(schema.salesItems)
-        .where(eq(schema.salesItems.voucherId, id));
+        .from(schema.vouchers)
+        .where(eq(schema.vouchers.id, id));
 
-      for (const saleItem of salesItemsList) {
-        const quantity = parseFloat(saleItem.quantity);
-        const costPrice = parseFloat(saleItem.costPrice);
-
-        // Get current inventory
-        const [currentInventory] = await db
-          .select()
-          .from(schema.inventory)
-          .where(and(
-            eq(schema.inventory.locationId, voucher.locationId),
-            eq(schema.inventory.stockItemId, saleItem.stockItemId)
-          ));
-
-        if (currentInventory) {
-          // Add back the quantity
-          const newQuantity = parseFloat(currentInventory.quantity) + quantity;
-          const currentTotalValue = parseFloat(currentInventory.totalValue);
-          const newTotalValue = currentTotalValue + (quantity * costPrice);
-          const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-          await db
-            .update(schema.inventory)
-            .set({
-              quantity: newQuantity.toFixed(3),
-              averageRate: newAverageRate.toFixed(2),
-              totalValue: newTotalValue.toFixed(2),
-            })
-            .where(eq(schema.inventory.id, currentInventory.id));
-        } else {
-          // Create new inventory record (shouldn't normally happen, but handle it)
-          await db.insert(schema.inventory).values({
-            companyId: voucher.companyId,
-            locationId: voucher.locationId,
-            stockItemId: saleItem.stockItemId,
-            quantity: quantity.toFixed(3),
-            averageRate: costPrice.toFixed(2),
-            totalValue: (quantity * costPrice).toFixed(2),
-          });
-        }
+      if (!voucher) {
+        throw new Error("Voucher not found");
       }
 
-      // Delete sales items
-      await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
-    }
-
-    if (voucher.voucherType === "Stock Transfer") {
-      // Reverse the stock transfer
-      const [transferVoucher] = await db
-        .select()
-        .from(schema.stockTransferVouchers)
-        .where(eq(schema.stockTransferVouchers.voucherId, id));
-
-      if (transferVoucher) {
-        const transferItems = await db
+      // STEP 1: Reverse inventory movements based on voucher type
+      if (voucher.voucherType === "Sales" && voucher.locationId) {
+        // Restore items back to location inventory
+        const salesItemsList = await tx
           .select()
-          .from(schema.stockTransferItems)
-          .where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+          .from(schema.salesItems)
+          .where(eq(schema.salesItems.voucherId, id));
 
-        for (const item of transferItems) {
-          const quantity = parseFloat(item.quantity);
-          const rate = parseFloat(item.rate);
+        for (const saleItem of salesItemsList) {
+          const quantity = parseFloat(saleItem.quantity);
+          const costPrice = parseFloat(saleItem.costPrice);
 
-          // Note: Each transfer item now has its own sourceLocationId
-          // We need to get it from the item if stored, or from the transfer voucher as fallback
-          const sourceLocationId = transferVoucher.sourceLocationId;
-          const destinationLocationId = transferVoucher.destinationLocationId;
-
-          // Add back to source location
-          const [sourceInventory] = await db
+          // Get current inventory
+          const [currentInventory] = await tx
             .select()
             .from(schema.inventory)
             .where(and(
-              eq(schema.inventory.locationId, sourceLocationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
-
-          if (sourceInventory) {
-            const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
-            const newTotalValue = parseFloat(sourceInventory.totalValue) + (quantity * rate);
-            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-            await db
-              .update(schema.inventory)
-              .set({
-                quantity: newQuantity.toFixed(3),
-                averageRate: newAverageRate.toFixed(2),
-                totalValue: newTotalValue.toFixed(2),
-              })
-              .where(eq(schema.inventory.id, sourceInventory.id));
-          } else {
-            await db.insert(schema.inventory).values({
-              companyId: voucher.companyId,
-              locationId: sourceLocationId,
-              stockItemId: item.stockItemId,
-              quantity: quantity.toFixed(3),
-              averageRate: rate.toFixed(2),
-              totalValue: (quantity * rate).toFixed(2),
-            });
-          }
-
-          // Subtract from destination location
-          const [destInventory] = await db
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, destinationLocationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
-            ));
-
-          if (destInventory) {
-            const newQuantity = Math.max(0, parseFloat(destInventory.quantity) - quantity);
-            const newTotalValue = Math.max(0, parseFloat(destInventory.totalValue) - (quantity * rate));
-            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-            await db
-              .update(schema.inventory)
-              .set({
-                quantity: newQuantity.toFixed(3),
-                averageRate: newAverageRate.toFixed(2),
-                totalValue: newTotalValue.toFixed(2),
-              })
-              .where(eq(schema.inventory.id, destInventory.id));
-          }
-        }
-
-        // Delete transfer items and transfer voucher
-        await db.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
-        await db.delete(schema.stockTransferVouchers).where(eq(schema.stockTransferVouchers.id, transferVoucher.id));
-      }
-    }
-
-    if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed" || voucher.voucherType === "Stock Adjustment") {
-      // Reverse stock adjustments (Production/Consumption/Mixed/Stock Adjustment)
-      const [adjustmentVoucher] = await db
-        .select()
-        .from(schema.stockAdjustmentVouchers)
-        .where(eq(schema.stockAdjustmentVouchers.voucherId, id));
-
-      if (adjustmentVoucher) {
-        const adjustmentItems = await db
-          .select()
-          .from(schema.stockAdjustmentItems)
-          .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
-
-        for (const item of adjustmentItems) {
-          const rawQuantity = parseFloat(item.quantity);
-          const quantity = Math.abs(rawQuantity);
-          const rate = parseFloat(item.rate);
-          
-          // For consumption: we subtracted, so we need to ADD back
-          // For production: we added, so we need to SUBTRACT back
-          // For Mixed adjustments, check the item's quantity sign:
-          //   - Positive quantity = was production (added), need to subtract back
-          //   - Negative quantity = was consumption (subtracted), need to add back
-          const adjustmentType = adjustmentVoucher.adjustmentType;
-          const isConsumption = adjustmentType === "Consumption" || 
-            (adjustmentType === "Mixed" && rawQuantity < 0);
-          const reversedQuantity = isConsumption ? quantity : -quantity;
-
-          const [currentInventory] = await db
-            .select()
-            .from(schema.inventory)
-            .where(and(
-              eq(schema.inventory.locationId, adjustmentVoucher.locationId),
-              eq(schema.inventory.stockItemId, item.stockItemId)
+              eq(schema.inventory.locationId, voucher.locationId),
+              eq(schema.inventory.stockItemId, saleItem.stockItemId)
             ));
 
           if (currentInventory) {
-            const currentQty = parseFloat(currentInventory.quantity);
-            const currentRate = parseFloat(currentInventory.averageRate);
-            const newQuantity = Math.max(0, currentQty + reversedQuantity);
-            
-            let newTotalValue: number;
-            let newAverageRate: number;
-            
-            if (isConsumption) {
-              // Restoring consumed items: use the rate they were consumed at
-              newTotalValue = (currentQty * currentRate) + (quantity * rate);
-              newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
-            } else {
-              // Removing produced items: just reduce value proportionally
-              newTotalValue = Math.max(0, newQuantity * currentRate);
-              newAverageRate = currentRate;
-            }
+            // Add back the quantity
+            const newQuantity = parseFloat(currentInventory.quantity) + quantity;
+            const currentTotalValue = parseFloat(currentInventory.totalValue);
+            const newTotalValue = currentTotalValue + (quantity * costPrice);
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
-            await db
+            await tx
               .update(schema.inventory)
               .set({
                 quantity: newQuantity.toFixed(3),
@@ -3357,107 +3193,273 @@ export class DbStorage implements IStorage {
                 totalValue: newTotalValue.toFixed(2),
               })
               .where(eq(schema.inventory.id, currentInventory.id));
-          } else if (isConsumption) {
-            // Restoring consumed items when no inventory exists - create new record
-            const [location] = await db
+          } else {
+            // Create new inventory record (shouldn't normally happen, but handle it)
+            await tx.insert(schema.inventory).values({
+              companyId: voucher.companyId,
+              locationId: voucher.locationId,
+              stockItemId: saleItem.stockItemId,
+              quantity: quantity.toFixed(3),
+              averageRate: costPrice.toFixed(2),
+              totalValue: (quantity * costPrice).toFixed(2),
+            });
+          }
+        }
+
+        // Delete sales items
+        await tx.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
+      }
+
+      if (voucher.voucherType === "Stock Transfer") {
+        // Reverse the stock transfer
+        const [transferVoucher] = await tx
+          .select()
+          .from(schema.stockTransferVouchers)
+          .where(eq(schema.stockTransferVouchers.voucherId, id));
+
+        if (transferVoucher) {
+          const transferItems = await tx
+            .select()
+            .from(schema.stockTransferItems)
+            .where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+
+          for (const item of transferItems) {
+            const quantity = parseFloat(item.quantity);
+            const rate = parseFloat(item.rate);
+
+            // Note: Each transfer item now has its own sourceLocationId
+            // We need to get it from the item if stored, or from the transfer voucher as fallback
+            const sourceLocationId = transferVoucher.sourceLocationId;
+            const destinationLocationId = transferVoucher.destinationLocationId;
+
+            // Add back to source location
+            const [sourceInventory] = await tx
               .select()
-              .from(schema.locations)
-              .where(eq(schema.locations.id, adjustmentVoucher.locationId));
-            
-            if (location) {
-              await db.insert(schema.inventory).values({
-                companyId: location.companyId,
-                locationId: adjustmentVoucher.locationId,
+              .from(schema.inventory)
+              .where(and(
+                eq(schema.inventory.locationId, sourceLocationId),
+                eq(schema.inventory.stockItemId, item.stockItemId)
+              ));
+
+            if (sourceInventory) {
+              const newQuantity = parseFloat(sourceInventory.quantity) + quantity;
+              const newTotalValue = parseFloat(sourceInventory.totalValue) + (quantity * rate);
+              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+              await tx
+                .update(schema.inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(schema.inventory.id, sourceInventory.id));
+            } else {
+              await tx.insert(schema.inventory).values({
+                companyId: voucher.companyId,
+                locationId: sourceLocationId,
                 stockItemId: item.stockItemId,
                 quantity: quantity.toFixed(3),
                 averageRate: rate.toFixed(2),
                 totalValue: (quantity * rate).toFixed(2),
               });
             }
+
+            // Subtract from destination location
+            const [destInventory] = await tx
+              .select()
+              .from(schema.inventory)
+              .where(and(
+                eq(schema.inventory.locationId, destinationLocationId),
+                eq(schema.inventory.stockItemId, item.stockItemId)
+              ));
+
+            if (destInventory) {
+              const newQuantity = parseFloat(destInventory.quantity) - quantity;
+              const newTotalValue = parseFloat(destInventory.totalValue) - (quantity * rate);
+              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+              await tx
+                .update(schema.inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(schema.inventory.id, destInventory.id));
+            }
           }
+
+          // Delete transfer items and transfer voucher
+          await tx.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+          await tx.delete(schema.stockTransferVouchers).where(eq(schema.stockTransferVouchers.id, transferVoucher.id));
+        }
+      }
+
+      if (voucher.voucherType === "Production" || voucher.voucherType === "Consumption" || voucher.voucherType === "Mixed" || voucher.voucherType === "Stock Adjustment") {
+        // Reverse stock adjustments (Production/Consumption/Mixed/Stock Adjustment)
+        const [adjustmentVoucher] = await tx
+          .select()
+          .from(schema.stockAdjustmentVouchers)
+          .where(eq(schema.stockAdjustmentVouchers.voucherId, id));
+
+        if (adjustmentVoucher) {
+          const adjustmentItems = await tx
+            .select()
+            .from(schema.stockAdjustmentItems)
+            .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+          for (const item of adjustmentItems) {
+            const rawQuantity = parseFloat(item.quantity);
+            const quantity = Math.abs(rawQuantity);
+            const rate = parseFloat(item.rate);
+            
+            // For consumption: we subtracted, so we need to ADD back
+            // For production: we added, so we need to SUBTRACT back
+            // For Mixed adjustments, check the item's quantity sign:
+            //   - Positive quantity = was production (added), need to subtract back
+            //   - Negative quantity = was consumption (subtracted), need to add back
+            const adjustmentType = adjustmentVoucher.adjustmentType;
+            const isConsumption = adjustmentType === "Consumption" || 
+              (adjustmentType === "Mixed" && rawQuantity < 0);
+            const reversedQuantity = isConsumption ? quantity : -quantity;
+
+            const [currentInventory] = await tx
+              .select()
+              .from(schema.inventory)
+              .where(and(
+                eq(schema.inventory.locationId, adjustmentVoucher.locationId),
+                eq(schema.inventory.stockItemId, item.stockItemId)
+              ));
+
+            if (currentInventory) {
+              const currentQty = parseFloat(currentInventory.quantity);
+              const currentRate = parseFloat(currentInventory.averageRate);
+              const newQuantity = currentQty + reversedQuantity;
+              
+              let newTotalValue: number;
+              let newAverageRate: number;
+              
+              if (isConsumption) {
+                // Restoring consumed items: use the rate they were consumed at
+                newTotalValue = (currentQty * currentRate) + (quantity * rate);
+                newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+              } else {
+                // Removing produced items: just reduce value proportionally
+                newTotalValue = newQuantity * currentRate;
+                newAverageRate = currentRate;
+              }
+
+              await tx
+                .update(schema.inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(schema.inventory.id, currentInventory.id));
+            } else if (isConsumption) {
+              // Restoring consumed items when no inventory exists - create new record
+              const [location] = await tx
+                .select()
+                .from(schema.locations)
+                .where(eq(schema.locations.id, adjustmentVoucher.locationId));
+              
+              if (location) {
+                await tx.insert(schema.inventory).values({
+                  companyId: location.companyId,
+                  locationId: adjustmentVoucher.locationId,
+                  stockItemId: item.stockItemId,
+                  quantity: quantity.toFixed(3),
+                  averageRate: rate.toFixed(2),
+                  totalValue: (quantity * rate).toFixed(2),
+                });
+              }
+            }
+          }
+
+          // Delete adjustment items and adjustment voucher
+          await tx.delete(schema.stockAdjustmentItems).where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+          await tx.delete(schema.stockAdjustmentVouchers).where(eq(schema.stockAdjustmentVouchers.id, adjustmentVoucher.id));
+        }
+      }
+
+      // STEP 2: Handle Purchase Orders (existing logic)
+      const linkedPOs = await tx
+        .select()
+        .from(schema.purchaseOrders)
+        .where(eq(schema.purchaseOrders.voucherId, id));
+
+      if (linkedPOs.length > 0) {
+        const containerUpdates = new Map<number, { itemsTotal: number; containerNumber: string }>();
+        
+        for (const po of linkedPOs) {
+          const itemsTotal = parseFloat(po.itemsTotal || "0");
+          const container = await tx.select().from(schema.containers).where(eq(schema.containers.id, po.containerId)).limit(1);
+          const containerNumber = container.length > 0 ? container[0].containerNumber : "";
+          const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0, containerNumber };
+          containerUpdates.set(po.containerId, {
+            itemsTotal: existing.itemsTotal + itemsTotal,
+            containerNumber,
+          });
+
+          await tx.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
         }
 
-        // Delete adjustment items and adjustment voucher
-        await db.delete(schema.stockAdjustmentItems).where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
-        await db.delete(schema.stockAdjustmentVouchers).where(eq(schema.stockAdjustmentVouchers.id, adjustmentVoucher.id));
-      }
-    }
+        await tx.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
 
-    // STEP 2: Handle Purchase Orders (existing logic)
-    const linkedPOs = await db
-      .select()
-      .from(schema.purchaseOrders)
-      .where(eq(schema.purchaseOrders.voucherId, id));
-
-    if (linkedPOs.length > 0) {
-      const containerUpdates = new Map<number, { itemsTotal: number; containerNumber: string }>();
-      
-      for (const po of linkedPOs) {
-        const itemsTotal = parseFloat(po.itemsTotal || "0");
-        const container = await db.select().from(schema.containers).where(eq(schema.containers.id, po.containerId)).limit(1);
-        const containerNumber = container.length > 0 ? container[0].containerNumber : "";
-        const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0, containerNumber };
-        containerUpdates.set(po.containerId, {
-          itemsTotal: existing.itemsTotal + itemsTotal,
-          containerNumber,
-        });
-
-        await db.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
-      }
-
-      await db.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
-
-      for (const [containerId, totals] of Array.from(containerUpdates.entries())) {
-        const [container] = await db
-          .select()
-          .from(schema.containers)
-          .where(eq(schema.containers.id, containerId))
-          .limit(1);
-
-        if (container) {
-          // Delete all charge vouchers associated with this container whenever ANY PO is deleted
-          const chargeVouchers = await db
-            .select({ id: schema.vouchers.id })
-            .from(schema.vouchers)
-            .where(sql`${schema.vouchers.voucherNumber} LIKE ${'CHARGE-' + container.containerNumber + '-%'}`);
-          
-          for (const chargeVoucher of chargeVouchers) {
-            await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
-            await db.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
-          }
-
-          const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - totals.itemsTotal);
-          const newChargesTotal = 0; // Reset to 0 since we deleted charge vouchers
-          const newGrandTotal = newItemsTotal + newChargesTotal;
-
-          const remainingPOs = await db
+        for (const [containerId, totals] of Array.from(containerUpdates.entries())) {
+          const [container] = await tx
             .select()
-            .from(schema.purchaseOrders)
-            .where(eq(schema.purchaseOrders.containerId, containerId))
+            .from(schema.containers)
+            .where(eq(schema.containers.id, containerId))
             .limit(1);
 
-          if (remainingPOs.length === 0) {
-            await db.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
-            await db.delete(schema.containers).where(eq(schema.containers.id, containerId));
-          } else {
-            await db
-              .update(schema.containers)
-              .set({
-                itemsTotal: newItemsTotal.toString(),
-                chargesTotal: newChargesTotal.toString(),
-                grandTotal: newGrandTotal.toString(),
-              })
-              .where(eq(schema.containers.id, containerId));
+          if (container) {
+            // Delete all charge vouchers associated with this container whenever ANY PO is deleted
+            const chargeVouchers = await tx
+              .select({ id: schema.vouchers.id })
+              .from(schema.vouchers)
+              .where(sql`${schema.vouchers.voucherNumber} LIKE ${'CHARGE-' + container.containerNumber + '-%'}`);
+            
+            for (const chargeVoucher of chargeVouchers) {
+              await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+              await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
+            }
+
+            const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - totals.itemsTotal);
+            const newChargesTotal = 0; // Reset to 0 since we deleted charge vouchers
+            const newGrandTotal = newItemsTotal + newChargesTotal;
+
+            const remainingPOs = await tx
+              .select()
+              .from(schema.purchaseOrders)
+              .where(eq(schema.purchaseOrders.containerId, containerId))
+              .limit(1);
+
+            if (remainingPOs.length === 0) {
+              await tx.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+              await tx.delete(schema.containers).where(eq(schema.containers.id, containerId));
+            } else {
+              await tx
+                .update(schema.containers)
+                .set({
+                  itemsTotal: newItemsTotal.toString(),
+                  chargesTotal: newChargesTotal.toString(),
+                  grandTotal: newGrandTotal.toString(),
+                })
+                .where(eq(schema.containers.id, containerId));
+            }
           }
         }
       }
-    }
 
-    // STEP 3: Delete voucher entries (this automatically restores account balances)
-    await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
-    
-    // STEP 4: Delete the voucher itself
-    await db.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
+      // STEP 3: Delete voucher entries (this automatically restores account balances)
+      await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
+      
+      // STEP 4: Delete the voucher itself
+      await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
+    });
   }
 
   // Fiscal Period Closing

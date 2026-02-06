@@ -1850,6 +1850,113 @@ if (asOfDate) {
     }
   });
 
+  app.get("/api/inventory/reconcile", requireAuth, requireRole("Admin"), async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId!;
+      const issues: any[] = [];
+
+      const allInventory = await db
+        .select()
+        .from(inventory)
+        .where(eq(inventory.companyId, companyId));
+
+      for (const inv of allInventory) {
+        const qty = parseFloat(inv.quantity || "0");
+        const rate = parseFloat(inv.averageRate || "0");
+        const totalValue = parseFloat(inv.totalValue || "0");
+        const expectedValue = qty * rate;
+
+        if (qty < 0) {
+          issues.push({
+            type: "negative_inventory",
+            severity: "info",
+            stockItemId: inv.stockItemId,
+            locationId: inv.locationId,
+            quantity: qty,
+            message: `Negative inventory: ${qty} units`,
+          });
+        }
+
+        if (qty > 0 && Math.abs(totalValue - expectedValue) > 0.02) {
+          issues.push({
+            type: "value_mismatch",
+            severity: "error",
+            stockItemId: inv.stockItemId,
+            locationId: inv.locationId,
+            quantity: qty,
+            averageRate: rate,
+            totalValue,
+            expectedValue: parseFloat(expectedValue.toFixed(2)),
+            difference: parseFloat((totalValue - expectedValue).toFixed(2)),
+            message: `Value mismatch: stored=${totalValue}, expected=${expectedValue.toFixed(2)}`,
+          });
+        }
+
+        if (rate < 0) {
+          issues.push({
+            type: "negative_rate",
+            severity: "error",
+            stockItemId: inv.stockItemId,
+            locationId: inv.locationId,
+            averageRate: rate,
+            message: `Negative average rate: ${rate}`,
+          });
+        }
+
+        if (qty === 0 && totalValue !== 0) {
+          issues.push({
+            type: "zero_qty_nonzero_value",
+            severity: "warning",
+            stockItemId: inv.stockItemId,
+            locationId: inv.locationId,
+            quantity: qty,
+            totalValue,
+            message: `Zero quantity but non-zero total value: ${totalValue}`,
+          });
+        }
+      }
+
+      const locationIds = [...new Set(allInventory.map(i => i.locationId))];
+      const stockItemIds = [...new Set(allInventory.map(i => i.stockItemId))];
+
+      const duplicateCheck = new Map<string, number>();
+      for (const inv of allInventory) {
+        const key = `${inv.locationId}-${inv.stockItemId}`;
+        duplicateCheck.set(key, (duplicateCheck.get(key) || 0) + 1);
+      }
+      for (const [key, count] of duplicateCheck.entries()) {
+        if (count > 1) {
+          const [locId, itemId] = key.split("-").map(Number);
+          issues.push({
+            type: "duplicate_inventory",
+            severity: "critical",
+            stockItemId: itemId,
+            locationId: locId,
+            duplicateCount: count,
+            message: `${count} duplicate inventory records found`,
+          });
+        }
+      }
+
+      const summary = {
+        totalRecords: allInventory.length,
+        totalLocations: locationIds.length,
+        totalStockItems: stockItemIds.length,
+        issueCount: issues.length,
+        criticalIssues: issues.filter(i => i.severity === "critical").length,
+        errorIssues: issues.filter(i => i.severity === "error").length,
+        warningIssues: issues.filter(i => i.severity === "warning").length,
+        infoIssues: issues.filter(i => i.severity === "info").length,
+        totalInventoryValue: allInventory.reduce((sum, inv) => sum + parseFloat(inv.totalValue || "0"), 0).toFixed(2),
+      };
+
+      res.json({ summary, issues });
+    } catch (error: any) {
+      console.error("Inventory reconciliation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get today vouchers for a location (for POS dashboard)
   app.get("/api/locations/:locationId/vouchers/today", requireAuth, async (req, res) => {
     try {
@@ -15509,139 +15616,142 @@ if (asOfDate) {
           };
         });
 
-        // STEP 1: Reverse inventory for old adjustment items before deleting
-        const oldAdjustmentItems = await db
-          .select()
-          .from(stockAdjustmentItems)
-          .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
-
-        const oldLocationId = adjustmentVoucher.locationId;
-
-        for (const oldItem of oldAdjustmentItems) {
-          // Reverse the adjustment (negate the quantity)
-          const quantity = parseFloat(oldItem.quantity);
-          const rate = parseFloat(oldItem.rate);
-          const reversedQuantity = -quantity; // Flip the sign to reverse
-
-          const [currentInventory] = await db
+        // Wrap all inventory mutations + related writes in a transaction
+        const updated = await db.transaction(async (tx) => {
+          // STEP 1: Reverse inventory for old adjustment items before deleting
+          const oldAdjustmentItems = await tx
             .select()
-            .from(inventory)
-            .where(
-              and(
-                eq(inventory.locationId, oldLocationId),
-                eq(inventory.stockItemId, oldItem.stockItemId),
-              ),
-            );
+            .from(stockAdjustmentItems)
+            .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
-          if (currentInventory) {
-            const newQuantity = Math.max(
-              0,
-              parseFloat(currentInventory.quantity) + reversedQuantity,
-            );
-            const currentTotalValue = parseFloat(currentInventory.totalValue);
-            const newTotalValue = Math.max(
-              0,
-              currentTotalValue + reversedQuantity * rate,
-            );
-            const newAverageRate =
-              newQuantity > 0 ? newTotalValue / newQuantity : 0;
+          const oldLocationId = adjustmentVoucher.locationId;
 
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQuantity.toFixed(3),
-                averageRate: newAverageRate.toFixed(2),
-                totalValue: newTotalValue.toFixed(2),
-              })
-              .where(eq(inventory.id, currentInventory.id));
+          for (const oldItem of oldAdjustmentItems) {
+            const quantity = parseFloat(oldItem.quantity);
+            const rate = parseFloat(oldItem.rate);
+            const reversedQuantity = -quantity;
+
+            const [currentInventory] = await tx
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, oldLocationId),
+                  eq(inventory.stockItemId, oldItem.stockItemId),
+                ),
+              );
+
+            if (currentInventory) {
+              const newQuantity = Math.max(
+                0,
+                parseFloat(currentInventory.quantity) + reversedQuantity,
+              );
+              const currentTotalValue = parseFloat(currentInventory.totalValue);
+              const newTotalValue = Math.max(
+                0,
+                currentTotalValue + reversedQuantity * rate,
+              );
+              const newAverageRate =
+                newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(inventory.id, currentInventory.id));
+            }
           }
-        }
 
-        // STEP 2: Delete existing adjustment items
-        await db
-          .delete(stockAdjustmentItems)
-          .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+          // STEP 2: Delete existing adjustment items
+          await tx
+            .delete(stockAdjustmentItems)
+            .where(eq(stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
 
-        // STEP 3: Apply inventory for new adjustment items
-        const newLocationId = parseInt(locationId);
+          // STEP 3: Apply inventory for new adjustment items
+          const newLocationId = parseInt(locationId);
 
-        for (const newItem of adjustmentItemsData) {
-          const quantity = parseFloat(newItem.quantity);
-          const rate = parseFloat(newItem.rate);
+          for (const newItem of adjustmentItemsData) {
+            const quantity = parseFloat(newItem.quantity);
+            const rate = parseFloat(newItem.rate);
 
-          const [currentInventory] = await db
-            .select()
-            .from(inventory)
-            .where(
-              and(
-                eq(inventory.locationId, newLocationId),
-                eq(inventory.stockItemId, newItem.stockItemId),
-              ),
-            );
+            const [currentInventory] = await tx
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, newLocationId),
+                  eq(inventory.stockItemId, newItem.stockItemId),
+                ),
+              );
 
-          if (currentInventory) {
-            const newQuantity = Math.max(
-              0,
-              parseFloat(currentInventory.quantity) + quantity,
-            );
-            const currentTotalValue = parseFloat(currentInventory.totalValue);
-            const newTotalValue = Math.max(
-              0,
-              currentTotalValue + quantity * rate,
-            );
-            const newAverageRate =
-              newQuantity > 0 ? newTotalValue / newQuantity : 0;
+            if (currentInventory) {
+              const newQuantity = Math.max(
+                0,
+                parseFloat(currentInventory.quantity) + quantity,
+              );
+              const currentTotalValue = parseFloat(currentInventory.totalValue);
+              const newTotalValue = Math.max(
+                0,
+                currentTotalValue + quantity * rate,
+              );
+              const newAverageRate =
+                newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQuantity.toFixed(3),
-                averageRate: newAverageRate.toFixed(2),
-                totalValue: newTotalValue.toFixed(2),
-              })
-              .where(eq(inventory.id, currentInventory.id));
-          } else {
-            await db.insert(inventory).values({
-              companyId: existingVoucher.companyId,
-              locationId: newLocationId,
-              stockItemId: newItem.stockItemId,
-              quantity: Math.max(0, quantity).toFixed(3),
-              averageRate: rate.toFixed(2),
-              totalValue: Math.max(0, quantity * rate).toFixed(2),
-            });
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQuantity.toFixed(3),
+                  averageRate: newAverageRate.toFixed(2),
+                  totalValue: newTotalValue.toFixed(2),
+                })
+                .where(eq(inventory.id, currentInventory.id));
+            } else {
+              await tx.insert(inventory).values({
+                companyId: existingVoucher.companyId,
+                locationId: newLocationId,
+                stockItemId: newItem.stockItemId,
+                quantity: Math.max(0, quantity).toFixed(3),
+                averageRate: rate.toFixed(2),
+                totalValue: Math.max(0, quantity * rate).toFixed(2),
+              });
+            }
           }
-        }
 
-        // STEP 4: Insert new adjustment items
-        await db.insert(stockAdjustmentItems).values(adjustmentItemsData);
+          // STEP 4: Insert new adjustment items
+          await tx.insert(stockAdjustmentItems).values(adjustmentItemsData);
 
-        // Update the adjustment voucher (location can be changed, but shouldn't affect old inventory)
-        await db
-          .update(stockAdjustmentVouchers)
-          .set({ locationId: parseInt(locationId), notes: description || "" })
-          .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
+          // Update the adjustment voucher
+          await tx
+            .update(stockAdjustmentVouchers)
+            .set({ locationId: parseInt(locationId), notes: description || "" })
+            .where(eq(stockAdjustmentVouchers.id, adjustmentVoucher.id));
 
-        // Update the main voucher
-        const parsedLocationId = parseInt(locationId);
-        const voucherUpdates: any = {
-          totalAmount: totalAmount.toFixed(2),
-          locationId: parsedLocationId,
-        };
-        // Also save the location name for when the location is later deleted
-        const location = await storage.getLocationById(parsedLocationId);
-        if (location) {
-          voucherUpdates.locationName = location.name;
-        }
-        if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
-        if (description !== undefined) voucherUpdates.description = description;
+          // Update the main voucher
+          const parsedLocationId = parseInt(locationId);
+          const voucherUpdates: any = {
+            totalAmount: totalAmount.toFixed(2),
+            locationId: parsedLocationId,
+          };
+          const location = await storage.getLocationById(parsedLocationId);
+          if (location) {
+            voucherUpdates.locationName = location.name;
+          }
+          if (voucherDate !== undefined) voucherUpdates.voucherDate = voucherDate;
+          if (description !== undefined) voucherUpdates.description = description;
 
-        const updated = await db
-          .update(vouchers)
-          .set(voucherUpdates)
-          .where(eq(vouchers.id, id))
-          .returning();
+          const [updatedVoucher] = await tx
+            .update(vouchers)
+            .set(voucherUpdates)
+            .where(eq(vouchers.id, id))
+            .returning();
 
-        res.json(updated[0]);
+          return updatedVoucher;
+        });
+
+        res.json(updated);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
@@ -16096,109 +16206,105 @@ if (asOfDate) {
       const locationChanged = oldLocationId !== newLocationId;
 
       if (existingVoucher.voucherType === "Sales" && locationChanged) {
-        // Get sales items for this voucher
-        const oldSalesItemsList = await db
-          .select()
-          .from(salesItems)
-          .where(eq(salesItems.voucherId, id));
+        await db.transaction(async (tx) => {
+          // Get sales items for this voucher
+          const oldSalesItemsList = await tx
+            .select()
+            .from(salesItems)
+            .where(eq(salesItems.voucherId, id));
 
-        // STEP 1: Reverse inventory at old location (add back the quantities)
-        if (oldLocationId && oldSalesItemsList.length > 0) {
-          for (const oldItem of oldSalesItemsList) {
-            const quantity = parseFloat(oldItem.quantity);
-            const costPrice = parseFloat(oldItem.costPrice);
+          // STEP 1: Reverse inventory at old location (add back the quantities)
+          if (oldLocationId && oldSalesItemsList.length > 0) {
+            for (const oldItem of oldSalesItemsList) {
+              const quantity = parseFloat(oldItem.quantity);
+              const costPrice = parseFloat(oldItem.costPrice);
 
-            // Get current inventory at old location
-            const [currentInventory] = await db
-              .select()
-              .from(inventory)
-              .where(
-                and(
-                  eq(inventory.locationId, oldLocationId),
-                  eq(inventory.stockItemId, oldItem.stockItemId),
-                ),
-              );
+              const [currentInventory] = await tx
+                .select()
+                .from(inventory)
+                .where(
+                  and(
+                    eq(inventory.locationId, oldLocationId),
+                    eq(inventory.stockItemId, oldItem.stockItemId),
+                  ),
+                );
 
-            if (currentInventory) {
-              // Add back the quantity (reverse the sale)
-              const newQuantity = parseFloat(currentInventory.quantity) + quantity;
-              const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
-              const newTotalValue = currentTotalValue + quantity * costPrice;
-              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+              if (currentInventory) {
+                const newQuantity = parseFloat(currentInventory.quantity) + quantity;
+                const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
+                const newTotalValue = currentTotalValue + quantity * costPrice;
+                const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
-              await db
-                .update(inventory)
-                .set({
-                  quantity: newQuantity.toFixed(3),
-                  averageRate: newAverageRate.toFixed(2),
-                  totalValue: newTotalValue.toFixed(2),
-                })
-                .where(eq(inventory.id, currentInventory.id));
-              
-              console.log(`[Sales Edit] Reversed inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty +${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
-            } else {
-              // Create inventory record if it doesn't exist (restore to positive)
-              await db.insert(inventory).values({
-                companyId: existingVoucher.companyId,
-                locationId: oldLocationId,
-                stockItemId: oldItem.stockItemId,
-                quantity: quantity.toFixed(3),
-                averageRate: costPrice.toFixed(2),
-                totalValue: (quantity * costPrice).toFixed(2),
-              });
-              console.log(`[Sales Edit] Created inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty ${quantity}`);
+                await tx
+                  .update(inventory)
+                  .set({
+                    quantity: newQuantity.toFixed(3),
+                    averageRate: newAverageRate.toFixed(2),
+                    totalValue: newTotalValue.toFixed(2),
+                  })
+                  .where(eq(inventory.id, currentInventory.id));
+                
+                console.log(`[Sales Edit] Reversed inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty +${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
+              } else {
+                await tx.insert(inventory).values({
+                  companyId: existingVoucher.companyId,
+                  locationId: oldLocationId,
+                  stockItemId: oldItem.stockItemId,
+                  quantity: quantity.toFixed(3),
+                  averageRate: costPrice.toFixed(2),
+                  totalValue: (quantity * costPrice).toFixed(2),
+                });
+                console.log(`[Sales Edit] Created inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty ${quantity}`);
+              }
             }
           }
-        }
 
-        // STEP 2: Deduct inventory at new location
-        if (newLocationId && oldSalesItemsList.length > 0) {
-          for (const item of oldSalesItemsList) {
-            const quantity = parseFloat(item.quantity);
-            const costPrice = parseFloat(item.costPrice);
+          // STEP 2: Deduct inventory at new location
+          if (newLocationId && oldSalesItemsList.length > 0) {
+            for (const item of oldSalesItemsList) {
+              const quantity = parseFloat(item.quantity);
+              const costPrice = parseFloat(item.costPrice);
 
-            // Get current inventory at new location
-            const [currentInventory] = await db
-              .select()
-              .from(inventory)
-              .where(
-                and(
-                  eq(inventory.locationId, newLocationId),
-                  eq(inventory.stockItemId, item.stockItemId),
-                ),
-              );
+              const [currentInventory] = await tx
+                .select()
+                .from(inventory)
+                .where(
+                  and(
+                    eq(inventory.locationId, newLocationId),
+                    eq(inventory.stockItemId, item.stockItemId),
+                  ),
+                );
 
-            if (currentInventory) {
-              // Deduct quantity at new location
-              const newQuantity = parseFloat(currentInventory.quantity) - quantity;
-              const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
-              const newTotalValue = currentTotalValue - quantity * costPrice;
-              const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+              if (currentInventory) {
+                const newQuantity = parseFloat(currentInventory.quantity) - quantity;
+                const currentTotalValue = parseFloat(currentInventory.totalValue || "0");
+                const newTotalValue = currentTotalValue - quantity * costPrice;
+                const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
 
-              await db
-                .update(inventory)
-                .set({
-                  quantity: newQuantity.toFixed(3),
-                  averageRate: Math.max(0, newAverageRate).toFixed(2),
-                  totalValue: Math.max(0, newTotalValue).toFixed(2),
-                })
-                .where(eq(inventory.id, currentInventory.id));
-              
-              console.log(`[Sales Edit] Deducted inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
-            } else {
-              // Create inventory record with negative quantity if it doesn't exist
-              await db.insert(inventory).values({
-                companyId: existingVoucher.companyId,
-                locationId: newLocationId,
-                stockItemId: item.stockItemId,
-                quantity: (-quantity).toFixed(3),
-                averageRate: costPrice.toFixed(2),
-                totalValue: "0",
-              });
-              console.log(`[Sales Edit] Created negative inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity}`);
+                await tx
+                  .update(inventory)
+                  .set({
+                    quantity: newQuantity.toFixed(3),
+                    averageRate: Math.max(0, newAverageRate).toFixed(2),
+                    totalValue: Math.max(0, newTotalValue).toFixed(2),
+                  })
+                  .where(eq(inventory.id, currentInventory.id));
+                
+                console.log(`[Sales Edit] Deducted inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity} (was ${currentInventory.quantity}, now ${newQuantity})`);
+              } else {
+                await tx.insert(inventory).values({
+                  companyId: existingVoucher.companyId,
+                  locationId: newLocationId,
+                  stockItemId: item.stockItemId,
+                  quantity: (-quantity).toFixed(3),
+                  averageRate: costPrice.toFixed(2),
+                  totalValue: "0",
+                });
+                console.log(`[Sales Edit] Created negative inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity}`);
+              }
             }
           }
-        }
+        });
       }
 
       try {
@@ -18325,6 +18431,21 @@ if (asOfDate) {
           .json({ message: "At least one item is required" });
       }
 
+      // Input validation assertions for inventory safety
+      const parsedLocationId = Number(locationId);
+      if (!locationId || isNaN(parsedLocationId)) {
+        return res.status(400).json({ message: `Invalid locationId: ${locationId}` });
+      }
+      for (const item of items) {
+        if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
+          return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
+        }
+        const qty = parseFloat(item.quantity);
+        if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+          return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
+        }
+      }
+
       // Validate and calculate total
       let grandTotal = 0;
       for (const item of items) {
@@ -19382,6 +19503,24 @@ if (asOfDate) {
           if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: "Items are required" });
           }
+          // Input validation assertions for inventory safety
+          for (const item of items) {
+            const itemSourceId = item.sourceLocationId || sourceLocationId;
+            if (!itemSourceId || isNaN(Number(itemSourceId))) {
+              return res.status(400).json({ message: `Invalid sourceLocationId for item ${item.stockItemId}: ${itemSourceId}` });
+            }
+            if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
+              return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
+            }
+            const qty = parseFloat(item.quantity);
+            if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+              return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
+            }
+          }
+          if (isNaN(Number(destinationLocationId))) {
+            return res.status(400).json({ message: `Invalid destinationLocationId: ${destinationLocationId}` });
+          }
+
           // Compute multi-source detection
           const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
           const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? [...uniqueSourceIds][0] : null;
@@ -32590,6 +32729,20 @@ if (asOfDate) {
         return res.status(400).json({ message: "At least one item is required" });
       }
 
+      // Input validation assertions for inventory safety
+      for (const item of items) {
+        if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
+          return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
+        }
+        if (!item.locationId || isNaN(Number(item.locationId))) {
+          return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+        }
+        const qty = parseFloat(item.quantity);
+        if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+          return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
+        }
+      }
+
       // Calculate totals - refund amount (customer gets) and inventory value (goes to stock)
       let totalRefundAmount = 0;
       let totalInventoryValue = 0;
@@ -32613,9 +32766,10 @@ if (asOfDate) {
       const voucherNumber = `${prefix}-${timestamp}`;
 
       // Create the voucher (total is the refund amount)
-      const [voucher] = await db
-        .insert(vouchers)
-        .values({
+      const voucher = await db.transaction(async (tx) => {
+        const [createdVoucher] = await tx
+          .insert(vouchers)
+          .values({
           companyId,
           voucherNumber,
           voucherType: noteType,
@@ -32625,132 +32779,82 @@ if (asOfDate) {
         })
         .returning();
 
-      // Create voucher entries for the cash account using the REFUND amount
-      // For Credit Note (refund): Credit Cash (money going out to customer)
-      // For Debit Note: Debit Cash (money coming in from customer)
-      if (cashAccountType === "bank") {
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          bankAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
-          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
-        });
-      } else {
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
-          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
-        });
-      }
+        // Create voucher entries for the cash account using the REFUND amount
+        if (cashAccountType === "bank") {
+          await tx.insert(voucherEntries).values({
+            voucherId: createdVoucher.id,
+            bankAccountId: cashAccountId,
+            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+          });
+        } else {
+          await tx.insert(voucherEntries).values({
+            voucherId: createdVoucher.id,
+            ledgerAccountId: cashAccountId,
+            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+          });
+        }
 
-      // For each item, process inventory (using inventoryCost) and track refund amounts
-      for (const item of items) {
-        const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
-        const qty = parseFloat(quantity);
-        const refundRateVal = parseFloat(itemRefundRate || "0");
-        const inventoryCostVal = parseFloat(itemInventoryCost || "0");
-        const inventoryValue = qty * inventoryCostVal;
+        // For each item, process inventory (using inventoryCost) and track refund amounts
+        for (const item of items) {
+          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const qty = parseFloat(quantity);
+          const refundRateVal = parseFloat(itemRefundRate || "0");
+          const inventoryCostVal = parseFloat(itemInventoryCost || "0");
+          const inventoryValue = qty * inventoryCostVal;
 
-        // Get the location's companyId
-        const [location] = await db
-          .select()
-          .from(locations)
-          .where(eq(locations.id, locationId));
+          const [location] = await tx
+            .select()
+            .from(locations)
+            .where(eq(locations.id, locationId));
 
         if (!location) {
           throw new Error(`Location ${locationId} not found`);
         }
 
-        // Check if inventory record exists for this item at this location
-        const [existingInventory] = await db
-          .select()
-          .from(inventory)
-          .where(
-            and(
-              eq(inventory.locationId, locationId),
-              eq(inventory.stockItemId, stockItemId)
-            )
-          );
-
-        if (noteType === "Credit Note") {
-          // Credit Note: Add items back to inventory at inventoryCost (not refund rate)
-          if (existingInventory) {
-            const existingQty = parseFloat(existingInventory.quantity);
-            const existingValue = parseFloat(existingInventory.totalValue || "0");
-
-            // Calculate new weighted average rate using inventory cost
-            const newQty = existingQty + qty;
-            const newValue = existingValue + inventoryValue;
-            const newRate = newQty > 0 ? newValue / newQty : inventoryCostVal;
-
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
-                lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
-          } else {
-            // Create new inventory record at inventory cost
-            await db.insert(inventory).values({
-              companyId: location.companyId,
-              locationId,
-              stockItemId,
-              quantity: qty.toFixed(3),
-              averageRate: inventoryCostVal.toFixed(2),
-              totalValue: inventoryValue.toFixed(2),
-              lastUpdated: new Date(),
-            });
-          }
-
-          // For balanced accounting: Debit Inventory at INVENTORY COST
-          let inventoryAccount = await db
+          const [existingInventory] = await tx
             .select()
-            .from(ledgerAccounts)
+            .from(inventory)
             .where(
               and(
-                eq(ledgerAccounts.companyId, companyId),
-                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
+                eq(inventory.locationId, locationId),
+                eq(inventory.stockItemId, stockItemId)
               )
-            )
-            .limit(1);
+            );
 
-          if (inventoryAccount.length > 0) {
-            await db.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: inventoryAccount[0].id,
-              debitAmount: inventoryValue.toFixed(2),
-              creditAmount: "0",
-              narration: `Inventory restored - ${noteType}`,
-            });
-          }
-        } else {
-          // Debit Note: Remove items from inventory
-          if (existingInventory) {
-            const existingQty = parseFloat(existingInventory.quantity);
-            const existingValue = parseFloat(existingInventory.totalValue || "0");
+          if (noteType === "Credit Note") {
+            if (existingInventory) {
+              const existingQty = parseFloat(existingInventory.quantity);
+              const existingValue = parseFloat(existingInventory.totalValue || "0");
+              const newQty = existingQty + qty;
+              const newValue = existingValue + inventoryValue;
+              const newRate = newQty > 0 ? newValue / newQty : inventoryCostVal;
 
-            const newQty = existingQty - qty;
-            const newValue = Math.max(0, existingValue - inventoryValue);
-            const newRate = newQty > 0 ? newValue / newQty : 0;
-
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+            } else {
+              await tx.insert(inventory).values({
+                companyId: location.companyId,
+                locationId,
+                stockItemId,
+                quantity: qty.toFixed(3),
+                averageRate: inventoryCostVal.toFixed(2),
+                totalValue: inventoryValue.toFixed(2),
                 lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
+              });
+            }
 
-            // For balanced accounting: Credit Inventory at INVENTORY COST
-            let inventoryAccount = await db
+            let inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -32762,81 +32866,116 @@ if (asOfDate) {
               .limit(1);
 
             if (inventoryAccount.length > 0) {
-              await db.insert(voucherEntries).values({
-                voucherId: voucher.id,
+              await tx.insert(voucherEntries).values({
+                voucherId: createdVoucher.id,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: "0",
-                creditAmount: inventoryValue.toFixed(2),
-                narration: `Inventory reduced - ${noteType}`,
+                debitAmount: inventoryValue.toFixed(2),
+                creditAmount: "0",
+                narration: `Inventory restored - ${noteType}`,
               });
             }
+          } else {
+            if (existingInventory) {
+              const existingQty = parseFloat(existingInventory.quantity);
+              const existingValue = parseFloat(existingInventory.totalValue || "0");
+              const newQty = existingQty - qty;
+              const newValue = Math.max(0, existingValue - inventoryValue);
+              const newRate = newQty > 0 ? newValue / newQty : 0;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+
+              let inventoryAccount = await tx
+                .select()
+                .from(ledgerAccounts)
+                .where(
+                  and(
+                    eq(ledgerAccounts.companyId, companyId),
+                    or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
+                  )
+                )
+                .limit(1);
+
+              if (inventoryAccount.length > 0) {
+                await tx.insert(voucherEntries).values({
+                  voucherId: createdVoucher.id,
+                  ledgerAccountId: inventoryAccount[0].id,
+                  debitAmount: "0",
+                  creditAmount: inventoryValue.toFixed(2),
+                  narration: `Inventory reduced - ${noteType}`,
+                });
+              }
+            }
           }
+
+          await tx.insert(creditNoteItems).values({
+            voucherId: createdVoucher.id,
+            stockItemId,
+            locationId,
+            quantity: qty.toFixed(3),
+            rate: refundRateVal.toFixed(2),
+            inventoryCost: inventoryCostVal.toFixed(2),
+            totalValue: (qty * refundRateVal).toFixed(2),
+          });
         }
 
-        // Create credit note item record with both rates
-        await db.insert(creditNoteItems).values({
-          voucherId: voucher.id,
-          stockItemId,
-          locationId,
-          quantity: qty.toFixed(3),
-          rate: refundRateVal.toFixed(2),
-          inventoryCost: inventoryCostVal.toFixed(2),
-          totalValue: (qty * refundRateVal).toFixed(2),
-        });
-      }
-
-      // Handle variance between refund amount and inventory value with Sales Returns/Adjustments account
-      const variance = totalRefundAmount - totalInventoryValue;
-      if (Math.abs(variance) > 0.01) {
-        // Find or create Sales Returns account
-        let salesReturnsAccount = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              ilike(ledgerAccounts.name, "%sales return%")
-            )
-          )
-          .limit(1);
-
-        if (salesReturnsAccount.length === 0) {
-          // Try to find any indirect expense or direct expense account as fallback
-          salesReturnsAccount = await db
+        // Handle variance
+        const variance = totalRefundAmount - totalInventoryValue;
+        if (Math.abs(variance) > 0.01) {
+          let salesReturnsAccount = await tx
             .select()
             .from(ledgerAccounts)
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.accountType, "Indirect Expense")
+                ilike(ledgerAccounts.name, "%sales return%")
               )
             )
             .limit(1);
-        }
 
-        if (salesReturnsAccount.length > 0) {
-          if (noteType === "Credit Note") {
-            // Variance > 0: Refund > Inventory Cost = DR Sales Returns (expense)
-            // Variance < 0: Refund < Inventory Cost = CR Sales Returns (income/offset)
-            await db.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: salesReturnsAccount[0].id,
-              debitAmount: variance > 0 ? variance.toFixed(2) : "0",
-              creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-              narration: `Variance between refund and inventory cost`,
-            });
-          } else {
-            // Debit Note: opposite treatment
-            await db.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: salesReturnsAccount[0].id,
-              debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-              creditAmount: variance > 0 ? variance.toFixed(2) : "0",
-              narration: `Variance between debit note amount and inventory cost`,
-            });
+          if (salesReturnsAccount.length === 0) {
+            salesReturnsAccount = await tx
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  eq(ledgerAccounts.accountType, "Indirect Expense")
+                )
+              )
+              .limit(1);
+          }
+
+          if (salesReturnsAccount.length > 0) {
+            if (noteType === "Credit Note") {
+              await tx.insert(voucherEntries).values({
+                voucherId: createdVoucher.id,
+                ledgerAccountId: salesReturnsAccount[0].id,
+                debitAmount: variance > 0 ? variance.toFixed(2) : "0",
+                creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                narration: `Variance between refund and inventory cost`,
+              });
+            } else {
+              await tx.insert(voucherEntries).values({
+                voucherId: createdVoucher.id,
+                ledgerAccountId: salesReturnsAccount[0].id,
+                debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                creditAmount: variance > 0 ? variance.toFixed(2) : "0",
+                narration: `Variance between debit note amount and inventory cost`,
+              });
+            }
           }
         }
-      }
+
+        return createdVoucher;
+      });
 
       res.json({
         success: true,
@@ -33031,209 +33170,183 @@ if (asOfDate) {
         return res.status(400).json({ message: "Not a credit/debit note" });
       }
 
-      // Get existing credit note items to reverse inventory
-      const existingItems = await db
-        .select()
-        .from(creditNoteItems)
-        .where(eq(creditNoteItems.voucherId, voucherId));
-
-      // REVERSE: Undo inventory changes from existing items
-      for (const item of existingItems) {
-        const qty = parseFloat(item.quantity || "0");
-        const rate = parseFloat(item.rate || "0");
-        const itemValue = qty * rate;
-
-        const [existingInventory] = await db
-          .select()
-          .from(inventory)
-          .where(
-            and(
-              eq(inventory.locationId, item.locationId),
-              eq(inventory.stockItemId, item.stockItemId)
-            )
-          );
-
-        if (existingInventory) {
-          const existingQty = parseFloat(existingInventory.quantity);
-          const existingValue = parseFloat(existingInventory.totalValue || "0");
-
-          if (noteType === "Credit Note") {
-            // Original added to inventory, so subtract to reverse
-            const newQty = Math.max(0, existingQty - qty);
-            const newValue = Math.max(0, existingValue - itemValue);
-            const newRate = newQty > 0 ? newValue / newQty : 0;
-
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
-                lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
-          } else {
-            // Original subtracted from inventory, so add back to reverse
-            const newQty = existingQty + qty;
-            const newValue = existingValue + itemValue;
-            const newRate = newQty > 0 ? newValue / newQty : inventoryCost;
-
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
-                lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
+      // Input validation assertions for inventory safety
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
+            return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
+          }
+          if (!item.locationId || isNaN(Number(item.locationId))) {
+            return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+          }
+          const qty = parseFloat(item.quantity);
+          if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+            return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
           }
         }
       }
 
-      // Delete old voucher entries and credit note items
-      await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-      await db.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
-
-      // Calculate new totals
-      let totalRefundAmount = 0;
-      let totalInventoryValue = 0;
-      for (const item of items) {
-        const qty = parseFloat(item.quantity);
-        const refundRate = parseFloat(item.refundRate || "0");
-        const inventoryCost = parseFloat(item.inventoryCost || "0");
-        totalRefundAmount += qty * refundRate;
-        totalInventoryValue += qty * inventoryCost;
-      }
-
-      // Update voucher
-      await db
-        .update(vouchers)
-        .set({
-          voucherDate,
-          description: description || voucher.description,
-          totalAmount: totalRefundAmount.toFixed(2),
-        })
-        .where(eq(vouchers.id, voucherId));
-
-      // Create new cash entry
-      if (cashAccountType === "bank") {
-        await db.insert(voucherEntries).values({
-          voucherId,
-          bankAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
-          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
-        });
-      } else {
-        await db.insert(voucherEntries).values({
-          voucherId,
-          ledgerAccountId: cashAccountId,
-          debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-          creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
-          narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
-        });
-      }
-
-      // Apply new items
-      for (const item of items) {
-        const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
-        const qty = parseFloat(quantity);
-        const refundRateVal = parseFloat(itemRefundRate || "0");
-        const inventoryCostVal = parseFloat(itemInventoryCost || "0");
-        const inventoryValue = qty * inventoryCostVal;
-
-        const [location] = await db
+      // Wrap all mutations in a transaction
+      await db.transaction(async (tx) => {
+        // Get existing credit note items to reverse inventory
+        const existingItems = await tx
           .select()
-          .from(locations)
-          .where(eq(locations.id, locationId));
+          .from(creditNoteItems)
+          .where(eq(creditNoteItems.voucherId, voucherId));
 
-        if (!location) {
-          throw new Error(`Location ${locationId} not found`);
-        }
+        // REVERSE: Undo inventory changes from existing items
+        for (const item of existingItems) {
+          const qty = parseFloat(item.quantity || "0");
+          const rate = parseFloat(item.rate || "0");
+          const itemValue = qty * rate;
 
-        const [existingInventory] = await db
-          .select()
-          .from(inventory)
-          .where(
-            and(
-              eq(inventory.locationId, locationId),
-              eq(inventory.stockItemId, stockItemId)
-            )
-          );
-
-        if (noteType === "Credit Note") {
-          // Add to inventory
-          if (existingInventory) {
-            const existingQty = parseFloat(existingInventory.quantity);
-            const existingValue = parseFloat(existingInventory.totalValue || "0");
-            const newQty = existingQty + qty;
-            const newValue = existingValue + inventoryValue;
-            const newRate = newQty > 0 ? newValue / newQty : inventoryCostVal;
-
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
-                lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
-          } else {
-            await db.insert(inventory).values({
-              companyId: location.companyId,
-              locationId,
-              stockItemId,
-              quantity: qty.toFixed(3),
-              averageRate: inventoryCostVal.toFixed(2),
-              totalValue: inventoryValue.toFixed(2),
-              lastUpdated: new Date(),
-            });
-          }
-
-          // Debit Inventory
-          let inventoryAccount = await db
+          const [existingInventory] = await tx
             .select()
-            .from(ledgerAccounts)
+            .from(inventory)
             .where(
               and(
-                eq(ledgerAccounts.companyId, companyId),
-                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
+                eq(inventory.locationId, item.locationId),
+                eq(inventory.stockItemId, item.stockItemId)
               )
-            )
-            .limit(1);
+            );
 
-          if (inventoryAccount.length > 0) {
-            await db.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: inventoryAccount[0].id,
-              debitAmount: inventoryValue.toFixed(2),
-              creditAmount: "0",
-              narration: `Inventory restored - ${noteType}`,
-            });
-          }
-        } else {
-          // Debit Note: Remove from inventory
           if (existingInventory) {
             const existingQty = parseFloat(existingInventory.quantity);
             const existingValue = parseFloat(existingInventory.totalValue || "0");
-            const newQty = existingQty - qty;
-            const newValue = Math.max(0, existingValue - inventoryValue);
-            const newRate = newQty > 0 ? newValue / newQty : 0;
 
-            await db
-              .update(inventory)
-              .set({
-                quantity: newQty.toFixed(3),
-                averageRate: newRate.toFixed(2),
-                totalValue: newValue.toFixed(2),
+            if (noteType === "Credit Note") {
+              const newQty = Math.max(0, existingQty - qty);
+              const newValue = Math.max(0, existingValue - itemValue);
+              const newRate = newQty > 0 ? newValue / newQty : 0;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+            } else {
+              const newQty = existingQty + qty;
+              const newValue = existingValue + itemValue;
+              const newRate = newQty > 0 ? newValue / newQty : inventoryCost;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+            }
+          }
+        }
+
+        // Delete old voucher entries and credit note items
+        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+        await tx.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
+
+        // Calculate new totals
+        let totalRefundAmount = 0;
+        let totalInventoryValue = 0;
+        for (const item of items) {
+          const qty = parseFloat(item.quantity);
+          const refundRate = parseFloat(item.refundRate || "0");
+          const inventoryCost = parseFloat(item.inventoryCost || "0");
+          totalRefundAmount += qty * refundRate;
+          totalInventoryValue += qty * inventoryCost;
+        }
+
+        // Update voucher
+        await tx
+          .update(vouchers)
+          .set({
+            voucherDate,
+            description: description || voucher.description,
+            totalAmount: totalRefundAmount.toFixed(2),
+          })
+          .where(eq(vouchers.id, voucherId));
+
+        // Create new cash entry
+        if (cashAccountType === "bank") {
+          await tx.insert(voucherEntries).values({
+            voucherId,
+            bankAccountId: cashAccountId,
+            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+          });
+        } else {
+          await tx.insert(voucherEntries).values({
+            voucherId,
+            ledgerAccountId: cashAccountId,
+            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
+            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
+          });
+        }
+
+        // Apply new items
+        for (const item of items) {
+          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const qty = parseFloat(quantity);
+          const refundRateVal = parseFloat(itemRefundRate || "0");
+          const inventoryCostVal = parseFloat(itemInventoryCost || "0");
+          const inventoryValue = qty * inventoryCostVal;
+
+          const [location] = await tx
+            .select()
+            .from(locations)
+            .where(eq(locations.id, locationId));
+
+          if (!location) {
+            throw new Error(`Location ${locationId} not found`);
+          }
+
+          const [existingInventory] = await tx
+            .select()
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.locationId, locationId),
+                eq(inventory.stockItemId, stockItemId)
+              )
+            );
+
+          if (noteType === "Credit Note") {
+            if (existingInventory) {
+              const existingQty = parseFloat(existingInventory.quantity);
+              const existingValue = parseFloat(existingInventory.totalValue || "0");
+              const newQty = existingQty + qty;
+              const newValue = existingValue + inventoryValue;
+              const newRate = newQty > 0 ? newValue / newQty : inventoryCostVal;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+            } else {
+              await tx.insert(inventory).values({
+                companyId: location.companyId,
+                locationId,
+                stockItemId,
+                quantity: qty.toFixed(3),
+                averageRate: inventoryCostVal.toFixed(2),
+                totalValue: inventoryValue.toFixed(2),
                 lastUpdated: new Date(),
-              })
-              .where(eq(inventory.id, existingInventory.id));
+              });
+            }
 
-            // Credit Inventory
-            let inventoryAccount = await db
+            let inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -33245,76 +33358,114 @@ if (asOfDate) {
               .limit(1);
 
             if (inventoryAccount.length > 0) {
-              await db.insert(voucherEntries).values({
+              await tx.insert(voucherEntries).values({
                 voucherId,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: "0",
-                creditAmount: inventoryValue.toFixed(2),
-                narration: `Inventory reduced - ${noteType}`,
+                debitAmount: inventoryValue.toFixed(2),
+                creditAmount: "0",
+                narration: `Inventory restored - ${noteType}`,
               });
             }
+          } else {
+            if (existingInventory) {
+              const existingQty = parseFloat(existingInventory.quantity);
+              const existingValue = parseFloat(existingInventory.totalValue || "0");
+              const newQty = existingQty - qty;
+              const newValue = Math.max(0, existingValue - inventoryValue);
+              const newRate = newQty > 0 ? newValue / newQty : 0;
+
+              await tx
+                .update(inventory)
+                .set({
+                  quantity: newQty.toFixed(3),
+                  averageRate: newRate.toFixed(2),
+                  totalValue: newValue.toFixed(2),
+                  lastUpdated: new Date(),
+                })
+                .where(eq(inventory.id, existingInventory.id));
+
+              let inventoryAccount = await tx
+                .select()
+                .from(ledgerAccounts)
+                .where(
+                  and(
+                    eq(ledgerAccounts.companyId, companyId),
+                    or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
+                  )
+                )
+                .limit(1);
+
+              if (inventoryAccount.length > 0) {
+                await tx.insert(voucherEntries).values({
+                  voucherId,
+                  ledgerAccountId: inventoryAccount[0].id,
+                  debitAmount: "0",
+                  creditAmount: inventoryValue.toFixed(2),
+                  narration: `Inventory reduced - ${noteType}`,
+                });
+              }
+            }
           }
+
+          await tx.insert(creditNoteItems).values({
+            voucherId,
+            stockItemId,
+            locationId,
+            quantity: qty.toFixed(3),
+            rate: refundRateVal.toFixed(2),
+            inventoryCost: inventoryCostVal.toFixed(2),
+            totalValue: (qty * refundRateVal).toFixed(2),
+          });
         }
 
-        // Create credit note item
-        await db.insert(creditNoteItems).values({
-          voucherId,
-          stockItemId,
-          locationId,
-          quantity: qty.toFixed(3),
-          rate: refundRateVal.toFixed(2),
-          inventoryCost: inventoryCostVal.toFixed(2),
-          totalValue: (qty * refundRateVal).toFixed(2),
-        });
-      }
-
-      // Handle variance
-      const variance = totalRefundAmount - totalInventoryValue;
-      if (Math.abs(variance) > 0.01) {
-        let salesReturnsAccount = await db
-          .select()
-          .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.companyId, companyId),
-              ilike(ledgerAccounts.name, "%sales return%")
-            )
-          )
-          .limit(1);
-
-        if (salesReturnsAccount.length === 0) {
-          salesReturnsAccount = await db
+        // Handle variance
+        const variance = totalRefundAmount - totalInventoryValue;
+        if (Math.abs(variance) > 0.01) {
+          let salesReturnsAccount = await tx
             .select()
             .from(ledgerAccounts)
             .where(
               and(
                 eq(ledgerAccounts.companyId, companyId),
-                eq(ledgerAccounts.accountType, "Indirect Expense")
+                ilike(ledgerAccounts.name, "%sales return%")
               )
             )
             .limit(1);
-        }
 
-        if (salesReturnsAccount.length > 0) {
-          if (noteType === "Credit Note") {
-            await db.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: salesReturnsAccount[0].id,
-              debitAmount: variance > 0 ? variance.toFixed(2) : "0",
-              creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-              narration: `Variance between refund and inventory cost`,
-            });
-          } else {
-            await db.insert(voucherEntries).values({
-              voucherId,
-              ledgerAccountId: salesReturnsAccount[0].id,
-              debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-              creditAmount: variance > 0 ? variance.toFixed(2) : "0",
-              narration: `Variance between debit note amount and inventory cost`,
-            });
+          if (salesReturnsAccount.length === 0) {
+            salesReturnsAccount = await tx
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.companyId, companyId),
+                  eq(ledgerAccounts.accountType, "Indirect Expense")
+                )
+              )
+              .limit(1);
+          }
+
+          if (salesReturnsAccount.length > 0) {
+            if (noteType === "Credit Note") {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: salesReturnsAccount[0].id,
+                debitAmount: variance > 0 ? variance.toFixed(2) : "0",
+                creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                narration: `Variance between refund and inventory cost`,
+              });
+            } else {
+              await tx.insert(voucherEntries).values({
+                voucherId,
+                ledgerAccountId: salesReturnsAccount[0].id,
+                debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                creditAmount: variance > 0 ? variance.toFixed(2) : "0",
+                narration: `Variance between debit note amount and inventory cost`,
+              });
+            }
           }
         }
-      }
+      });
 
       res.json({
         success: true,
